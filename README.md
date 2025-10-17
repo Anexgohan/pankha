@@ -1,5 +1,3 @@
-# Pankha - Open Source Fan Control System
-
 ![Docker Pulls](https://img.shields.io/docker/pulls/anexgohan/pankha)
 ![GitHub Discussions](https://img.shields.io/github/discussions/Anexgohan/pankha)
 ![GitHub Repo Size](https://img.shields.io/github/repo-size/Anexgohan/pankha)
@@ -17,7 +15,7 @@
 ![Reddit Subscribers](https://img.shields.io/reddit/subreddit-subscribers/selfhosted?style=social)
 ![Discord](https://img.shields.io/discord/112233445566778899?label=Discord&logo=discord)
 
-# Pankha (पंखा) - Fan Control System
+# Pankha (पंखा) - Open Source Fan Control System
 Is an open-source Distributed fan control system with Centralized Management system for monitoring and controlling hardware cooling across multiple machines. Production-ready with real-time hardware monitoring, WebSocket communication, and PostgreSQL database.
 
 ## Features:
