@@ -1,0 +1,86 @@
+/* ===================================
+   Pankha Design System - Badges & Status
+   =================================== */
+
+/* Status Badges */
+.status-badge {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 12px;
+  color: white;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  font-weight: var(--font-weight-medium);
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  white-space: nowrap;
+  max-width: fit-content;
+}
+
+.status-indicator.ok {
+  background-color: rgba(76, 175, 80, 0.2);
+  color: var(--color-success);
+}
+
+.status-indicator.caution {
+  background-color: #FFEBEE;
+  color: #FFC107;
+}
+
+.status-indicator.warning {
+  background-color: #FFEBEE;
+  color: var(--color-warning);
+}
+
+.status-indicator.critical {
+  background-color: #FFEBEE;
+  color: var(--color-error);
+}
+
+.status-indicator.error {
+  background-color: #FFEBEE;
+  color: var(--color-error);
+}
+
+.status-indicator.stopped {
+  background-color: rgba(158, 158, 158, 0.2);
+  color: var(--text-secondary);
+}
+
+/* Profile Badges */
+.profile-badges {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.badge {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: 12px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+}
+
+.badge.global {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.badge.active {
+  background: #e8f5e8;
+  color: var(--color-success);
+}
+
+.badge.system {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}

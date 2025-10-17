@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .bg{fill:#0e0f12}
+      .card{fill:#1a1d22;stroke:#2a2f38;stroke-width:1}
+      .tile{fill:#262b34;stroke:#2f3641}
+      .accent{fill:#2e6cff}
+      .good{fill:#1db954}
+      .warn{fill:#ffb020}
+      .bad{fill:#ff4d4f}
+      .txt{fill:#e6e9ef;font:600 20px Inter,Segoe UI,Arial}
+      .sm{fill:#b8c0cc;font:500 13px Inter,Segoe UI,Arial}
+      .title{fill:#ffffff;font:800 30px Inter,Segoe UI,Arial}
+      .knum{fill:#ffffff;font:800 30px Inter,Segoe UI,Arial}
+      .klbl{fill:#9aa3ad;font:600 12px Inter,Segoe UI,Arial;letter-spacing:.3px}
+    </style>
+  </defs>
+  <rect class="bg" width="1920" height="1080"/>
+
+  <!-- Header -->
+  <g transform="translate(40,24)">
+    <rect class="card" width="1840" height="72" rx="10"/>
+    <text class="title" x="24" y="46">Pankha Fan Control</text>
+    <g transform="translate(1060,16)">
+      <rect class="tile" width="170" height="40" rx="8"/>
+      <text class="sm" x="14" y="25">Compare: 2/4</text>
+      <rect class="tile" x="180" width="160" height="40" rx="8"/>
+      <text class="sm" x="194" y="25">Range: 5m ▾</text>
+      <rect class="accent" x="350" width="110" height="40" rx="8"/>
+      <text class="sm" x="382" y="25" style="fill:#fff">Refresh</text>
+    </g>
+  </g>
+
+  <!-- KPI row -->
+  <g transform="translate(40,116)">
+    <g>
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">12</text>
+      <text class="klbl" x="24" y="78">SYSTEMS</text>
+    </g>
+    <g transform="translate(310,0)">
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">9</text>
+      <text class="klbl" x="24" y="78">ONLINE</text>
+    </g>
+    <g transform="translate(620,0)">
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">3</text>
+      <text class="klbl" x="24" y="78">ALERTS</text>
+    </g>
+    <g transform="translate(930,0)">
+      <rect class="card" width="950" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">Compare</text>
+      <text class="klbl" x="24" y="78">Select agents below to compare side-by-side</text>
+    </g>
+  </g>
+
+  <!-- Compare row -->
+  <g transform="translate(40,220)">
+    <rect class="card" width="1840" height="260" rx="12"/>
+    <text class="txt" x="20" y="40">Comparison</text>
+    <g transform="translate(20,60)">
+      <rect class="tile" width="440" height="180" rx="12"/>
+      <text class="sm" x="16" y="30">pve-shadow · Max 58°C · RPM 2319</text>
+      <polyline points="16,140 66,136 116,144 166,130 216,126 266,118 316,112 366,110 420,108" fill="none" stroke="#2e6cff" stroke-width="3"/>
+    </g>
+    <g transform="translate(480,60)">
+      <rect class="tile" width="440" height="180" rx="12"/>
+      <text class="sm" x="16" y="30">pve-rpimox01 · Max 61.3°C · RPM 3598</text>
+      <polyline points="16,140 66,142 116,140 166,134 216,128 266,122 316,118 366,116 420,112" fill="none" stroke="#1db954" stroke-width="3"/>
+    </g>
+    <g transform="translate(960,60)">
+      <rect class="tile" width="440" height="180" rx="12"/>
+      <text class="sm" x="16" y="30">workstation · Alert</text>
+    </g>
+    <g transform="translate(1440,60)">
+      <rect class="tile" width="400" height="180" rx="12"/>
+      <text class="sm" x="16" y="30">Profile: Balanced vs Fans_Optimal</text>
+      <text class="sm" x="16" y="56">RPM headroom · duty deltas</text>
+    </g>
+  </g>
+
+  <!-- Systems grid (unchanged style) -->
+  <g transform="translate(40,500)">
+    <rect class="card" width="1840" height="540" rx="12"/>
+    <text class="txt" x="20" y="40">Systems</text>
+    <g transform="translate(20,60)">
+      <rect class="tile" width="420" height="220" rx="12"/>
+      <text class="sm" x="16" y="32">pve-shadow · Avg 36°C · Max 58°C · RPM 2319</text>
+      <rect class="tile" x="440" width="420" height="220" rx="12"/>
+      <text class="sm" x="456" y="32">pve-rpimox01 · Avg 51.9°C · Max 61.3°C · RPM 3598</text>
+      <rect class="tile" x="880" width="420" height="220" rx="12"/>
+      <text class="sm" x="896" y="32">workstation · Overheat</text>
+      <rect class="tile" x="1320" width="420" height="220" rx="12"/>
+      <text class="sm" x="1336" y="32">old-junk · Offline</text>
+    </g>
+  </g>
+</svg>

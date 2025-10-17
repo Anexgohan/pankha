@@ -1,0 +1,249 @@
+/* ===================================
+   Pankha Design System - Button Components
+   =================================== */
+
+button {
+  border-radius: var(--radius-lg);
+  border: 1px solid transparent;
+  padding: var(--spacing-md) var(--spacing-xl);
+  font-size: 1em;
+  font-weight: var(--font-weight-medium);
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+/* Primary Button */
+.refresh-button,
+.control-button {
+  background-color: var(--color-info);
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.refresh-button:hover,
+.control-button:hover {
+  background-color: var(--color-info-hover);
+}
+
+/* Danger Button */
+.emergency-button,
+.delete-button {
+  background-color: var(--color-error);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.emergency-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+.delete-button {
+  border-radius: var(--radius-circle);
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.emergency-button:hover,
+.delete-button:hover:not(:disabled) {
+  background-color: var(--color-error-hover);
+  transform: scale(1.05);
+}
+
+.delete-button:disabled {
+  background: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+/* Success Button */
+.create-profile-button,
+.create-first-profile-button,
+.save-button {
+  background: var(--color-success);
+  color: white;
+  border: none;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+}
+
+.create-profile-button:hover,
+.create-first-profile-button:hover,
+.save-button:hover:not(:disabled) {
+  background: var(--color-success-hover);
+}
+
+.save-button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Secondary Button */
+.cancel-button,
+.close-button {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: none;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.cancel-button:hover,
+.close-button:hover {
+  background: var(--bg-hover);
+}
+
+/* Toggle Button */
+.theme-toggle {
+  background: none;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-circle);
+  width: 40px;
+  height: 40px;
+  font-size: 1.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme-toggle:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-info);
+  transform: scale(1.05);
+}
+
+/* Icon Buttons */
+.edit-button {
+  background: none;
+  border: none;
+  padding: var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: 1.1em;
+}
+
+.edit-button:hover {
+  background: #e3fdeb;
+}
+
+.remove-point-button {
+  background: none;
+  border: none;
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+}
+
+.remove-point-button:hover:not(:disabled) {
+  background: #ffebee;
+}
+
+.remove-point-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Preset Buttons */
+.preset-button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  font-size: var(--font-size-sm);
+  transition: all 0.2s;
+}
+
+.preset-button:hover {
+  background: var(--bg-tertiary);
+}
+
+.preset-button.silent {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.preset-button.balanced {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.preset-button.performance {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Add Point Button */
+.add-point-button {
+  background: var(--color-info);
+  color: white;
+  border: none;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+}
+
+.add-point-button:hover {
+  background: var(--color-info-hover);
+}
+
+/* Retry Button */
+.retry-button {
+  background-color: var(--color-info);
+  color: white;
+  border: none;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.retry-button:hover {
+  background-color: var(--color-info-hover);
+}
+
+/* Toggle Hidden Button */
+.toggle-hidden-button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.toggle-hidden-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-info);
+  transform: translateY(-1px);
+}
+
+/* Visibility Toggle */
+.visibility-toggle {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  padding: var(--spacing-xs);
+  opacity: 0.6;
+  line-height: 1;
+}
+
+.visibility-toggle:hover {
+  opacity: 1;
+  transform: scale(1.2);
+}

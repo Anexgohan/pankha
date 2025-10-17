@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .bg{fill:#0e0f12}
+      .card{fill:#1a1d22;stroke:#2a2f38;stroke-width:1}
+      .tile{fill:#262b34;stroke:#2f3641}
+      .accent{fill:#2e6cff}
+      .good{fill:#1db954}
+      .warn{fill:#ffb020}
+      .bad{fill:#ff4d4f}
+      .txt{fill:#e6e9ef;font:600 20px Inter,Segoe UI,Arial}
+      .sm{fill:#b8c0cc;font:500 13px Inter,Segoe UI,Arial}
+      .title{fill:#ffffff;font:800 30px Inter,Segoe UI,Arial}
+      .knum{fill:#ffffff;font:800 30px Inter,Segoe UI,Arial}
+      .klbl{fill:#9aa3ad;font:600 12px Inter,Segoe UI,Arial;letter-spacing:.3px}
+    </style>
+  </defs>
+  <rect class="bg" width="1920" height="1080"/>
+
+  <!-- Top header (keep design language) -->
+  <g transform="translate(40,24)">
+    <rect class="card" width="1840" height="72" rx="10"/>
+    <text class="title" x="24" y="46">Pankha Fan Control</text>
+    <g transform="translate(1060,16)">
+      <rect class="tile" width="170" height="40" rx="8"/>
+      <text class="sm" x="14" y="25">Last update: 12:45</text>
+      <rect class="tile" x="180" width="160" height="40" rx="8"/>
+      <text class="sm" x="194" y="25">Range: 5m ▾</text>
+      <rect class="accent" x="350" width="110" height="40" rx="8"/>
+      <text class="sm" x="382" y="25" style="fill:#fff">Refresh</text>
+      <rect class="bad" x="470" width="170" height="40" rx="8"/>
+      <text class="sm" x="500" y="25" style="fill:#fff">Emergency Stop</text>
+    </g>
+  </g>
+
+  <!-- KPI row (denser, more signal) -->
+  <g transform="translate(40,116)">
+    <g>
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">12</text>
+      <text class="klbl" x="24" y="78">TOTAL SYSTEMS</text>
+    </g>
+    <g transform="translate(310,0)">
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">9</text>
+      <text class="klbl" x="24" y="78">ONLINE</text>
+    </g>
+    <g transform="translate(620,0)">
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">3</text>
+      <text class="klbl" x="24" y="78">OFFLINE</text>
+    </g>
+    <g transform="translate(930,0)">
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">38.7°C</text>
+      <text class="klbl" x="24" y="78">AVERAGE TEMPERATURE</text>
+    </g>
+    <g transform="translate(1240,0)">
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">61.3°C</text>
+      <text class="klbl" x="24" y="78">MAX TEMP (pve-shadow)</text>
+    </g>
+    <g transform="translate(1550,0)">
+      <rect class="card" width="290" height="96" rx="10"/>
+      <text class="knum" x="24" y="52">7</text>
+      <text class="klbl" x="24" y="78">CRITICAL ALERTS</text>
+    </g>
+  </g>
+
+  <!-- Right rail: recent actions + WS -->
+  <g transform="translate(1500,224)">
+    <rect class="card" width="380" height="320" rx="10"/>
+    <text class="txt" x="18" y="36">Recent Activity</text>
+    <text class="sm" x="18" y="62">Profile applied to pve-shadow · OK</text>
+    <text class="sm" x="18" y="86">Agent ping old-junk · Fail</text>
+    <text class="sm" x="18" y="110">Set tolerance 1.0°C · OK</text>
+    <rect class="card" y="336" width="380" height="200" rx="10"/>
+    <text class="txt" x="18" y="372">Connection</text>
+    <text class="sm" x="18" y="398">WebSocket: Connected · 12 clients</text>
+  </g>
+
+  <!-- Agents dense grid (kept style, more data) -->
+  <g transform="translate(40,224)">
+    <g>
+      <rect class="card" width="1440" height="720" rx="12"/>
+      <text class="txt" x="20" y="40">Systems Monitor</text>
+      <!-- 2 rows x 3 cols of agent cards -->
+      <g transform="translate(20,60)">
+        <!-- agent card template -->
+        <g>
+          <rect class="tile" width="440" height="300" rx="12"/>
+          <text class="txt" x="16" y="36">pve-rpimox01 <tspan class="sm">· 192.168.100.198</tspan></text>
+          <text class="sm" x="16" y="60">Last seen: just now</text>
+          <!-- KPIs row -->
+          <g transform="translate(16,76)">
+            <rect class="card" width="120" height="28" rx="6"/><text class="sm" x="10" y="19">Avg 51.9°C</text>
+            <rect class="card" x="130" width="120" height="28" rx="6"/><text class="sm" x="140" y="19">Max 61.3°C</text>
+            <rect class="card" x="260" width="80" height="28" rx="6"/><text class="sm" x="270" y="19">RPM 3598</text>
+            <rect class="card" x="350" width="70" height="28" rx="6"/><text class="sm" x="360" y="19">Q 0</text>
+          </g>
+          <!-- sparkline -->
+          <polyline points="16,150 66,146 116,152 166,138 216,130 266,126 316,118 366,114 420,112" fill="none" stroke="#2e6cff" stroke-width="3"/>
+          <polyline points="16,170 66,168 116,166 166,164 216,160 266,158 316,156 366,154 420,152" fill="none" stroke="#1db954" stroke-width="2"/>
+          <!-- actions -->
+          <g transform="translate(16,210)">
+            <rect class="accent" width="90" height="32" rx="8"/><text class="sm" x="24" y="22" style="fill:#fff">Show</text>
+            <rect class="tile" x="100" width="120" height="32" rx="8"/><text class="sm" x="118" y="22">Investigate</text>
+            <rect class="tile" x="230" width="150" height="32" rx="8"/><text class="sm" x="246" y="22">Assign Profile</text>
+          </g>
+        </g>
+
+        <g transform="translate(480,0)">
+          <rect class="tile" width="440" height="300" rx="12"/>
+          <text class="txt" x="16" y="36">pve-shadow <tspan class="sm">· 192.168.100.199</tspan></text>
+          <text class="sm" x="16" y="60">Last seen: just now</text>
+          <g transform="translate(16,76)">
+            <rect class="card" width="120" height="28" rx="6"/><text class="sm" x="10" y="19">Avg 36.0°C</text>
+            <rect class="card" x="130" width="120" height="28" rx="6"/><text class="sm" x="140" y="19">Max 58.0°C</text>
+            <rect class="card" x="260" width="80" height="28" rx="6"/><text class="sm" x="270" y="19">RPM 2319</text>
+            <rect class="card" x="350" width="70" height="28" rx="6"/><text class="sm" x="360" y="19">Q 2</text>
+          </g>
+          <polyline points="16,150 66,160 116,150 166,148 216,142 266,140 316,138 366,132 420,130" fill="none" stroke="#2e6cff" stroke-width="3"/>
+          <polyline points="16,170 66,170 116,169 166,168 216,166 266,164 316,163 366,162 420,160" fill="none" stroke="#1db954" stroke-width="2"/>
+          <g transform="translate(16,210)">
+            <rect class="accent" width="90" height="32" rx="8"/><text class="sm" x="24" y="22" style="fill:#fff">Show</text>
+            <rect class="tile" x="100" width="120" height="32" rx="8"/><text class="sm" x="118" y="22">Investigate</text>
+            <rect class="tile" x="230" width="150" height="32" rx="8"/><text class="sm" x="246" y="22">Assign Profile</text>
+          </g>
+        </g>
+
+        <g transform="translate(960,0)">
+          <rect class="tile" width="440" height="300" rx="12"/>
+          <text class="txt" x="16" y="36">old-junk <tspan class="sm">· 192.168.100.239</tspan></text>
+          <text class="sm" x="16" y="60">Offline · 18h</text>
+          <g transform="translate(16,76)">
+            <rect class="card" width="160" height="28" rx="6"/><text class="sm" x="10" y="19">No real-time data</text>
+            <rect class="card" x="170" width="120" height="28" rx="6"/><text class="sm" x="182" y="19">Ping Agent</text>
+          </g>
+        </g>
+
+        <!-- second row -->
+        <g transform="translate(0,320)">
+          <rect class="tile" width="440" height="300" rx="12"/>
+          <text class="txt" x="16" y="36">wife-pc <tspan class="sm">· 192.168.100.238</tspan></text>
+          <text class="sm" x="16" y="60">Offline · 18h</text>
+        </g>
+        <g transform="translate(480,320)">
+          <rect class="tile" width="440" height="300" rx="12"/>
+          <text class="txt" x="16" y="36">lab-node <tspan class="sm">· 10.0.0.50</tspan></text>
+          <text class="sm" x="16" y="60">Last seen: 2m</text>
+        </g>
+        <g transform="translate(960,320)">
+          <rect class="tile" width="440" height="300" rx="12"/>
+          <text class="txt" x="16" y="36">workstation <tspan class="sm">· 10.0.0.12</tspan></text>
+          <text class="sm" x="16" y="60">High temp alert</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

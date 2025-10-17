@@ -1,0 +1,92 @@
+/* ===================================
+   Pankha Design System - Responsive Design
+   =================================== */
+
+@media (max-width: 768px) {
+  /* Dashboard */
+  .dashboard {
+    padding: var(--spacing-lg);
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    align-items: stretch;
+  }
+
+  .header-controls {
+    justify-content: space-between;
+  }
+
+  /* Grids */
+  .systems-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .overview-stats {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .profiles-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* System Cards */
+  .system-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-sm);
+  }
+
+  /* Fan Controls */
+  .fan-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  /* Profile Manager */
+  .profile-manager-header {
+    flex-direction: column;
+    gap: var(--spacing-lg);
+    align-items: stretch;
+  }
+
+  /* Curve Editor */
+  .curve-editor {
+    grid-template-columns: 1fr;
+  }
+
+  /* Form Rows */
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  /* Profile Editor */
+  .fan-profile-editor {
+    margin: var(--spacing-md);
+    width: calc(100% - calc(var(--spacing-md) * 2));
+  }
+
+  /* Preset Cards */
+  .preset-cards {
+    grid-template-columns: 1fr;
+  }
+
+  /* Detail Row */
+  .detail-row {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-lg);
+  }
+
+  /* Chart Controls */
+  .chart-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Curve Info */
+  .curve-info {
+    justify-content: center;
+  }
+}

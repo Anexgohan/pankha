@@ -1,0 +1,322 @@
+/* ===================================
+   Pankha Design System - Card Components
+   =================================== */
+
+/* Base Card */
+.system-card,
+.stat-card,
+.profile-card,
+.no-systems,
+.no-profiles,
+.error-message {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: var(--spacing-xl);
+  transition: box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+/* Stat Cards */
+.overview-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-3xl);
+}
+
+.stat-card {
+  text-align: center;
+  border-left: 4px solid var(--color-info);
+}
+
+.stat-card.online {
+  border-left-color: var(--color-success);
+}
+
+.stat-card.offline {
+  border-left-color: var(--text-tertiary);
+}
+
+.stat-card.error {
+  border-left-color: var(--color-error);
+}
+
+.stat-card.temperature {
+  border-left-color: var(--color-warning);
+}
+
+.stat-value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.stat-label {
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  margin-top: var(--spacing-xs);
+}
+
+/* System Cards */
+.systems-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-3xl);
+  justify-content: center;
+}
+
+.systems-grid .system-card {
+  flex: 0 0 400px;
+  max-width: 400px;
+}
+
+.system-card:hover {
+  box-shadow: var(--shadow-hover);
+}
+
+.system-header {
+  margin-bottom: var(--spacing-lg);
+}
+
+.system-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.title-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.system-title h3 {
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.system-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-base);
+}
+
+.info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-lg);
+  align-items: flex-start;
+}
+
+.info-row:has(.info-item-vertical) {
+  gap: 0;
+}
+
+.info-item {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.info-item-vertical {
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: 0 var(--spacing-xs);
+  border-right: 1px solid var(--border-light);
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-item-vertical .label {
+  line-height: 1.1;
+  margin-bottom: 4px;
+}
+
+.info-item-vertical .value {
+  font-size: var(--font-size-lg2);
+  font-weight: var(--font-weight-semibold);
+}
+
+.info-item-vertical:last-child,
+.info-row > .info-item-vertical:last-of-type {
+  border-right: none;
+}
+
+.info-item-horizontal {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-2xs);
+  margin-top: 0;
+  padding: 0 var(--spacing-sm);
+  border-right: 1px solid var(--border-light);
+  text-align: center;
+}
+
+.info-item-horizontal:last-child {
+  border-right: none;
+}
+
+.info-item-horizontal .label {
+  display: block;
+  margin-bottom: 0;
+}
+
+.info-item-horizontal input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+.info-item .label {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.info-item .value {
+  color: var(--text-primary);
+}
+
+.info-item .value.temperature {
+  font-weight: var(--font-weight-semibold);
+}
+
+.system-stats {
+  display: flex;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--border-light);
+  align-items: center;
+}
+
+.system-stats .toggle-hidden-button {
+  margin-left: auto;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat-number {
+  display: block;
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-info);
+}
+
+/* Profile Cards */
+.profiles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+.profile-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-lg);
+  color: var(--text-secondary);
+}
+
+.profile-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.profile-icon {
+  font-size: var(--font-size-xl);
+}
+
+.profile-info h3 {
+  margin: 0;
+  color: var(--color-primary);
+  font-size: var(--font-size-lg);
+}
+
+.profile-type {
+  text-transform: capitalize;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.profile-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.profile-description {
+  color: var(--text-secondary);
+  font-size: var(--font-size-base);
+  margin-bottom: var(--spacing-lg);
+  line-height: var(--line-height-normal);
+}
+
+.profile-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-item .label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.detail-item .value {
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+/* Empty State Cards */
+.no-systems,
+.no-profiles {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--spacing-4xl);
+}
+
+.no-systems h3,
+.no-profiles h3 {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.no-systems p,
+.no-profiles p {
+  color: var(--text-tertiary);
+  margin-bottom: var(--spacing-sm);
+}
+
+/* Error Cards */
+.error-message {
+  text-align: center;
+  border-left: 4px solid var(--color-error);
+}
+
+.error-message h2 {
+  color: var(--color-error);
+  margin-bottom: var(--spacing-lg);
+}
+
+.error-message p {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+}

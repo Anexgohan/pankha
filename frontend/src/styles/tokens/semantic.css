@@ -1,0 +1,39 @@
+/* ===================================
+   Pankha Design System - Semantic Tokens
+   These map base tokens to contextual uses
+   =================================== */
+
+:root {
+  /* Backgrounds */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #2d2d2d;
+  --bg-tertiary: #404040;
+  --bg-hover: #404040;
+  --bg-active: #505050;
+
+  /* Text Colors */
+  --text-primary: var(--neutral-700);
+  --text-secondary: var(--neutral-600);
+  --text-tertiary: var(--neutral-500);
+
+  /* Border Colors */
+  --border-color: var(--neutral-100);
+  --border-light: var(--neutral-200);
+
+  /* Shadows (using spacing tokens) */
+  --shadow: var(--shadow-sm);
+  --shadow-hover: var(--shadow-md);
+}
+
+[data-theme="light"] {
+  /* Backgrounds */
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f9f9f9;
+  --bg-hover: #f0f0f0;
+  --bg-active: #e0e0e0;
+
+  /* Border Colors */
+  --border-color: var(--neutral-200);
+  --border-light: var(--neutral-300);
+}
