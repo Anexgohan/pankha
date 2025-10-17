@@ -255,7 +255,7 @@ strip = true            # Remove debug symbols
 
 ```bash
 # 1. Build on development machine
-cd /root/anex/dev/pankha-dev/agents/clients/rust
+cd /root/anex/dev/pankha-dev/agents/clients/linux/rust
 cargo build --release
 
 # 2. Copy to target system
