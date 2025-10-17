@@ -1227,44 +1227,35 @@ fn start_daemon() -> Result<()> {
 
     println!("Starting Pankha Rust Agent daemon...");
 
-    // Fork the process
-    match unsafe { libc::fork() } {
-        0 => {
-            // Child process
-            // Create new session
-            unsafe { libc::setsid() };
+    // Get current executable path
+    let exe_path = std::env::current_exe()?;
 
-            // Redirect stdout/stderr to log file
-            let log_path = format!("{}/agent.log", LOG_DIR);
-            let log_file = fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&log_path)?;
+    // Prepare log file
+    ensure_directories()?;
+    let log_path = format!("{}/agent.log", LOG_DIR);
+    let log_file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)?;
 
-            // Redirect stdout and stderr
-            unsafe {
-                libc::dup2(log_file.as_raw_fd(), 1); // stdout
-                libc::dup2(log_file.as_raw_fd(), 2); // stderr
-            }
+    // Spawn new process in daemon mode using --daemon-child (internal flag)
+    let child = process::Command::new(&exe_path)
+        .arg("--daemon-child")
+        .current_dir(std::env::current_dir()?)
+        .stdin(process::Stdio::null())
+        .stdout(log_file.try_clone()?)
+        .stderr(log_file)
+        .spawn()?;
 
-            // Save PID
-            save_pid(process::id())?;
+    let pid = child.id();
 
-            // Continue with normal agent execution
-            Ok(())
-        }
-        pid if pid > 0 => {
-            // Parent process - exit
-            println!("Agent started successfully (PID: {})", pid);
-            println!("Logs: tail -f {}/agent.log", LOG_DIR);
-            process::exit(0);
-        }
-        _ => {
-            // Fork failed
-            eprintln!("ERROR: Failed to start daemon");
-            process::exit(1);
-        }
-    }
+    // Save PID
+    save_pid(pid)?;
+
+    println!("Agent started successfully (PID: {})", pid);
+    println!("Logs: tail -f {}/agent.log", LOG_DIR);
+
+    Ok(())
 }
 
 fn stop_daemon() -> Result<()> {
@@ -1389,6 +1380,10 @@ struct Args {
     /// Show agent status
     #[arg(short = 't', long = "status")]
     status: bool,
+
+    /// Internal flag for daemon child process (do not use directly)
+    #[arg(long, hide = true)]
+    daemon_child: bool,
 }
 
 #[tokio::main]
@@ -1397,7 +1392,7 @@ async fn main() -> Result<()> {
 
     // Handle management commands first (before async setup)
     if args.start {
-        return start_daemon();
+        return start_daemon();  // Spawns new process and exits
     }
 
     if args.stop {
@@ -1412,11 +1407,17 @@ async fn main() -> Result<()> {
         return show_status().await;
     }
 
-    // Setup logging
+    // Setup logging (daemon child or foreground mode)
     let log_level = if args.debug { "debug" } else { "info" };
     tracing_subscriber::fmt()
         .with_env_filter(log_level)
         .init();
+
+    // If we're a daemon child, save our PID and continue
+    if args.daemon_child {
+        ensure_directories()?;
+        save_pid(process::id())?;
+    }
 
     info!("Pankha Rust Agent v1.0.0");
     info!("Platform: {}", std::env::consts::OS);
