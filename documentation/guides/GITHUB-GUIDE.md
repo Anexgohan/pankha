@@ -92,7 +92,9 @@ services:
 
 ## Development Workflow
 
-### Standard Development Cycle
+### Standard Development Cycle (Automated)
+
+With GitHub Actions, syncing to the public repository is **fully automated**:
 
 ```bash
 # STEP 1: Work in Development Environment
@@ -123,93 +125,229 @@ git commit -m "Brief description of changes"
 # STEP 4: Push to Development Repository
 git push origin main
 
-# STEP 5: Deploy to Development Server (if needed)
-# SSH to 192.168.100.237
-ssh root@192.168.100.237
-cd /root/anex/dev/pankha-dev
-git pull origin main
-docker compose down
-docker compose build --no-cache
-docker compose up -d
+# 🎉 AUTOMATIC: GitHub Actions triggers and:
+# - Syncs code to pankha (public repo)
+# - Excludes dev-specific files
+# - Builds Docker image
+# - Pushes to Docker Hub as anexgohan/pankha:latest
+# - Takes 3-5 minutes
+
+# STEP 5: Monitor (Optional)
+# Watch at: https://github.com/Anexgohan/pankha-dev/actions
 ```
+
+**What happens automatically:**
+1. ✅ Code syncs from pankha-dev → pankha
+2. ✅ Dev files excluded (tasks-todo, samples, CLAUDE.md, etc.)
+3. ✅ Public README applied
+4. ✅ Docker Hub compose.yml applied
+5. ✅ Docker image built and pushed
+6. ✅ Community can pull `docker pull anexgohan/pankha:latest`
 
 ---
 
-## Release Process
+## Release Process (Automated)
 
 ### When to Release
 
-Release to the production repository when:
+With GitHub Actions, **every push to pankha-dev automatically releases to pankha**! However, you should still ensure:
 - ✅ Feature is complete and tested
 - ✅ All tests pass
 - ✅ Documentation is updated
 - ✅ No known critical bugs
-- ✅ Production deployment is successful
 - ✅ Code has been reviewed
 
-### Release Workflow
+### Automated Release Workflow
+
+**The Simple Way (Recommended):**
 
 ```bash
-# STEP 1: Verify Development Repository is Ready
+# STEP 1: Test Your Changes
 cd /root/anex/dev/pankha-dev/
-git status  # Ensure clean working tree
-git log --oneline -5  # Review recent commits
+npm run dev  # Test locally
+docker compose build --no-cache && docker compose up -d  # Test Docker
 
-# STEP 2: Test Docker Build in Development
-cd /root/anex/dev/pankha-dev/
-docker compose build --no-cache
-docker compose up -d
-# Test thoroughly to ensure everything works
-
-# STEP 3: Build and Push Docker Image to Docker Hub
-docker build -t anexgohan/pankha:latest -f docker/Dockerfile .
-docker push anexgohan/pankha:latest
-
-# Optional: Tag specific version
-docker tag anexgohan/pankha:latest anexgohan/pankha:v1.0.0
-docker push anexgohan/pankha:v1.0.0
-
-# STEP 4: Switch to Production Repository
-cd /root/anex/dev/pankha/
-
-# STEP 5: Pull Latest from Production Repo
-git pull origin main
-
-# STEP 6: Merge Changes from Development
-# Option A: Cherry-pick specific commits from pankha-dev
-cd /root/anex/dev/pankha-dev/
-git log --oneline -10  # Find commit hashes to cherry-pick
-
-cd /root/anex/dev/pankha/
-git cherry-pick <commit-hash>  # Repeat for each commit
-
-# Option B: Manually copy changes (recommended for major releases)
-# Copy files from pankha-dev to pankha
-rsync -av --exclude='.git' --exclude='node_modules' --exclude='dist' \
-  /root/anex/dev/pankha-dev/ /root/anex/dev/pankha/
-
-# STEP 7: Test Production Release with Docker Hub Image
-cd /root/anex/dev/pankha/
-docker compose pull  # Pull the image we just pushed
-docker compose up -d
-# Test thoroughly
-
-# STEP 8: Create Release Commit
+# STEP 2: Commit and Push
 git add .
-git commit -m "Release v1.x.x: Brief release description
-
-- Feature 1: Description
-- Feature 2: Description
-- Bug fixes: List major fixes
-"
-
-# STEP 9: Tag the Release
-git tag -a v1.0.0 -m "Version 1.0.0 - Production Release"
-
-# STEP 10: Push to Production Repository
+git commit -m "Add new feature: description"
 git push origin main
-git push origin v1.0.0  # Push the tag
+
+# 🎉 DONE! GitHub Actions automatically:
+# - Syncs to pankha (public repo)
+# - Builds Docker image
+# - Pushes to Docker Hub
+# - Community can immediately use it
+
+# STEP 3: Monitor the Release
+# Watch at: https://github.com/Anexgohan/pankha-dev/actions
+# Takes 3-5 minutes to complete
+
+# STEP 4: Tag a Version (Optional)
+# For major releases, create a version tag:
+git tag -a v1.0.0 -m "Version 1.0.0 - Major release"
+git push origin v1.0.0
 ```
+
+**What Happens Automatically:**
+
+```
+You push → GitHub Actions workflow triggers
+    ↓
+Sync files to pankha (with exclusions)
+    ↓
+Replace README.md with public version
+    ↓
+Replace compose.yml with Docker Hub version
+    ↓
+Commit to pankha with your message
+    ↓
+Build Docker image from Dockerfile
+    ↓
+Push to Docker Hub as anexgohan/pankha:latest
+    ↓
+✅ Release complete!
+```
+
+**Manual Release (If Needed):**
+
+If GitHub Actions is disabled or you need manual control:
+
+```bash
+# See task_13_github-action.md for manual sync instructions
+# Or temporarily disable workflow and use rsync method
+```
+
+---
+
+## Managing What Gets Synced (Exclusions)
+
+### How to Control What's Public
+
+All exclusions are managed in: **`.github/sync-exclude.txt`**
+
+```bash
+# Edit exclusions
+cd /root/anex/dev/pankha-dev
+nano .github/sync-exclude.txt
+
+# Commit and push
+git add .github/sync-exclude.txt
+git commit -m "Update sync exclusions"
+git push origin main
+
+# Changes apply on next sync!
+```
+
+### Current Exclusions
+
+Files/directories that **DO NOT** sync to pankha (public repo):
+
+**Development Files:**
+- `documentation/tasks-todo/` - Development tasks
+- `samples/` - Sample/reference code
+- `.claude/` - Claude Code configuration
+- `CLAUDE.md` - Development workflow guide
+- `AGENTS.md` - Agent development notes
+- `.github/` - GitHub workflows (public has its own)
+
+**Special Handling:**
+- `compose.yml` - **Replaced** with Docker Hub version
+- `README.md` - **Replaced** with public README
+
+**Security:**
+- `.env*` - All environment files
+- Agent config directories
+- Database files
+- Logs
+
+### Add New Exclusion
+
+```bash
+# Keep a new folder private
+echo "my-private-folder/" >> .github/sync-exclude.txt
+git add .github/sync-exclude.txt
+git commit -m "Exclude my-private-folder from public repo"
+git push origin main
+```
+
+### Remove Exclusion (Make Public)
+
+```bash
+# Edit file and delete the line
+nano .github/sync-exclude.txt
+# Remove the line for what you want to make public
+git add .github/sync-exclude.txt
+git commit -m "Make samples/ public"
+git push origin main
+```
+
+### Exclusion Patterns
+
+```txt
+# Directory (with trailing slash)
+folder-name/
+
+# Specific file
+filename.txt
+
+# Pattern matching
+*.secret
+*.draft
+
+# Nested paths
+path/to/file.txt
+```
+
+---
+
+## Monitoring the Sync
+
+### View Workflow Status
+
+**GitHub UI:**
+https://github.com/Anexgohan/pankha-dev/actions
+
+**Check Latest Run:**
+```bash
+# View in browser
+open https://github.com/Anexgohan/pankha-dev/actions
+
+# Or check via API
+curl -H "Authorization: token YOUR_PAT" \
+  "https://api.github.com/repos/Anexgohan/pankha-dev/actions/runs?per_page=1"
+```
+
+### Verify Sync Succeeded
+
+```bash
+# Check pankha repo has latest code
+cd /root/anex/dev/pankha
+git pull origin main
+git log -1  # Should show your commit message
+
+# Check Docker Hub has new image
+docker pull anexgohan/pankha:latest
+
+# Verify exclusions worked
+ls documentation/tasks-todo/  # Should NOT exist in pankha
+ls samples/                   # Should NOT exist in pankha
+```
+
+### Troubleshooting
+
+**Workflow Failed:**
+1. Check logs: https://github.com/Anexgohan/pankha-dev/actions
+2. Verify secrets are configured correctly
+3. Check task_13_github-action.md for detailed troubleshooting
+
+**Sync Not Happening:**
+- Ensure workflow file exists: `.github/workflows/sync-to-public.yml`
+- Check workflow is enabled in GitHub Actions tab
+- Verify pushing to `main` branch (not other branches)
+
+**Wrong Files Synced:**
+- Check `.github/sync-exclude.txt`
+- Remember: Changes apply on **next** push, not retroactively
 
 ---
 
@@ -425,15 +563,17 @@ Before pushing to GitHub:
 |--------|-----------|--------|
 | **Purpose** | Development/Testing | Stable Releases |
 | **Visibility** | Private | Public (open source) |
-| **Update Frequency** | Multiple times/day | Weekly/Monthly |
-| **Code Quality** | Work-in-progress | Production-ready |
-| **Testing** | Active testing | Fully tested |
-| **Commits** | Frequent, small | Infrequent, versioned |
+| **Update Frequency** | Multiple times/day | **Auto-synced from pankha-dev** |
+| **Code Quality** | Work-in-progress | Production-ready (tested code from pankha-dev) |
+| **Testing** | Active testing | Fully tested before sync |
+| **Commits** | Frequent, small | **Auto-synced with original messages** |
+| **Sync Method** | N/A | **GitHub Actions (automated)** |
 | **Docker Build** | Local build from Dockerfile | Pre-built from Docker Hub |
-| **Docker Image** | Built on-demand | `anexgohan/pankha:latest` |
+| **Docker Image** | Built on-demand | `anexgohan/pankha:latest` (auto-built) |
 | **Local Path** | `/root/anex/dev/pankha-dev/` | `/root/anex/dev/pankha/` |
 | **GitHub URL** | github.com/Anexgohan/pankha-dev | github.com/Anexgohan/pankha |
 | **Audience** | Development team | End users, community |
+| **Workflow** | Push triggers auto-sync | Receives updates automatically |
 
 ---
 
