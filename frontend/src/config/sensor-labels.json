@@ -1,0 +1,14 @@
+{
+  "k10temp": "AMD CPU",
+  "coretemp": "Intel CPU",
+  "cpu_thermal": "CPU Thermal",
+  "it8628": "Motherboard (IT8628)",
+  "it87": "Motherboard (IT87)",
+  "nvme": "NVMe Storage",
+  "acpitz": "ACPI Thermal",
+  "gigabyte_wmi": "Motherboard (WMI)",
+  "asus_wmi": "Motherboard (WMI)",
+  "thermal": "ACPI",
+  "rp1_adc": "RPi ADC",
+  "gpu": "Graphics Card"
+}

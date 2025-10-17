@@ -1,0 +1,52 @@
+# Docker Compose for Public Pankha Repository
+# This file uses the pre-built Docker image from Docker Hub
+
+services:
+  pankha-app:
+    image: anexgohan/pankha:latest  # Pull from Docker Hub instead of building
+    ports:
+      - "${PANKHA_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - pankha-postgres
+    restart: unless-stopped
+
+  pankha-postgres:
+    image: postgres:17-alpine
+    command:
+      - "postgres"
+      - "-c"
+      - "max_wal_size=${POSTGRES_MAX_WAL_SIZE:-256MB}"
+      - "-c"
+      - "min_wal_size=${POSTGRES_MIN_WAL_SIZE:-80MB}"
+      - "-c"
+      - "checkpoint_timeout=${POSTGRES_CHECKPOINT_TIMEOUT:-5min}"
+      - "-c"
+      - "wal_keep_size=${POSTGRES_WAL_KEEP_SIZE:-128MB}"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - ./backend/database/postgres_data:/var/lib/postgresql/data
+      - ./backend/src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

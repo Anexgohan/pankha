@@ -1,0 +1,83 @@
+/* ===================================
+   Pankha Design System - Color Tokens
+   Dark Mode is Default
+   =================================== */
+
+:root {
+  /* Brand Colors */
+  --color-primary: #2196F3;
+  --color-primary-hover: #1976D2;
+  --color-primary-light: #BBDEFB;
+  --color-primary-dark: #0D47A1;
+
+  /* Status Colors */
+  --color-success: #4CAF50;
+  --color-success-hover: #45a049;
+  --color-warning: #FF9800;
+  --color-warning-hover: #E68900;
+  --color-error: #F44336;
+  --color-error-hover: #D32F2F;
+  --color-info: #2196F3;
+  --color-info-hover: #1976D2;
+
+  /* Neutral Colors - Dark Theme (Default) */
+  --neutral-50: #2d2d2d;
+  --neutral-100: #404040;
+  --neutral-200: #505050;
+  --neutral-300: #404040;
+  --neutral-400: #666666;
+  --neutral-500: #bbbbbb;
+  --neutral-600: #dddddd;
+  --neutral-700: #ffffff;
+  --neutral-800: #f5f5f5;
+  --neutral-900: #ffffff;
+
+  /* Temperature Status Colors - Dark Theme (Default) */
+  --temp-normal-bg: rgba(50, 255, 50, 0.10);
+  --temp-normal-border: #4CAF50;
+  --temp-normal-text: #34a33a;
+
+  --temp-caution-bg: rgba(255, 193, 7, 0.15);
+  --temp-caution-border: #FFCA28;
+  --temp-caution-text: #FFCA28;
+
+  --temp-warning-bg: #FFF3E0;
+  --temp-warning-border: #FF9800;
+  --temp-warning-text: #E65100;
+
+  --temp-critical-bg: #FFEBEE;
+  --temp-critical-border: #F44336;
+  --temp-critical-text: #C62828;
+}
+
+/* Light Theme Color Overrides */
+[data-theme="light"] {
+  /* Neutral Colors - Light Theme */
+  --neutral-50: #f5f5f5;
+  --neutral-100: #f9f9f9;
+  --neutral-200: #e0e0e0;
+  --neutral-300: #eeeeee;
+  --neutral-400: #cccccc;
+  --neutral-500: #999999;
+  --neutral-600: #666666;
+  --neutral-700: #333333;
+  --neutral-800: #1a1a1a;
+  --neutral-900: #000000;
+
+  /* Temperature Status Colors - Light Theme */
+  --temp-normal-bg: #E8F5E8;
+  --temp-normal-border: #4CAF50;
+  --temp-normal-text: #2E7D32;
+
+  --temp-caution-bg: #FFFDE7;
+  --temp-caution-border: #FFC107;
+  --temp-caution-text: #F57F17;
+
+  --temp-warning-bg: #FFF3E0;
+  --temp-warning-border: #FF9800;
+  --temp-warning-text: #E65100;
+
+  --temp-critical-bg: #FFEBEE;
+  --temp-critical-border: #F44336;
+  --temp-critical-text: #C62828;
+}

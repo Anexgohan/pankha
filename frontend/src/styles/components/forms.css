@@ -1,0 +1,150 @@
+/* ===================================
+   Pankha Design System - Form Components
+   =================================== */
+
+.form-section {
+  margin-bottom: var(--spacing-3xl);
+}
+
+.form-section h3 {
+  margin: 0 0 var(--spacing-lg) 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.form-group {
+  margin-bottom: var(--spacing-lg);
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: var(--spacing-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--color-info);
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+.form-group input[type="checkbox"] {
+  width: auto;
+  margin-right: var(--spacing-sm);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-lg);
+}
+
+/* Dropdowns */
+.refresh-rate-dropdown,
+.agent-interval-select {
+  background: var(--bg-secondary);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.refresh-rate-dropdown:hover,
+.agent-interval-select:hover {
+  border-color: var(--color-info);
+}
+
+.refresh-rate-dropdown:focus,
+.agent-interval-select:focus {
+  outline: none;
+  border-color: var(--color-info);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.agent-interval-select {
+  border-width: 1px;
+  padding: 2px var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  width: 60px;
+  min-width: 60px;
+  max-width: 80px;
+}
+
+.agent-interval-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Sliders */
+.speed-slider {
+  flex: 1;
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.speed-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--color-info);
+  border-radius: var(--radius-circle);
+  cursor: pointer;
+}
+
+.speed-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--color-info);
+  border-radius: var(--radius-circle);
+  cursor: pointer;
+  border: none;
+}
+
+.speed-slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input Groups */
+.input-group {
+  flex: 1;
+}
+
+.input-group label {
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.input-group input {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}

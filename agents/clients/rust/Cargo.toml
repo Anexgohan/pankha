@@ -1,0 +1,60 @@
+[package]
+name = "pankha-agent"
+version = "1.0.0"
+edition = "2021"
+authors = ["Pankha Development Team"]
+description = "Cross-platform hardware monitoring and fan control agent for Pankha"
+license = "AGPL-3.0"
+
+[[bin]]
+name = "pankha-agent"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging and error handling
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Async traits
+async-trait = "0.1"
+
+# Command-line parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# System information
+sysinfo = "0.30"
+hostname = "0.3"
+
+# File system
+glob = "0.3"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific dependencies
+libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+# Windows-specific dependencies
+winapi = { version = "0.3", features = ["winuser", "winbase", "winerror"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# macOS-specific dependencies (if needed)
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
