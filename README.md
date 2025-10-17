@@ -27,7 +27,7 @@ Is an open-source Distributed fan control system with Centralized Management sys
 - **Multi-System Support** - Monitor and control multiple machines from one dashboard
 - **Web Dashboard** - Modern React interface with real-time updates
 - **WebSocket Communication** - Bidirectional real-time data transmission
-- **Easy Deployment** - Docker-based deployment with one command
+- **Easy Deployment** - Docker based server deployment, with one command setup for agents
 - **PostgreSQL Database** - Production-grade time-series data storage
 - **Open Source**
 
@@ -70,7 +70,7 @@ Deploy agents on each machine you want to monitor:
 # On your target system (Linux)
 wget https://github.com/Anexgohan/pankha/archive/refs/heads/main.zip
 unzip main.zip
-cd pankha-main/agents/clients/linux/debian
+cd pankha-main/agents/clients/linux/python-script
 
 # Install dependency
 sudo apt install python3-websockets
@@ -167,7 +167,7 @@ docker build -t pankha:local -f docker/Dockerfile .
 docker compose up -d
 ```
 
-## 🤖 Agent Setup
+## Agent Setup
 
 ### Linux Agent (Production)
 
@@ -191,11 +191,11 @@ sudo apt install python3-websockets
    # Download agent
    wget https://github.com/Anexgohan/pankha/archive/refs/heads/main.zip
    unzip main.zip
-   cd pankha-main/agents/clients/linux/debian
+   cd pankha-main/agents/clients/linux/python-script
 
    # Or use git
    git clone https://github.com/Anexgohan/pankha.git
-   cd pankha/agents/clients/linux/debian
+   cd pankha/agents/clients/linux/python-script
    ```
 
 2. **Configure agent**
@@ -247,7 +247,7 @@ sudo apt install python3-websockets
 ./pankha-agent.sh config
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Backend Configuration
 
@@ -365,7 +365,7 @@ cat /sys/class/hwmon/hwmon*/pwm*
 echo 128 | sudo tee /sys/class/hwmon/hwmon0/pwm1
 ```
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our contributing guidelines:
 
@@ -375,7 +375,7 @@ We welcome contributions! Please see our contributing guidelines:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📊 System Requirements
+## System Requirements
 
 ### Backend (Server)
 - CPU: x86_64 or ARM64
@@ -390,30 +390,31 @@ We welcome contributions! Please see our contributing guidelines:
 - Requirements:
   - PWM-controllable fans
 
-## 🏷️ Supported Hardware
+## Supported Hardware
 
 ### Fan Control
 - ✅ PWM fans (4-pin, Speed control)
 - ✅ DC fans (voltage control, On/Off)
 - Hardware monitoring chips (IPMI, Supermicro, Dell iDRAC), coming soon
 
-## 📜 License
+## License
 
 This project is licensed under the AGPL-3.0 License ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg) , see the [LICENSE](LICENSE) file for details.
 
-## 🔗 Links
+## Links
 
 - **GitHub**: https://github.com/Anexgohan/pankha
 - **Docker Hub**: https://hub.docker.com/r/anexgohan/pankha
 - **Issues**: https://github.com/Anexgohan/pankha/issues
 - **Discussions**: https://github.com/Anexgohan/pankha/discussions
 
-## 💬 Support
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/Anexgohan/pankha/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/Anexgohan/pankha/discussions)
+- **Discord**: [Discore coming Soon](#discord)
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Built with Node.js, React, and PostgreSQL
 - Inspired by the need for centralized hardware monitoring

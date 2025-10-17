@@ -9,7 +9,7 @@ Successfully implemented a high-performance, cross-platform hardware monitoring 
 ### ✅ Completed
 
 1. **Single-File Rust Implementation** (~1100 lines)
-   - Location: `/root/anex/dev/pankha-dev/agents/clients/rust/src/main.rs`
+   - Location: `/root/anex/dev/pankha-dev/agents/clients/linux/rust/src/main.rs`
    - Platform abstraction via traits
    - Embedded modules (no separate files needed)
 
@@ -85,7 +85,7 @@ Status: ✅ Successful
 ## File Structure
 
 ```
-agents/clients/rust/
+agents/clients/linux/rust/
 ├── Cargo.toml                    # Dependency configuration
 ├── config.example.json           # Sample configuration
 ├── README.md                     # User documentation
