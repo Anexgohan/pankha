@@ -61,7 +61,7 @@
 .systems-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-xl);
+  gap: var(--spacing-md);
   margin-bottom: var(--spacing-3xl);
   justify-content: center;
 }
