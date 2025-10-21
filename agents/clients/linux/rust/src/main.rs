@@ -21,6 +21,7 @@ use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time;
 use tracing::{debug, error, info, warn};
+use uuid::Uuid;
 
 // ============================================================================
 // CORE DATA STRUCTURES
@@ -118,10 +119,16 @@ impl Default for AgentConfig {
             .to_string_lossy()
             .to_string();
 
+        // Generate unique agent ID: OS-hostname-UUID (short UUID: first 8 chars)
+        let os_name = std::env::consts::OS;
+        let unique_id = Uuid::new_v4();
+        let short_uuid = &unique_id.to_string()[..8];
+        let agent_id = format!("{}-{}-{}", os_name, hostname, short_uuid);
+
         Self {
             agent: AgentSettings {
-                id: format!("rust-agent-{}", hostname), // changes:should be OS-hostname-UUID, if config file missing, if config file present, use that ID
-                name: format!("Rust System ({})", hostname), // changes:should just be the hostname
+                id: agent_id,
+                name: hostname.clone(),
                 update_interval: 3.0,
                 log_level: "INFO".to_string(),
             },
@@ -134,10 +141,10 @@ impl Default for AgentConfig {
             hardware: HardwareSettings {
                 enable_fan_control: true,
                 enable_sensor_monitoring: true,
-                fan_safety_minimum: 10,
+                fan_safety_minimum: 30,
                 temperature_critical: 85.0,
-                filter_duplicate_sensors: true,
-                duplicate_sensor_tolerance: 0.5,
+                filter_duplicate_sensors: false,
+                duplicate_sensor_tolerance: 1.0,
             },
             logging: LoggingSettings {
                 enable_file_logging: true,
@@ -1011,7 +1018,8 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     println!("║   Pankha Rust Agent Setup Wizard   ║");
     println!("╚══════════════════════════════════════╝\n");
 
-    if config_file.exists() {
+    // Load existing config if present
+    let existing_config = if config_file.exists() {
         println!("⚠️  Config file already exists: {:?}", config_file);
         print!("Overwrite? (y/N): ");
         io::stdout().flush()?;
@@ -1021,7 +1029,11 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
             println!("Setup cancelled.");
             return Ok(());
         }
-    }
+        // Load existing config to use as defaults
+        Some(load_config(config_file.to_str()).await.ok())
+    } else {
+        None
+    };
 
     let hostname = hostname::get()
         .unwrap_or_else(|_| std::ffi::OsString::from("unknown"))
@@ -1029,18 +1041,26 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
         .to_string();
 
     println!("\n📋 Configuration:\n");
+    println!("Values in [brackets] are defaults - press Enter to use them.\n");
 
-    // Agent ID
-    let default_agent_id = format!("rust-agent-{}", hostname);
-    print!("Agent ID [{}]: ", default_agent_id);
-    io::stdout().flush()?;
-    let mut agent_id = String::new();
-    io::stdin().read_line(&mut agent_id)?;
-    let agent_id = agent_id.trim();
-    let agent_id = if agent_id.is_empty() { default_agent_id.clone() } else { agent_id.to_string() };
+    // Agent ID - Generate silently (don't ask user)
+    let agent_id = if let Some(ref existing) = existing_config {
+        // Keep existing ID
+        existing.as_ref().unwrap().agent.id.clone()
+    } else {
+        // Generate new ID: OS-hostname-UUID (short UUID: first 8 chars)
+        let os_name = std::env::consts::OS;
+        let unique_id = Uuid::new_v4();
+        let short_uuid = &unique_id.to_string()[..8];
+        format!("{}-{}-{}", os_name, hostname, short_uuid)
+    };
 
-    // Agent Name
-    let default_name = format!("Rust System ({})", hostname);
+    // Agent Name - Just use hostname
+    let default_name = if let Some(ref existing) = existing_config {
+        existing.as_ref().unwrap().agent.name.clone()
+    } else {
+        hostname.clone()
+    };
     print!("Agent Name [{}]: ", default_name);
     io::stdout().flush()?;
     let mut agent_name = String::new();
@@ -1049,7 +1069,11 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     let agent_name = if agent_name.is_empty() { default_name.clone() } else { agent_name.to_string() };
 
     // Server URL
-    let default_url = "ws://192.168.100.237:3000/websocket".to_string();
+    let default_url = if let Some(ref existing) = existing_config {
+        existing.as_ref().unwrap().backend.server_url.clone()
+    } else {
+        "ws://192.168.100.237:3000/websocket".to_string()
+    };
     print!("Backend Server URL [{}]: ", default_url);
     io::stdout().flush()?;
     let mut server_url = String::new();
@@ -1057,33 +1081,67 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     let server_url = server_url.trim();
     let server_url = if server_url.is_empty() { default_url } else { server_url.to_string() };
 
-    // Update Interval
-    print!("Update Interval (seconds) [3.0]: ");
+    // Update Interval - 3.0 for new, existing value for re-run
+    let default_interval = if let Some(ref existing) = existing_config {
+        existing.as_ref().unwrap().agent.update_interval
+    } else {
+        3.0
+    };
+    print!("Update Interval (seconds) [{}]: ", default_interval);
     io::stdout().flush()?;
     let mut interval_str = String::new();
     io::stdin().read_line(&mut interval_str)?;
-    let update_interval = interval_str.trim().parse::<f64>().unwrap_or(3.0);
+    let update_interval = if interval_str.trim().is_empty() {
+        default_interval
+    } else {
+        interval_str.trim().parse::<f64>().unwrap_or(default_interval)
+    };
 
-    // Fan Control
+    // Fan Control - default Y
     print!("Enable Fan Control? (Y/n): ");
     io::stdout().flush()?;
     let mut fan_control_str = String::new();
     io::stdin().read_line(&mut fan_control_str)?;
     let enable_fan_control = !fan_control_str.trim().eq_ignore_ascii_case("n");
 
-    // Filter Duplicates
-    print!("Filter Duplicate Sensors? (Y/n): ");
+    // Fan Safety Minimum - default 30
+    let default_fan_min = if let Some(ref existing) = existing_config {
+        existing.as_ref().unwrap().hardware.fan_safety_minimum
+    } else {
+        30
+    };
+    print!("Fan safety minimum percentage (0-100%, default {}, 0=allow stop): ", default_fan_min);
+    io::stdout().flush()?;
+    let mut fan_min_str = String::new();
+    io::stdin().read_line(&mut fan_min_str)?;
+    let fan_safety_minimum = if fan_min_str.trim().is_empty() {
+        default_fan_min
+    } else {
+        fan_min_str.trim().parse::<u8>().unwrap_or(default_fan_min).min(100)
+    };
+
+    // Filter Duplicates - default n (false)
+    print!("Filter Duplicate Sensors? (y/N): ");
     io::stdout().flush()?;
     let mut filter_str = String::new();
     io::stdin().read_line(&mut filter_str)?;
-    let filter_duplicates = !filter_str.trim().eq_ignore_ascii_case("n");
+    let filter_duplicates = filter_str.trim().eq_ignore_ascii_case("y");
 
-    // Tolerance
-    print!("Sensor Tolerance (°C) [0.5]: ");
+    // Tolerance - default 1.0
+    let default_tolerance = if let Some(ref existing) = existing_config {
+        existing.as_ref().unwrap().hardware.duplicate_sensor_tolerance
+    } else {
+        1.0
+    };
+    print!("Sensor Tolerance (°C) [{}]: ", default_tolerance);
     io::stdout().flush()?;
     let mut tolerance_str = String::new();
     io::stdin().read_line(&mut tolerance_str)?;
-    let tolerance = tolerance_str.trim().parse::<f64>().unwrap_or(0.5);
+    let tolerance = if tolerance_str.trim().is_empty() {
+        default_tolerance
+    } else {
+        tolerance_str.trim().parse::<f64>().unwrap_or(default_tolerance)
+    };
 
     // Create config
     let config = AgentConfig {
@@ -1102,7 +1160,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
         hardware: HardwareSettings {
             enable_fan_control,
             enable_sensor_monitoring: true,
-            fan_safety_minimum: 10,
+            fan_safety_minimum,
             temperature_critical: 85.0,
             filter_duplicate_sensors: filter_duplicates,
             duplicate_sensor_tolerance: tolerance,
@@ -1225,10 +1283,23 @@ fn start_daemon() -> Result<()> {
         process::exit(1);
     }
 
-    println!("Starting Pankha Rust Agent daemon...");
-
-    // Get current executable path
+    // Check if config file exists
     let exe_path = std::env::current_exe()?;
+    let config_path = exe_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+        .join("config.json");
+
+    if !config_path.exists() {
+        eprintln!("ERROR: Configuration file not found: {:?}", config_path);
+        eprintln!("\nPlease run the setup wizard first:");
+        eprintln!("  ./pankha-agent --setup");
+        eprintln!("  or");
+        eprintln!("  ./pankha-agent -e");
+        process::exit(1);
+    }
+
+    println!("Starting Pankha Rust Agent daemon...");
 
     // Prepare log file
     ensure_directories()?;
@@ -1433,6 +1504,25 @@ async fn main() -> Result<()> {
     if args.setup {
         run_setup_wizard(args.config_path.as_deref()).await?;
         return Ok(());
+    }
+
+    // Check if config file exists (required for normal operation)
+    let config_file_path = if let Some(p) = args.config_path.as_deref() {
+        PathBuf::from(p)
+    } else {
+        std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json")
+    };
+
+    if !config_file_path.exists() {
+        eprintln!("ERROR: Configuration file not found: {:?}", config_file_path);
+        eprintln!("\nPlease run the setup wizard first:");
+        eprintln!("  ./pankha-agent --setup");
+        eprintln!("  or");
+        eprintln!("  ./pankha-agent -e");
+        process::exit(1);
     }
 
     // Load configuration
