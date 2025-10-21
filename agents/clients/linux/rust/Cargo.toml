@@ -7,7 +7,7 @@ description = "Cross-platform hardware monitoring and fan control agent for Pank
 license = "AGPL-3.0"
 
 [[bin]]
-name = "pankha-agent"
+name = "pankha-agent-linux"
 path = "src/main.rs"
 
 [dependencies]
