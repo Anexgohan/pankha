@@ -64,8 +64,8 @@ async function initializeServices() {
       (commandDispatcher as any).handleCommandResponse(event);
     });
 
-    // Start Fan Profile Controller (default 2 second update interval)
-    fanProfileController.start(2000);
+    // Start Fan Profile Controller (loads interval from database)
+    await fanProfileController.start();
 
     // Note: Agents connect TO the backend, not vice versa
     log.info(' WebSocket server ready - waiting for agent connections...', 'index');
