@@ -152,6 +152,49 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
+   * Set fan step percentage
+   */
+  public async setFanStep(agentId: string, step: number, priority: 'low' | 'normal' | 'high' | 'emergency' = 'normal'): Promise<any> {
+    // Validate step (3, 5, 10, 15, 25, 50, 100)
+    const validSteps = [3, 5, 10, 15, 25, 50, 100];
+    if (!validSteps.includes(step)) {
+      throw new Error('Fan step must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)');
+    }
+
+    log.info(` Setting fan step for agent ${agentId}: ${step}%`, 'CommandDispatcher');
+
+    return this.sendCommand(agentId, 'setFanStep', { step }, priority);
+  }
+
+  /**
+   * Set hysteresis temperature
+   */
+  public async setHysteresis(agentId: string, hysteresis: number, priority: 'low' | 'normal' | 'high' | 'emergency' = 'normal'): Promise<any> {
+    // Validate hysteresis (0.0-10.0°C)
+    if (hysteresis < 0.0 || hysteresis > 10.0) {
+      throw new Error('Hysteresis must be between 0.0 (disable) and 10.0°C');
+    }
+
+    log.info(` Setting hysteresis for agent ${agentId}: ${hysteresis}°C`, 'CommandDispatcher');
+
+    return this.sendCommand(agentId, 'setHysteresis', { hysteresis }, priority);
+  }
+
+  /**
+   * Set emergency temperature
+   */
+  public async setEmergencyTemp(agentId: string, temp: number, priority: 'low' | 'normal' | 'high' | 'emergency' = 'normal'): Promise<any> {
+    // Validate temperature (70-100°C)
+    if (temp < 70.0 || temp > 100.0) {
+      throw new Error('Emergency temperature must be between 70.0 and 100.0°C');
+    }
+
+    log.info(` Setting emergency temperature for agent ${agentId}: ${temp}°C`, 'CommandDispatcher');
+
+    return this.sendCommand(agentId, 'setEmergencyTemp', { temp }, priority);
+  }
+
+  /**
    * Apply a fan profile to a system
    */
   public async applyFanProfile(agentId: string, profileName: string): Promise<any> {
@@ -353,6 +396,15 @@ export class CommandDispatcher extends EventEmitter {
       }
       if (pendingCommand.command.type === 'setSensorTolerance' && response.data?.tolerance !== undefined) {
         this.agentManager.setAgentSensorTolerance(pendingCommand.command.agentId, response.data.tolerance);
+      }
+      if (pendingCommand.command.type === 'setFanStep' && response.data?.step !== undefined) {
+        this.agentManager.setAgentFanStep(pendingCommand.command.agentId, response.data.step);
+      }
+      if (pendingCommand.command.type === 'setHysteresis' && response.data?.hysteresis !== undefined) {
+        this.agentManager.setAgentHysteresis(pendingCommand.command.agentId, response.data.hysteresis);
+      }
+      if (pendingCommand.command.type === 'setEmergencyTemp' && response.data?.temp !== undefined) {
+        this.agentManager.setAgentEmergencyTemp(pendingCommand.command.agentId, response.data.temp);
       }
       pendingCommand.resolve(response.data);
       this.emit('commandCompleted', { command: pendingCommand.command, response });

@@ -10,6 +10,9 @@ export class AgentManager extends EventEmitter {
   private agentUpdateIntervals: Map<string, number> = new Map(); // Track current update intervals
   private agentSensorDeduplication: Map<string, boolean> = new Map(); // Track sensor deduplication setting
   private agentSensorTolerance: Map<string, number> = new Map(); // Track sensor tolerance setting
+  private agentFanStep: Map<string, number> = new Map(); // Track fan step percentage
+  private agentHysteresis: Map<string, number> = new Map(); // Track hysteresis temperature
+  private agentEmergencyTemp: Map<string, number> = new Map(); // Track emergency temperature
   private db: Database;
   private healthCheckInterval: NodeJS.Timeout | null = null;
 
@@ -368,6 +371,51 @@ export class AgentManager extends EventEmitter {
   public setAgentSensorTolerance(agentId: string, tolerance: number): void {
     this.agentSensorTolerance.set(agentId, tolerance);
     log.info(` Agent ${agentId} sensor tolerance set to ${tolerance}°C`, 'AgentManager');
+  }
+
+  /**
+   * Get agent fan step percentage
+   */
+  public getAgentFanStep(agentId: string): number {
+    return this.agentFanStep.get(agentId) || 5; // Default 5%
+  }
+
+  /**
+   * Set agent fan step percentage
+   */
+  public setAgentFanStep(agentId: string, step: number): void {
+    this.agentFanStep.set(agentId, step);
+    log.info(` Agent ${agentId} fan step set to ${step}%`, 'AgentManager');
+  }
+
+  /**
+   * Get agent hysteresis temperature
+   */
+  public getAgentHysteresis(agentId: string): number {
+    return this.agentHysteresis.get(agentId) || 3.0; // Default 3°C
+  }
+
+  /**
+   * Set agent hysteresis temperature
+   */
+  public setAgentHysteresis(agentId: string, hysteresis: number): void {
+    this.agentHysteresis.set(agentId, hysteresis);
+    log.info(` Agent ${agentId} hysteresis set to ${hysteresis}°C`, 'AgentManager');
+  }
+
+  /**
+   * Get agent emergency temperature
+   */
+  public getAgentEmergencyTemp(agentId: string): number {
+    return this.agentEmergencyTemp.get(agentId) || 85.0; // Default 85°C
+  }
+
+  /**
+   * Set agent emergency temperature
+   */
+  public setAgentEmergencyTemp(agentId: string, temp: number): void {
+    this.agentEmergencyTemp.set(agentId, temp);
+    log.info(` Agent ${agentId} emergency temp set to ${temp}°C`, 'AgentManager');
   }
 
   /**

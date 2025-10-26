@@ -78,7 +78,7 @@ export interface AgentDataPacket {
 export interface FanControlCommand {
   commandId: string;
   agentId: string;
-  type: 'setFanSpeed' | 'setProfile' | 'emergencyStop' | 'getStatus' | 'updateSensorMapping' | 'rescanSensors' | 'setUpdateInterval' | 'setSensorDeduplication' | 'setSensorTolerance';
+  type: 'setFanSpeed' | 'setProfile' | 'emergencyStop' | 'getStatus' | 'updateSensorMapping' | 'rescanSensors' | 'setUpdateInterval' | 'setSensorDeduplication' | 'setSensorTolerance' | 'setFanStep' | 'setHysteresis' | 'setEmergencyTemp';
   payload: {
     fanId?: string;
     speed?: number;
@@ -89,9 +89,12 @@ export interface FanControlCommand {
       secondarySensorId?: string;
       logic: 'max' | 'avg' | 'primary_only';
     }>;
-    interval?: number;  // For setUpdateInterval command
-    enabled?: boolean;  // For setSensorDeduplication command
-    tolerance?: number; // For setSensorTolerance command
+    interval?: number;     // For setUpdateInterval command
+    enabled?: boolean;     // For setSensorDeduplication command
+    tolerance?: number;    // For setSensorTolerance command
+    step?: number;         // For setFanStep command
+    hysteresis?: number;   // For setHysteresis command
+    temp?: number;         // For setEmergencyTemp command
   };
   timestamp: number;
   priority: 'low' | 'normal' | 'high' | 'emergency';
