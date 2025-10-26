@@ -102,6 +102,9 @@ pub struct HardwareSettings {
     pub temperature_critical: f64,
     pub filter_duplicate_sensors: bool,
     pub duplicate_sensor_tolerance: f64,
+    pub fan_step_percent: u8,        // 3, 5, 10, 15, 25, 50, 100 (disable)
+    pub hysteresis_temp: f64,        // 0.5-10.0°C (0.0 = disable)
+    pub emergency_temp: f64,         // 70-100°C
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -145,6 +148,9 @@ impl Default for AgentConfig {
                 temperature_critical: 85.0,
                 filter_duplicate_sensors: false,
                 duplicate_sensor_tolerance: 1.0,
+                fan_step_percent: 5,
+                hysteresis_temp: 3.0,
+                emergency_temp: 85.0,
             },
             logging: LoggingSettings {
                 enable_file_logging: true,
@@ -748,6 +754,9 @@ impl WebSocketClient {
                 "update_interval": (self.config.agent.update_interval * 1000.0) as u64,
                 "filter_duplicate_sensors": self.config.hardware.filter_duplicate_sensors,
                 "duplicate_sensor_tolerance": self.config.hardware.duplicate_sensor_tolerance,
+                "fan_step_percent": self.config.hardware.fan_step_percent,
+                "hysteresis_temp": self.config.hardware.hysteresis_temp,
+                "emergency_temp": self.config.hardware.emergency_temp,
                 "capabilities": {
                     "sensors": sensors,
                     "fans": fans,
@@ -873,6 +882,36 @@ impl WebSocketClient {
                     (false, Some("Missing or invalid tolerance".to_string()), serde_json::json!({}))
                 }
             }
+            "setFanStep" => {
+                if let Some(step) = payload.and_then(|p| p.get("step")).and_then(|v| v.as_u64()) {
+                    match self.set_fan_step(step as u8).await {
+                        Ok(_) => (true, None, serde_json::json!({"step": step})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid step".to_string()), serde_json::json!({}))
+                }
+            }
+            "setHysteresis" => {
+                if let Some(hysteresis) = payload.and_then(|p| p.get("hysteresis")).and_then(|v| v.as_f64()) {
+                    match self.set_hysteresis(hysteresis).await {
+                        Ok(_) => (true, None, serde_json::json!({"hysteresis": hysteresis})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid hysteresis".to_string()), serde_json::json!({}))
+                }
+            }
+            "setEmergencyTemp" => {
+                if let Some(temp) = payload.and_then(|p| p.get("temp")).and_then(|v| v.as_f64()) {
+                    match self.set_emergency_temp(temp).await {
+                        Ok(_) => (true, None, serde_json::json!({"temp": temp})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid temp".to_string()), serde_json::json!({}))
+                }
+            }
             "ping" => (true, None, serde_json::json!({"pong": true})),
             _ => {
                 warn!("Unknown command: {}", command_type);
@@ -965,6 +1004,73 @@ impl WebSocketClient {
         Ok(())
     }
 
+    async fn set_fan_step(&self, step: u8) -> Result<()> {
+        // Validate: 3, 5, 10, 15, 25, 50, 100
+        let valid = [3, 5, 10, 15, 25, 50, 100];
+        if !valid.contains(&step) {
+            return Err(anyhow::anyhow!("Invalid fan step: {}. Must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)", step));
+        }
+
+        // Update config
+        let mut config = Arc::as_ref(&self.config).clone();
+        config.hardware.fan_step_percent = step;
+
+        // Save config to disk
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&config, config_path.to_str().unwrap()).await?;
+
+        info!("Fan step changed to: {}% (saved to config)", step);
+        Ok(())
+    }
+
+    async fn set_hysteresis(&self, hysteresis: f64) -> Result<()> {
+        // Validate: 0.0 (disable), 0.5-10.0°C
+        if hysteresis < 0.0 || hysteresis > 10.0 {
+            return Err(anyhow::anyhow!("Invalid hysteresis: {}. Must be between 0.0 (disable) and 10.0°C", hysteresis));
+        }
+
+        // Update config
+        let mut config = Arc::as_ref(&self.config).clone();
+        config.hardware.hysteresis_temp = hysteresis;
+
+        // Save config to disk
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&config, config_path.to_str().unwrap()).await?;
+
+        info!("Hysteresis changed to: {}°C (saved to config)", hysteresis);
+        Ok(())
+    }
+
+    async fn set_emergency_temp(&self, temp: f64) -> Result<()> {
+        // Validate: 70-100°C
+        if temp < 70.0 || temp > 100.0 {
+            return Err(anyhow::anyhow!("Invalid emergency temp: {}. Must be between 70.0 and 100.0°C", temp));
+        }
+
+        // Update config
+        let mut config = Arc::as_ref(&self.config).clone();
+        config.hardware.emergency_temp = temp;
+
+        // Save config to disk
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&config, config_path.to_str().unwrap()).await?;
+
+        info!("Emergency temperature changed to: {}°C (saved to config)", temp);
+        Ok(())
+    }
+
     pub async fn stop(&self) {
         *self.running.write().await = false;
     }
@@ -1032,7 +1138,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
             return Ok(());
         }
         // Load existing config to use as defaults
-        Some(load_config(config_file.to_str()).await.ok())
+        load_config(config_file.to_str()).await.ok()
     } else {
         None
     };
@@ -1046,9 +1152,9 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     println!("Values in [brackets] are defaults - press Enter to use them.\n");
 
     // Agent ID - Generate silently (don't ask user)
-    let agent_id = if let Some(ref existing) = existing_config {
+    let agent_id = if let Some(existing) = &existing_config {
         // Keep existing ID
-        existing.as_ref().unwrap().agent.id.clone()
+        existing.agent.id.clone()
     } else {
         // Generate new ID: OS-hostname-UUID (short UUID: first 8 chars)
         let os_name = std::env::consts::OS;
@@ -1058,8 +1164,8 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     };
 
     // Agent Name - Just use hostname
-    let default_name = if let Some(ref existing) = existing_config {
-        existing.as_ref().unwrap().agent.name.clone()
+    let default_name = if let Some(existing) = &existing_config {
+        existing.agent.name.clone()
     } else {
         hostname.clone()
     };
@@ -1072,7 +1178,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
 
     // Server URL
     let default_url = if let Some(ref existing) = existing_config {
-        existing.as_ref().unwrap().backend.server_url.clone()
+        existing.backend.server_url.clone()
     } else {
         "ws://192.168.100.237:3000/websocket".to_string()
     };
@@ -1085,7 +1191,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
 
     // Update Interval - 3.0 for new, existing value for re-run
     let default_interval = if let Some(ref existing) = existing_config {
-        existing.as_ref().unwrap().agent.update_interval
+        existing.agent.update_interval
     } else {
         3.0
     };
@@ -1108,7 +1214,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
 
     // Fan Safety Minimum - default 30
     let default_fan_min = if let Some(ref existing) = existing_config {
-        existing.as_ref().unwrap().hardware.fan_safety_minimum
+        existing.hardware.fan_safety_minimum
     } else {
         30
     };
@@ -1131,7 +1237,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
 
     // Tolerance - default 1.0
     let default_tolerance = if let Some(ref existing) = existing_config {
-        existing.as_ref().unwrap().hardware.duplicate_sensor_tolerance
+        existing.hardware.duplicate_sensor_tolerance
     } else {
         1.0
     };
@@ -1166,6 +1272,9 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
             temperature_critical: 85.0,
             filter_duplicate_sensors: filter_duplicates,
             duplicate_sensor_tolerance: tolerance,
+            fan_step_percent: 5,
+            hysteresis_temp: 3.0,
+            emergency_temp: 85.0,
         },
         logging: LoggingSettings {
             enable_file_logging: true,

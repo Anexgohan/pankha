@@ -342,6 +342,20 @@ export class WebSocketHub extends EventEmitter {
           log.info(` Agent ${agentId} sensor tolerance: ${registrationData.duplicate_sensor_tolerance}`, 'WebSocketHub');
         }
 
+        // Set hysteresis settings if provided
+        if (registrationData.fan_step_percent !== undefined) {
+          this.agentManager.setAgentFanStep(agentId, registrationData.fan_step_percent);
+          log.info(` Agent ${agentId} fan step: ${registrationData.fan_step_percent}%`, 'WebSocketHub');
+        }
+        if (registrationData.hysteresis_temp !== undefined) {
+          this.agentManager.setAgentHysteresis(agentId, registrationData.hysteresis_temp);
+          log.info(` Agent ${agentId} hysteresis: ${registrationData.hysteresis_temp}°C`, 'WebSocketHub');
+        }
+        if (registrationData.emergency_temp !== undefined) {
+          this.agentManager.setAgentEmergencyTemp(agentId, registrationData.emergency_temp);
+          log.info(` Agent ${agentId} emergency temp: ${registrationData.emergency_temp}°C`, 'WebSocketHub');
+        }
+
         // Send registration confirmation
         this.sendToClient(clientId, 'registered', {
           agentId: agentId,

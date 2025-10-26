@@ -43,7 +43,10 @@ router.get('/', async (req: Request, res: Response) => {
         current_fan_speeds: systemData?.fans || [],
         current_update_interval: agentManager.getAgentUpdateInterval(system.agent_id),
         filter_duplicate_sensors: agentManager.getAgentSensorDeduplication(system.agent_id),
-        duplicate_sensor_tolerance: agentManager.getAgentSensorTolerance(system.agent_id)
+        duplicate_sensor_tolerance: agentManager.getAgentSensorTolerance(system.agent_id),
+        fan_step_percent: agentManager.getAgentFanStep(system.agent_id),
+        hysteresis_temp: agentManager.getAgentHysteresis(system.agent_id),
+        emergency_temp: agentManager.getAgentEmergencyTemp(system.agent_id)
       };
     });
 
@@ -202,7 +205,10 @@ router.get('/:id', async (req: Request, res: Response) => {
       real_time_data: systemData || null,
       current_update_interval: agentManager.getAgentUpdateInterval(system.agent_id),
       filter_duplicate_sensors: agentManager.getAgentSensorDeduplication(system.agent_id),
-      duplicate_sensor_tolerance: agentManager.getAgentSensorTolerance(system.agent_id)
+      duplicate_sensor_tolerance: agentManager.getAgentSensorTolerance(system.agent_id),
+      fan_step_percent: agentManager.getAgentFanStep(system.agent_id),
+      hysteresis_temp: agentManager.getAgentHysteresis(system.agent_id),
+      emergency_temp: agentManager.getAgentEmergencyTemp(system.agent_id)
     });
 
   } catch (error) {
@@ -660,6 +666,101 @@ router.get('/:id/charts', async (req: Request, res: Response) => {
   } catch (error) {
     log.error('Error fetching chart data:', 'systems', error);
     res.status(500).json({ error: 'Failed to fetch chart data' });
+  }
+});
+
+// PUT /api/systems/:id/fan-step - Set fan step percentage
+router.put('/:id/fan-step', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const { step, priority = 'normal' } = req.body;
+
+    const validSteps = [3, 5, 10, 15, 25, 50, 100];
+    if (!validSteps.includes(step)) {
+      return res.status(400).json({ error: 'Step must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)' });
+    }
+
+    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    const result = await commandDispatcher.setFanStep(system.agent_id, step, priority);
+
+    res.json({
+      message: 'Fan step command sent',
+      agent_id: system.agent_id,
+      requested_step: step,
+      priority,
+      result
+    });
+
+  } catch (error) {
+    log.error('Error setting fan step:', 'systems', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to set fan step' });
+  }
+});
+
+// PUT /api/systems/:id/hysteresis - Set hysteresis temperature
+router.put('/:id/hysteresis', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const { hysteresis, priority = 'normal' } = req.body;
+
+    const validHysteresis = [0, 0.5, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0];
+    if (!validHysteresis.includes(hysteresis)) {
+      return res.status(400).json({ error: 'Hysteresis must be one of: 0 (disable), 0.5, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0' });
+    }
+
+    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    const result = await commandDispatcher.setHysteresis(system.agent_id, hysteresis, priority);
+
+    res.json({
+      message: 'Hysteresis command sent',
+      agent_id: system.agent_id,
+      requested_hysteresis: hysteresis,
+      priority,
+      result
+    });
+
+  } catch (error) {
+    log.error('Error setting hysteresis:', 'systems', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to set hysteresis' });
+  }
+});
+
+// PUT /api/systems/:id/emergency-temp - Set emergency temperature
+router.put('/:id/emergency-temp', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const { temp, priority = 'normal' } = req.body;
+
+    if (typeof temp !== 'number' || temp < 70 || temp > 100) {
+      return res.status(400).json({ error: 'Emergency temp must be between 70 and 100°C' });
+    }
+
+    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    const result = await commandDispatcher.setEmergencyTemp(system.agent_id, temp, priority);
+
+    res.json({
+      message: 'Emergency temperature command sent',
+      agent_id: system.agent_id,
+      requested_temp: temp,
+      priority,
+      result
+    });
+
+  } catch (error) {
+    log.error('Error setting emergency temp:', 'systems', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to set emergency temp' });
   }
 });
 
