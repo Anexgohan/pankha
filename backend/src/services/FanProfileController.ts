@@ -350,19 +350,66 @@ export class FanProfileController {
   }
 
   /**
+   * Load controller interval from database
+   */
+  private async loadControllerInterval(): Promise<number> {
+    try {
+      const setting = await this.db.get(
+        'SELECT setting_value FROM backend_settings WHERE setting_key = $1',
+        ['controller_update_interval']
+      );
+
+      if (setting && setting.setting_value) {
+        const interval = parseInt(setting.setting_value, 10);
+        log.info(`Loaded controller interval from database: ${interval}ms`, 'FanProfileController');
+        return interval;
+      }
+    } catch (error) {
+      log.error('Error loading controller interval from database:', 'FanProfileController', error);
+    }
+
+    // Default fallback
+    log.info('Using default controller interval: 2000ms', 'FanProfileController');
+    return 2000;
+  }
+
+  /**
+   * Save controller interval to database
+   */
+  private async saveControllerInterval(intervalMs: number): Promise<void> {
+    try {
+      await this.db.run(
+        `INSERT INTO backend_settings (setting_key, setting_value, description)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (setting_key)
+         DO UPDATE SET setting_value = $2, updated_at = CURRENT_TIMESTAMP`,
+        ['controller_update_interval', intervalMs.toString(), 'Fan Profile Controller update interval in milliseconds']
+      );
+      log.info(`Saved controller interval to database: ${intervalMs}ms`, 'FanProfileController');
+    } catch (error) {
+      log.error('Error saving controller interval to database:', 'FanProfileController', error);
+    }
+  }
+
+  /**
    * Start the controller with specified update rate
    */
-  public start(updateIntervalMs: number = 2000): void {
+  public async start(updateIntervalMs?: number): Promise<void> {
     if (this.isRunning) {
       log.warn('Fan profile controller already running', 'FanProfileController');
       return;
     }
 
-    this.updateInterval = updateIntervalMs;
+    // Load from database if no interval specified
+    const intervalToUse = updateIntervalMs !== undefined
+      ? updateIntervalMs
+      : await this.loadControllerInterval();
+
+    this.updateInterval = intervalToUse;
     this.isRunning = true;
     this.consecutiveErrors = 0;
 
-    log.info(`Starting fan profile controller (update rate: ${updateIntervalMs}ms)`, 'FanProfileController');
+    log.info(`Starting fan profile controller (update rate: ${intervalToUse}ms)`, 'FanProfileController');
 
     // Run immediately, then repeat
     this.controlLoop();
@@ -387,13 +434,16 @@ export class FanProfileController {
   /**
    * Update the control loop frequency
    */
-  public setUpdateInterval(intervalMs: number): void {
+  public async setUpdateInterval(intervalMs: number): Promise<void> {
     if (intervalMs < 500 || intervalMs > 60000) {
       throw new Error('Update interval must be between 500ms and 60000ms');
     }
 
     log.info(`Updating fan controller interval: ${this.updateInterval}ms -> ${intervalMs}ms`, 'FanProfileController');
     this.updateInterval = intervalMs;
+
+    // Save to database
+    await this.saveControllerInterval(intervalMs);
 
     if (this.isRunning) {
       // Restart with new interval

@@ -746,6 +746,8 @@ impl WebSocketClient {
                 "name": self.config.agent.name,
                 "agent_version": "1.0.0-rust",
                 "update_interval": (self.config.agent.update_interval * 1000.0) as u64,
+                "filter_duplicate_sensors": self.config.hardware.filter_duplicate_sensors,
+                "duplicate_sensor_tolerance": self.config.hardware.duplicate_sensor_tolerance,
                 "capabilities": {
                     "sensors": sensors,
                     "fans": fans,

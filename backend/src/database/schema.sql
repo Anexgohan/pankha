@@ -236,3 +236,27 @@ VALUES
 (3, 70.0, 85, 5),
 (3, 80.0, 100, 6)
 ON CONFLICT (profile_id, temperature) DO NOTHING;
+
+-- Backend Settings (Global Configuration)
+CREATE TABLE IF NOT EXISTS backend_settings (
+  id SERIAL PRIMARY KEY,
+  setting_key VARCHAR(255) UNIQUE NOT NULL,
+  setting_value TEXT NOT NULL,
+  description TEXT,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Trigger for backend_settings timestamp
+DROP TRIGGER IF EXISTS update_backend_settings_timestamp ON backend_settings;
+CREATE TRIGGER update_backend_settings_timestamp
+    BEFORE UPDATE ON backend_settings
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Insert default controller interval setting (2000ms = 2 seconds)
+INSERT INTO backend_settings (setting_key, setting_value, description)
+VALUES ('controller_update_interval', '2000', 'Fan Profile Controller update interval in milliseconds')
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- Create index for faster setting lookups
+CREATE INDEX IF NOT EXISTS idx_backend_settings_key ON backend_settings(setting_key);

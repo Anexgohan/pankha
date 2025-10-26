@@ -155,10 +155,10 @@ router.put('/controller/interval', async (req: Request, res: Response) => {
       });
     }
 
-    fanProfileController.setUpdateInterval(interval);
+    await fanProfileController.setUpdateInterval(interval);
 
     res.json({
-      message: 'Controller update interval changed',
+      message: 'Controller update interval changed and saved to database',
       interval,
       status: fanProfileController.getStatus()
     });
