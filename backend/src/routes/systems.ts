@@ -764,4 +764,108 @@ router.put('/:id/emergency-temp', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/systems/:id/sensors/:sensorId/label - Update sensor label
+router.put('/:id/sensors/:sensorId/label', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const sensorId = parseInt(req.params.sensorId);
+    const { label } = req.body;
+
+    // Validation
+    if (!label || typeof label !== 'string') {
+      return res.status(400).json({ error: 'Label is required and must be a string' });
+    }
+
+    if (label.length > 255) {
+      return res.status(400).json({ error: 'Label must be 255 characters or less' });
+    }
+
+    // Verify system exists
+    const system = await db.get('SELECT id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    // Verify sensor exists
+    const sensor = await db.get(
+      'SELECT id, sensor_name FROM sensors WHERE id = $1 AND system_id = $2',
+      [sensorId, systemId]
+    );
+    if (!sensor) {
+      return res.status(404).json({ error: 'Sensor not found' });
+    }
+
+    // Update label
+    await db.run(
+      `UPDATE sensors SET sensor_label = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [label, sensorId]
+    );
+
+    const updatedSensor = await db.get('SELECT * FROM sensors WHERE id = $1', [sensorId]);
+
+    log.info(`Sensor label updated: ${sensor.sensor_name} -> "${label}"`, 'systems');
+
+    res.json({
+      message: 'Sensor label updated successfully',
+      sensor: updatedSensor
+    });
+
+  } catch (error) {
+    log.error('Error updating sensor label:', 'systems', error);
+    res.status(500).json({ error: 'Failed to update sensor label' });
+  }
+});
+
+// PUT /api/systems/:id/fans/:fanId/label - Update fan label
+router.put('/:id/fans/:fanId/label', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = parseInt(req.params.fanId);
+    const { label } = req.body;
+
+    // Validation
+    if (!label || typeof label !== 'string') {
+      return res.status(400).json({ error: 'Label is required and must be a string' });
+    }
+
+    if (label.length > 255) {
+      return res.status(400).json({ error: 'Label must be 255 characters or less' });
+    }
+
+    // Verify system exists
+    const system = await db.get('SELECT id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    // Verify fan exists
+    const fan = await db.get(
+      'SELECT id, fan_name FROM fans WHERE id = $1 AND system_id = $2',
+      [fanId, systemId]
+    );
+    if (!fan) {
+      return res.status(404).json({ error: 'Fan not found' });
+    }
+
+    // Update label
+    await db.run(
+      `UPDATE fans SET fan_label = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [label, fanId]
+    );
+
+    const updatedFan = await db.get('SELECT * FROM fans WHERE id = $1', [fanId]);
+
+    log.info(`Fan label updated: ${fan.fan_name} -> "${label}"`, 'systems');
+
+    res.json({
+      message: 'Fan label updated successfully',
+      fan: updatedFan
+    });
+
+  } catch (error) {
+    log.error('Error updating fan label:', 'systems', error);
+    res.status(500).json({ error: 'Failed to update fan label' });
+  }
+});
+
 export default router;

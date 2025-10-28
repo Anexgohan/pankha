@@ -49,6 +49,21 @@ export const getFans = async (id: number) => {
   return response.data;
 };
 
+// Sensor and Fan Labels
+export const updateSensorLabel = async (systemId: number, sensorId: number, label: string): Promise<void> => {
+  const response = await api.put(`/api/systems/${systemId}/sensors/${sensorId}/label`, {
+    label
+  });
+  return response.data;
+};
+
+export const updateFanLabel = async (systemId: number, fanId: number, label: string): Promise<void> => {
+  const response = await api.put(`/api/systems/${systemId}/fans/${fanId}/label`, {
+    label
+  });
+  return response.data;
+};
+
 // Fan Control
 export const setFanSpeed = async (systemId: number, fanId: string, speed: number, priority: string = 'normal') => {
   const response = await api.put(`/api/systems/${systemId}/fans/${fanId}`, {
