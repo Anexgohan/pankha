@@ -17,6 +17,9 @@ export interface SystemData {
   current_update_interval?: number;
   filter_duplicate_sensors?: boolean;
   duplicate_sensor_tolerance?: number;
+  fan_step_percent?: number;
+  hysteresis_temp?: number;
+  emergency_temp?: number;
 }
 
 export interface SensorReading {

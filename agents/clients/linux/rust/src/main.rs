@@ -625,7 +625,7 @@ use tokio_tungstenite::{connect_async, tungstenite::protocol::Message};
 use futures_util::{StreamExt, SinkExt};
 
 pub struct WebSocketClient {
-    config: Arc<AgentConfig>,
+    config: Arc<RwLock<AgentConfig>>,
     hardware_monitor: Arc<dyn HardwareMonitor>,
     running: Arc<RwLock<bool>>,
 }
@@ -633,7 +633,7 @@ pub struct WebSocketClient {
 impl WebSocketClient {
     pub fn new(config: AgentConfig, hardware_monitor: Arc<dyn HardwareMonitor>) -> Self {
         Self {
-            config: Arc::new(config),
+            config: Arc::new(RwLock::new(config)),
             hardware_monitor,
             running: Arc::new(RwLock::new(false)),
         }
@@ -653,8 +653,9 @@ impl WebSocketClient {
             }
 
             if *self.running.read().await {
-                info!("Reconnecting in {}s...", self.config.backend.reconnect_interval);
-                time::sleep(Duration::from_secs_f64(self.config.backend.reconnect_interval)).await;
+                let config = self.config.read().await;
+                info!("Reconnecting in {}s...", config.backend.reconnect_interval);
+                time::sleep(Duration::from_secs_f64(config.backend.reconnect_interval)).await;
             }
         }
 
@@ -662,9 +663,11 @@ impl WebSocketClient {
     }
 
     async fn connect_and_communicate(&self) -> Result<()> {
-        info!("Connecting to WebSocket: {}", self.config.backend.server_url);
+        let config = self.config.read().await;
+        info!("Connecting to WebSocket: {}", config.backend.server_url);
 
-        let (ws_stream, _) = connect_async(&self.config.backend.server_url).await?;
+        let (ws_stream, _) = connect_async(&config.backend.server_url).await?;
+        drop(config); // Release read lock
         info!("✅ WebSocket connected");
 
         let (write, read) = ws_stream.split();
@@ -690,7 +693,8 @@ impl WebSocketClient {
                     break;
                 }
                 drop(w);
-                time::sleep(Duration::from_secs_f64(config.agent.update_interval)).await;
+                let interval = config.read().await.agent.update_interval;
+                time::sleep(Duration::from_secs_f64(interval)).await;
             }
         });
 
@@ -745,44 +749,46 @@ impl WebSocketClient {
         let sensors = self.hardware_monitor.discover_sensors().await?;
         let fans = self.hardware_monitor.discover_fans().await?;
 
+        let config = self.config.read().await;
         let registration = serde_json::json!({
             "type": "register",
             "data": {
-                "agentId": self.config.agent.id,
-                "name": self.config.agent.name,
+                "agentId": config.agent.id,
+                "name": config.agent.name,
                 "agent_version": "1.0.0-rust",
-                "update_interval": (self.config.agent.update_interval * 1000.0) as u64,
-                "filter_duplicate_sensors": self.config.hardware.filter_duplicate_sensors,
-                "duplicate_sensor_tolerance": self.config.hardware.duplicate_sensor_tolerance,
-                "fan_step_percent": self.config.hardware.fan_step_percent,
-                "hysteresis_temp": self.config.hardware.hysteresis_temp,
-                "emergency_temp": self.config.hardware.emergency_temp,
+                "update_interval": (config.agent.update_interval * 1000.0) as u64,
+                "filter_duplicate_sensors": config.hardware.filter_duplicate_sensors,
+                "duplicate_sensor_tolerance": config.hardware.duplicate_sensor_tolerance,
+                "fan_step_percent": config.hardware.fan_step_percent,
+                "hysteresis_temp": config.hardware.hysteresis_temp,
+                "emergency_temp": config.hardware.emergency_temp,
                 "capabilities": {
                     "sensors": sensors,
                     "fans": fans,
-                    "fan_control": self.config.hardware.enable_fan_control
+                    "fan_control": config.hardware.enable_fan_control
                 }
             }
         });
 
         write.send(Message::Text(registration.to_string())).await?;
-        info!("✅ Agent registered: {}", self.config.agent.id);
+        info!("✅ Agent registered: {}", config.agent.id);
         Ok(())
     }
 
     async fn send_data(
         write: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>,
-        config: &AgentConfig,
+        config: &Arc<RwLock<AgentConfig>>,
         hardware_monitor: &Arc<dyn HardwareMonitor>
     ) -> Result<()> {
         let sensors = hardware_monitor.discover_sensors().await?;
         let fans = hardware_monitor.discover_fans().await?;
         let system_health = hardware_monitor.get_system_info().await?;
 
+        let config_read = config.read().await;
         let data = serde_json::json!({
             "type": "data",
             "data": {
-                "agentId": config.agent.id,
+                "agentId": config_read.agent.id,
                 "timestamp": chrono::Utc::now().timestamp_millis(),
                 "sensors": sensors,
                 "fans": fans,
@@ -948,8 +954,8 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid interval: {}. Must be between 0.5 and 30 seconds", interval));
         }
 
-        // Update config
-        let mut config = Arc::as_ref(&self.config).clone();
+        // Get write lock and update config
+        let mut config = self.config.write().await;
         let old_interval = config.agent.update_interval;
         config.agent.update_interval = interval;
 
@@ -959,15 +965,15 @@ impl WebSocketClient {
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&config, config_path.to_str().unwrap()).await?;
+        save_config(&*config, config_path.to_str().unwrap()).await?;
 
         info!("Update interval changed: {}s → {}s (saved to config)", old_interval, interval);
         Ok(())
     }
 
     async fn set_sensor_deduplication(&self, enabled: bool) -> Result<()> {
-        // Update config
-        let mut config = Arc::as_ref(&self.config).clone();
+        // Get write lock and update config
+        let mut config = self.config.write().await;
         config.hardware.filter_duplicate_sensors = enabled;
 
         // Save config to disk
@@ -976,7 +982,7 @@ impl WebSocketClient {
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&config, config_path.to_str().unwrap()).await?;
+        save_config(&*config, config_path.to_str().unwrap()).await?;
 
         info!("Sensor deduplication changed to: {} (saved to config)", enabled);
         Ok(())
@@ -988,8 +994,8 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid tolerance: {}. Must be between 0.25 and 5.0°C", tolerance));
         }
 
-        // Update config
-        let mut config = Arc::as_ref(&self.config).clone();
+        // Get write lock and update config
+        let mut config = self.config.write().await;
         config.hardware.duplicate_sensor_tolerance = tolerance;
 
         // Save config to disk
@@ -998,7 +1004,7 @@ impl WebSocketClient {
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&config, config_path.to_str().unwrap()).await?;
+        save_config(&*config, config_path.to_str().unwrap()).await?;
 
         info!("Sensor tolerance changed to: {}°C (saved to config)", tolerance);
         Ok(())
@@ -1011,8 +1017,8 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid fan step: {}. Must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)", step));
         }
 
-        // Update config
-        let mut config = Arc::as_ref(&self.config).clone();
+        // Get write lock and update config
+        let mut config = self.config.write().await;
         config.hardware.fan_step_percent = step;
 
         // Save config to disk
@@ -1021,7 +1027,7 @@ impl WebSocketClient {
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&config, config_path.to_str().unwrap()).await?;
+        save_config(&*config, config_path.to_str().unwrap()).await?;
 
         info!("Fan step changed to: {}% (saved to config)", step);
         Ok(())
@@ -1033,8 +1039,8 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid hysteresis: {}. Must be between 0.0 (disable) and 10.0°C", hysteresis));
         }
 
-        // Update config
-        let mut config = Arc::as_ref(&self.config).clone();
+        // Get write lock and update config
+        let mut config = self.config.write().await;
         config.hardware.hysteresis_temp = hysteresis;
 
         // Save config to disk
@@ -1043,7 +1049,7 @@ impl WebSocketClient {
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&config, config_path.to_str().unwrap()).await?;
+        save_config(&*config, config_path.to_str().unwrap()).await?;
 
         info!("Hysteresis changed to: {}°C (saved to config)", hysteresis);
         Ok(())
@@ -1055,8 +1061,8 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid emergency temp: {}. Must be between 70.0 and 100.0°C", temp));
         }
 
-        // Update config
-        let mut config = Arc::as_ref(&self.config).clone();
+        // Get write lock and update config
+        let mut config = self.config.write().await;
         config.hardware.emergency_temp = temp;
 
         // Save config to disk
@@ -1065,7 +1071,7 @@ impl WebSocketClient {
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&config, config_path.to_str().unwrap()).await?;
+        save_config(&*config, config_path.to_str().unwrap()).await?;
 
         info!("Emergency temperature changed to: {}°C (saved to config)", temp);
         Ok(())
