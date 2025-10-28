@@ -1,0 +1,124 @@
+.inline-edit-container {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.inline-edit-container:not(.editing) {
+  cursor: pointer;
+}
+
+.inline-edit-container:not(.editing):hover .inline-edit-icon {
+  opacity: 1;
+}
+
+.inline-edit-value {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.inline-edit-container:not(.editing):hover .inline-edit-value {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.inline-edit-icon {
+  opacity: 0;
+  font-size: 12px;
+  transition: opacity 0.2s;
+}
+
+.inline-edit-hardware-id {
+  font-size: 11px;
+  color: #666;
+  margin-top: 2px;
+  padding-left: 8px;
+  font-family: 'Courier New', monospace;
+}
+
+.inline-edit-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 2px solid #007bff;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  background-color: white;
+  color: #000;
+}
+
+.inline-edit-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.inline-edit-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.inline-edit-save,
+.inline-edit-cancel {
+  padding: 4px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  font-weight: 500;
+}
+
+.inline-edit-save {
+  background-color: #28a745;
+  color: white;
+}
+
+.inline-edit-save:hover:not(:disabled) {
+  background-color: #218838;
+}
+
+.inline-edit-cancel {
+  background-color: #dc3545;
+  color: white;
+}
+
+.inline-edit-cancel:hover:not(:disabled) {
+  background-color: #c82333;
+}
+
+.inline-edit-save:disabled,
+.inline-edit-cancel:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.inline-edit-error {
+  color: #dc3545;
+  font-size: 12px;
+  margin-top: 4px;
+  padding-left: 8px;
+}
+
+/* Dark mode support */
+[data-theme="dark"] .inline-edit-container:not(.editing):hover .inline-edit-value {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .inline-edit-hardware-id {
+  color: #aaa;
+}
+
+[data-theme="dark"] .inline-edit-input {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+  border-color: #4a9eff;
+}
+
+[data-theme="dark"] .inline-edit-input:disabled {
+  background-color: #1a1a1a;
+}

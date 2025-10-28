@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import type { SystemData, SensorReading, FanReading } from '../types/api';
-import { deleteSystem, setAgentUpdateInterval, setSensorDeduplication, setSensorTolerance, setFanStep, setHysteresis, setEmergencyTemp, getFanAssignments } from '../services/api';
+import { deleteSystem, setAgentUpdateInterval, setSensorDeduplication, setSensorTolerance, setFanStep, setHysteresis, setEmergencyTemp, getFanAssignments, updateSensorLabel, updateFanLabel } from '../services/api';
 import { useSensorVisibility } from '../contexts/SensorVisibilityContext';
 import { getFanProfiles, assignProfileToFan, type FanProfile } from '../services/fanProfilesApi';
 import { setFanSensor, getFanConfigurations } from '../services/fanConfigurationsApi';
 import { getSensorLabel } from '../config/sensorLabels';
+import { InlineEdit } from './InlineEdit';
 
 interface SystemCardProps {
   system: SystemData;
@@ -724,7 +725,20 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             >
                               <div className="sensor-info">
                                 <div className="sensor-header">
-                                  <span className="sensor-name">{getSensorDisplayName(sensor.id, sensor.name, sensor.label)}</span>
+                                  <div className="sensor-name">
+                                    <InlineEdit
+                                      value={getSensorDisplayName(sensor.id, sensor.name, sensor.label)}
+                                      hardwareId={sensor.id}
+                                      onSave={async (newLabel) => {
+                                        if (!sensor.dbId) {
+                                          throw new Error('Sensor not registered in database');
+                                        }
+                                        await updateSensorLabel(system.id, sensor.dbId, newLabel);
+                                        onUpdate();
+                                      }}
+                                      className="sensor-name-edit"
+                                    />
+                                  </div>
                                   <div className="sensor-actions">
                                     <span className="sensor-icon">{getSensorIcon(sensor.type)}</span>
                                     <button
@@ -786,7 +800,20 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     <div className="fan-info">
                       <div className="fan-title">
                         <span className="fan-icon">🌀</span>
-                        <span className="fan-name">{getFanDisplayName(fan.id, fan.name, fan.label)}</span>
+                        <div className="fan-name">
+                          <InlineEdit
+                            value={getFanDisplayName(fan.id, fan.name, fan.label)}
+                            hardwareId={fan.id}
+                            onSave={async (newLabel) => {
+                              if (!fan.dbId) {
+                                throw new Error('Fan not registered in database');
+                              }
+                              await updateFanLabel(system.id, fan.dbId, newLabel);
+                              onUpdate();
+                            }}
+                            className="fan-name-edit"
+                          />
+                        </div>
                       </div>
                       <div className="fan-metrics">
                         <span className="fan-rpm">{fan.rpm} RPM</span>
