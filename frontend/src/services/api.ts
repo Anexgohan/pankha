@@ -90,6 +90,30 @@ export const setSensorTolerance = async (systemId: number, tolerance: number, pr
   return response.data;
 };
 
+export const setFanStep = async (systemId: number, step: number, priority: string = 'normal') => {
+  const response = await api.put(`/api/systems/${systemId}/fan-step`, {
+    step,
+    priority
+  });
+  return response.data;
+};
+
+export const setHysteresis = async (systemId: number, hysteresis: number, priority: string = 'normal') => {
+  const response = await api.put(`/api/systems/${systemId}/hysteresis`, {
+    hysteresis,
+    priority
+  });
+  return response.data;
+};
+
+export const setEmergencyTemp = async (systemId: number, temp: number, priority: string = 'normal') => {
+  const response = await api.put(`/api/systems/${systemId}/emergency-temp`, {
+    temp,
+    priority
+  });
+  return response.data;
+};
+
 // Emergency
 export const emergencyStop = async () => {
   const response = await api.post('/api/emergency-stop');

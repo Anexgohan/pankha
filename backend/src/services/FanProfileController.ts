@@ -48,6 +48,11 @@ export class FanProfileController {
   // Track sensor availability to only log state changes
   private sensorAvailabilityState: Map<string, boolean> = new Map();
 
+  // Hysteresis and stepping state tracking
+  private lastAppliedSpeeds: Map<string, number> = new Map();
+  private lastSignificantTemp: Map<string, number> = new Map();
+  private lastSpeedChangeTime: Map<string, number> = new Map();
+
   private constructor() {
     this.db = Database.getInstance();
     this.dataAggregator = DataAggregator.getInstance();
@@ -240,6 +245,108 @@ export class FanProfileController {
   }
 
   /**
+   * Apply fan control with hysteresis and stepping
+   *
+   * This method implements:
+   * 1. Emergency override - immediately go to 100% if temperature exceeds emergency threshold
+   * 2. Hysteresis - only react if temperature changed significantly
+   * 3. Fan stepping - change speed incrementally, not instantly
+   */
+  private async applyFanControl(
+    agentId: string,
+    fanName: string,
+    currentTemp: number,
+    targetSpeed: number
+  ): Promise<void> {
+    const fanKey = `${agentId}:${fanName}`;
+
+    // Get agent-specific settings
+    const fanStep = this.agentManager.getAgentFanStep(agentId);
+    const hysteresis = this.agentManager.getAgentHysteresis(agentId);
+    const emergencyTemp = this.agentManager.getAgentEmergencyTemp(agentId);
+
+    // EMERGENCY OVERRIDE: Skip all logic if critical temp
+    if (currentTemp >= emergencyTemp) {
+      log.warn(
+        `🚨 EMERGENCY: Agent ${agentId} temp ${currentTemp.toFixed(1)}°C >= ${emergencyTemp}°C - ` +
+        `Setting fan ${fanName} to 100%`,
+        'FanProfileController'
+      );
+      await this.sendFanSpeedCommand(agentId, fanName, 100);
+      this.lastAppliedSpeeds.set(fanKey, 100);
+      this.lastSignificantTemp.set(fanKey, currentTemp);
+      this.lastSpeedChangeTime.set(fanKey, Date.now());
+      return;
+    }
+
+    // Get current state
+    const currentSpeed = this.lastAppliedSpeeds.get(fanKey) || 0;
+    const lastTemp = this.lastSignificantTemp.get(fanKey);
+
+    // Initialize if first run
+    if (lastTemp === undefined) {
+      this.lastSignificantTemp.set(fanKey, currentTemp);
+      this.lastAppliedSpeeds.set(fanKey, targetSpeed);
+      this.lastSpeedChangeTime.set(fanKey, Date.now());
+      await this.sendFanSpeedCommand(agentId, fanName, targetSpeed);
+      log.debug(
+        `Fan ${fanName} initialized: temp=${currentTemp.toFixed(1)}°C, speed=${targetSpeed}%`,
+        'FanProfileController'
+      );
+      return;
+    }
+
+    // HYSTERESIS CHECK: Only react if temp changed significantly
+    if (hysteresis > 0) {
+      const tempDiff = Math.abs(currentTemp - lastTemp);
+      if (tempDiff < hysteresis && currentSpeed === targetSpeed) {
+        // Temperature within hysteresis zone and already at target - no change
+        return;
+      }
+
+      // Update last significant temp if we're outside hysteresis zone
+      if (tempDiff >= hysteresis) {
+        this.lastSignificantTemp.set(fanKey, currentTemp);
+      }
+    } else {
+      // Hysteresis disabled (0°C) - always update last temp
+      this.lastSignificantTemp.set(fanKey, currentTemp);
+    }
+
+    // FAN STEP: Calculate next speed (incremental change)
+    let nextSpeed: number;
+
+    if (fanStep >= 100) {
+      // Disable stepping - instant change
+      nextSpeed = targetSpeed;
+    } else if (targetSpeed > currentSpeed) {
+      // Need to increase speed
+      nextSpeed = Math.min(currentSpeed + fanStep, targetSpeed);
+    } else if (targetSpeed < currentSpeed) {
+      // Need to decrease speed
+      nextSpeed = Math.max(currentSpeed - fanStep, targetSpeed);
+    } else {
+      // Already at target
+      return;
+    }
+
+    // Apply the speed change
+    await this.sendFanSpeedCommand(agentId, fanName, nextSpeed);
+
+    // Update tracking state
+    this.lastAppliedSpeeds.set(fanKey, nextSpeed);
+    this.lastSpeedChangeTime.set(fanKey, Date.now());
+
+    // Log the action (debug level to avoid spam)
+    const direction = nextSpeed > currentSpeed ? '↑' : nextSpeed < currentSpeed ? '↓' : '=';
+    log.debug(
+      `Fan ${fanName}: temp=${currentTemp.toFixed(1)}°C, ${currentSpeed}% ${direction} ${nextSpeed}% ` +
+      `(target=${targetSpeed}%, step=${fanStep}%, hyst=${hysteresis}°C)`,
+      'FanProfileController'
+    );
+  }
+
+  /**
    * Main control loop - runs every updateInterval milliseconds
    */
   private async controlLoop(): Promise<void> {
@@ -311,18 +418,12 @@ export class FanProfileController {
             assignment.fan_max_speed
           );
 
-          // Send fan speed command to agent
-          await this.sendFanSpeedCommand(
+          // Apply fan control with hysteresis and stepping
+          await this.applyFanControl(
             assignment.agent_id,
             assignment.fan_name,
+            temperature,
             constrainedSpeed
-          );
-
-          // Log the action (debug level to avoid spam)
-          log.debug(
-            `Fan ${assignment.fan_name}: ${temperature.toFixed(1)}°C -> ${constrainedSpeed}% ` +
-            `(profile: ${assignment.profile_name})`,
-            'FanProfileController'
           );
 
         } catch (error) {

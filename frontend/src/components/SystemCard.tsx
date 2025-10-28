@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { SystemData, SensorReading, FanReading } from '../types/api';
-import { deleteSystem, setAgentUpdateInterval, setSensorDeduplication, setSensorTolerance, getFanAssignments } from '../services/api';
+import { deleteSystem, setAgentUpdateInterval, setSensorDeduplication, setSensorTolerance, setFanStep, setHysteresis, setEmergencyTemp, getFanAssignments } from '../services/api';
 import { useSensorVisibility } from '../contexts/SensorVisibilityContext';
 import { getFanProfiles, assignProfileToFan, type FanProfile } from '../services/fanProfilesApi';
 import { setFanSensor, getFanConfigurations } from '../services/fanConfigurationsApi';
@@ -27,6 +27,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [agentInterval, setAgentInterval] = useState<number>(system.current_update_interval || 3);
   const [filterDuplicates, setFilterDuplicates] = useState<boolean>(system.filter_duplicate_sensors ?? true);
   const [sensorTolerance, setSensorToleranceLocal] = useState<number>(system.duplicate_sensor_tolerance || 0.5);
+  const [fanStep, setFanStepLocal] = useState<number>(system.fan_step_percent || 5);
+  const [hysteresis, setHysteresisLocal] = useState<number>(system.hysteresis_temp || 3.0);
+  const [emergencyTemp, setEmergencyTempLocal] = useState<number>(system.emergency_temp || 85.0);
   const [showHiddenSensors, setShowHiddenSensors] = useState(false);
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);
   const [selectedSensors, setSelectedSensors] = useState<Record<string, string>>({});
@@ -117,7 +120,16 @@ const SystemCard: React.FC<SystemCardProps> = ({
     if (system.duplicate_sensor_tolerance !== undefined) {
       setSensorToleranceLocal(system.duplicate_sensor_tolerance);
     }
-  }, [system.current_update_interval, system.filter_duplicate_sensors, system.duplicate_sensor_tolerance]);
+    if (system.fan_step_percent !== undefined) {
+      setFanStepLocal(system.fan_step_percent);
+    }
+    if (system.hysteresis_temp !== undefined) {
+      setHysteresisLocal(system.hysteresis_temp);
+    }
+    if (system.emergency_temp !== undefined) {
+      setEmergencyTempLocal(system.emergency_temp);
+    }
+  }, [system.current_update_interval, system.filter_duplicate_sensors, system.duplicate_sensor_tolerance, system.fan_step_percent, system.hysteresis_temp, system.emergency_temp]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -274,6 +286,45 @@ const SystemCard: React.FC<SystemCardProps> = ({
       onUpdate();
     } catch (error) {
       alert('Failed to set sensor tolerance: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleFanStepChange = async (newStep: number) => {
+    try {
+      setLoading('fan-step');
+      await setFanStep(system.id, newStep);
+      setFanStepLocal(newStep);
+      // No need to call onUpdate() since this doesn't affect displayed data
+    } catch (error) {
+      alert('Failed to set fan step: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleHysteresisChange = async (newHysteresis: number) => {
+    try {
+      setLoading('hysteresis');
+      await setHysteresis(system.id, newHysteresis);
+      setHysteresisLocal(newHysteresis);
+      // No need to call onUpdate() since this doesn't affect displayed data
+    } catch (error) {
+      alert('Failed to set hysteresis: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleEmergencyTempChange = async (newTemp: number) => {
+    try {
+      setLoading('emergency-temp');
+      await setEmergencyTemp(system.id, newTemp);
+      setEmergencyTempLocal(newTemp);
+      // No need to call onUpdate() since this doesn't affect displayed data
+    } catch (error) {
+      alert('Failed to set emergency temperature: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(null);
     }
@@ -523,6 +574,64 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <option value={5.0}>5.0°C</option>
                 </select>
                 {loading === 'sensor-tolerance' && <span className="loading-spinner">⏳</span>}
+              </div>
+              <div className="info-item info-item-vertical">
+                <span className="label">Fan Step:</span>
+                <select
+                  className="agent-interval-select"
+                  value={fanStep}
+                  onChange={(e) => handleFanStepChange(parseInt(e.target.value))}
+                  disabled={loading === 'fan-step'}
+                  title={`Determines the incremental percentage change in fan speed when adjusting towards the target temperature. Instead of making abrupt changes, the fan speed will increase or decrease in defined steps, providing smoother transitions and reducing wear on the fan. Changes are applied every ${agentInterval}s (Agent Rate).`}
+                >
+                  <option value={3}>3%</option>
+                  <option value={5}>5%</option>
+                  <option value={10}>10%</option>
+                  <option value={15}>15%</option>
+                  <option value={25}>25%</option>
+                  <option value={50}>50%</option>
+                  <option value={100}>Disable (instant)</option>
+                </select>
+                {loading === 'fan-step' && <span className="loading-spinner">⏳</span>}
+              </div>
+              <div className="info-item info-item-vertical">
+                <span className="label">Hysteresis:</span>
+                <select
+                  className="agent-interval-select"
+                  value={hysteresis}
+                  onChange={(e) => handleHysteresisChange(parseFloat(e.target.value))}
+                  disabled={loading === 'hysteresis'}
+                  title="Temperature tolerance before adjusting fan speed. The fan will only change speed when temperature moves more than this amount from the target, preventing constant micro-adjustments. Higher values = more stability, lower values = more responsive cooling."
+                >
+                  <option value={0.0}>Disable (instant)</option>
+                  <option value={0.5}>0.5°C</option>
+                  <option value={1.0}>1.0°C</option>
+                  <option value={2.0}>2.0°C</option>
+                  <option value={3.0}>3.0°C</option>
+                  <option value={5.0}>5.0°C</option>
+                  <option value={7.5}>7.5°C</option>
+                  <option value={10.0}>10.0°C</option>
+                </select>
+                {loading === 'hysteresis' && <span className="loading-spinner">⏳</span>}
+              </div>
+              <div className="info-item info-item-vertical">
+                <span className="label">Emergency Temp:</span>
+                <select
+                  className="agent-interval-select"
+                  value={emergencyTemp}
+                  onChange={(e) => handleEmergencyTempChange(parseFloat(e.target.value))}
+                  disabled={loading === 'emergency-temp'}
+                  title="Temperature threshold that overrides all controls and sets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety."
+                >
+                  <option value={70}>70°C</option>
+                  <option value={75}>75°C</option>
+                  <option value={80}>80°C</option>
+                  <option value={85}>85°C</option>
+                  <option value={90}>90°C</option>
+                  <option value={95}>95°C</option>
+                  <option value={100}>100°C</option>
+                </select>
+                {loading === 'emergency-temp' && <span className="loading-spinner">⏳</span>}
               </div>
             </div>
           )}

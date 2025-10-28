@@ -87,6 +87,25 @@ export class AgentManager extends EventEmitter {
       // Initialize with agent's reported update interval (convert from milliseconds to seconds)
       const intervalSeconds = agentConfig.updateInterval ? Math.round(agentConfig.updateInterval / 1000) : 3;
       this.agentUpdateIntervals.set(agentConfig.agentId, intervalSeconds);
+
+      // Initialize ALL configuration Maps with default values to prevent reset bug
+      // This ensures all getters return actual values instead of fallback defaults
+      if (!this.agentSensorDeduplication.has(agentConfig.agentId)) {
+        this.agentSensorDeduplication.set(agentConfig.agentId, true); // Default true
+      }
+      if (!this.agentSensorTolerance.has(agentConfig.agentId)) {
+        this.agentSensorTolerance.set(agentConfig.agentId, 0.5); // Default 0.5°C
+      }
+      if (!this.agentFanStep.has(agentConfig.agentId)) {
+        this.agentFanStep.set(agentConfig.agentId, 5); // Default 5%
+      }
+      if (!this.agentHysteresis.has(agentConfig.agentId)) {
+        this.agentHysteresis.set(agentConfig.agentId, 3.0); // Default 3.0°C
+      }
+      if (!this.agentEmergencyTemp.has(agentConfig.agentId)) {
+        this.agentEmergencyTemp.set(agentConfig.agentId, 85.0); // Default 85.0°C
+      }
+
       log.info(` Agent ${agentConfig.agentId} registered with update interval: ${intervalSeconds}s`, 'AgentManager');
 
       log.info(` Agent registered: ${agentConfig.name} (${agentConfig.agentId})`, 'AgentManager');
@@ -237,9 +256,27 @@ export class AgentManager extends EventEmitter {
         };
         
         this.agentStatuses.set(agentConfig.agentId, status);
-        
+
         // Initialize with default update interval (3 seconds)
         this.agentUpdateIntervals.set(agentConfig.agentId, 3);
+
+        // Initialize ALL configuration Maps with default values to prevent reset bug
+        // This ensures all getters return actual values instead of fallback defaults
+        if (!this.agentSensorDeduplication.has(agentConfig.agentId)) {
+          this.agentSensorDeduplication.set(agentConfig.agentId, true); // Default true
+        }
+        if (!this.agentSensorTolerance.has(agentConfig.agentId)) {
+          this.agentSensorTolerance.set(agentConfig.agentId, 0.5); // Default 0.5°C
+        }
+        if (!this.agentFanStep.has(agentConfig.agentId)) {
+          this.agentFanStep.set(agentConfig.agentId, 5); // Default 5%
+        }
+        if (!this.agentHysteresis.has(agentConfig.agentId)) {
+          this.agentHysteresis.set(agentConfig.agentId, 3.0); // Default 3.0°C
+        }
+        if (!this.agentEmergencyTemp.has(agentConfig.agentId)) {
+          this.agentEmergencyTemp.set(agentConfig.agentId, 85.0); // Default 85.0°C
+        }
       }
 
       log.info(` Loaded ${systems.length} agents from database`, 'AgentManager');
