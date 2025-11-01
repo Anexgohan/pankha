@@ -363,7 +363,7 @@ export class CommandDispatcher extends EventEmitter {
   /**
    * Handle command response from agent
    */
-  private handleCommandResponse(event: { agentId: string; response: any }): void {
+  private async handleCommandResponse(event: { agentId: string; response: any }): Promise<void> {
     const { response } = event;
     const commandId = response.commandId;
     
@@ -390,21 +390,33 @@ export class CommandDispatcher extends EventEmitter {
       // Update AgentManager with new values when commands succeed
       if (pendingCommand.command.type === 'setUpdateInterval' && response.data?.interval) {
         this.agentManager.setAgentUpdateInterval(pendingCommand.command.agentId, response.data.interval);
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, { update_interval: response.data.interval });
       }
       if (pendingCommand.command.type === 'setSensorDeduplication' && response.data?.enabled !== undefined) {
         this.agentManager.setAgentSensorDeduplication(pendingCommand.command.agentId, response.data.enabled);
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, { filter_duplicate_sensors: response.data.enabled });
       }
       if (pendingCommand.command.type === 'setSensorTolerance' && response.data?.tolerance !== undefined) {
         this.agentManager.setAgentSensorTolerance(pendingCommand.command.agentId, response.data.tolerance);
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, { duplicate_sensor_tolerance: response.data.tolerance });
       }
       if (pendingCommand.command.type === 'setFanStep' && response.data?.step !== undefined) {
         this.agentManager.setAgentFanStep(pendingCommand.command.agentId, response.data.step);
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, { fan_step_percent: response.data.step });
       }
       if (pendingCommand.command.type === 'setHysteresis' && response.data?.hysteresis !== undefined) {
         this.agentManager.setAgentHysteresis(pendingCommand.command.agentId, response.data.hysteresis);
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, { hysteresis_temp: response.data.hysteresis });
       }
       if (pendingCommand.command.type === 'setEmergencyTemp' && response.data?.temp !== undefined) {
         this.agentManager.setAgentEmergencyTemp(pendingCommand.command.agentId, response.data.temp);
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, { emergency_temp: response.data.temp });
       }
       pendingCommand.resolve(response.data);
       this.emit('commandCompleted', { command: pendingCommand.command, response });
@@ -485,10 +497,38 @@ export class CommandDispatcher extends EventEmitter {
   private async logCommand(command: FanControlCommand, status: string, details?: any): Promise<void> {
     try {
       // This could be stored in a separate audit table if needed
-      console.log(` Command log: ${command.type} (${command.commandId}) - ${status}`, 
+      console.log(` Command log: ${command.type} (${command.commandId}) - ${status}`,
         details ? JSON.stringify(details) : '');
     } catch (error) {
       log.error('Error logging command:', 'CommandDispatcher', error);
+    }
+  }
+
+  /**
+   * Save agent configuration to database
+   */
+  private async saveAgentConfig(agentId: string, config: Record<string, any>): Promise<void> {
+    try {
+      // Get current config_data
+      const system = await this.db.get('SELECT config_data FROM systems WHERE agent_id = $1', [agentId]);
+      if (!system) {
+        log.warn(`System not found for agent ${agentId}, skipping config save`, 'CommandDispatcher');
+        return;
+      }
+
+      // Merge with existing config
+      const currentConfig = system.config_data || {};
+      const updatedConfig = { ...currentConfig, ...config };
+
+      // Save to database
+      await this.db.run(
+        'UPDATE systems SET config_data = $1, updated_at = CURRENT_TIMESTAMP WHERE agent_id = $2',
+        [JSON.stringify(updatedConfig), agentId]
+      );
+
+      log.info(` Agent ${agentId} configuration saved to database: ${Object.keys(config).join(', ')}`, 'CommandDispatcher');
+    } catch (error) {
+      log.error(`Error saving agent ${agentId} configuration to database:`, 'CommandDispatcher', error);
     }
   }
 
