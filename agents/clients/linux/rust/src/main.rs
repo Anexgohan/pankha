@@ -11,7 +11,7 @@
 //! - Configuration hot-reloading
 //! - Automatic reconnection with backoff
 
-use anyhow::{Context, Result};
+use anyhow::{Result, Context};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -194,6 +194,8 @@ pub struct LinuxHardwareMonitor {
     thermal_base: PathBuf,
     discovered_fans: Arc<RwLock<HashMap<String, FanInfo>>>,
     config: HardwareSettings,
+    system_info: Arc<RwLock<sysinfo::System>>,
+    system_info_cache: Arc<RwLock<Option<(SystemHealth, std::time::Instant)>>>,
 }
 
 #[cfg(target_os = "linux")]
@@ -202,6 +204,8 @@ struct FanInfo {
     rpm_path: PathBuf,
     pwm_enable_path: Option<PathBuf>,
     chip_name: String,
+    last_pwm_value: Arc<RwLock<Option<u8>>>,
+    last_write_time: Arc<RwLock<std::time::Instant>>,
 }
 
 #[cfg(target_os = "linux")]
@@ -212,6 +216,8 @@ impl LinuxHardwareMonitor {
             thermal_base: PathBuf::from("/sys/class/thermal"),
             discovered_fans: Arc::new(RwLock::new(HashMap::new())),
             config,
+            system_info: Arc::new(RwLock::new(sysinfo::System::new_all())),
+            system_info_cache: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -321,7 +327,8 @@ impl LinuxHardwareMonitor {
     async fn discover_hwmon_fans(&self) -> Result<Vec<Fan>> {
         let mut fans = Vec::new();
         let mut fan_map = self.discovered_fans.write().await;
-        fan_map.clear();
+        // DON'T CLEAR - keep existing entries with their cached state
+        // fan_map.clear();  // ← REMOVED - This causes race conditions
 
         if !self.hwmon_base.exists() {
             return Ok(fans);
@@ -378,13 +385,28 @@ impl LinuxHardwareMonitor {
                         pwm_file: Some(pwm_path.to_string_lossy().to_string()),
                     };
 
-                    // Store fan info for later control
-                    fan_map.insert(fan_id.clone(), FanInfo {
-                        pwm_path: pwm_path.clone(),
-                        rpm_path: fan_file.clone(),
-                        pwm_enable_path: if pwm_enable_path.exists() { Some(pwm_enable_path) } else { None },
-                        chip_name: chip_name.clone(),
-                    });
+                    // Update or insert fan info, preserving cached state
+                    match fan_map.get_mut(&fan_id) {
+                        Some(existing) => {
+                            // Update paths but preserve cached PWM state
+                            existing.pwm_path = pwm_path.clone();
+                            existing.rpm_path = fan_file.clone();
+                            existing.pwm_enable_path = if pwm_enable_path.exists() { Some(pwm_enable_path) } else { None };
+                            existing.chip_name = chip_name.clone();
+                            // Keep existing last_pwm_value and last_write_time
+                        }
+                        None => {
+                            // Insert new fan with fresh cache
+                            fan_map.insert(fan_id.clone(), FanInfo {
+                                pwm_path: pwm_path.clone(),
+                                rpm_path: fan_file.clone(),
+                                pwm_enable_path: if pwm_enable_path.exists() { Some(pwm_enable_path) } else { None },
+                                chip_name: chip_name.clone(),
+                                last_pwm_value: Arc::new(RwLock::new(None)),
+                                last_write_time: Arc::new(RwLock::new(std::time::Instant::now())),
+                            });
+                        }
+                    }
 
                     fans.push(fan);
                 }
@@ -399,32 +421,53 @@ impl LinuxHardwareMonitor {
 #[async_trait]
 impl HardwareMonitor for LinuxHardwareMonitor {
     async fn discover_sensors(&self) -> Result<Vec<Sensor>> {
+        // Always perform fresh sensor discovery (no caching)
         let sensors = self.discover_hwmon_sensors().await?;
 
         // Apply deduplication if enabled
-        if self.config.filter_duplicate_sensors {
-            Ok(Self::deduplicate_sensors(sensors, self.config.duplicate_sensor_tolerance))
+        let final_sensors = if self.config.filter_duplicate_sensors {
+            Self::deduplicate_sensors(sensors, self.config.duplicate_sensor_tolerance)
         } else {
-            Ok(sensors)
-        }
+            sensors
+        };
+
+        Ok(final_sensors)
     }
 
     async fn discover_fans(&self) -> Result<Vec<Fan>> {
-        self.discover_hwmon_fans().await
+        // Always perform fresh fan discovery (no caching)
+        let fans = self.discover_hwmon_fans().await?;
+        Ok(fans)
     }
 
     async fn get_system_info(&self) -> Result<SystemHealth> {
-        let mut sys = sysinfo::System::new_all();
-        sys.refresh_all();
+        // Check cache first (1 second TTL)
+        let cache = self.system_info_cache.read().await;
+        if let Some((health, timestamp)) = cache.as_ref() {
+            if timestamp.elapsed() < std::time::Duration::from_secs(1) {
+                return Ok(health.clone());
+            }
+        }
+        drop(cache);
+
+        // Cache miss or expired - refresh system info
+        let mut sys = self.system_info.write().await;
+        sys.refresh_cpu();
+        sys.refresh_memory();
 
         let cpu_usage = sys.global_cpu_info().cpu_usage() as f64;
         let memory_usage = (sys.used_memory() as f64 / sys.total_memory() as f64) * 100.0;
 
-        Ok(SystemHealth {
+        let health = SystemHealth {
             cpu_usage,
             memory_usage,
             agent_uptime: 0.0, // TODO: Track agent uptime
-        })
+        };
+
+        // Update cache
+        *self.system_info_cache.write().await = Some((health.clone(), std::time::Instant::now()));
+
+        Ok(health)
     }
 
     async fn set_fan_speed(&self, fan_id: &str, speed: u8) -> Result<()> {
@@ -435,19 +478,51 @@ impl HardwareMonitor for LinuxHardwareMonitor {
         let fan_info = fan_map.get(fan_id)
             .ok_or_else(|| anyhow::anyhow!("Fan not found: {}", fan_id))?;
 
-        // Enable manual PWM mode if needed
+        // DEDUPLICATION: Check if value unchanged
+        {
+            let last_value = fan_info.last_pwm_value.read().await;
+            if *last_value == Some(pwm_value) {
+                debug!("Fan {} already at PWM {}, skipping write", fan_id, pwm_value);
+                return Ok(());
+            }
+        }
+
+        // RATE LIMITING: Max 1 write per 100ms per fan
+        {
+            let mut last_time = fan_info.last_write_time.write().await;
+            let now = std::time::Instant::now();
+            let elapsed = now.duration_since(*last_time);
+
+            if elapsed < std::time::Duration::from_millis(100) {
+                debug!("Fan {} rate limited, last write {:?} ago", fan_id, elapsed);
+                return Ok(());
+            }
+            *last_time = now;
+        }
+
+        // Enable manual PWM mode if needed (with deduplication)
         if let Some(enable_path) = &fan_info.pwm_enable_path {
             let current_enable = self.read_file(enable_path).await.ok();
             if current_enable.as_deref() != Some("1") {
+                debug!("Enabling manual PWM mode for fan {}", fan_id);
                 self.write_file(enable_path, "1").await?;
             }
         }
 
-        // Set PWM value
-        self.write_file(&fan_info.pwm_path, &pwm_value.to_string()).await?;
-
-        info!("Set fan {} to {}% (PWM: {})", fan_id, speed, pwm_value);
-        Ok(())
+        // Perform actual PWM write with error handling
+        match self.write_file(&fan_info.pwm_path, &pwm_value.to_string()).await {
+            Ok(_) => {
+                // Update cache on success
+                *fan_info.last_pwm_value.write().await = Some(pwm_value);
+                debug!("Set fan {} to {}% (PWM: {})", fan_id, speed, pwm_value);
+                Ok(())
+            }
+            Err(e) => {
+                error!("Failed to write PWM for fan {}: {}", fan_id, e);
+                // Don't update cache on failure
+                Err(e)
+            }
+        }
     }
 
     async fn emergency_stop(&self) -> Result<()> {
@@ -513,6 +588,13 @@ impl LinuxHardwareMonitor {
             .cloned()
             .unwrap()
     }
+
+    // Method to force hardware rediscovery (no longer needed without caching, but kept for API compatibility)
+    pub async fn rediscover_hardware(&self) -> Result<()> {
+        info!("Hardware rediscovery requested (no caching, always fresh)");
+        // No-op since we always do fresh discovery now
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -522,12 +604,18 @@ impl LinuxHardwareMonitor {
 #[cfg(target_os = "windows")]
 pub struct WindowsHardwareMonitor {
     config: HardwareSettings,
+    system_info: Arc<RwLock<sysinfo::System>>,
+    system_info_cache: Arc<RwLock<Option<(SystemHealth, std::time::Instant)>>>,
 }
 
 #[cfg(target_os = "windows")]
 impl WindowsHardwareMonitor {
     pub fn new(config: HardwareSettings) -> Self {
-        Self { config }
+        Self {
+            config,
+            system_info: Arc::new(RwLock::new(sysinfo::System::new_all())),
+            system_info_cache: Arc::new(RwLock::new(None)),
+        }
     }
 }
 
@@ -547,8 +635,9 @@ impl HardwareMonitor for WindowsHardwareMonitor {
     }
 
     async fn get_system_info(&self) -> Result<SystemHealth> {
-        let mut sys = sysinfo::System::new_all();
-        sys.refresh_all();
+        let mut sys = self.system_info.write().await;
+        sys.refresh_cpu();
+        sys.refresh_memory();
 
         Ok(SystemHealth {
             cpu_usage: sys.global_cpu_info().cpu_usage() as f64,
@@ -573,12 +662,18 @@ impl HardwareMonitor for WindowsHardwareMonitor {
 #[cfg(target_os = "macos")]
 pub struct MacOSHardwareMonitor {
     config: HardwareSettings,
+    system_info: Arc<RwLock<sysinfo::System>>,
+    system_info_cache: Arc<RwLock<Option<(SystemHealth, std::time::Instant)>>>,
 }
 
 #[cfg(target_os = "macos")]
 impl MacOSHardwareMonitor {
     pub fn new(config: HardwareSettings) -> Self {
-        Self { config }
+        Self {
+            config,
+            system_info: Arc::new(RwLock::new(sysinfo::System::new_all())),
+            system_info_cache: Arc::new(RwLock::new(None)),
+        }
     }
 }
 
@@ -598,8 +693,9 @@ impl HardwareMonitor for MacOSHardwareMonitor {
     }
 
     async fn get_system_info(&self) -> Result<SystemHealth> {
-        let mut sys = sysinfo::System::new_all();
-        sys.refresh_all();
+        let mut sys = self.system_info.write().await;
+        sys.refresh_cpu();
+        sys.refresh_memory();
 
         Ok(SystemHealth {
             cpu_usage: sys.global_cpu_info().cpu_usage() as f64,
@@ -742,6 +838,11 @@ impl WebSocketClient {
         }
 
         data_sender.abort();
+        match data_sender.await {
+            Ok(_) => debug!("Data sender task completed"),
+            Err(e) if e.is_cancelled() => debug!("Data sender task cancelled"),
+            Err(e) => error!("Data sender task error: {}", e),
+        }
         Ok(())
     }
 
@@ -821,6 +922,65 @@ impl WebSocketClient {
                 }
                 "registered" => {
                     info!("Registration confirmed by server");
+
+                    // Apply configuration from registration response
+                    if let Some(config) = message.get("configuration") {
+                        info!("Applying configuration from server");
+
+                        // Apply update_interval
+                        if let Some(interval) = config.get("update_interval").and_then(|v| v.as_f64()) {
+                            if let Err(e) = self.set_update_interval(interval).await {
+                                error!("Failed to apply update_interval: {}", e);
+                            } else {
+                                info!("Applied update_interval: {}s", interval);
+                            }
+                        }
+
+                        // Apply filter_duplicate_sensors
+                        if let Some(enabled) = config.get("filter_duplicate_sensors").and_then(|v| v.as_bool()) {
+                            if let Err(e) = self.set_sensor_deduplication(enabled).await {
+                                error!("Failed to apply filter_duplicate_sensors: {}", e);
+                            } else {
+                                info!("Applied filter_duplicate_sensors: {}", enabled);
+                            }
+                        }
+
+                        // Apply duplicate_sensor_tolerance
+                        if let Some(tolerance) = config.get("duplicate_sensor_tolerance").and_then(|v| v.as_f64()) {
+                            if let Err(e) = self.set_sensor_tolerance(tolerance).await {
+                                error!("Failed to apply duplicate_sensor_tolerance: {}", e);
+                            } else {
+                                info!("Applied duplicate_sensor_tolerance: {}", tolerance);
+                            }
+                        }
+
+                        // Apply fan_step_percent
+                        if let Some(step) = config.get("fan_step_percent").and_then(|v| v.as_f64()) {
+                            if let Err(e) = self.set_fan_step(step.round() as u8).await {
+                                error!("Failed to apply fan_step_percent: {}", e);
+                            } else {
+                                info!("Applied fan_step_percent: {}%", step);
+                            }
+                        }
+
+                        // Apply hysteresis_temp
+                        if let Some(hysteresis) = config.get("hysteresis_temp").and_then(|v| v.as_f64()) {
+                            if let Err(e) = self.set_hysteresis(hysteresis).await {
+                                error!("Failed to apply hysteresis_temp: {}", e);
+                            } else {
+                                info!("Applied hysteresis_temp: {}°C", hysteresis);
+                            }
+                        }
+
+                        // Apply emergency_temp
+                        if let Some(temp) = config.get("emergency_temp").and_then(|v| v.as_f64()) {
+                            if let Err(e) = self.set_emergency_temp(temp).await {
+                                error!("Failed to apply emergency_temp: {}", e);
+                            } else {
+                                info!("Applied emergency_temp: {}°C", temp);
+                            }
+                        }
+                    }
                 }
                 _ => {
                     debug!("Received message type: {}", msg_type);
@@ -832,24 +992,39 @@ impl WebSocketClient {
     }
 
     async fn handle_command(&self, data: &serde_json::Value, write: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>) -> Result<()> {
-        let command_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("");
-        let command_id = data.get("commandId").and_then(|v| v.as_str());
-        let payload = data.get("payload");
+        // Validate command structure first
+        let command_type = data.get("type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing or invalid command type"))?;
+
+        let command_id = data.get("commandId")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Missing command ID"))?;
+
+        let payload = data.get("payload")
+            .ok_or_else(|| anyhow::anyhow!("Missing command payload"))?;
 
         debug!("Processing command: {} with payload: {:?}", command_type, payload);
 
         let (success, error_msg, result_data) = match command_type {
             "setFanSpeed" => {
                 if let (Some(fan_id), Some(speed)) = (
-                    payload.and_then(|p| p.get("fanId")).and_then(|v| v.as_str()),
-                    payload.and_then(|p| p.get("speed")).and_then(|v| v.as_u64())
+                    payload.get("fanId").and_then(|v| v.as_str()),
+                    payload.get("speed").and_then(|v| v.as_u64())
                 ) {
-                    match self.hardware_monitor.set_fan_speed(fan_id, speed as u8).await {
-                        Ok(_) => (true, None, serde_json::json!({"fanId": fan_id, "speed": speed})),
-                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    // Validate fan ID and speed
+                    if fan_id.trim().is_empty() {
+                        (false, Some("Fan ID cannot be empty".to_string()), serde_json::json!({}))
+                    } else if speed > 100 {
+                        (false, Some(format!("Invalid fan speed: {}. Must be between 0-100", speed)), serde_json::json!({}))
+                    } else {
+                        match self.hardware_monitor.set_fan_speed(fan_id, speed as u8).await {
+                            Ok(_) => (true, None, serde_json::json!({"fanId": fan_id, "speed": speed})),
+                            Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                        }
                     }
                 } else {
-                    (false, Some("Missing fanId or speed".to_string()), serde_json::json!({}))
+                    (false, Some("Missing fanId or speed in setFanSpeed command".to_string()), serde_json::json!({}))
                 }
             }
             "emergencyStop" => {
@@ -859,7 +1034,7 @@ impl WebSocketClient {
                 }
             }
             "setUpdateInterval" => {
-                if let Some(interval) = payload.and_then(|p| p.get("interval")).and_then(|v| v.as_f64()) {
+                if let Some(interval) = payload.get("interval").and_then(|v| v.as_f64()) {
                     match self.set_update_interval(interval).await {
                         Ok(_) => (true, None, serde_json::json!({"interval": interval})),
                         Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
@@ -869,7 +1044,7 @@ impl WebSocketClient {
                 }
             }
             "setSensorDeduplication" => {
-                if let Some(enabled) = payload.and_then(|p| p.get("enabled")).and_then(|v| v.as_bool()) {
+                if let Some(enabled) = payload.get("enabled").and_then(|v| v.as_bool()) {
                     match self.set_sensor_deduplication(enabled).await {
                         Ok(_) => (true, None, serde_json::json!({"enabled": enabled})),
                         Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
@@ -879,7 +1054,7 @@ impl WebSocketClient {
                 }
             }
             "setSensorTolerance" => {
-                if let Some(tolerance) = payload.and_then(|p| p.get("tolerance")).and_then(|v| v.as_f64()) {
+                if let Some(tolerance) = payload.get("tolerance").and_then(|v| v.as_f64()) {
                     match self.set_sensor_tolerance(tolerance).await {
                         Ok(_) => (true, None, serde_json::json!({"tolerance": tolerance})),
                         Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
@@ -889,7 +1064,7 @@ impl WebSocketClient {
                 }
             }
             "setFanStep" => {
-                if let Some(step) = payload.and_then(|p| p.get("step")).and_then(|v| v.as_u64()) {
+                if let Some(step) = payload.get("step").and_then(|v| v.as_u64()) {
                     match self.set_fan_step(step as u8).await {
                         Ok(_) => (true, None, serde_json::json!({"step": step})),
                         Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
@@ -899,7 +1074,7 @@ impl WebSocketClient {
                 }
             }
             "setHysteresis" => {
-                if let Some(hysteresis) = payload.and_then(|p| p.get("hysteresis")).and_then(|v| v.as_f64()) {
+                if let Some(hysteresis) = payload.get("hysteresis").and_then(|v| v.as_f64()) {
                     match self.set_hysteresis(hysteresis).await {
                         Ok(_) => (true, None, serde_json::json!({"hysteresis": hysteresis})),
                         Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
@@ -909,7 +1084,7 @@ impl WebSocketClient {
                 }
             }
             "setEmergencyTemp" => {
-                if let Some(temp) = payload.and_then(|p| p.get("temp")).and_then(|v| v.as_f64()) {
+                if let Some(temp) = payload.get("temp").and_then(|v| v.as_f64()) {
                     match self.set_emergency_temp(temp).await {
                         Ok(_) => (true, None, serde_json::json!({"temp": temp})),
                         Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
@@ -926,10 +1101,10 @@ impl WebSocketClient {
         };
 
         // Send command response back to backend
-        if let Some(cmd_id) = command_id {
+        {
             let mut response = serde_json::json!({
                 "type": "commandResponse",
-                "commandId": cmd_id,
+                "commandId": command_id,
                 "success": success,
                 "data": result_data,
                 "timestamp": chrono::Utc::now().timestamp_millis()
@@ -942,7 +1117,7 @@ impl WebSocketClient {
             }
 
             write.send(Message::Text(response.to_string())).await?;
-            debug!("Sent command response: {}, success: {}", cmd_id, success);
+            debug!("Sent command response: {}, success: {}", command_id, success);
         }
 
         Ok(())
@@ -954,35 +1129,40 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid interval: {}. Must be between 0.5 and 30 seconds", interval));
         }
 
-        // Get write lock and update config
-        let mut config = self.config.write().await;
-        let old_interval = config.agent.update_interval;
-        config.agent.update_interval = interval;
+        // Get write lock, update quickly, release lock
+        let old_interval;
+        {
+            let mut config = self.config.write().await;
+            old_interval = config.agent.update_interval;
+            config.agent.update_interval = interval;
+        } // Lock released here
 
-        // Save config to disk
+        // Perform I/O outside of lock
         let config_path = std::env::current_exe()?
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&*config, config_path.to_str().unwrap()).await?;
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
         info!("Update interval changed: {}s → {}s (saved to config)", old_interval, interval);
         Ok(())
     }
 
     async fn set_sensor_deduplication(&self, enabled: bool) -> Result<()> {
-        // Get write lock and update config
-        let mut config = self.config.write().await;
-        config.hardware.filter_duplicate_sensors = enabled;
+        // Update config quickly with minimal lock time
+        {
+            let mut config = self.config.write().await;
+            config.hardware.filter_duplicate_sensors = enabled;
+        } // Lock released here
 
-        // Save config to disk
+        // Perform I/O outside of lock
         let config_path = std::env::current_exe()?
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&*config, config_path.to_str().unwrap()).await?;
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
         info!("Sensor deduplication changed to: {} (saved to config)", enabled);
         Ok(())
@@ -994,17 +1174,19 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid tolerance: {}. Must be between 0.25 and 5.0°C", tolerance));
         }
 
-        // Get write lock and update config
-        let mut config = self.config.write().await;
-        config.hardware.duplicate_sensor_tolerance = tolerance;
+        // Update config quickly with minimal lock time
+        {
+            let mut config = self.config.write().await;
+            config.hardware.duplicate_sensor_tolerance = tolerance;
+        } // Lock released here
 
-        // Save config to disk
+        // Perform I/O outside of lock
         let config_path = std::env::current_exe()?
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&*config, config_path.to_str().unwrap()).await?;
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
         info!("Sensor tolerance changed to: {}°C (saved to config)", tolerance);
         Ok(())
@@ -1017,17 +1199,19 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid fan step: {}. Must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)", step));
         }
 
-        // Get write lock and update config
-        let mut config = self.config.write().await;
-        config.hardware.fan_step_percent = step;
+        // Update config quickly with minimal lock time
+        {
+            let mut config = self.config.write().await;
+            config.hardware.fan_step_percent = step;
+        } // Lock released here
 
-        // Save config to disk
+        // Perform I/O outside of lock
         let config_path = std::env::current_exe()?
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&*config, config_path.to_str().unwrap()).await?;
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
         info!("Fan step changed to: {}% (saved to config)", step);
         Ok(())
@@ -1039,17 +1223,19 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid hysteresis: {}. Must be between 0.0 (disable) and 10.0°C", hysteresis));
         }
 
-        // Get write lock and update config
-        let mut config = self.config.write().await;
-        config.hardware.hysteresis_temp = hysteresis;
+        // Update config quickly with minimal lock time
+        {
+            let mut config = self.config.write().await;
+            config.hardware.hysteresis_temp = hysteresis;
+        } // Lock released here
 
-        // Save config to disk
+        // Perform I/O outside of lock
         let config_path = std::env::current_exe()?
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&*config, config_path.to_str().unwrap()).await?;
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
         info!("Hysteresis changed to: {}°C (saved to config)", hysteresis);
         Ok(())
@@ -1061,17 +1247,19 @@ impl WebSocketClient {
             return Err(anyhow::anyhow!("Invalid emergency temp: {}. Must be between 70.0 and 100.0°C", temp));
         }
 
-        // Get write lock and update config
-        let mut config = self.config.write().await;
-        config.hardware.emergency_temp = temp;
+        // Update config quickly with minimal lock time
+        {
+            let mut config = self.config.write().await;
+            config.hardware.emergency_temp = temp;
+        } // Lock released here
 
-        // Save config to disk
+        // Perform I/O outside of lock
         let config_path = std::env::current_exe()?
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .join("config.json");
 
-        save_config(&*config, config_path.to_str().unwrap()).await?;
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
         info!("Emergency temperature changed to: {}°C (saved to config)", temp);
         Ok(())
@@ -1351,7 +1539,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
 use std::fs;
 use std::process;
 #[cfg(target_os = "linux")]
-use std::os::fd::AsRawFd;
+// use std::os::fd::AsRawFd; // Unused import
 
 const PID_FILE: &str = "/run/pankha-agent/pankha-agent.pid";
 const LOG_DIR: &str = "/var/log/pankha-agent";
@@ -1676,18 +1864,6 @@ async fn main() -> Result<()> {
         client_clone.stop().await;
     });
 
-    // Clean up PID file on shutdown
-    let client_clone = Arc::clone(&client);
-    tokio::spawn(async move {
-        client_clone.run().await.ok();
-        // Clean up PID file when shutting down
-        if let Ok(Some(pid)) = get_pid() {
-            if pid == process::id() as u32 {
-                let _ = remove_pid_file();
-            }
-        }
-    });
-
     // Run client with timeout/select to check for shutdown
     tokio::select! {
         result = client.run() => {
@@ -1697,6 +1873,14 @@ async fn main() -> Result<()> {
         }
         _ = shutdown_signal => {
             info!("Shutdown signal handled");
+        }
+    }
+
+    // Clean up PID file after shutdown
+    if let Ok(Some(pid)) = get_pid() {
+        if pid == process::id() {
+            let _ = remove_pid_file();
+            info!("PID file cleaned up");
         }
     }
 

@@ -380,9 +380,9 @@ export class DataAggregator extends EventEmitter {
         for (const [fanId, dataPoints] of buffer.fans.entries()) {
           if (dataPoints.length === 0) continue;
 
-          // Calculate average speed and RPM
-          const avgSpeed = dataPoints.reduce((sum, p) => sum + (p.speed || 0), 0) / dataPoints.length;
-          const avgRpm = dataPoints.reduce((sum, p) => sum + (p.rpm || 0), 0) / dataPoints.length;
+          // Calculate average speed and RPM (rounded to integers for database)
+          const avgSpeed = Math.round(dataPoints.reduce((sum, p) => sum + (p.speed || 0), 0) / dataPoints.length);
+          const avgRpm = Math.round(dataPoints.reduce((sum, p) => sum + (p.rpm || 0), 0) / dataPoints.length);
 
           // Store aggregated average to database
           await this.db.run(

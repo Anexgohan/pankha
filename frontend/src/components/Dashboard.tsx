@@ -39,6 +39,7 @@ const Dashboard: React.FC = () => {
       setSystems(systemsData);
       setOverview(overviewData);
       setError(null);
+      // Only update lastUpdate when we successfully fetch data
       setLastUpdate(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
@@ -62,7 +63,8 @@ const Dashboard: React.FC = () => {
         console.log('⚡ Auto-refreshing data for real-time updates...');
         // Auto-refresh without loading spinner to preserve dropdown states
         refreshData(false);
-        setLastUpdate(new Date());
+        // NOTE: Don't update lastUpdate here - it should only update when data actually changes
+        // Each system card shows its own last_seen from the backend (when agent last sent data)
       }
     }, refreshRate); // Now uses configurable refresh rate!
 
@@ -119,7 +121,7 @@ const Dashboard: React.FC = () => {
               🟢 API Polling
             </span>
             <span className="last-update">
-              Last update: {lastUpdate.toLocaleTimeString()}
+              Dashboard refreshed: {lastUpdate.toLocaleTimeString()}
             </span>
           </div>
           <RefreshRateSelector />

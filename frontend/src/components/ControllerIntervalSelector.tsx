@@ -52,7 +52,7 @@ const ControllerIntervalSelector: React.FC = () => {
   return (
     <div
       className="controller-interval-selector"
-      title="How quickly the system calculates temperature changes and fan speeds, reads agents, send commands to agents. Lower values are CPU intensive."
+      title="How frequently the backend controller processes fan profiles and sends control commands to agents. Agents push their data independently based on their Agent Rate. Lower values increase CPU usage but provide faster fan speed adjustments."
     >
       <label htmlFor="controller-interval" className="controller-interval-label">
         System Responsiveness (CPU Load)

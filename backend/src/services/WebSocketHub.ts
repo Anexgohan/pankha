@@ -332,36 +332,55 @@ export class WebSocketHub extends EventEmitter {
         await this.agentManager.registerAgent(agentConfig);
         log.info(` Agent ${agentId} registered successfully via WebSocket`, 'WebSocketHub');
 
-        // Set sensor deduplication settings if provided
-        if (registrationData.filter_duplicate_sensors !== undefined) {
-          this.agentManager.setAgentSensorDeduplication(agentId, registrationData.filter_duplicate_sensors);
-          log.info(` Agent ${agentId} sensor deduplication: ${registrationData.filter_duplicate_sensors}`, 'WebSocketHub');
+        // Load saved configuration from database
+        const Database = (await import('../database/database')).default;
+        const db = Database.getInstance();
+        const system = await db.get('SELECT config_data FROM systems WHERE agent_id = $1', [agentId]);
+        const savedConfig = system?.config_data || {};
+
+        // Apply saved configuration, with priority to database values over registration data
+        const finalConfig = {
+          update_interval: savedConfig.update_interval ?? registrationData.update_interval ?? 3,
+          filter_duplicate_sensors: savedConfig.filter_duplicate_sensors ?? registrationData.filter_duplicate_sensors ?? true,
+          duplicate_sensor_tolerance: savedConfig.duplicate_sensor_tolerance ?? registrationData.duplicate_sensor_tolerance,
+          fan_step_percent: savedConfig.fan_step_percent ?? registrationData.fan_step_percent,
+          hysteresis_temp: savedConfig.hysteresis_temp ?? registrationData.hysteresis_temp,
+          emergency_temp: savedConfig.emergency_temp ?? registrationData.emergency_temp
+        };
+
+        // Set configuration in AgentManager
+        if (finalConfig.update_interval !== undefined) {
+          this.agentManager.setAgentUpdateInterval(agentId, finalConfig.update_interval);
+          log.info(` Agent ${agentId} update interval: ${finalConfig.update_interval}s`, 'WebSocketHub');
         }
-        if (registrationData.duplicate_sensor_tolerance !== undefined) {
-          this.agentManager.setAgentSensorTolerance(agentId, registrationData.duplicate_sensor_tolerance);
-          log.info(` Agent ${agentId} sensor tolerance: ${registrationData.duplicate_sensor_tolerance}`, 'WebSocketHub');
+        if (finalConfig.filter_duplicate_sensors !== undefined) {
+          this.agentManager.setAgentSensorDeduplication(agentId, finalConfig.filter_duplicate_sensors);
+          log.info(` Agent ${agentId} sensor deduplication: ${finalConfig.filter_duplicate_sensors}`, 'WebSocketHub');
+        }
+        if (finalConfig.duplicate_sensor_tolerance !== undefined) {
+          this.agentManager.setAgentSensorTolerance(agentId, finalConfig.duplicate_sensor_tolerance);
+          log.info(` Agent ${agentId} sensor tolerance: ${finalConfig.duplicate_sensor_tolerance}`, 'WebSocketHub');
+        }
+        if (finalConfig.fan_step_percent !== undefined) {
+          this.agentManager.setAgentFanStep(agentId, finalConfig.fan_step_percent);
+          log.info(` Agent ${agentId} fan step: ${finalConfig.fan_step_percent}%`, 'WebSocketHub');
+        }
+        if (finalConfig.hysteresis_temp !== undefined) {
+          this.agentManager.setAgentHysteresis(agentId, finalConfig.hysteresis_temp);
+          log.info(` Agent ${agentId} hysteresis: ${finalConfig.hysteresis_temp}°C`, 'WebSocketHub');
+        }
+        if (finalConfig.emergency_temp !== undefined) {
+          this.agentManager.setAgentEmergencyTemp(agentId, finalConfig.emergency_temp);
+          log.info(` Agent ${agentId} emergency temp: ${finalConfig.emergency_temp}°C`, 'WebSocketHub');
         }
 
-        // Set hysteresis settings if provided
-        if (registrationData.fan_step_percent !== undefined) {
-          this.agentManager.setAgentFanStep(agentId, registrationData.fan_step_percent);
-          log.info(` Agent ${agentId} fan step: ${registrationData.fan_step_percent}%`, 'WebSocketHub');
-        }
-        if (registrationData.hysteresis_temp !== undefined) {
-          this.agentManager.setAgentHysteresis(agentId, registrationData.hysteresis_temp);
-          log.info(` Agent ${agentId} hysteresis: ${registrationData.hysteresis_temp}°C`, 'WebSocketHub');
-        }
-        if (registrationData.emergency_temp !== undefined) {
-          this.agentManager.setAgentEmergencyTemp(agentId, registrationData.emergency_temp);
-          log.info(` Agent ${agentId} emergency temp: ${registrationData.emergency_temp}°C`, 'WebSocketHub');
-        }
-
-        // Send registration confirmation
+        // Send registration confirmation with configuration
         this.sendToClient(clientId, 'registered', {
           agentId: agentId,
           status: 'success',
           message: 'Agent registered successfully',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          configuration: finalConfig // Send configuration to agent so it can apply it
         });
 
         // Notify other clients about new agent
