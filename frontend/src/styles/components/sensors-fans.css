@@ -276,6 +276,9 @@
   border-radius: var(--radius-lg);
   border-left: 4px solid var(--color-info);
   transition: all 0.3s ease;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .fan-item:hover {
@@ -358,6 +361,7 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   width: 100%;
+  box-sizing: border-box;
 }
 
 .fan-control-row {
@@ -366,13 +370,15 @@
   gap: var(--spacing-sm);
   width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
 .control-label {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
-  min-width: 120px;
+  min-width: 100px;
+  flex-shrink: 0;
 }
 
 .fan-dropdown {
@@ -386,6 +392,7 @@
   font-size: var(--font-size-sm);
   cursor: pointer;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 .fan-dropdown:hover:not(:disabled) {
