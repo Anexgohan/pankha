@@ -579,120 +579,124 @@ const SystemCard: React.FC<SystemCardProps> = ({
             </div>
           )}
           {system.status === 'online' && (
-            <div className="info-row">
-              <div className="info-item info-item-vertical">
-                <span className="label">Agent rate:</span>
-                <select
-                  className="agent-interval-select"
-                  value={agentInterval}
-                  onChange={(e) => handleAgentIntervalChange(parseFloat(e.target.value))}
-                  disabled={loading === 'agent-interval'}
-                  title="Agent data collection interval"
-                >
-                  <option value={0.5}>0.5s</option>
-                  <option value={1}>1s</option>
-                  <option value={2}>2s</option>
-                  <option value={3}>3s</option>
-                  <option value={5}>5s</option>
-                  <option value={10}>10s</option>
-                  <option value={15}>15s</option>
-                  <option value={30}>30s</option>
-                </select>
-                {loading === 'agent-interval' && <span className="loading-spinner">⏳</span>}
+            <>
+              <div className="info-row">
+                <div className="info-item info-item-vertical">
+                  <span className="label">Agent rate:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={agentInterval}
+                    onChange={(e) => handleAgentIntervalChange(parseFloat(e.target.value))}
+                    disabled={loading === 'agent-interval'}
+                    title="Agent data collection interval"
+                  >
+                    <option value={0.5}>0.5s</option>
+                    <option value={1}>1s</option>
+                    <option value={2}>2s</option>
+                    <option value={3}>3s</option>
+                    <option value={5}>5s</option>
+                    <option value={10}>10s</option>
+                    <option value={15}>15s</option>
+                    <option value={30}>30s</option>
+                  </select>
+                  {loading === 'agent-interval' && <span className="loading-spinner">⏳</span>}
+                </div>
+                <div className="info-item info-item-horizontal">
+                  <span className="label">Filter duplicates:</span>
+                  <input
+                    type="checkbox"
+                    checked={filterDuplicates}
+                    onChange={(e) => handleFilterDuplicatesChange(e.target.checked)}
+                    disabled={loading === 'filter-duplicates'}
+                    title="Filter duplicate temperature sensors"
+                  />
+                  {loading === 'filter-duplicates' && <span className="loading-spinner">⏳</span>}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label">Sensor tolerance:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={sensorTolerance}
+                    onChange={(e) => handleSensorToleranceChange(parseFloat(e.target.value))}
+                    disabled={loading === 'sensor-tolerance'}
+                    title="Temperature tolerance for sensor deduplication (°C)"
+                  >
+                    <option value={0.25}>0.25°C</option>
+                    <option value={0.5}>0.5°C</option>
+                    <option value={1.0}>1.0°C</option>
+                    <option value={1.5}>1.5°C</option>
+                    <option value={2.0}>2.0°C</option>
+                    <option value={2.5}>2.5°C</option>
+                    <option value={3.0}>3.0°C</option>
+                    <option value={3.5}>3.5°C</option>
+                    <option value={4.0}>4.0°C</option>
+                    <option value={4.5}>4.5°C</option>
+                    <option value={5.0}>5.0°C</option>
+                  </select>
+                  {loading === 'sensor-tolerance' && <span className="loading-spinner">⏳</span>}
+                </div>
               </div>
-              <div className="info-item info-item-horizontal">
-                <span className="label">Filter duplicates:</span>
-                <input
-                  type="checkbox"
-                  checked={filterDuplicates}
-                  onChange={(e) => handleFilterDuplicatesChange(e.target.checked)}
-                  disabled={loading === 'filter-duplicates'}
-                  title="Filter duplicate temperature sensors"
-                />
-                {loading === 'filter-duplicates' && <span className="loading-spinner">⏳</span>}
+              <div className="info-row">
+                <div className="info-item info-item-vertical">
+                  <span className="label">Fan Step:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={fanStep}
+                    onChange={(e) => handleFanStepChange(parseInt(e.target.value))}
+                    disabled={loading === 'fan-step'}
+                    title={`Determines the incremental percentage change in fan speed when adjusting towards the target temperature. Instead of making abrupt changes, the fan speed will increase or decrease in defined steps, providing smoother transitions and reducing wear on the fan. Changes are applied every ${agentInterval}s (Agent Rate).`}
+                  >
+                    <option value={3}>3%</option>
+                    <option value={5}>5%</option>
+                    <option value={10}>10%</option>
+                    <option value={15}>15%</option>
+                    <option value={25}>25%</option>
+                    <option value={50}>50%</option>
+                    <option value={100}>Disable (instant)</option>
+                  </select>
+                  {loading === 'fan-step' && <span className="loading-spinner">⏳</span>}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label">Hysteresis:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={hysteresis}
+                    onChange={(e) => handleHysteresisChange(parseFloat(e.target.value))}
+                    disabled={loading === 'hysteresis'}
+                    title="Temperature tolerance before adjusting fan speed. The fan will only change speed when temperature moves more than this amount from the target, preventing constant micro-adjustments. Higher values = more stability, lower values = more responsive cooling."
+                  >
+                    <option value={0.0}>Disable (instant)</option>
+                    <option value={0.5}>0.5°C</option>
+                    <option value={1.0}>1.0°C</option>
+                    <option value={2.0}>2.0°C</option>
+                    <option value={3.0}>3.0°C</option>
+                    <option value={5.0}>5.0°C</option>
+                    <option value={7.5}>7.5°C</option>
+                    <option value={10.0}>10.0°C</option>
+                  </select>
+                  {loading === 'hysteresis' && <span className="loading-spinner">⏳</span>}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label">Emergency Temp:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={emergencyTemp}
+                    onChange={(e) => handleEmergencyTempChange(parseFloat(e.target.value))}
+                    disabled={loading === 'emergency-temp'}
+                    title="Temperature threshold that overrides all controls and sets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety."
+                  >
+                    <option value={70}>70°C</option>
+                    <option value={75}>75°C</option>
+                    <option value={80}>80°C</option>
+                    <option value={85}>85°C</option>
+                    <option value={90}>90°C</option>
+                    <option value={95}>95°C</option>
+                    <option value={100}>100°C</option>
+                  </select>
+                  {loading === 'emergency-temp' && <span className="loading-spinner">⏳</span>}
+                </div>
               </div>
-              <div className="info-item info-item-vertical">
-                <span className="label">Sensor tolerance:</span>
-                <select
-                  className="agent-interval-select"
-                  value={sensorTolerance}
-                  onChange={(e) => handleSensorToleranceChange(parseFloat(e.target.value))}
-                  disabled={loading === 'sensor-tolerance'}
-                  title="Temperature tolerance for sensor deduplication (°C)"
-                >
-                  <option value={0.25}>0.25°C</option>
-                  <option value={0.5}>0.5°C</option>
-                  <option value={1.0}>1.0°C</option>
-                  <option value={1.5}>1.5°C</option>
-                  <option value={2.0}>2.0°C</option>
-                  <option value={2.5}>2.5°C</option>
-                  <option value={3.0}>3.0°C</option>
-                  <option value={3.5}>3.5°C</option>
-                  <option value={4.0}>4.0°C</option>
-                  <option value={4.5}>4.5°C</option>
-                  <option value={5.0}>5.0°C</option>
-                </select>
-                {loading === 'sensor-tolerance' && <span className="loading-spinner">⏳</span>}
-              </div>
-              <div className="info-item info-item-vertical">
-                <span className="label">Fan Step:</span>
-                <select
-                  className="agent-interval-select"
-                  value={fanStep}
-                  onChange={(e) => handleFanStepChange(parseInt(e.target.value))}
-                  disabled={loading === 'fan-step'}
-                  title={`Determines the incremental percentage change in fan speed when adjusting towards the target temperature. Instead of making abrupt changes, the fan speed will increase or decrease in defined steps, providing smoother transitions and reducing wear on the fan. Changes are applied every ${agentInterval}s (Agent Rate).`}
-                >
-                  <option value={3}>3%</option>
-                  <option value={5}>5%</option>
-                  <option value={10}>10%</option>
-                  <option value={15}>15%</option>
-                  <option value={25}>25%</option>
-                  <option value={50}>50%</option>
-                  <option value={100}>Disable (instant)</option>
-                </select>
-                {loading === 'fan-step' && <span className="loading-spinner">⏳</span>}
-              </div>
-              <div className="info-item info-item-vertical">
-                <span className="label">Hysteresis:</span>
-                <select
-                  className="agent-interval-select"
-                  value={hysteresis}
-                  onChange={(e) => handleHysteresisChange(parseFloat(e.target.value))}
-                  disabled={loading === 'hysteresis'}
-                  title="Temperature tolerance before adjusting fan speed. The fan will only change speed when temperature moves more than this amount from the target, preventing constant micro-adjustments. Higher values = more stability, lower values = more responsive cooling."
-                >
-                  <option value={0.0}>Disable (instant)</option>
-                  <option value={0.5}>0.5°C</option>
-                  <option value={1.0}>1.0°C</option>
-                  <option value={2.0}>2.0°C</option>
-                  <option value={3.0}>3.0°C</option>
-                  <option value={5.0}>5.0°C</option>
-                  <option value={7.5}>7.5°C</option>
-                  <option value={10.0}>10.0°C</option>
-                </select>
-                {loading === 'hysteresis' && <span className="loading-spinner">⏳</span>}
-              </div>
-              <div className="info-item info-item-vertical">
-                <span className="label">Emergency Temp:</span>
-                <select
-                  className="agent-interval-select"
-                  value={emergencyTemp}
-                  onChange={(e) => handleEmergencyTempChange(parseFloat(e.target.value))}
-                  disabled={loading === 'emergency-temp'}
-                  title="Temperature threshold that overrides all controls and sets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety."
-                >
-                  <option value={70}>70°C</option>
-                  <option value={75}>75°C</option>
-                  <option value={80}>80°C</option>
-                  <option value={85}>85°C</option>
-                  <option value={90}>90°C</option>
-                  <option value={95}>95°C</option>
-                  <option value={100}>100°C</option>
-                </select>
-                {loading === 'emergency-temp' && <span className="loading-spinner">⏳</span>}
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>
