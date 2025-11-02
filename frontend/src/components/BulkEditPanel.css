@@ -220,7 +220,7 @@
 }
 
 /* Fan Item */
-.fan-item {
+.bulk-edit-fan-item {
   padding: 14px;
   background-color: var(--bg-primary);
   border: 2px solid var(--border-color);
@@ -233,12 +233,12 @@
   min-height: 60px; /* Touch-friendly */
 }
 
-.fan-item:hover {
+.bulk-edit-fan-item:hover {
   border-color: var(--color-info);
   background-color: var(--bg-hover);
 }
 
-.fan-item.selected {
+.bulk-edit-fan-item.selected {
   border-color: var(--color-info);
   background-color: var(--bg-hover);
 }
@@ -342,7 +342,7 @@
     padding: 14px;
   }
 
-  .fan-item {
+  .bulk-edit-fan-item {
     min-height: 70px; /* Larger touch targets */
   }
 

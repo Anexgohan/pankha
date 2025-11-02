@@ -117,7 +117,7 @@
 
 .info-item {
   display: flex;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-md);
 }
 
 .info-item-vertical {
@@ -137,7 +137,7 @@
 }
 
 .info-item-vertical .value {
-  font-size: var(--font-size-lg2);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -184,9 +184,9 @@
 
 .system-stats {
   display: flex;
-  gap: var(--spacing-xl);
-  margin-bottom: var(--spacing-lg);
-  padding-bottom: var(--spacing-lg);
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: var(--spacing-md);
   border-bottom: 1px solid var(--border-light);
   align-items: center;
 }

@@ -10,6 +10,7 @@
   --bg-tertiary: #404040;
   --bg-hover: #404040;
   --bg-active: #505050;
+  --bg-panels_01: #24242480;
 
   /* Text Colors */
   --text-primary: var(--neutral-700);
@@ -32,6 +33,7 @@
   --bg-tertiary: #f9f9f9;
   --bg-hover: #f0f0f0;
   --bg-active: #e0e0e0;
+  --bg-panels_01: #f3f3f380;
 
   /* Border Colors */
   --border-color: var(--neutral-200);

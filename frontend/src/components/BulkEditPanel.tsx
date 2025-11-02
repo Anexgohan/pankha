@@ -203,7 +203,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                 return (
                   <div
                     key={fan.id}
-                    className={`fan-item ${isSelected ? 'selected' : ''}`}
+                    className={`bulk-edit-fan-item ${isSelected ? 'selected' : ''}`}
                     onClick={() => handleToggleFan(fan.id)}
                   >
                     <input
