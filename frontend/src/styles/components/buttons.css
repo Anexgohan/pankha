@@ -220,8 +220,28 @@ button:focus-visible {
   background-color: var(--color-info-hover);
 }
 
-/* Toggle Hidden Button */
+/* System Stats Action Buttons (Shared style for Show, Bulk Edit, etc.) */
+.system-stats-button {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.system-stats-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-info);
+  transform: translateY(-1px);
+}
+
+/* Legacy aliases for backward compatibility */
 .toggle-hidden-button {
+  /* Use system-stats-button class instead */
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);

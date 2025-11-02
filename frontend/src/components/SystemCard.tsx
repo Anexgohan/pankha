@@ -6,6 +6,7 @@ import { getFanProfiles, assignProfileToFan, type FanProfile } from '../services
 import { setFanSensor, getFanConfigurations } from '../services/fanConfigurationsApi';
 import { getSensorLabel } from '../config/sensorLabels';
 import { InlineEdit } from './InlineEdit';
+import { BulkEditPanel } from './BulkEditPanel';
 
 interface SystemCardProps {
   system: SystemData;
@@ -35,6 +36,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);
   const [selectedSensors, setSelectedSensors] = useState<Record<string, string>>({});
   const [selectedProfiles, setSelectedProfiles] = useState<Record<string, number>>({});
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const { toggleSensorVisibility, isSensorHidden, toggleGroupVisibility, isGroupHidden } = useSensorVisibility();
 
   // Load fan profiles, assignments, and configurations on mount
@@ -377,6 +379,62 @@ const SystemCard: React.FC<SystemCardProps> = ({
     }
   };
 
+  const handleBulkApply = async (fanIds: string[], sensorId?: string, profileId?: number) => {
+    // Apply changes to multiple fans at once
+    const fans = system.current_fan_speeds?.filter(f => fanIds.includes(f.id)) || [];
+
+    for (const fan of fans) {
+      if (!fan.dbId) continue;
+
+      // Update sensor if provided
+      if (sensorId) {
+        let sensorDbId: number | string | null = null;
+        if (sensorId.startsWith('__')) {
+          sensorDbId = sensorId; // Special identifier
+        } else {
+          const sensor = system.current_temperatures?.find(s => s.id === sensorId);
+          sensorDbId = sensor?.dbId || null;
+        }
+        await setFanSensor(fan.dbId, sensorDbId);
+
+        // Update local state
+        setSelectedSensors(prev => ({
+          ...prev,
+          [fan.id]: sensorId
+        }));
+      }
+
+      // Update profile if provided
+      if (profileId) {
+        const selectedSensorId = sensorId || selectedSensors[fan.id];
+        let sensorDbId: number | string | undefined = undefined;
+
+        if (selectedSensorId) {
+          if (selectedSensorId.startsWith('__')) {
+            sensorDbId = selectedSensorId;
+          } else {
+            const sensor = system.current_temperatures?.find(s => s.id === selectedSensorId);
+            sensorDbId = sensor?.dbId;
+          }
+        }
+
+        await assignProfileToFan({
+          fan_id: fan.dbId,
+          profile_id: profileId,
+          sensor_id: sensorDbId
+        });
+
+        // Update local state
+        setSelectedProfiles(prev => ({
+          ...prev,
+          [fan.id]: profileId
+        }));
+      }
+    }
+
+    onUpdate();
+  };
+
   const formatLastSeen = (lastSeen?: string) => {
     if (!lastSeen) return 'Never';
     const date = new Date(lastSeen);
@@ -650,11 +708,22 @@ const SystemCard: React.FC<SystemCardProps> = ({
         </div>
         {system.current_temperatures && system.current_temperatures.length > 0 && (
           <button
-            className="toggle-hidden-button"
+            className="system-stats-button"
             onClick={() => setShowHiddenSensors(!showHiddenSensors)}
             title={showHiddenSensors ? "Hide hidden sensors" : "Show hidden sensors"}
           >
             {showHiddenSensors ? '👁️ Hide' : '👁️‍🗨️ Show'}
+          </button>
+        )}
+
+        {/* Bulk Edit Button */}
+        {system.current_fan_speeds && system.current_fan_speeds.length > 0 && system.status === 'online' && (
+          <button
+            className="system-stats-button"
+            onClick={() => setIsBulkEditOpen(true)}
+            title="Bulk edit fan settings"
+          >
+            Bulk edit
           </button>
         )}
       </div>
@@ -1011,6 +1080,19 @@ const SystemCard: React.FC<SystemCardProps> = ({
           <p>System may be offline or not sending data</p>
         </div>
       )}
+
+      {/* Bulk Edit Panel */}
+      <BulkEditPanel
+        fans={system.current_fan_speeds || []}
+        sensors={system.current_temperatures || []}
+        profiles={fanProfiles}
+        onApply={handleBulkApply}
+        getSensorDisplayName={getSensorDisplayName}
+        getFanDisplayName={getFanDisplayName}
+        highestTemperature={highestTemperature}
+        isOpen={isBulkEditOpen}
+        onClose={() => setIsBulkEditOpen(false)}
+      />
     </div>
   );
 };
