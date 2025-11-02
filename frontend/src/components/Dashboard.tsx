@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import type { SystemData, SystemOverview } from '../types/api';
-import { getSystems, getOverview, emergencyStop } from '../services/api';
+import React, { useState } from 'react';
+import { emergencyStop } from '../services/api';
 import SystemCard from './SystemCard';
 import OverviewStats from './OverviewStats';
 import ThemeToggle from './ThemeToggle';
@@ -8,70 +7,30 @@ import RefreshRateSelector from './RefreshRateSelector';
 import ControllerIntervalSelector from './ControllerIntervalSelector';
 import FanProfileManager from './FanProfileManager';
 import { useDashboardSettings } from '../contexts/DashboardSettingsContext';
+import { useSystemData } from '../hooks/useSystemData';
 
 type TabType = 'systems' | 'profiles';
 
 const Dashboard: React.FC = () => {
   const { refreshRate, isPaused } = useDashboardSettings();
   const [activeTab, setActiveTab] = useState<TabType>('systems');
-  const [systems, setSystems] = useState<SystemData[]>([]);
-  const [overview, setOverview] = useState<SystemOverview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   // Persistent dropdown states across re-renders
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
 
-  // Auto-refresh data every 3 seconds  
-  const refreshData = useCallback(async (isInitialLoad = false) => {
-    try {
-      // Only show loading spinner during initial load, not auto-refresh
-      if (isInitialLoad) {
-        setLoading(true);
-      }
-      
-      const [systemsData, overviewData] = await Promise.all([
-        getSystems(),
-        getOverview()
-      ]);
-      
-      setSystems(systemsData);
-      setOverview(overviewData);
-      setError(null);
-      // Only update lastUpdate when we successfully fetch data
-      setLastUpdate(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
-      console.error('Dashboard refresh error:', err);
-    } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    // Initial load with loading spinner
-    refreshData(true);
-
-    // Use configurable API polling for real-time updates
-    console.log(`🔄 CONFIGURABLE REFRESH: Using API polling every ${refreshRate}ms (paused: ${isPaused})`);
-    
-    const refreshInterval = setInterval(() => {
-      if (!isPaused) {
-        console.log('⚡ Auto-refreshing data for real-time updates...');
-        // Auto-refresh without loading spinner to preserve dropdown states
-        refreshData(false);
-        // NOTE: Don't update lastUpdate here - it should only update when data actually changes
-        // Each system card shows its own last_seen from the backend (when agent last sent data)
-      }
-    }, refreshRate); // Now uses configurable refresh rate!
-
-    return () => {
-      clearInterval(refreshInterval);
-    };
-  }, [refreshData, refreshRate, isPaused]); // Add dependencies for refresh rate and pause state
+  // Use WebSocket with HTTP polling fallback
+  const {
+    systems,
+    overview,
+    loading,
+    error,
+    lastUpdate,
+    refreshData,
+    isWebSocketConnected
+  } = useSystemData({
+    enableWebSocket: !isPaused, // Disable WebSocket when paused
+    pollingInterval: refreshRate
+  });
 
   const handleEmergencyStop = async () => {
     if (window.confirm('Are you sure you want to trigger emergency stop for ALL systems? This will set all fans to maximum speed.')) {
@@ -103,7 +62,7 @@ const Dashboard: React.FC = () => {
         <div className="error-message">
           <h2>Error Loading Dashboard</h2>
           <p>{error}</p>
-          <button onClick={() => refreshData(true)} className="retry-button">
+          <button onClick={refreshData} className="retry-button">
             Retry
           </button>
         </div>
@@ -117,17 +76,17 @@ const Dashboard: React.FC = () => {
         <h1>Pankha Fan Control</h1>
         <div className="header-controls">
           <div className="connection-status">
-            <span className="status-indicator connected">
-              🟢 API Polling
+            <span className={`status-indicator ${isWebSocketConnected ? 'connected' : 'polling'}`}>
+              {isWebSocketConnected ? '🟢 WebSocket (Real-time)' : '🟡 HTTP Polling'}
             </span>
             <span className="last-update">
-              Dashboard refreshed: {lastUpdate.toLocaleTimeString()}
+              {isWebSocketConnected ? 'Live' : `Refreshed: ${lastUpdate.toLocaleTimeString()}`}
             </span>
           </div>
           <RefreshRateSelector />
           <ControllerIntervalSelector />
           <ThemeToggle />
-          <button onClick={() => refreshData(false)} className="refresh-button">
+          <button onClick={refreshData} className="refresh-button">
             🔄 Refresh
           </button>
           <button 
@@ -172,10 +131,10 @@ const Dashboard: React.FC = () => {
               </div>
             ) : (
               systems.map(system => (
-                <SystemCard 
-                  key={system.id} 
+                <SystemCard
+                  key={system.id}
                   system={system}
-                  onUpdate={() => refreshData(false)}
+                  onUpdate={refreshData}
                   expandedSensors={expandedSensors[system.id] || false}
                   expandedFans={expandedFans[system.id] || false}
                   onToggleSensors={(expanded) => setExpandedSensors(prev => ({...prev, [system.id]: expanded}))}

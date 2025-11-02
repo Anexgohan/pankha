@@ -49,6 +49,10 @@
   color: var(--color-success);
 }
 
+.status-indicator.polling {
+  color: var(--color-warning, #f59e0b);
+}
+
 .status-indicator.disconnected {
   color: var(--color-error);
 }
