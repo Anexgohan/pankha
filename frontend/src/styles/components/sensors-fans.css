@@ -271,7 +271,7 @@
 .fan-item {
   display: flex;
   flex-direction: column;
-  padding: var(--spacing-lg);
+  padding: var(--spacing-md);
   background-color: var(--bg-tertiary);
   border-radius: var(--radius-lg);
   border-left: 4px solid var(--color-info);
@@ -287,13 +287,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+  width: 100%;
+  gap: var(--spacing-md);
 }
 
 .fan-info {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+  flex: 1;
+  min-width: 0;
 }
 
 .fan-title {
@@ -328,6 +332,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .speed-circle {
@@ -351,7 +356,7 @@
 .fan-controls {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
   width: 100%;
 }
 
