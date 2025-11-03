@@ -72,7 +72,7 @@ That's it! The backend is now running with:
 
 ### Deploy Agent on target system (Linux Client)
 
-**For x86_64 systems (Intel/AMD):**  
+## *For x86_64 systems (Intel/AMD):*  
   - With wget
     ```bash
     wget https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
@@ -83,30 +83,30 @@ That's it! The backend is now running with:
     curl -fsSLO https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
     chmod +x pankha-agent-linux_x86_64
     ```
-    ### Configure and manage the x86_64 agent using the following commands:
+  Configure and manage the x86_64 agent using the following commands:
 
-    1. Configure agent (Required for first time)
-        ```bash
-        ./pankha-agent-linux_x86_64 --setup
-        ```
-    2. Start agent (Make sure --setup is done first)
-        ```bash
-        ./pankha-agent-linux_x86_64 --start
-        ```
-    3. Check status
-        ```bash
-        ./pankha-agent-linux_x86_64 --status
-        ```
-    4. Stop agent
-        ```bash
-        ./pankha-agent-linux_x86_64 --stop
-        ```
-    5. Help, or list all commands and options
-        ```bash
-        ./pankha-agent-linux_x86_64 --help
+  1. Configure agent (Required for first time)
+      ```bash
+      ./pankha-agent-linux_x86_64 --setup
+      ```
+  2. Start agent (Make sure --setup is done first)
+      ```bash
+      ./pankha-agent-linux_x86_64 --start
+      ```
+  3. Check status
+      ```bash
+      ./pankha-agent-linux_x86_64 --status
+      ```
+  4. Stop agent
+      ```bash
+      ./pankha-agent-linux_x86_64 --stop
+      ```
+  5. Help, or list all commands and options
+      ```bash
+      ./pankha-agent-linux_x86_64 --help
         ```
 
-**For ARM64 systems (Raspberry Pi 5, pimox, pxvirt, ARM sbc, etc):**  
+## *For ARM64 systems (Raspberry Pi 5, pimox, pxvirt, ARM sbc, etc):*  
   - With wget
     ```bash
     wget https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
@@ -118,28 +118,28 @@ That's it! The backend is now running with:
     chmod +x pankha-agent
     ```
 
-    ### Configure and manage the arm64 agent using the following commands:
+  Configure and manage the arm64 agent using the following commands:
 
-    1. Configure agent (Required for first time)
-        ```bash
-        ./pankha-agent-linux_arm64 --setup
-        ```
-    2. Start agent (Make sure --setup is done first)
-        ```bash
-        ./pankha-agent-linux_arm64 --start
-        ```
-    3. Check status
-        ```bash
-        ./pankha-agent-linux_arm64 --status
-        ```
-    4. Stop agent
-        ```bash
-        ./pankha-agent-linux_arm64 --stop
-        ```
-    5. Help, or list all commands and options
-        ```bash
-        ./pankha-agent-linux_arm64 --help
-        ```
+  1. Configure agent (Required for first time)
+      ```bash
+      ./pankha-agent-linux_arm64 --setup
+      ```
+  2. Start agent (Make sure --setup is done first)
+      ```bash
+      ./pankha-agent-linux_arm64 --start
+      ```
+  3. Check status
+      ```bash
+      ./pankha-agent-linux_arm64 --status
+      ```
+  4. Stop agent
+      ```bash
+      ./pankha-agent-linux_arm64 --stop
+      ```
+  5. Help, or list all commands and options
+      ```bash
+      ./pankha-agent-linux_arm64 --help
+      ```
 
 The agent will connect to the backend and start sending hardware data. You can now manage the agent from the dashboard.
 
