@@ -145,11 +145,13 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 ## Documentation
 
-- [Installation Guide](#installation-guide)
-- [Agent Setup](#agent-setup)
-- [Configuration](#configuration)
-- [API Documentation](#api-documentation)
-- [Troubleshooting](#troubleshooting)
+- [Installation Guide](documentation/public/getting-started/installation.md) - Server setup and deployment
+- [Agent Setup Guide](documentation/public/getting-started/agent-setup.md) - Installing and configuring agents
+- [Backend Configuration](documentation/public/configuration/backend.md) - Server environment and settings
+- [Agent Configuration](documentation/public/configuration/agent.md) - Agent configuration options
+- [API Documentation](documentation/public/api/endpoints.md) - REST API reference
+- [Backend Troubleshooting](documentation/public/troubleshooting/backend.md) - Server issues and solutions
+- [Agent Troubleshooting](documentation/public/troubleshooting/agent.md) - Agent issues and solutions
 
 ## Architecture
 
