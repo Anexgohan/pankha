@@ -66,24 +66,29 @@ That's it! The backend is now running with:
 Deploy agents on each machine you want to monitor:
 
 ```bash
-# These instructions are outdated, change to the newer single binary rust agent:
+# CAUTION: currently only Linux agents are supported and Windows support is coming soon.
+# CAUTION: Manualy Start is needed every reboot for now, automatic service start is being worked on.
+
 # On your target system (Linux)
-wget https://github.com/Anexgohan/pankha/archive/refs/heads/main.zip
-unzip main.zip
-cd pankha-main/agents/clients/linux/python-script
+# With curl:
+curl -fsSL -o pankha-agent https://raw.githubusercontent.com/Anexgohan/pankha/main/agents/clients/linux/rust/target/release/pankha-agent-linux
+chmod +x pankha-agent
+# With wget:
+wget -O pankha-agent https://raw.githubusercontent.com/Anexgohan/pankha/main/agents/clients/linux/rust/target/release/pankha-agent-linux
+chmod +x pankha-agent
 
-# Install dependency
-sudo apt install python3-websockets
-
-# Configure agent
-./pankha-agent.sh setup
-
-# Start agent
-./pankha-agent.sh start
-
+# Configure agent (Required for first time)
+./pankha-agent --setup
+# Start agent (Make sure --setup is done first)
+./pankha-agent --start
 # Check status
-./pankha-agent.sh status
+./pankha-agent --status
+# Stop agent
+./pankha-agent --stop
+# Help
+./pankha-agent --help
 ```
+The agent will connect to the backend and start sending hardware data. You can now manage it from the dashboard.
 
 ## Documentation
 
@@ -151,6 +156,15 @@ Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardw
    open http://localhost:3000
    ```
 
+5. **Cleanup**
+   ```bash
+   # To stop services
+   docker compose down
+
+   # To remove volumes (data loss)
+   docker compose down -v
+   ```
+
 ### Option 2: Manual Build
 
 If you prefer to build from source:
@@ -161,7 +175,7 @@ git clone https://github.com/Anexgohan/pankha.git
 cd pankha
 
 # Build Docker image
-docker build -t pankha:local -f docker/Dockerfile .
+docker compose build --no-cache
 
 # Run with compose
 docker compose up -d
