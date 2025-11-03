@@ -38,7 +38,8 @@ Is an open-source Distributed fan control system with Centralized Management sys
 - Docker and Docker Compose for server deployment
 - System with fan control capabilities (for agents)
 
-### Deploy Backend (Server)
+# Installation Guide for Server:
+### Clone and Deploy Backend (Server)
 
 ```bash
 # Clone the repository
@@ -47,10 +48,12 @@ git clone https://github.com/Anexgohan/pankha.git
 cd pankha
 # or, clone as is to current directory without creating pankha/ folder
 git clone https://github.com/Anexgohan/pankha.git .
-
+```
+### Start Backend
+```bash
 # Edit .env and compose with your configuration, if needed.
 # Start the system
-docker compose up -d
+docker compose pull && docker compose up -d
 
 # Access the dashboard
 open http://localhost:3000
@@ -60,24 +63,26 @@ docker compose down
 ```
 
 That's it! The backend is now running with:
-- Access the Web Dashboard on port <serverIP>:<3000>
+- Access the Web Dashboard on port [serverIP]:[3000]
 
-### Deploy Agent (Client)
+# Installation Guide for Agent:
+***CAUTION***: Currently only Linux agents are supported and Windows support is coming soon.  
+***CAUTION***: Manualy Start is needed every reboot for now, automatic service start is being worked on.
 
-Deploy agents on each machine you want to monitor:
-
+### Deploy Agent on target system (Linux Client)
+With curl:
 ```bash
-# CAUTION: currently only Linux agents are supported and Windows support is coming soon.
-# CAUTION: Manualy Start is needed every reboot for now, automatic service start is being worked on.
-
-# On your target system (Linux)
-# With curl:
 curl -fsSL -o pankha-agent https://raw.githubusercontent.com/Anexgohan/pankha/main/agents/clients/linux/rust/target/release/pankha-agent-linux
 chmod +x pankha-agent
-# With wget:
+```
+With wget:
+```bash
 wget -O pankha-agent https://raw.githubusercontent.com/Anexgohan/pankha/main/agents/clients/linux/rust/target/release/pankha-agent-linux
 chmod +x pankha-agent
+```
 
+### Configure and manage the agent using the following commands:
+```bash
 # Configure agent (Required for first time)
 ./pankha-agent --setup
 # Start agent (Make sure --setup is done first)
@@ -107,45 +112,10 @@ Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardw
 
 - **Backend**: Node.js + Express + WebSocket + PostgreSQL (Dockerized)
 - **Frontend**: React + TypeScript + Vite (served by nginx)
-- **Agents**: Python processes with direct hardware access
+- **Agents**: Rust single binary processes with direct hardware access and WebSocket communication.
 
-## Installation Guide
-
-### Option 1: Docker Compose (Recommended)
-
-**Requirements:**
-- Docker 20.10+
-- Docker Compose 2.0+
-
-**Steps:**
-
-1. **Download and extract**
-   ```bash
-   git clone https://github.com/Anexgohan/pankha.git
-   cd pankha
-   ```
-
-2. **Configure environment**
-   ```bash
-   # Create .env file
-   cat > .env << EOF
-   # Database
-   POSTGRES_DB=db_pankha
-   POSTGRES_USER=pankha
-   POSTGRES_PASSWORD=your_secure_password_here
-
-   # Application
-   PANKHA_PORT=3000
-   DATABASE_URL=postgresql://pankha:your_secure_password_here@pankha-postgres:5432/db_pankha
-   EOF
-   ```
-
-3. **Start services**
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Verify installation**
+## Extra:
+- **Verify installation**
    ```bash
    # Check services are running
    docker compose ps
@@ -157,7 +127,7 @@ Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardw
    open http://localhost:3000
    ```
 
-5. **Cleanup**
+- **Cleanup**
    ```bash
    # To stop services
    docker compose down
@@ -176,90 +146,11 @@ git clone https://github.com/Anexgohan/pankha.git
 cd pankha
 
 # Build Docker image
+docker compose pull
 docker compose build --no-cache
 
 # Run with compose
 docker compose up -d
-```
-
-## Agent Setup
-
-### Linux Agent (Production)
-
-#### Prerequisites
-```bash
-# Install required packages
-sudo apt update
-sudo apt install python3 python3-pip lm-sensors
-
-# Configure sensors
-sudo sensors-detect
-
-# Install WebSocket library
-sudo apt install python3-websockets
-```
-
-#### Installation
-
-1. **Deploy agent files**
-   ```bash
-   # Download agent
-   wget https://github.com/Anexgohan/pankha/archive/refs/heads/main.zip
-   unzip main.zip
-   cd pankha-main/agents/clients/linux/python-script
-
-   # Or use git
-   git clone https://github.com/Anexgohan/pankha.git
-   cd pankha/agents/clients/linux/python-script
-   ```
-
-2. **Configure agent**
-   ```bash
-   ./pankha-agent.sh setup
-   ```
-
-   You'll be prompted for:
-   - Agent ID (unique name for this system)
-   - System name (friendly name)
-   - Backend server URL (e.g., `ws://192.168.1.100:3000/websocket`)
-
-3. **Start agent**
-   ```bash
-   ./pankha-agent.sh start
-   ```
-
-4. **Verify connection**
-   ```bash
-   # Check agent status
-   ./pankha-agent.sh status
-
-   # View logs
-   ./pankha-agent.sh logs
-
-   # Check backend received data
-   curl http://your-backend:3000/api/systems
-   ```
-
-#### Agent Management
-
-```bash
-# Start agent
-./pankha-agent.sh start
-
-# Stop agent
-./pankha-agent.sh stop
-
-# Restart agent
-./pankha-agent.sh restart
-
-# View logs
-./pankha-agent.sh logs
-
-# Check status
-./pankha-agent.sh status
-
-# Edit configuration
-./pankha-agent.sh config
 ```
 
 ## Configuration
@@ -278,11 +169,6 @@ DATABASE_URL=postgresql://pankha:password@pankha-postgres:5432/db_pankha
 # Server Configuration
 PANKHA_PORT=3000
 NODE_ENV=production
-
-# PostgreSQL Tuning (Optional)
-POSTGRES_MAX_WAL_SIZE=256MB
-POSTGRES_MIN_WAL_SIZE=80MB
-POSTGRES_CHECKPOINT_TIMEOUT=5min
 ```
 
 ### Agent Configuration
@@ -296,9 +182,9 @@ Agent configuration file: `pankha-agent/config/config.json`
 ```json
 {
   "agent": {
-    "id": "my-system-01",
-    "name": "My System",
-    "update_interval": 3,
+    "id": "OS-mysystem-randomhash",
+    "name": "hostname-or-custom-name",
+    "update_interval": 3.0,
     "log_level": "INFO"
   },
   "backend": {
@@ -310,10 +196,23 @@ Agent configuration file: `pankha-agent/config/config.json`
   "hardware": {
     "enable_fan_control": true,
     "enable_sensor_monitoring": true,
-    "fan_safety_minimum": 10,
-    "temperature_critical": 85.0
+    "fan_safety_minimum": 30,
+    "temperature_critical": 80.0,
+    "filter_duplicate_sensors": false,
+    "duplicate_sensor_tolerance": 2.0,
+    "fan_step_percent": 5,
+    "hysteresis_temp": 3.0,
+    "emergency_temp": 80.0
+  },
+  "logging": {
+    "enable_file_logging": true,
+    "log_file": "/var/log/pankha-agent/agent.log",
+    "max_log_size_mb": 10,
+    "log_retention_days": 7
   }
 }
+
+
 ```
 
 ## Troubleshooting
@@ -353,10 +252,11 @@ docker compose up -d
 curl http://your-backend:3000/health
 
 # Check agent logs
-./pankha-agent.sh logs
+tail -f /var/log/pankha-agent/agent.log
 
 # Verify config
 cat pankha-agent/config/config.json
+./pankha-agent -c
 ```
 
 **Issue: No sensors detected**
@@ -368,7 +268,7 @@ sensors
 ls -la /sys/class/hwmon/
 
 # Run as root
-sudo ./pankha-agent.sh start
+sudo ./pankha-agent --start
 ```
 
 **Issue: Fan control not working**
