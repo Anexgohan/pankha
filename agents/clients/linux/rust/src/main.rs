@@ -191,6 +191,7 @@ pub trait HardwareMonitor: Send + Sync {
 #[cfg(target_os = "linux")]
 pub struct LinuxHardwareMonitor {
     hwmon_base: PathBuf,
+    #[allow(dead_code)]
     thermal_base: PathBuf,
     discovered_fans: Arc<RwLock<HashMap<String, FanInfo>>>,
     config: HardwareSettings,
