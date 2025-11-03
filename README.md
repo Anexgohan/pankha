@@ -22,11 +22,11 @@ Is an open-source Distributed fan control system with Centralized Management sys
 
 ## Features:
 
-- **Real-time Temperature Monitoring** - 25+ sensors across multiple hardware types
-- **PWM Fan Control** - Direct hardware control with RPM feedback
+- **Real-time Temperature Monitoring** - Manage multiple sensors across multiple hardware types
+- **PWM Fan Control** - Direct hardware control with RPM feedback, Profiles, and Safety features, historical data visualization.
 - **Multi-System Support** - Monitor and control multiple machines from one dashboard
 - **Web Dashboard** - Modern React interface with real-time updates
-- **WebSocket Communication** - Bidirectional real-time data transmission
+- **WebSocket Communication** - Bidirectional real-time data transmission to centralize control
 - **Easy Deployment** - Docker based server deployment, with one command setup for agents
 - **PostgreSQL Database** - Production-grade time-series data storage
 - **Open Source**
@@ -38,63 +38,88 @@ Is an open-source Distributed fan control system with Centralized Management sys
 - Docker and Docker Compose for server deployment
 - System with fan control capabilities (for agents)
 
-# Installation Guide for Server:
+# Server Installation Guide :
 ### Clone and Deploy Backend (Server)
 
-```bash
-# Clone the repository
-# this creates a pankha directory in your current path
-git clone https://github.com/Anexgohan/pankha.git
-cd pankha
-# or, clone as is to current directory without creating pankha/ folder
-git clone https://github.com/Anexgohan/pankha.git .
-```
-### Start Backend
-```bash
-# Edit .env and compose with your configuration, if needed.
-# Start the system
-docker compose pull && docker compose up -d
+1. Clone the repository  
+    this creates a pankha directory in your current path
+    ```bash
+    git clone https://github.com/Anexgohan/pankha.git
+    cd pankha
+    ```
+    or, clone to current directory without creating pankha/ folder
+      ```bash
+      git clone https://github.com/Anexgohan/pankha.git .
+      ```
+    NOTE:  
+    Edit `.env` and `compose` with your configuration, if needed.
 
-# Access the dashboard
-open http://localhost:3000
-
-# To stop the system
-docker compose down
-```
+2. Start the system  
+      ```bash
+      docker compose pull && docker compose up -d
+      ```
 
 That's it! The backend is now running with:
-- Access the Web Dashboard on port [serverIP]:[3000]
+  - Access the Web Dashboard at http://localhost:3000 or, http://[serverIP]:[3000]  
+  - To stop the system, run:  
+    ```bash
+    docker compose down
+    ```
 
 # Installation Guide for Agent:
 ***CAUTION***: Currently only Linux agents are supported and Windows support is coming soon.  
-***CAUTION***: Manualy Start is needed every reboot for now, automatic service start is being worked on.
+***CAUTION***: Manual Start is needed every reboot for now, automatic service start is being worked on.
 
 ### Deploy Agent on target system (Linux Client)
-With curl:
-```bash
-curl -fsSL -o pankha-agent https://raw.githubusercontent.com/Anexgohan/pankha/main/agents/clients/linux/rust/target/release/pankha-agent-linux
-chmod +x pankha-agent
-```
-With wget:
-```bash
-wget -O pankha-agent https://raw.githubusercontent.com/Anexgohan/pankha/main/agents/clients/linux/rust/target/release/pankha-agent-linux
-chmod +x pankha-agent
-```
+
+**For x86_64 systems (Intel/AMD):**  
+  - With curl  
+    ```bash
+    curl -fsSL -o pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+    chmod +x pankha-agent
+    ```
+  - Or, with wget
+    ```bash
+    wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+    chmod +x pankha-agent
+    ```
+
+**For ARM64 systems (Raspberry Pi 5, pimox, pxvirt, ARM sbc, etc):**  
+  - With curl
+    ```bash
+    curl -fsSL -o pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+    chmod +x pankha-agent
+    ```
+  - Or, with wget
+    ```bash
+    wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+    chmod +x pankha-agent
+    ```
 
 ### Configure and manage the agent using the following commands:
-```bash
-# Configure agent (Required for first time)
-./pankha-agent --setup
-# Start agent (Make sure --setup is done first)
-./pankha-agent --start
-# Check status
-./pankha-agent --status
-# Stop agent
-./pankha-agent --stop
-# Help
-./pankha-agent --help
-```
-The agent will connect to the backend and start sending hardware data. You can now manage it from the dashboard.
+
+1. Configure agent (Required for first time)
+    ```bash
+    ./pankha-agent --setup
+    ```
+2. Start agent (Make sure --setup is done first)
+    ```bash
+    ./pankha-agent --start
+    ```
+3. Check status
+    ```bash
+    ./pankha-agent --status
+    ```
+4. Stop agent
+    ```bash
+    ./pankha-agent --stop
+    ```
+5. Help, or list all commands and options
+    ```bash
+    ./pankha-agent --help
+    ```
+
+The agent will connect to the backend and start sending hardware data. You can now manage the agent from the dashboard.
 
 ## Documentation
 
@@ -138,20 +163,22 @@ Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardw
 
 ### Option 2: Manual Build
 
-If you prefer to build from source:
+Build from source:  
 
-```bash
-# Clone repository
-git clone https://github.com/Anexgohan/pankha.git
-cd pankha
-
-# Build Docker image
-docker compose pull
-docker compose build --no-cache
-
-# Run with compose
-docker compose up -d
-```
+  Clone repository  
+  ```bash
+  git clone https://github.com/Anexgohan/pankha.git
+  cd pankha
+  ```
+  Build Docker image
+  ```bash
+  docker compose pull
+  docker compose build --no-cache
+  ```
+  Run with compose
+  ```bash
+  docker compose up -d
+  ```
 
 ## Configuration
 
@@ -162,9 +189,9 @@ Environment variables in `.env`:
 ```bash
 # Database Configuration
 POSTGRES_DB=db_pankha
-POSTGRES_USER=pankha
+POSTGRES_USER=pankha_user
 POSTGRES_PASSWORD=your_secure_password
-DATABASE_URL=postgresql://pankha:password@pankha-postgres:5432/db_pankha
+DATABASE_URL=postgresql://pankha_user:your_secure_password@pankha-postgres:5432/db_pankha
 
 # Server Configuration
 PANKHA_PORT=3000
