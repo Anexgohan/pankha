@@ -42,24 +42,25 @@ Is an open-source Distributed fan control system with Centralized Management sys
 
 ```bash
 # Clone the repository
+# this creates a pankha directory in your current path
 git clone https://github.com/Anexgohan/pankha.git
 cd pankha
+# or, clone as is to current directory without creating pankha/ folder
+git clone https://github.com/Anexgohan/pankha.git .
 
-# Create environment file
-cp .env.example .env
-# Edit .env with your configuration
-
+# Edit .env and compose with your configuration, if needed.
 # Start the system
 docker compose up -d
 
 # Access the dashboard
 open http://localhost:3000
+
+# To stop the system
+docker compose down
 ```
 
 That's it! The backend is now running with:
-- Web dashboard on port 3000
-- PostgreSQL database
-- WebSocket server for agent connections
+- Access the Web Dashboard on port <serverIP>:<3000>
 
 ### Deploy Agent (Client)
 
