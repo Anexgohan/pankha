@@ -39,8 +39,29 @@ Is an open-source Distributed fan control system with Centralized Management sys
 - System with fan control capabilities (for agents)
 
 # Server Installation Guide :
-### Clone and Deploy Backend (Server)
+## Docker Compose Deployment: 
+1. Download the Docker Compose file:
+   ```bash
+   wget https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
+   ```
+   or,
+   ```bash
+   curl -fsSLO https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
+   ```
+2. Download the .env file
+   ```bash
+   wget https://github.com/Anexgohan/pankha/releases/latest/download/.env
+   ```
+   or,
+   ```bash
+   curl -fsSLO https://github.com/Anexgohan/pankha/releases/latest/download/.env
+   ```
+3. Start Docker Compose
+   ```bash
+   docker pull && docker compose up -d
+   ```
 
+## Clone and Deploy (Alternate Method):
 1. Clone the repository  
     this creates a pankha directory in your current path
     ```bash
@@ -66,7 +87,7 @@ That's it! The backend is now running with:
     docker compose down
     ```
 
-# Installation Guide for Agent:
+# Agent Installation Guide:  
 ***CAUTION***: Currently only Linux agents are supported and Windows support is coming soon.  
 ***CAUTION***: Manual Start is needed every reboot for now, automatic service start is being worked on.
 
@@ -83,7 +104,7 @@ That's it! The backend is now running with:
     curl -fsSLO https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
     chmod +x pankha-agent-linux_x86_64
     ```
-  Configure and manage the x86_64 agent using the following commands:
+  ***Configure and manage the x86_64 agent using the following commands:***
 
   1. Configure agent (Required for first time)
       ```bash
@@ -118,7 +139,7 @@ That's it! The backend is now running with:
     chmod +x pankha-agent
     ```
 
-  Configure and manage the arm64 agent using the following commands:
+  ***Configure and manage the arm64 agent using the following commands:***
 
   1. Configure agent (Required for first time)
       ```bash
