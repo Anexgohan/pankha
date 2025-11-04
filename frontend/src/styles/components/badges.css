@@ -31,12 +31,12 @@
 }
 
 .status-indicator.caution {
-  background-color: #FFEBEE;
+  background-color: color-mix(in srgb, var(--temp-caution-border) 10%, transparent);
   color: #FFC107;
 }
 
 .status-indicator.warning {
-  background-color: #FFEBEE;
+  background-color: color-mix(in srgb, var(--temp-warning-text) 25%, transparent);
   color: var(--color-warning);
 }
 
