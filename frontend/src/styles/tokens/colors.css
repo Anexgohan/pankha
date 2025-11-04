@@ -33,21 +33,21 @@
   --neutral-900: #ffffff;
 
   /* Temperature Status Colors - Dark Theme (Default) */
-  --temp-normal-bg: rgba(50, 255, 50, 0.10);
+  --temp-normal-bg: #32ff321a;
   --temp-normal-border: #4CAF50;
   --temp-normal-text: #34a33a;
 
-  --temp-caution-bg: rgba(255, 193, 7, 0.15);
+  --temp-caution-bg: #ffc10726;
   --temp-caution-border: #FFCA28;
   --temp-caution-text: #FFCA28;
 
-  --temp-warning-bg: #FFF3E0;
+  --temp-warning-bg: #804d00;
   --temp-warning-border: #FF9800;
-  --temp-warning-text: #E65100;
+  --temp-warning-text: rgb(230, 81, 0);
 
-  --temp-critical-bg: #FFEBEE;
-  --temp-critical-border: #F44336;
-  --temp-critical-text: #C62828;
+  --temp-critical-bg: #873714;
+  --temp-critical-border: #c80f0f;
+  --temp-critical-text: rgb(225, 15, 0);
 }
 
 /* Light Theme Color Overrides */
@@ -73,11 +73,11 @@
   --temp-caution-border: #FFC107;
   --temp-caution-text: #F57F17;
 
-  --temp-warning-bg: #FFF3E0;
+  --temp-warning-bg: #ffe6c1;
   --temp-warning-border: #FF9800;
   --temp-warning-text: #E65100;
 
-  --temp-critical-bg: #FFEBEE;
-  --temp-critical-border: #F44336;
+  --temp-critical-bg: #ffd6ca;
+  --temp-critical-border: #ff3c00;
   --temp-critical-text: #C62828;
 }
