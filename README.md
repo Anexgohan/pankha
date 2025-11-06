@@ -39,22 +39,22 @@ Is an open-source Distributed fan control system with Centralized Management sys
 - System with fan control capabilities (for agents)
 
 # Server Installation Guide :
-## Docker Compose Deployment: 
+## Docker Compose Deployment:
 1. Download the Docker Compose file:
    ```bash
-   wget https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
+   wget -O compose.yml https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
    ```
    or,
    ```bash
-   curl -fsSLO https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
+   curl -fsSLo compose.yml https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
    ```
 2. Download the .env file
    ```bash
-   wget https://github.com/Anexgohan/pankha/releases/latest/download/.env
+   wget -O .env https://github.com/Anexgohan/pankha/releases/latest/download/.env
    ```
    or,
    ```bash
-   curl -fsSLO https://github.com/Anexgohan/pankha/releases/latest/download/.env
+   curl -fsSLo .env https://github.com/Anexgohan/pankha/releases/latest/download/.env
    ```
 3. Start Docker Compose
    ```bash
@@ -93,15 +93,15 @@ That's it! The backend is now running with:
 
 ### Deploy Agent on target system (Linux Client)
 
-## *For x86_64 systems (Intel/AMD):*  
+## *For x86_64 systems (Intel/AMD):*
   - With wget
     ```bash
-    wget https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+    wget -O pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
     chmod +x pankha-agent-linux_x86_64
     ```
-  - Or, With curl  
+  - Or, With curl
     ```bash
-    curl -fsSLO https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+    curl -fsSLo pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
     chmod +x pankha-agent-linux_x86_64
     ```
   ***Configure and manage the x86_64 agent using the following commands:***
@@ -127,16 +127,16 @@ That's it! The backend is now running with:
       ./pankha-agent-linux_x86_64 --help
         ```
 
-## *For ARM64 systems (Raspberry Pi 5, pimox, pxvirt, ARM sbc, etc):*  
+## *For ARM64 systems (Raspberry Pi 5, pimox, pxvirt, ARM sbc, etc):*
   - With wget
     ```bash
-    wget https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
-    chmod +x pankha-agent
+    wget -O pankha-agent-linux_arm64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+    chmod +x pankha-agent-linux_arm64
     ```
   - Or, With curl
     ```bash
-    curl -fsSL -o pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
-    chmod +x pankha-agent
+    curl -fsSLo pankha-agent-linux_arm64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+    chmod +x pankha-agent-linux_arm64
     ```
 
   ***Configure and manage the arm64 agent using the following commands:***
