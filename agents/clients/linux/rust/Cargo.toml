@@ -22,7 +22,7 @@ serde_json = "1.0"
 
 # Logging and error handling
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time", "local-time"] }
 anyhow = "1.0"
 thiserror = "1.0"
 
@@ -44,6 +44,7 @@ glob = "0.3"
 
 # Time
 chrono = { version = "0.4", features = ["serde"] }
+time = { version = "0.3", features = ["local-offset", "formatting"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Linux-specific dependencies

@@ -738,6 +738,7 @@ impl WebSocketClient {
 
     pub async fn run(&self) -> Result<()> {
         *self.running.write().await = true;
+        let mut retry_count = 0;
 
         loop {
             if !*self.running.read().await {
@@ -745,14 +746,27 @@ impl WebSocketClient {
             }
 
             match self.connect_and_communicate().await {
-                Ok(_) => info!("WebSocket connection closed normally"),
+                Ok(_) => {
+                    info!("WebSocket connection closed normally");
+                    retry_count = 0; // Reset on successful connection
+                }
                 Err(e) => error!("WebSocket error: {}", e),
             }
 
             if *self.running.read().await {
                 let config = self.config.read().await;
-                info!("Reconnecting in {}s...", config.backend.reconnect_interval);
-                time::sleep(Duration::from_secs_f64(config.backend.reconnect_interval)).await;
+                // Hardware-safe exponential backoff: max 15s to prevent thermal issues
+                let base_interval = config.backend.reconnect_interval;
+                let wait_time = match retry_count {
+                    0 => base_interval,           // 5s (first retry)
+                    1 => base_interval * 1.4,     // 7s (second retry)
+                    2 => base_interval * 2.0,     // 10s (third retry)
+                    _ => base_interval * 3.0,     // 15s (max - hardware safety)
+                };
+                retry_count = (retry_count + 1).min(3);
+
+                info!("Reconnecting in {:.1}s... (attempt {})", wait_time, retry_count);
+                time::sleep(Duration::from_secs_f64(wait_time)).await;
             }
         }
 
@@ -763,7 +777,13 @@ impl WebSocketClient {
         let config = self.config.read().await;
         info!("Connecting to WebSocket: {}", config.backend.server_url);
 
-        let (ws_stream, _) = connect_async(&config.backend.server_url).await?;
+        // Apply connection timeout to prevent hanging connections
+        let timeout_duration = Duration::from_secs_f64(config.backend.connection_timeout);
+        let connect_future = connect_async(&config.backend.server_url);
+
+        let (ws_stream, _) = tokio::time::timeout(timeout_duration, connect_future)
+            .await
+            .context("Connection timeout")??;
         drop(config); // Release read lock
         info!("✅ WebSocket connected");
 
@@ -783,6 +803,7 @@ impl WebSocketClient {
         let write_clone = Arc::clone(&write);
 
         let data_sender = tokio::spawn(async move {
+            let mut heartbeat_counter = 0;
             while *running.read().await {
                 let mut w = write_clone.lock().await;
                 if let Err(e) = Self::send_data(&mut *w, &config, &hardware_monitor).await {
@@ -790,6 +811,13 @@ impl WebSocketClient {
                     break;
                 }
                 drop(w);
+
+                // Heartbeat logging: every 20 cycles (60s at 3s intervals)
+                heartbeat_counter += 1;
+                if heartbeat_counter % 20 == 0 {
+                    info!("Heartbeat: {} data transmissions completed", heartbeat_counter);
+                }
+
                 let interval = config.read().await.agent.update_interval;
                 time::sleep(Duration::from_secs_f64(interval)).await;
             }
@@ -1788,6 +1816,7 @@ async fn main() -> Result<()> {
     let log_level = if args.debug { "debug" } else { "info" };
     tracing_subscriber::fmt()
         .with_env_filter(log_level)
+        .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
         .init();
 
     // If we're a daemon child, save our PID and continue

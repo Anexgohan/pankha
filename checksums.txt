@@ -1,2 +1,0 @@
-6549f9fa08a91effed25ccba70e865311d20b18bbfc77ed8f62ec03bdc9eed0b  pankha-agent-linux_x86_64
-dc92fe3b018e4ab2b9ec13ef02202d693bddded037c7bcc7d8ed6aae196c6b88  pankha-agent-linux_arm64
