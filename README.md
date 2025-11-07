@@ -31,6 +31,27 @@ Is an open-source Distributed fan control system with Centralized Management sys
 - **PostgreSQL Database** - Production-grade time-series data storage
 - **Open Source**
 
+## Showcase:  
+Centralized Dashboard:  
+![Centralized Dashboard](documentation/public/images/zen_2025-11-05_00-38-15_IutnWbxl11.png)  
+
+Agent widget:  
+![Agent widget](documentation/public/images/zen_2025-11-05_00-43-19_vXElWSbCmM.png)  
+
+Temperature Sensors:  
+![Temperature Sensors](documentation/public/images/zen_2025-11-05_00-42-49_O6jZxk8cqt.png)  
+
+Fan Control:  
+![Fan Control](documentation/public/images/zen_2025-11-05_00-36-53_JfYyTR3k2j.png)  
+
+Profiles:  
+![Profiles](documentation/public/images/zen_2025-11-05_00-38-44_57LBUM5n3B.png)  
+
+Fully Customizable:  
+![Profiles](documentation/public/images/zen_2025-11-05_00-39-25_A8ywDiMWc8.png)  
+![Import Export](documentation/public/images/zen_2025-11-05_00-41-41_7vx3VRh0Fl.png)  
+
+
 ## Instructions:
 
 ### Prerequisites
