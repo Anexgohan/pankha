@@ -823,6 +823,11 @@ impl WebSocketClient {
             }
         });
 
+        // Connection health tracking: detect stale connections
+        // This prevents "half-open" TCP connections where we can send but not receive
+        let mut last_message_received = std::time::Instant::now();
+        const CONNECTION_HEALTH_TIMEOUT_SECS: u64 = 30; // If no message for 30s, reconnect
+
         // Handle incoming messages with timeout to allow checking shutdown signal
         let mut read = read;
         loop {
@@ -832,17 +837,34 @@ impl WebSocketClient {
                 break;
             }
 
-            // Read with timeout to periodically check shutdown flag
+            // Check connection health: if no message received for too long, assume connection is dead
+            let elapsed_since_last_message = last_message_received.elapsed();
+            if elapsed_since_last_message.as_secs() > CONNECTION_HEALTH_TIMEOUT_SECS {
+                warn!(
+                    "Connection health check failed: no message received for {}s, reconnecting",
+                    elapsed_since_last_message.as_secs()
+                );
+                break; // Trigger reconnection
+            }
+
+            // Read with timeout to periodically check shutdown flag and connection health
             let timeout = time::timeout(Duration::from_secs(1), read.next()).await;
 
             match timeout {
                 Ok(Some(msg)) => {
                     match msg {
                         Ok(Message::Text(text)) => {
+                            // Update last message time on successful receive
+                            last_message_received = std::time::Instant::now();
                             let mut w = write.lock().await;
                             if let Err(e) = self.handle_message(&text, &mut *w).await {
                                 error!("Failed to handle message: {}", e);
                             }
+                        }
+                        Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => {
+                            // Update last message time on ping/pong
+                            last_message_received = std::time::Instant::now();
+                            debug!("Received WebSocket ping/pong");
                         }
                         Ok(Message::Close(_)) => {
                             info!("Server closed connection");
@@ -852,7 +874,10 @@ impl WebSocketClient {
                             error!("WebSocket error: {}", e);
                             break;
                         }
-                        _ => {}
+                        _ => {
+                            // Update last message time for any valid message
+                            last_message_received = std::time::Instant::now();
+                        }
                     }
                 }
                 Ok(None) => {
@@ -860,7 +885,7 @@ impl WebSocketClient {
                     break;
                 }
                 Err(_) => {
-                    // Timeout - loop back to check shutdown flag
+                    // Timeout - loop back to check shutdown flag and connection health
                     continue;
                 }
             }
