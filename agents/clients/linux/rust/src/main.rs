@@ -1654,7 +1654,7 @@ fn remove_pid_file() -> Result<()> {
     Ok(())
 }
 
-fn start_daemon() -> Result<()> {
+fn start_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
     if is_running() {
         eprintln!("ERROR: Agent is already running (PID: {:?})", get_pid()?);
         process::exit(1);
@@ -1687,8 +1687,15 @@ fn start_daemon() -> Result<()> {
         .open(&log_path)?;
 
     // Spawn new process in daemon mode using --daemon-child (internal flag)
-    let child = process::Command::new(&exe_path)
-        .arg("--daemon-child")
+    let mut cmd = process::Command::new(&exe_path);
+    cmd.arg("--daemon-child");
+
+    // Pass log level to daemon child if specified
+    if let Some(level) = log_level {
+        cmd.arg("--log-level").arg(level);
+    }
+
+    let child = cmd
         .current_dir(std::env::current_dir()?)
         .stdin(process::Stdio::null())
         .stdout(log_file.try_clone()?)
@@ -1739,7 +1746,11 @@ fn stop_daemon() -> Result<()> {
     Ok(())
 }
 
-fn restart_daemon() -> Result<()> {
+fn start_daemon() -> Result<()> {
+    start_daemon_with_log_level(None)
+}
+
+fn restart_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
     println!("Restarting Pankha Rust Agent...");
 
     // Stop the agent if it's running
@@ -1773,7 +1784,11 @@ fn restart_daemon() -> Result<()> {
     }
 
     // Always start the agent (whether it was running or not)
-    start_daemon()
+    start_daemon_with_log_level(log_level)
+}
+
+fn restart_daemon() -> Result<()> {
+    restart_daemon_with_log_level(None)
 }
 
 async fn show_status() -> Result<()> {
@@ -1886,7 +1901,7 @@ async fn main() -> Result<()> {
 
     // Handle management commands first (before async setup)
     if args.start {
-        return start_daemon();  // Spawns new process and exits
+        return start_daemon_with_log_level(args.log_level);  // Spawns new process and exits
     }
 
     if args.stop {
@@ -1894,7 +1909,7 @@ async fn main() -> Result<()> {
     }
 
     if args.restart {
-        return restart_daemon();
+        return restart_daemon_with_log_level(args.log_level);
     }
 
     if args.status {
@@ -1923,6 +1938,28 @@ async fn main() -> Result<()> {
         cmd.arg(&log_path);
         let status = cmd.status()?;
         process::exit(status.code().unwrap_or(1));
+    }
+
+    // If user provided --log-level without a command, show error
+    if args.log_level.is_some() && !args.daemon_child && !args.test && !args.config && !args.setup {
+        eprintln!("ERROR: --log-level must be used with a command like --start, --restart, or --test");
+        eprintln!();
+        Args::command().print_help().unwrap();
+        process::exit(1);
+    }
+
+    // If no command was provided at all (user just ran the binary), show help
+    if !args.daemon_child && !args.test && !args.config && !args.setup {
+        eprintln!("ERROR: No command specified. You must specify a command.");
+        eprintln!();
+        Args::command().print_help().unwrap();
+        eprintln!();
+        eprintln!("Common commands:");
+        eprintln!("  ./pankha-agent --start       Start the agent");
+        eprintln!("  ./pankha-agent --stop        Stop the agent");
+        eprintln!("  ./pankha-agent -i            Show status");
+        eprintln!("  ./pankha-agent -l            View logs");
+        process::exit(1);
     }
 
     // Setup logging (daemon child or foreground mode)
