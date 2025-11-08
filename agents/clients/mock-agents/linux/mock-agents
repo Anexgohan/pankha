@@ -1,0 +1,766 @@
+#!/usr/bin/env python3
+"""
+Pankha Mock Agents - CLI Management Tool
+
+Lightweight mock agent system for testing Pankha backend.
+Simulates multiple client agents with realistic random sensor/fan data.
+
+Usage:
+    mock-agents --help
+    mock-agents --build (interactive mode)
+    mock-agents --amount 5 --name client_ --sensors 5,9 --fans 3,7
+    mock-agents --start
+    mock-agents --stop
+    mock-agents --restart
+    mock-agents --status
+"""
+
+import argparse
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+SCRIPT_DIR = Path(__file__).parent.absolute()
+CONFIG_DIR = SCRIPT_DIR / "config"
+LOG_DIR = SCRIPT_DIR / "logs"
+PID_DIR = SCRIPT_DIR / "pids"
+AGENTS_CONFIG_FILE = CONFIG_DIR / "agents.json"
+MOCK_AGENT_SCRIPT = SCRIPT_DIR / "mock_agent.py"
+
+# Ensure directories exist
+CONFIG_DIR.mkdir(exist_ok=True)
+LOG_DIR.mkdir(exist_ok=True)
+PID_DIR.mkdir(exist_ok=True)
+
+# ============================================================================
+# COLORS (ANSI escape codes)
+# ============================================================================
+
+class Colors:
+    """ANSI color codes"""
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    RED = "\033[91m"
+    GREEN = "\033[92m"
+    YELLOW = "\033[93m"
+    BLUE = "\033[94m"
+    CYAN = "\033[96m"
+    GRAY = "\033[90m"
+
+def colorize(text: str, color: str) -> str:
+    """Add color to text"""
+    return f"{color}{text}{Colors.RESET}"
+
+# ============================================================================
+# AGENT MANAGEMENT
+# ============================================================================
+
+class AgentManager:
+    """Manages mock agent configurations and processes"""
+
+    def __init__(self):
+        self.config_file = AGENTS_CONFIG_FILE
+
+    def load_config(self) -> Dict:
+        """Load agent configurations"""
+        if not self.config_file.exists():
+            return {"agents": [], "default_server": "ws://192.168.100.237:3000/websocket"}
+
+        with open(self.config_file, 'r') as f:
+            return json.load(f)
+
+    def save_config(self, config: Dict):
+        """Save agent configurations"""
+        with open(self.config_file, 'w') as f:
+            json.dump(config, f, indent=2)
+
+    def create_agents(self, amount: int, name_prefix: str, sensors: Tuple[int, int],
+                      fans: Tuple[int, int], speed: Tuple[int, int], rpm: Tuple[int, int],
+                      temp: Tuple[int, int] = (25, 75), server_url: Optional[str] = None):
+        """Create agent configurations"""
+        import random
+        import uuid
+
+        config = self.load_config()
+        if server_url:
+            config["default_server"] = server_url
+
+        # Clear existing agents
+        config["agents"] = []
+
+        for i in range(1, amount + 1):
+            agent_name = f"{name_prefix}{i:02d}"
+            agent_id = f"mock-{agent_name}-{uuid.uuid4().hex[:8]}"
+
+            # Random sensor and fan counts within range
+            sensor_count = random.randint(sensors[0], sensors[1])
+            fan_count = random.randint(fans[0], fans[1])
+
+            agent_config = {
+                "agent_id": agent_id,
+                "agent_name": agent_name,
+                "server_url": config["default_server"],
+                "update_interval": 3.0,
+                "sensor_count": sensor_count,
+                "fan_count": fan_count,
+                "temp_range": list(temp),
+                "speed_range": list(speed),
+                "rpm_range": list(rpm),
+                "log_file": str(LOG_DIR / f"{agent_name}.log"),
+                "filter_duplicate_sensors": False,
+                "duplicate_sensor_tolerance": 1.0,
+                "fan_step_percent": 5,
+                "hysteresis_temp": 3.0,
+                "emergency_temp": 85.0,
+            }
+
+            config["agents"].append(agent_config)
+
+        self.save_config(config)
+        return config["agents"]
+
+    def get_agents(self) -> List[Dict]:
+        """Get all agent configurations"""
+        config = self.load_config()
+        return config.get("agents", [])
+
+    def get_pid_file(self, agent_name: str) -> Path:
+        """Get PID file path for agent"""
+        return PID_DIR / f"{agent_name}.pid"
+
+    def get_config_file(self, agent_name: str) -> Path:
+        """Get config file path for agent"""
+        return CONFIG_DIR / f"{agent_name}.json"
+
+    def is_agent_running(self, agent_name: str) -> Tuple[bool, Optional[int]]:
+        """Check if agent is running"""
+        pid_file = self.get_pid_file(agent_name)
+
+        if not pid_file.exists():
+            return False, None
+
+        try:
+            with open(pid_file, 'r') as f:
+                pid = int(f.read().strip())
+
+            # Check if process exists
+            try:
+                os.kill(pid, 0)  # Signal 0 checks if process exists
+                return True, pid
+            except OSError:
+                # Process doesn't exist, remove stale PID file
+                pid_file.unlink()
+                return False, None
+
+        except (ValueError, IOError):
+            return False, None
+
+    def start_agent(self, agent_config: Dict) -> bool:
+        """Start a single agent"""
+        agent_name = agent_config["agent_name"]
+
+        # Check if already running
+        running, pid = self.is_agent_running(agent_name)
+        if running:
+            print(f"  ⚠️  {agent_name} is already running (PID: {pid})")
+            return False
+
+        # Write individual agent config
+        agent_config_file = self.get_config_file(agent_name)
+        with open(agent_config_file, 'w') as f:
+            json.dump(agent_config, f, indent=2)
+
+        # Start agent process
+        try:
+            python_exe = sys.executable
+            process = subprocess.Popen(
+                [python_exe, str(MOCK_AGENT_SCRIPT), str(agent_config_file)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True
+            )
+
+            # Wait a moment to ensure it started
+            time.sleep(0.5)
+
+            # Check if process is still running
+            if process.poll() is not None:
+                print(f"  ❌ {agent_name} failed to start")
+                return False
+
+            # Write PID file
+            pid_file = self.get_pid_file(agent_name)
+            with open(pid_file, 'w') as f:
+                f.write(str(process.pid))
+
+            print(f"  ✅ {agent_name} started (PID: {process.pid})")
+            return True
+
+        except Exception as e:
+            print(f"  ❌ {agent_name} failed to start: {e}")
+            return False
+
+    def stop_agent(self, agent_name: str) -> bool:
+        """Stop a single agent"""
+        running, pid = self.is_agent_running(agent_name)
+
+        if not running:
+            print(f"  ⚠️  {agent_name} is not running")
+            return False
+
+        try:
+            # Send SIGTERM
+            os.kill(pid, signal.SIGTERM)
+
+            # Wait up to 5 seconds for graceful shutdown
+            for _ in range(50):
+                try:
+                    os.kill(pid, 0)
+                    time.sleep(0.1)
+                except OSError:
+                    break
+            else:
+                # Force kill if still running
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
+                    pass
+
+            # Remove PID file
+            pid_file = self.get_pid_file(agent_name)
+            if pid_file.exists():
+                pid_file.unlink()
+
+            print(f"  ✅ {agent_name} stopped")
+            return True
+
+        except Exception as e:
+            print(f"  ❌ {agent_name} failed to stop: {e}")
+            return False
+
+    def start_all(self) -> Tuple[int, int]:
+        """Start all agents"""
+        agents = self.get_agents()
+
+        if not agents:
+            print(colorize("⚠️  No agents configured. Run 'mock-agents --build' first.", Colors.YELLOW))
+            return 0, 0
+
+        print(colorize(f"\n🚀 Starting {len(agents)} mock agents...\n", Colors.BOLD))
+
+        started = 0
+        for agent in agents:
+            if self.start_agent(agent):
+                started += 1
+
+        return started, len(agents)
+
+    def stop_all(self) -> Tuple[int, int]:
+        """Stop all agents"""
+        agents = self.get_agents()
+
+        if not agents:
+            print(colorize("⚠️  No agents configured.", Colors.YELLOW))
+            return 0, 0
+
+        print(colorize(f"\n🛑 Stopping {len(agents)} mock agents...\n", Colors.BOLD))
+
+        stopped = 0
+        for agent in agents:
+            if self.stop_agent(agent["agent_name"]):
+                stopped += 1
+
+        return stopped, len(agents)
+
+    def restart_all(self):
+        """Restart all agents"""
+        print(colorize("🔄 Restarting all agents...", Colors.BOLD))
+        self.stop_all()
+        time.sleep(1)
+        self.start_all()
+
+    def show_status(self):
+        """Show status of all agents"""
+        agents = self.get_agents()
+
+        if not agents:
+            print(colorize("\n⚠️  No agents configured. Run 'mock-agents --build' first.\n", Colors.YELLOW))
+            return
+
+        config = self.load_config()
+        server_url = config.get("default_server", "N/A")
+
+        print(colorize("\n" + "="*70, Colors.BLUE))
+        print(colorize("  Pankha Mock Agents - Status", Colors.BOLD))
+        print(colorize("="*70 + "\n", Colors.BLUE))
+
+        print(f"  Server URL: {colorize(server_url, Colors.CYAN)}")
+        print(f"  Total Agents: {colorize(str(len(agents)), Colors.CYAN)}\n")
+
+        running_count = 0
+        stopped_count = 0
+
+        print(colorize("  Agent Status:", Colors.BOLD))
+        print(colorize("  " + "-"*66, Colors.GRAY))
+
+        for agent in agents:
+            agent_name = agent["agent_name"]
+            running, pid = self.is_agent_running(agent_name)
+
+            if running:
+                status = colorize("● RUNNING", Colors.GREEN)
+                pid_str = colorize(f"PID: {pid}", Colors.GRAY)
+                running_count += 1
+            else:
+                status = colorize("○ STOPPED", Colors.RED)
+                pid_str = ""
+                stopped_count += 1
+
+            sensors = agent["sensor_count"]
+            fans = agent["fan_count"]
+            hw_info = colorize(f"S:{sensors} F:{fans}", Colors.GRAY)
+
+            print(f"  {status}  {agent_name:20s}  {hw_info:20s}  {pid_str}")
+
+        print(colorize("  " + "-"*66 + "\n", Colors.GRAY))
+
+        # Summary
+        running_status = colorize(f"{running_count} running", Colors.GREEN)
+        stopped_status = colorize(f"{stopped_count} stopped", Colors.RED if stopped_count > 0 else Colors.GRAY)
+        print(f"  Summary: {running_status}, {stopped_status}\n")
+
+        # Show log file locations
+        print(colorize("  Log Files:", Colors.BOLD))
+        print(f"    {LOG_DIR}\n")
+
+        print(colorize("="*70 + "\n", Colors.BLUE))
+
+# ============================================================================
+# DEPENDENCY MANAGEMENT
+# ============================================================================
+
+def check_dependencies() -> bool:
+    """Check and optionally install required dependencies"""
+    missing_deps = []
+
+    # Check Python version
+    python_version = sys.version_info
+    if python_version < (3, 7):
+        print(colorize(f"\n❌ Python 3.7+ required (found {python_version.major}.{python_version.minor})\n", Colors.RED))
+        return False
+
+    print(colorize("\n🔍 Checking dependencies...\n", Colors.CYAN))
+
+    # Check for websockets library
+    try:
+        import websockets
+        print(f"  ✅ websockets library: {colorize('installed', Colors.GREEN)}")
+    except ImportError:
+        print(f"  ❌ websockets library: {colorize('not installed', Colors.RED)}")
+        missing_deps.append("websockets")
+
+    # Check Python executable
+    python_exe = sys.executable
+    print(f"  ✅ Python {python_version.major}.{python_version.minor}.{python_version.micro}: {colorize(python_exe, Colors.GREEN)}")
+
+    # If no missing dependencies, we're good
+    if not missing_deps:
+        print(colorize("\n✅ All dependencies satisfied\n", Colors.GREEN))
+        return True
+
+    # Ask user if they want to install missing dependencies
+    print(colorize("\n⚠️  Missing dependencies detected:\n", Colors.YELLOW))
+    for dep in missing_deps:
+        print(f"  - {dep}")
+
+    print()
+    install = input(colorize("Would you like to install missing dependencies now? [Y/n]: ", Colors.BOLD)).strip().lower()
+
+    if install and install != 'y':
+        print(colorize("\n⚠️  Dependencies not installed. Mock agents may not work correctly.\n", Colors.YELLOW))
+        print("To install manually, run:")
+        print(colorize(f"  {python_exe} -m pip install websockets\n", Colors.CYAN))
+        return False
+
+    # Install dependencies
+    print(colorize("\n📦 Installing dependencies...\n", Colors.CYAN))
+
+    for dep in missing_deps:
+        print(f"  Installing {colorize(dep, Colors.CYAN)}...")
+        try:
+            result = subprocess.run(
+                [python_exe, "-m", "pip", "install", dep],
+                capture_output=True,
+                text=True,
+                timeout=60
+            )
+
+            if result.returncode == 0:
+                print(f"  ✅ {dep}: {colorize('installed successfully', Colors.GREEN)}")
+            else:
+                print(f"  ❌ {dep}: {colorize('installation failed', Colors.RED)}")
+                print(f"     {result.stderr.strip()}")
+                return False
+
+        except subprocess.TimeoutExpired:
+            print(f"  ❌ {dep}: {colorize('installation timed out', Colors.RED)}")
+            return False
+        except Exception as e:
+            print(f"  ❌ {dep}: {colorize(f'installation error: {e}', Colors.RED)}")
+            return False
+
+    print(colorize("\n✅ All dependencies installed successfully\n", Colors.GREEN))
+    return True
+
+# ============================================================================
+# INTERACTIVE MODE
+# ============================================================================
+
+def interactive_build(manager: AgentManager):
+    """Interactive agent configuration"""
+    print(colorize("\n" + "="*70, Colors.CYAN))
+    print(colorize("  Pankha Mock Agent Builder - Interactive Mode", Colors.BOLD))
+    print(colorize("="*70 + "\n", Colors.CYAN))
+
+    print("This wizard will help you configure mock agents for testing.\n")
+
+    # Get server URL
+    default_server = manager.load_config().get("default_server", "ws://192.168.100.237:3000/websocket")
+    server_input = input(f"Server WebSocket URL [{default_server}]: ").strip()
+    server_url = server_input if server_input else default_server
+
+    # Get number of agents
+    while True:
+        try:
+            amount = int(input("\nHow many mock agents? [5]: ").strip() or "5")
+            if amount < 1 or amount > 100:
+                print(colorize("  ⚠️  Please enter a number between 1 and 100", Colors.YELLOW))
+                continue
+            break
+        except ValueError:
+            print(colorize("  ⚠️  Please enter a valid number", Colors.YELLOW))
+
+    # Get name prefix
+    name_prefix = input(f"\nAgent name prefix [client_]: ").strip() or "client_"
+
+    # Get sensor range
+    while True:
+        try:
+            sensors_input = input("\nSensor count range (min,max) [5,15]: ").strip() or "5,15"
+            sensors = tuple(map(int, sensors_input.split(',')))
+            if len(sensors) != 2 or sensors[0] < 1 or sensors[1] < sensors[0]:
+                print(colorize("  ⚠️  Invalid range. Use format: min,max (e.g., 5,15)", Colors.YELLOW))
+                continue
+            break
+        except ValueError:
+            print(colorize("  ⚠️  Invalid format. Use: min,max (e.g., 5,15)", Colors.YELLOW))
+
+    # Get temperature range
+    while True:
+        try:
+            temp_input = input("Sensor temperature range °C (min,max) [25,75]: ").strip() or "25,75"
+            temp = tuple(map(int, temp_input.split(',')))
+            if len(temp) != 2 or temp[0] < 0 or temp[1] < temp[0] or temp[1] > 150:
+                print(colorize("  ⚠️  Invalid range. Use format: min,max (e.g., 25,75)", Colors.YELLOW))
+                continue
+            break
+        except ValueError:
+            print(colorize("  ⚠️  Invalid format. Use: min,max (e.g., 25,75)", Colors.YELLOW))
+
+    # Get fan range
+    while True:
+        try:
+            fans_input = input("Fan count range (min,max) [3,7]: ").strip() or "3,7"
+            fans = tuple(map(int, fans_input.split(',')))
+            if len(fans) != 2 or fans[0] < 1 or fans[1] < fans[0]:
+                print(colorize("  ⚠️  Invalid range. Use format: min,max (e.g., 3,7)", Colors.YELLOW))
+                continue
+            break
+        except ValueError:
+            print(colorize("  ⚠️  Invalid format. Use: min,max (e.g., 3,7)", Colors.YELLOW))
+
+    # Get speed range (default 0-100%)
+    speed = (0, 100)
+
+    # Get RPM range
+    while True:
+        try:
+            rpm_input = input("Fan RPM range (min,max) [0,3000]: ").strip() or "0,3000"
+            rpm = tuple(map(int, rpm_input.split(',')))
+            if len(rpm) != 2 or rpm[0] < 0 or rpm[1] < rpm[0]:
+                print(colorize("  ⚠️  Invalid range. Use format: min,max (e.g., 0,3000)", Colors.YELLOW))
+                continue
+            break
+        except ValueError:
+            print(colorize("  ⚠️  Invalid format. Use: min,max (e.g., 0,3000)", Colors.YELLOW))
+
+    # Show summary
+    print(colorize("\n" + "="*70, Colors.CYAN))
+    print(colorize("  Configuration Summary", Colors.BOLD))
+    print(colorize("="*70 + "\n", Colors.CYAN))
+    print(f"  Server URL:        {colorize(server_url, Colors.CYAN)}")
+    print(f"  Agent Count:       {colorize(str(amount), Colors.CYAN)}")
+    print(f"  Name Prefix:       {colorize(name_prefix, Colors.CYAN)}")
+    print(f"  Sensor Range:      {colorize(f'{sensors[0]}-{sensors[1]}', Colors.CYAN)}")
+    print(f"  Temperature Range: {colorize(f'{temp[0]}-{temp[1]}°C', Colors.CYAN)}")
+    print(f"  Fan Range:         {colorize(f'{fans[0]}-{fans[1]}', Colors.CYAN)}")
+    print(f"  RPM Range:         {colorize(f'{rpm[0]}-{rpm[1]}', Colors.CYAN)}")
+    print()
+
+    # Confirm
+    confirm = input("Create these agents? [Y/n]: ").strip().lower()
+    if confirm and confirm != 'y':
+        print(colorize("\n❌ Cancelled\n", Colors.RED))
+        return
+
+    # Check if any agents are currently running
+    current_agents = manager.get_agents()
+    running_agents = []
+    for agent in current_agents:
+        running, _ = manager.is_agent_running(agent["agent_name"])
+        if running:
+            running_agents.append(agent["agent_name"])
+
+    if running_agents:
+        print(colorize(f"\n⚠️  Warning: {len(running_agents)} agent(s) are currently running:", Colors.YELLOW))
+        for agent_name in running_agents[:5]:  # Show first 5
+            print(f"    - {agent_name}")
+        if len(running_agents) > 5:
+            print(f"    ... and {len(running_agents) - 5} more")
+        print()
+        stop_first = input("Stop all running agents before creating new ones? [Y/n]: ").strip().lower()
+        if not stop_first or stop_first == 'y':
+            print(colorize("\n🛑 Stopping running agents...\n", Colors.YELLOW))
+            manager.stop_all()
+            print()
+        else:
+            print(colorize("\n⚠️  Keeping agents running. New config will be created but old agents will remain.\n", Colors.YELLOW))
+
+    # Create agents
+    print(colorize("✨ Creating agents...\n", Colors.GREEN))
+    agents = manager.create_agents(amount, name_prefix, sensors, fans, speed, rpm, temp, server_url)
+
+    print(colorize(f"✅ Created {len(agents)} mock agents\n", Colors.GREEN))
+
+    # Ask if user wants to start them
+    start_now = input("Start all agents now? [Y/n]: ").strip().lower()
+    if not start_now or start_now == 'y':
+        print()
+        manager.start_all()
+
+    print(colorize("\n✨ Done! Use 'mock-agents --status' to check agent status\n", Colors.GREEN))
+
+# ============================================================================
+# COMMAND-LINE INTERFACE
+# ============================================================================
+
+def show_help():
+    """Show help message"""
+    help_text = f"""
+{colorize('='*70, Colors.CYAN)}
+{colorize('  Pankha Mock Agents - Lightweight Testing Tool', Colors.BOLD)}
+{colorize('='*70, Colors.CYAN)}
+
+{colorize('DESCRIPTION:', Colors.BOLD)}
+  Simulates multiple Pankha client agents for backend testing.
+  Agents send realistic random sensor/fan data via WebSocket.
+
+{colorize('USAGE:', Colors.BOLD)}
+  mock-agents [OPTIONS]
+
+{colorize('INTERACTIVE MODE:', Colors.BOLD)}
+  mock-agents --build              Interactive agent configuration wizard
+
+{colorize('COMMAND-LINE MODE:', Colors.BOLD)}
+  mock-agents --amount <N> --name <prefix> --sensors <min,max> --fans <min,max>
+              [--temp <min,max>] [--speed <min,max>] [--rpm <min,max>] [--server <url>]
+
+{colorize('PROCESS MANAGEMENT:', Colors.BOLD)}
+  mock-agents --start              Start all configured agents
+  mock-agents --stop               Stop all running agents
+  mock-agents --restart            Restart all agents
+  mock-agents --status             Show status of all agents
+
+{colorize('OPTIONS:', Colors.BOLD)}
+  -h, --help                       Show this help message
+  -b, --build                      Interactive configuration mode
+  --amount <N>                     Number of agents to create (1-100)
+  --name <prefix>                  Agent name prefix (default: client_)
+  --sensors <min,max>              Sensor count range per agent
+  --temp <min,max>                 Sensor temperature range °C (default: 25,75)
+  --fans <min,max>                 Fan count range per agent
+  --speed <min,max>                Fan speed % range (default: 0,100)
+  --rpm <min,max>                  Fan RPM range (default: 0,3000)
+  --server <url>                   WebSocket server URL
+  --start                          Start all agents
+  --stop                           Stop all agents
+  --restart                        Restart all agents
+  --status                         Show agent status
+  --check-deps                     Check and install dependencies
+
+{colorize('EXAMPLES:', Colors.BOLD)}
+  # Check dependencies
+  mock-agents --check-deps
+
+  # Interactive mode (includes dependency check)
+  mock-agents --build
+
+  # Create 5 agents with 5-9 sensors and 3-7 fans each
+  mock-agents --amount 5 --name client_ --sensors 5,9 --fans 3,7
+
+  # Create agents with custom temperature range
+  mock-agents --amount 5 --name test_ --sensors 8,12 --fans 4,6 --temp 30,80
+
+  # Create agents with custom RPM range
+  mock-agents --amount 10 --name server_ --sensors 10,20 --fans 5,10 --rpm 500,4000
+
+  # Start/stop/status
+  mock-agents --start
+  mock-agents --status
+  mock-agents --stop
+
+{colorize('FILES:', Colors.BOLD)}
+  Configuration: {CONFIG_DIR}
+  Log Files:     {LOG_DIR}
+  PID Files:     {PID_DIR}
+
+{colorize('DEPENDENCIES:', Colors.BOLD)}
+  Python 3.7+, websockets library (pip3 install websockets)
+
+{colorize('='*70, Colors.CYAN)}
+"""
+    print(help_text)
+
+def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('-h', '--help', action='store_true')
+    parser.add_argument('-b', '--build', action='store_true')
+    parser.add_argument('--amount', type=int)
+    parser.add_argument('--name', type=str)
+    parser.add_argument('--sensors', type=str)
+    parser.add_argument('--fans', type=str)
+    parser.add_argument('--temp', type=str, default='25,75')
+    parser.add_argument('--speed', type=str, default='0,100')
+    parser.add_argument('--rpm', type=str, default='0,3000')
+    parser.add_argument('--server', type=str)
+    parser.add_argument('--start', action='store_true')
+    parser.add_argument('--stop', action='store_true')
+    parser.add_argument('--restart', action='store_true')
+    parser.add_argument('--status', action='store_true')
+    parser.add_argument('--check-deps', action='store_true', help='Check dependencies and exit')
+
+    args = parser.parse_args()
+    manager = AgentManager()
+
+    # Check dependencies only
+    if args.check_deps:
+        deps_ok = check_dependencies()
+        sys.exit(0 if deps_ok else 1)
+
+    # Show help
+    if args.help or len(sys.argv) == 1:
+        show_help()
+        return
+
+    # Interactive mode
+    if args.build:
+        # Check dependencies before interactive build
+        if not check_dependencies():
+            print(colorize("\n⚠️  Please install dependencies before building agents\n", Colors.YELLOW))
+            sys.exit(1)
+        interactive_build(manager)
+        return
+
+    # Start agents
+    if args.start:
+        started, total = manager.start_all()
+        if started == total:
+            print(colorize(f"\n✅ All {total} agents started successfully\n", Colors.GREEN))
+        else:
+            print(colorize(f"\n⚠️  Started {started}/{total} agents\n", Colors.YELLOW))
+        return
+
+    # Stop agents
+    if args.stop:
+        stopped, total = manager.stop_all()
+        if stopped > 0:
+            print(colorize(f"\n✅ Stopped {stopped} agents\n", Colors.GREEN))
+        else:
+            print(colorize("\n⚠️  No agents were running\n", Colors.YELLOW))
+        return
+
+    # Restart agents
+    if args.restart:
+        manager.restart_all()
+        print(colorize("\n✅ Restart complete\n", Colors.GREEN))
+        return
+
+    # Show status
+    if args.status:
+        manager.show_status()
+        return
+
+    # Create agents (command-line mode)
+    if args.amount and args.sensors and args.fans:
+        try:
+            # Parse ranges
+            sensors = tuple(map(int, args.sensors.split(',')))
+            fans = tuple(map(int, args.fans.split(',')))
+            temp = tuple(map(int, args.temp.split(',')))
+            speed = tuple(map(int, args.speed.split(',')))
+            rpm = tuple(map(int, args.rpm.split(',')))
+
+            if len(sensors) != 2 or len(fans) != 2 or len(temp) != 2 or len(speed) != 2 or len(rpm) != 2:
+                print(colorize("❌ Invalid range format. Use: min,max", Colors.RED))
+                sys.exit(1)
+
+            name_prefix = args.name or "client_"
+
+            # Check for running agents and stop them automatically in non-interactive mode
+            current_agents = manager.get_agents()
+            running_count = 0
+            for agent in current_agents:
+                running, _ = manager.is_agent_running(agent["agent_name"])
+                if running:
+                    running_count += 1
+
+            if running_count > 0:
+                print(colorize(f"\n⚠️  {running_count} agent(s) currently running. Stopping them first...\n", Colors.YELLOW))
+                manager.stop_all()
+                print()
+
+            print(colorize(f"✨ Creating {args.amount} mock agents...\n", Colors.GREEN))
+            agents = manager.create_agents(args.amount, name_prefix, sensors, fans, speed, rpm, temp, args.server)
+
+            print(colorize(f"✅ Created {len(agents)} agents\n", Colors.GREEN))
+            print("Use 'mock-agents --start' to start them\n")
+
+        except Exception as e:
+            print(colorize(f"❌ Error: {e}\n", Colors.RED))
+            sys.exit(1)
+
+        return
+
+    # No valid command
+    print(colorize("⚠️  Invalid command. Use --help for usage information\n", Colors.YELLOW))
+    sys.exit(1)
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(colorize("\n\n❌ Interrupted by user\n", Colors.YELLOW))
+        sys.exit(1)
+    except Exception as e:
+        print(colorize(f"\n❌ Error: {e}\n", Colors.RED))
+        sys.exit(1)
