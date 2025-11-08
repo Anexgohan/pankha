@@ -774,8 +774,12 @@ impl WebSocketClient {
     }
 
     async fn connect_and_communicate(&self) -> Result<()> {
+        use tracing::trace;
+
+        trace!("Acquiring config lock for connection");
         let config = self.config.read().await;
         info!("Connecting to WebSocket: {}", config.backend.server_url);
+        trace!("Connection timeout: {}s", config.backend.connection_timeout);
 
         // Apply connection timeout to prevent hanging connections
         let timeout_duration = Duration::from_secs_f64(config.backend.connection_timeout);
@@ -812,10 +816,10 @@ impl WebSocketClient {
                 }
                 drop(w);
 
-                // Heartbeat logging: every 20 cycles (60s at 3s intervals)
+                // Heartbeat logging: only in DEBUG mode, every 20 cycles (60s at 3s intervals)
                 heartbeat_counter += 1;
                 if heartbeat_counter % 20 == 0 {
-                    info!("Heartbeat: {} data transmissions completed", heartbeat_counter);
+                    debug!("Data transmissions: {} completed", heartbeat_counter);
                 }
 
                 let interval = config.read().await.agent.update_interval;
@@ -864,7 +868,7 @@ impl WebSocketClient {
                         Ok(Message::Ping(_)) | Ok(Message::Pong(_)) => {
                             // Update last message time on ping/pong
                             last_message_received = std::time::Instant::now();
-                            debug!("Received WebSocket ping/pong");
+                            debug!("Received keepalive ping/pong");
                         }
                         Ok(Message::Close(_)) => {
                             info!("Server closed connection");
@@ -935,29 +939,43 @@ impl WebSocketClient {
         config: &Arc<RwLock<AgentConfig>>,
         hardware_monitor: &Arc<dyn HardwareMonitor>
     ) -> Result<()> {
+        use tracing::trace;
+
+        trace!("Starting hardware data collection");
         let sensors = hardware_monitor.discover_sensors().await?;
+        trace!("Collected {} sensors", sensors.len());
+
         let fans = hardware_monitor.discover_fans().await?;
+        trace!("Collected {} fans", fans.len());
+
         let system_health = hardware_monitor.get_system_info().await?;
+        trace!("Collected system health info");
 
         let config_read = config.read().await;
+        let timestamp = chrono::Utc::now().timestamp_millis();
         let data = serde_json::json!({
             "type": "data",
             "data": {
                 "agentId": config_read.agent.id,
-                "timestamp": chrono::Utc::now().timestamp_millis(),
+                "timestamp": timestamp,
                 "sensors": sensors,
                 "fans": fans,
                 "systemHealth": system_health
             }
         });
 
+        trace!("Sending WebSocket message (timestamp: {})", timestamp);
         write.send(Message::Text(data.to_string())).await?;
-        debug!("Sent data: {} sensors, {} fans", sensors.len(), fans.len());
+        debug!("Sent telemetry: {} sensors, {} fans", sensors.len(), fans.len());
         Ok(())
     }
 
     async fn handle_message(&self, text: &str, write: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>) -> Result<()> {
+        use tracing::trace;
+
+        trace!("Received message: {} bytes", text.len());
         let message: serde_json::Value = serde_json::from_str(text)?;
+        trace!("Parsed message type: {:?}", message.get("type"));
 
         if let Some(msg_type) = message.get("type").and_then(|v| v.as_str()) {
             match msg_type {
@@ -975,7 +993,7 @@ impl WebSocketClient {
                     write.send(Message::Text(pong.to_string())).await?;
                 }
                 "registered" => {
-                    info!("Registration confirmed by server");
+                    info!("Agent successfully registered with backend");
 
                     // Apply configuration from registration response
                     if let Some(config) = message.get("configuration") {
@@ -1723,8 +1741,38 @@ fn stop_daemon() -> Result<()> {
 
 fn restart_daemon() -> Result<()> {
     println!("Restarting Pankha Rust Agent...");
-    stop_daemon()?;
-    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    // Stop the agent if it's running
+    if is_running() {
+        if let Some(pid) = get_pid()? {
+            println!("Stopping Pankha Rust Agent (PID: {})...", pid);
+
+            // Send SIGTERM
+            unsafe { libc::kill(pid as i32, libc::SIGTERM) };
+
+            // Wait for graceful shutdown
+            for _ in 0..10 {
+                if !is_running() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+
+            // Force kill if necessary
+            if is_running() {
+                println!("WARNING: Force killing agent...");
+                unsafe { libc::kill(pid as i32, libc::SIGKILL) };
+            }
+
+            remove_pid_file()?;
+            println!("Agent stopped");
+        }
+        std::thread::sleep(std::time::Duration::from_secs(1));
+    } else {
+        println!("Agent not running, starting it...");
+    }
+
+    // Always start the agent (whether it was running or not)
     start_daemon()
 }
 
@@ -1769,19 +1817,16 @@ async fn show_status() -> Result<()> {
 // MAIN APPLICATION
 // ============================================================================
 
-use clap::Parser;
+use clap::{Parser, CommandFactory};
 
 #[derive(Parser, Debug)]
 #[command(name = "pankha-agent")]
 #[command(about = "Pankha Cross-Platform Hardware Monitoring Agent", long_about = None)]
+#[command(disable_help_flag = false)]
 struct Args {
-    /// Configuration file path
-    #[arg(short = 'p', long = "config-path")]
-    config_path: Option<String>,
-
-    /// Enable debug logging
-    #[arg(short = 'd', long)]
-    debug: bool,
+    /// Set log level (TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL)
+    #[arg(long = "log-level")]
+    log_level: Option<String>,
 
     /// Test mode (hardware discovery only)
     #[arg(long)]
@@ -1808,8 +1853,12 @@ struct Args {
     restart: bool,
 
     /// Show agent status
-    #[arg(short = 't', long = "status")]
+    #[arg(short = 'i', long = "status")]
     status: bool,
+
+    /// Show agent logs (tail -f by default, or tail -n <lines> if number provided)
+    #[arg(short = 'l', long = "log-show")]
+    log_show: Option<Option<usize>>,
 
     /// Internal flag for daemon child process (do not use directly)
     #[arg(long, hide = true)]
@@ -1818,7 +1867,22 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Args::parse();
+    // Parse arguments with custom error handling
+    let args = match Args::try_parse() {
+        Ok(args) => args,
+        Err(err) => {
+            // Print the error first
+            eprintln!("{}", err);
+            eprintln!();
+
+            // Then print full help
+            Args::command().print_help().unwrap();
+            eprintln!();
+            eprintln!("\nFor more information, try '--help'.");
+
+            process::exit(1);
+        }
+    };
 
     // Handle management commands first (before async setup)
     if args.start {
@@ -1837,10 +1901,58 @@ async fn main() -> Result<()> {
         return show_status().await;
     }
 
+    if let Some(lines) = args.log_show {
+        // Show agent logs
+        let log_path = format!("{}/agent.log", LOG_DIR);
+
+        let mut cmd = process::Command::new("tail");
+
+        match lines {
+            Some(n) => {
+                // Show last N lines: tail -n <lines>
+                println!("Showing last {} log entries...\n", n);
+                cmd.arg("-n").arg(n.to_string());
+            }
+            None => {
+                // Follow logs: tail -f
+                println!("Showing live agent logs (Ctrl+C to exit)...\n");
+                cmd.arg("-f");
+            }
+        }
+
+        cmd.arg(&log_path);
+        let status = cmd.status()?;
+        process::exit(status.code().unwrap_or(1));
+    }
+
     // Setup logging (daemon child or foreground mode)
-    let log_level = if args.debug { "debug" } else { "info" };
+    // Priority: 1. --log-level flag, 2. LOG_LEVEL env, 3. config file, 4. default (info)
+    let log_level = if let Some(level) = args.log_level.as_ref() {
+        level.to_lowercase()
+    } else if let Ok(env_level) = std::env::var("LOG_LEVEL") {
+        env_level.to_lowercase()
+    } else {
+        // Will be set from config after loading, default to info for now
+        "info".to_string()
+    };
+
+    // Note: Rust tracing uses ERROR, WARN, INFO, DEBUG, TRACE
+    // CRITICAL is handled as ERROR level with critical context
+    let filter = match log_level.as_str() {
+        "critical" => "error",  // CRITICAL maps to ERROR level (most severe)
+        "trace" => "trace",
+        "debug" => "debug",
+        "info" => "info",
+        "warn" => "warn",
+        "error" => "error",
+        _ => {
+            eprintln!("Invalid log level '{}'. Using INFO. Valid levels: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL", log_level);
+            "info"
+        }
+    };
+
     tracing_subscriber::fmt()
-        .with_env_filter(log_level)
+        .with_env_filter(filter)
         .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
         .init();
 
@@ -1850,31 +1962,26 @@ async fn main() -> Result<()> {
         save_pid(process::id())?;
     }
 
-    info!("Pankha Rust Agent v1.0.0");
-    info!("Platform: {}", std::env::consts::OS);
+    info!("Pankha Agent v1.0.0 starting ({})", std::env::consts::OS);
 
     // Show config if requested
     if args.config {
-        let config = load_config(args.config_path.as_deref()).await?;
+        let config = load_config(None).await?;
         println!("\n{}", serde_json::to_string_pretty(&config)?);
         return Ok(());
     }
 
     // Run setup wizard if requested
     if args.setup {
-        run_setup_wizard(args.config_path.as_deref()).await?;
+        run_setup_wizard(None).await?;
         return Ok(());
     }
 
     // Check if config file exists (required for normal operation)
-    let config_file_path = if let Some(p) = args.config_path.as_deref() {
-        PathBuf::from(p)
-    } else {
-        std::env::current_exe()?
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
-            .join("config.json")
-    };
+    let config_file_path = std::env::current_exe()?
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+        .join("config.json");
 
     if !config_file_path.exists() {
         eprintln!("ERROR: Configuration file not found: {:?}", config_file_path);
@@ -1886,7 +1993,7 @@ async fn main() -> Result<()> {
     }
 
     // Load configuration
-    let config = load_config(args.config_path.as_deref()).await?;
+    let config = load_config(None).await?;
 
     // Create platform-specific hardware monitor
     #[cfg(target_os = "linux")]
