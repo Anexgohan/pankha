@@ -15,9 +15,9 @@
 ![GitHub Stars](https://img.shields.io/github/stars/Anexgohan/pankha?style=social)
 ![GitHub Forks](https://img.shields.io/github/forks/Anexgohan/pankha?style=social)
 ![GitHub Watchers](https://img.shields.io/github/watchers/Anexgohan/pankha?style=social)
+![GitHub Sponsors](https://img.shields.io/github/sponsors/Anexgohan?style=social)
 ![GitHub Issues](https://img.shields.io/github/issues/Anexgohan/pankha)
 ![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Anexgohan/pankha)
-![GitHub Sponsors](https://img.shields.io/github/sponsors/Anexgohan?style=social)
 
 ![Reddit Subscribers](https://img.shields.io/reddit/subreddit-subscribers/selfhosted?style=social)
 ![Discord](https://img.shields.io/discord/:serverId?label=Pankha%20Discord&logo=discord)
