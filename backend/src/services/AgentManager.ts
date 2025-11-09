@@ -13,6 +13,7 @@ export class AgentManager extends EventEmitter {
   private agentFanStep: Map<string, number> = new Map(); // Track fan step percentage
   private agentHysteresis: Map<string, number> = new Map(); // Track hysteresis temperature
   private agentEmergencyTemp: Map<string, number> = new Map(); // Track emergency temperature
+  private agentLogLevel: Map<string, string> = new Map(); // Track log level
   private db: Database;
   private healthCheckInterval: NodeJS.Timeout | null = null;
 
@@ -453,6 +454,21 @@ export class AgentManager extends EventEmitter {
   public setAgentEmergencyTemp(agentId: string, temp: number): void {
     this.agentEmergencyTemp.set(agentId, temp);
     log.info(` Agent ${agentId} emergency temp set to ${temp}°C`, 'AgentManager');
+  }
+
+  /**
+   * Get agent log level
+   */
+  public getAgentLogLevel(agentId: string): string {
+    return this.agentLogLevel.get(agentId) || 'INFO'; // Default INFO
+  }
+
+  /**
+   * Set agent log level
+   */
+  public setAgentLogLevel(agentId: string, level: string): void {
+    this.agentLogLevel.set(agentId, level);
+    log.info(` Agent ${agentId} log level set to ${level}`, 'AgentManager');
   }
 
   /**

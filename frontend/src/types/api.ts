@@ -20,6 +20,7 @@ export interface SystemData {
   fan_step_percent?: number;
   hysteresis_temp?: number;
   emergency_temp?: number;
+  log_level?: string;
 }
 
 export interface SensorReading {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { SystemData, SensorReading, FanReading } from '../types/api';
-import { deleteSystem, setAgentUpdateInterval, setSensorDeduplication, setSensorTolerance, setFanStep, setHysteresis, setEmergencyTemp, getFanAssignments, updateSensorLabel, updateFanLabel } from '../services/api';
+import { deleteSystem, setAgentUpdateInterval, setSensorDeduplication, setSensorTolerance, setFanStep, setHysteresis, setEmergencyTemp, setLogLevel, getFanAssignments, updateSensorLabel, updateFanLabel } from '../services/api';
 import { useSensorVisibility } from '../contexts/SensorVisibilityContext';
 import { getFanProfiles, assignProfileToFan, type FanProfile } from '../services/fanProfilesApi';
 import { setFanSensor, getFanConfigurations } from '../services/fanConfigurationsApi';
@@ -32,6 +32,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [fanStep, setFanStepLocal] = useState<number>(system.fan_step_percent || 5);
   const [hysteresis, setHysteresisLocal] = useState<number>(system.hysteresis_temp || 3.0);
   const [emergencyTemp, setEmergencyTempLocal] = useState<number>(system.emergency_temp || 85.0);
+  const [logLevel, setLogLevelLocal] = useState<string>(system.log_level || 'INFO');
   const [showHiddenSensors, setShowHiddenSensors] = useState(false);
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);
   const [selectedSensors, setSelectedSensors] = useState<Record<string, string>>({});
@@ -132,7 +133,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
     if (system.emergency_temp !== undefined) {
       setEmergencyTempLocal(system.emergency_temp);
     }
-  }, [system.current_update_interval, system.filter_duplicate_sensors, system.duplicate_sensor_tolerance, system.fan_step_percent, system.hysteresis_temp, system.emergency_temp]);
+    if (system.log_level !== undefined) {
+      setLogLevelLocal(system.log_level);
+    }
+  }, [system.current_update_interval, system.filter_duplicate_sensors, system.duplicate_sensor_tolerance, system.fan_step_percent, system.hysteresis_temp, system.emergency_temp, system.log_level]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -328,6 +332,19 @@ const SystemCard: React.FC<SystemCardProps> = ({
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
       alert('Failed to set emergency temperature: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleLogLevelChange = async (newLevel: string) => {
+    try {
+      setLoading('log-level');
+      await setLogLevel(system.id, newLevel);
+      setLogLevelLocal(newLevel);
+      // No need to call onUpdate() since this doesn't affect displayed data
+    } catch (error) {
+      alert('Failed to set log level: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(null);
     }
@@ -694,6 +711,23 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     <option value={100}>100°C</option>
                   </select>
                   {loading === 'emergency-temp' && <span className="loading-spinner">⏳</span>}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label">Log Level:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={logLevel}
+                    onChange={(e) => handleLogLevelChange(e.target.value)}
+                    disabled={loading === 'log-level'}
+                    title="Agent logging verbosity. TRACE: very detailed debug info, DEBUG: detailed diagnostics, INFO: normal operation logs, WARN: warnings, ERROR: errors only."
+                  >
+                    <option value="TRACE">TRACE</option>
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARN">WARN</option>
+                    <option value="ERROR">ERROR</option>
+                  </select>
+                  {loading === 'log-level' && <span className="loading-spinner">⏳</span>}
                 </div>
               </div>
             </>

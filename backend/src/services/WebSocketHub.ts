@@ -345,7 +345,8 @@ export class WebSocketHub extends EventEmitter {
           duplicate_sensor_tolerance: savedConfig.duplicate_sensor_tolerance ?? registrationData.duplicate_sensor_tolerance,
           fan_step_percent: savedConfig.fan_step_percent ?? registrationData.fan_step_percent,
           hysteresis_temp: savedConfig.hysteresis_temp ?? registrationData.hysteresis_temp,
-          emergency_temp: savedConfig.emergency_temp ?? registrationData.emergency_temp
+          emergency_temp: savedConfig.emergency_temp ?? registrationData.emergency_temp,
+          log_level: savedConfig.log_level ?? registrationData.log_level
         };
 
         // Set configuration in AgentManager
@@ -372,6 +373,10 @@ export class WebSocketHub extends EventEmitter {
         if (finalConfig.emergency_temp !== undefined) {
           this.agentManager.setAgentEmergencyTemp(agentId, finalConfig.emergency_temp);
           log.info(` Agent ${agentId} emergency temp: ${finalConfig.emergency_temp}°C`, 'WebSocketHub');
+        }
+        if (finalConfig.log_level !== undefined) {
+          this.agentManager.setAgentLogLevel(agentId, finalConfig.log_level);
+          log.info(` Agent ${agentId} log level: ${finalConfig.log_level}`, 'WebSocketHub');
         }
 
         // Send registration confirmation with configuration

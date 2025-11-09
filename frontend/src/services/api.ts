@@ -129,6 +129,14 @@ export const setEmergencyTemp = async (systemId: number, temp: number, priority:
   return response.data;
 };
 
+export const setLogLevel = async (systemId: number, level: string, priority: string = 'normal') => {
+  const response = await api.put(`/api/systems/${systemId}/log-level`, {
+    level,
+    priority
+  });
+  return response.data;
+};
+
 // Emergency
 export const emergencyStop = async () => {
   const response = await api.post('/api/emergency-stop');
