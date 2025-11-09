@@ -8,9 +8,10 @@
 ![GitHub](https://img.shields.io/github/downloads/Anexgohan/pankha/latest/total?label=Latest%20Downloads)
 ![GitHub](https://img.shields.io/github/downloads/Anexgohan/pankha/total?label=Total%20Downloads)
 ![GitHub](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha)
-
-![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
 ![GitHub Last Commit](https://img.shields.io/github/last-commit/Anexgohan/pankha)
+![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
+
+
 ![GitHub Stars](https://img.shields.io/github/stars/Anexgohan/pankha?style=social)
 ![GitHub Forks](https://img.shields.io/github/forks/Anexgohan/pankha?style=social)
 ![GitHub Watchers](https://img.shields.io/github/watchers/Anexgohan/pankha?style=social)
@@ -19,7 +20,7 @@
 ![GitHub Sponsors](https://img.shields.io/github/sponsors/Anexgohan?style=social)
 
 ![Reddit Subscribers](https://img.shields.io/reddit/subreddit-subscribers/selfhosted?style=social)
-![Discord](https://img.shields.io/discord/112233445566778899?label=Discord&logo=discord)
+![Discord](https://img.shields.io/discord/:serverId?label=Pankha%20Discord&logo=discord)
 
 ---
 Is an open-source Distributed fan control system with Centralized Management system for monitoring and controlling hardware cooling across multiple machines. Production-ready with real-time hardware monitoring, WebSocket communication, and PostgreSQL database.
