@@ -1818,10 +1818,6 @@ fn stop_daemon() -> Result<()> {
     Ok(())
 }
 
-fn start_daemon() -> Result<()> {
-    start_daemon_with_log_level(None)
-}
-
 fn restart_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
     println!("Restarting Pankha Rust Agent...");
 
@@ -1857,10 +1853,6 @@ fn restart_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
 
     // Always start the agent (whether it was running or not)
     start_daemon_with_log_level(log_level)
-}
-
-fn restart_daemon() -> Result<()> {
-    restart_daemon_with_log_level(None)
 }
 
 fn set_log_level_runtime(level: &str) -> Result<()> {
