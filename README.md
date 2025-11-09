@@ -5,6 +5,11 @@
 ![GitHub Repo Size](https://img.shields.io/github/repo-size/Anexgohan/pankha)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 
+![GitHub](https://img.shields.io/github/downloads/Anexgohan/pankha/latest/total?label=Latest Downloads)
+![GitHub](https://img.shields.io/github/downloads/Anexgohan/pankha/total?label=Total Downloads)
+![GitHub](https://img.shields.io/github/stars/Anexgohan/pankha?style=social)
+![GitHub](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha)
+
 ![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
 ![GitHub Last Commit](https://img.shields.io/github/last-commit/Anexgohan/pankha)
 ![GitHub Stars](https://img.shields.io/github/stars/Anexgohan/pankha?style=social)
