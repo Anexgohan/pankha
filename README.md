@@ -36,13 +36,13 @@ Centralized Dashboard:
 ![Centralized Dashboard](documentation/public/images/zen_2025-11-05_00-38-15_IutnWbxl11.png)  
 
 Agent widget:  
-![Agent widget](documentation/public/images/zen_2025-11-05_00-43-19_vXElWSbCmM.png)  
+![Agent widget](documentation/public/images/zen_2025-11-09_10-06-33_dsPnjkAOT3.png)  
 
 Temperature Sensors:  
-![Temperature Sensors](documentation/public/images/zen_2025-11-05_00-42-49_O6jZxk8cqt.png)  
+![Temperature Sensors](documentation/public/images/2025-11-09_10-08-14_sQjuyQPPjL.png)  
 
 Fan Control:  
-![Fan Control](documentation/public/images/zen_2025-11-05_00-36-53_JfYyTR3k2j.png)  
+![Fan Control](documentation/public/images/2025-11-09_10-11-32_2L9HjamqLC.png)  
 
 Profiles:  
 ![Profiles](documentation/public/images/zen_2025-11-05_00-38-44_57LBUM5n3B.png)  
