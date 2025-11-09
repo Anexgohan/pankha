@@ -14,7 +14,6 @@
 use anyhow::{Result, Context};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -187,6 +186,9 @@ pub trait HardwareMonitor: Send + Sync {
 // ============================================================================
 // LINUX HARDWARE MONITOR IMPLEMENTATION
 // ============================================================================
+
+#[cfg(target_os = "linux")]
+use std::collections::HashMap;
 
 #[cfg(target_os = "linux")]
 pub struct LinuxHardwareMonitor {
@@ -921,6 +923,7 @@ impl WebSocketClient {
                 "fan_step_percent": config.hardware.fan_step_percent,
                 "hysteresis_temp": config.hardware.hysteresis_temp,
                 "emergency_temp": config.hardware.emergency_temp,
+                "log_level": config.agent.log_level.clone(),
                 "capabilities": {
                     "sensors": sensors,
                     "fans": fans,
@@ -1052,6 +1055,15 @@ impl WebSocketClient {
                                 info!("Applied emergency_temp: {}°C", temp);
                             }
                         }
+
+                        // Apply log_level
+                        if let Some(level) = config.get("log_level").and_then(|v| v.as_str()) {
+                            if let Err(e) = self.set_log_level(level).await {
+                                error!("Failed to apply log_level: {}", e);
+                            } else {
+                                info!("Applied log_level: {}", level);
+                            }
+                        }
                     }
                 }
                 _ => {
@@ -1163,6 +1175,16 @@ impl WebSocketClient {
                     }
                 } else {
                     (false, Some("Missing or invalid temp".to_string()), serde_json::json!({}))
+                }
+            }
+            "setLogLevel" => {
+                if let Some(level) = payload.get("level").and_then(|v| v.as_str()) {
+                    match self.set_log_level(level).await {
+                        Ok(_) => (true, None, serde_json::json!({"level": level})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid log level".to_string()), serde_json::json!({}))
                 }
             }
             "ping" => (true, None, serde_json::json!({"pong": true})),
@@ -1285,7 +1307,7 @@ impl WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("Fan step changed to: {}% (saved to config)", step);
+        info!("✏️  Fan Step changed → {}%", step);
         Ok(())
     }
 
@@ -1309,7 +1331,7 @@ impl WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("Hysteresis changed to: {}°C (saved to config)", hysteresis);
+        info!("✏️  Hysteresis changed → {}°C", hysteresis);
         Ok(())
     }
 
@@ -1333,7 +1355,57 @@ impl WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("Emergency temperature changed to: {}°C (saved to config)", temp);
+        info!("✏️  Emergency Temp changed → {}°C", temp);
+        Ok(())
+    }
+
+    async fn set_log_level(&self, level: &str) -> Result<()> {
+        // Validate log level
+        let valid_levels = ["trace", "debug", "info", "warn", "error", "critical"];
+        let level_lower = level.to_lowercase();
+        if !valid_levels.contains(&level_lower.as_str()) {
+            return Err(anyhow::anyhow!(
+                "Invalid log level '{}'. Valid levels: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL",
+                level
+            ));
+        }
+
+        // Update config quickly with minimal lock time
+        let old_level;
+        {
+            let mut config = self.config.write().await;
+            old_level = config.agent.log_level.clone();
+            config.agent.log_level = level.to_uppercase();
+        } // Lock released here
+
+        // Perform I/O outside of lock
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
+
+        // Reload the tracing filter dynamically
+        let filter = match level_lower.as_str() {
+            "critical" => "error",
+            "trace" => "trace",
+            "debug" => "debug",
+            "info" => "info",
+            "warn" => "warn",
+            "error" => "error",
+            _ => "info",
+        };
+
+        if let Some(handle) = RELOAD_HANDLE.get() {
+            match handle.reload(EnvFilter::new(filter)) {
+                Ok(_) => info!("✏️  Log Level changed: {} → {}", old_level, level.to_uppercase()),
+                Err(e) => error!("Failed to reload log level filter: {}", e),
+            }
+        } else {
+            warn!("✏️  Log Level changed: {} → {} (filter reload unavailable)", old_level, level.to_uppercase());
+        }
+
         Ok(())
     }
 
@@ -1791,6 +1863,57 @@ fn restart_daemon() -> Result<()> {
     restart_daemon_with_log_level(None)
 }
 
+fn set_log_level_runtime(level: &str) -> Result<()> {
+    // Validate log level
+    let valid_levels = ["trace", "debug", "info", "warn", "error", "critical"];
+    let level_lower = level.to_lowercase();
+    if !valid_levels.contains(&level_lower.as_str()) {
+        return Err(anyhow::anyhow!(
+            "Invalid log level '{}'. Valid levels: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL",
+            level
+        ));
+    }
+
+    // Check if agent is running
+    if !is_running() {
+        return Err(anyhow::anyhow!(
+            "Agent is not running. Start the agent first with: --start"
+        ));
+    }
+
+    // Load current config
+    let config_path = std::env::current_exe()?
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+        .join("config.json");
+
+    let content = std::fs::read_to_string(&config_path)?;
+    let mut config: AgentConfig = serde_json::from_str(&content)?;
+
+    // Update log level in config
+    let old_level = config.agent.log_level.clone();
+    config.agent.log_level = level.to_uppercase();
+
+    // Save updated config
+    let content = serde_json::to_string_pretty(&config)?;
+    std::fs::write(&config_path, content)?;
+
+    println!("Log level updated: {} → {}", old_level, level.to_uppercase());
+    println!("Configuration saved to: {:?}", config_path);
+
+    // Send SIGHUP to running agent to reload config
+    if let Some(pid) = get_pid()? {
+        println!("Sending reload signal to agent (PID: {})...", pid);
+        unsafe { libc::kill(pid as i32, libc::SIGHUP) };
+        println!("✅ Log level changed successfully");
+        println!("\nNote: New log level will be applied immediately.");
+        println!("      Logs are written to: {}/agent.log", LOG_DIR);
+        println!("      View logs with: ./pankha-agent -l");
+    }
+
+    Ok(())
+}
+
 async fn show_status() -> Result<()> {
     println!("Pankha Rust Agent Status");
     println!("========================");
@@ -1833,13 +1956,20 @@ async fn show_status() -> Result<()> {
 // ============================================================================
 
 use clap::{Parser, CommandFactory};
+use tracing_subscriber::{reload, EnvFilter};
+
+// Global reload handle for dynamic log level changes
+type ReloadHandle = reload::Handle<EnvFilter, tracing_subscriber::Registry>;
+static RELOAD_HANDLE: std::sync::OnceLock<ReloadHandle> = std::sync::OnceLock::new();
 
 #[derive(Parser, Debug)]
 #[command(name = "pankha-agent")]
 #[command(about = "Pankha Cross-Platform Hardware Monitoring Agent", long_about = None)]
 #[command(disable_help_flag = false)]
 struct Args {
-    /// Set log level (TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL)
+    /// Set log level dynamically (TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL).
+    /// When used alone, changes the log level of a running agent without restart.
+    /// Can also be used with --start/--restart to set level on startup.
     #[arg(long = "log-level")]
     log_level: Option<String>,
 
@@ -1886,11 +2016,19 @@ async fn main() -> Result<()> {
     let args = match Args::try_parse() {
         Ok(args) => args,
         Err(err) => {
-            // Print the error first
+            // Check if this is a help or version request (already formatted by clap)
+            if err.kind() == clap::error::ErrorKind::DisplayHelp
+                || err.kind() == clap::error::ErrorKind::DisplayVersion {
+                // Just print the error (which contains the help/version)
+                print!("{}", err);
+                process::exit(0);
+            }
+
+            // For other errors, print the error
             eprintln!("{}", err);
             eprintln!();
 
-            // Then print full help
+            // Then print full help for clarity
             Args::command().print_help().unwrap();
             eprintln!();
             eprintln!("\nFor more information, try '--help'.");
@@ -1940,12 +2078,12 @@ async fn main() -> Result<()> {
         process::exit(status.code().unwrap_or(1));
     }
 
-    // If user provided --log-level without a command, show error
-    if args.log_level.is_some() && !args.daemon_child && !args.test && !args.config && !args.setup {
-        eprintln!("ERROR: --log-level must be used with a command like --start, --restart, or --test");
-        eprintln!();
-        Args::command().print_help().unwrap();
-        process::exit(1);
+    // If user provided --log-level without other commands, set it for running agent
+    if let Some(level) = args.log_level.as_ref() {
+        if !args.daemon_child && !args.test && !args.config && !args.setup {
+            // Set log level for running agent
+            return set_log_level_runtime(level);
+        }
     }
 
     // If no command was provided at all (user just ran the binary), show help
@@ -1988,10 +2126,22 @@ async fn main() -> Result<()> {
         }
     };
 
-    tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+    // Set up tracing with reload capability for dynamic log level changes
+    use tracing_subscriber::prelude::*;
+
+    let env_filter = EnvFilter::new(filter);
+    let (filter_layer, reload_handle) = reload::Layer::new(env_filter);
+
+    tracing_subscriber::registry()
+        .with(filter_layer)
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_timer(tracing_subscriber::fmt::time::LocalTime::rfc_3339())
+        )
         .init();
+
+    // Store reload handle in the global static for signal handler access
+    let _ = RELOAD_HANDLE.set(reload_handle);
 
     // If we're a daemon child, save our PID and continue
     if args.daemon_child {
@@ -2054,6 +2204,45 @@ async fn main() -> Result<()> {
     // Create and run WebSocket client
     let client = WebSocketClient::new(config, hardware_monitor);
     let client = Arc::new(client);
+
+    // Setup SIGHUP handler for log level reload
+    #[cfg(target_os = "linux")]
+    if args.daemon_child {
+        use tokio::signal::unix::{signal, SignalKind};
+        let mut sighup = signal(SignalKind::hangup()).expect("Failed to setup SIGHUP handler");
+
+        tokio::spawn(async move {
+            loop {
+                sighup.recv().await;
+                info!("SIGHUP received, reloading log level configuration");
+
+                // Reload config from file
+                match load_config(None).await {
+                    Ok(new_config) => {
+                        let new_level = new_config.agent.log_level.to_lowercase();
+                        let filter = match new_level.as_str() {
+                            "critical" => "error",
+                            "trace" => "trace",
+                            "debug" => "debug",
+                            "info" => "info",
+                            "warn" => "warn",
+                            "error" => "error",
+                            _ => "info",
+                        };
+
+                        // Reload the tracing filter
+                        if let Some(handle) = RELOAD_HANDLE.get() {
+                            match handle.reload(EnvFilter::new(filter)) {
+                                Ok(_) => info!("Log level reloaded: {}", new_level.to_uppercase()),
+                                Err(e) => error!("Failed to reload log level: {}", e),
+                            }
+                        }
+                    }
+                    Err(e) => error!("Failed to reload config: {}", e),
+                }
+            }
+        });
+    }
 
     // Setup signal handler with proper cancellation
     let client_clone = Arc::clone(&client);

@@ -195,6 +195,21 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
+   * Set log level
+   */
+  public async setLogLevel(agentId: string, level: string, priority: 'low' | 'normal' | 'high' | 'emergency' = 'normal'): Promise<any> {
+    // Validate log level
+    const validLevels = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'];
+    if (!validLevels.includes(level.toUpperCase())) {
+      throw new Error('Log level must be one of: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL');
+    }
+
+    log.info(` Setting log level for agent ${agentId}: ${level}`, 'CommandDispatcher');
+
+    return this.sendCommand(agentId, 'setLogLevel', { level: level.toUpperCase() }, priority);
+  }
+
+  /**
    * Apply a fan profile to a system
    */
   public async applyFanProfile(agentId: string, profileName: string): Promise<any> {
@@ -417,6 +432,11 @@ export class CommandDispatcher extends EventEmitter {
         this.agentManager.setAgentEmergencyTemp(pendingCommand.command.agentId, response.data.temp);
         // Persist to database
         await this.saveAgentConfig(pendingCommand.command.agentId, { emergency_temp: response.data.temp });
+      }
+      if (pendingCommand.command.type === 'setLogLevel' && response.data?.level !== undefined) {
+        this.agentManager.setAgentLogLevel(pendingCommand.command.agentId, response.data.level);
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, { log_level: response.data.level });
       }
       pendingCommand.resolve(response.data);
       this.emit('commandCompleted', { command: pendingCommand.command, response });

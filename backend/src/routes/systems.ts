@@ -46,7 +46,8 @@ router.get('/', async (req: Request, res: Response) => {
         duplicate_sensor_tolerance: agentManager.getAgentSensorTolerance(system.agent_id),
         fan_step_percent: agentManager.getAgentFanStep(system.agent_id),
         hysteresis_temp: agentManager.getAgentHysteresis(system.agent_id),
-        emergency_temp: agentManager.getAgentEmergencyTemp(system.agent_id)
+        emergency_temp: agentManager.getAgentEmergencyTemp(system.agent_id),
+        log_level: agentManager.getAgentLogLevel(system.agent_id)
       };
     });
 
@@ -208,7 +209,8 @@ router.get('/:id', async (req: Request, res: Response) => {
       duplicate_sensor_tolerance: agentManager.getAgentSensorTolerance(system.agent_id),
       fan_step_percent: agentManager.getAgentFanStep(system.agent_id),
       hysteresis_temp: agentManager.getAgentHysteresis(system.agent_id),
-      emergency_temp: agentManager.getAgentEmergencyTemp(system.agent_id)
+      emergency_temp: agentManager.getAgentEmergencyTemp(system.agent_id),
+      log_level: agentManager.getAgentLogLevel(system.agent_id)
     });
 
   } catch (error) {
@@ -761,6 +763,38 @@ router.put('/:id/emergency-temp', async (req: Request, res: Response) => {
   } catch (error) {
     log.error('Error setting emergency temp:', 'systems', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to set emergency temp' });
+  }
+});
+
+// PUT /api/systems/:id/log-level - Set agent log level
+router.put('/:id/log-level', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const { level, priority = 'normal' } = req.body;
+
+    const validLevels = ['TRACE', 'DEBUG', 'INFO', 'WARN', 'ERROR', 'CRITICAL'];
+    if (!validLevels.includes(level.toUpperCase())) {
+      return res.status(400).json({ error: 'Log level must be one of: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL' });
+    }
+
+    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    const result = await commandDispatcher.setLogLevel(system.agent_id, level.toUpperCase(), priority);
+
+    res.json({
+      message: 'Log level command sent',
+      agent_id: system.agent_id,
+      requested_level: level.toUpperCase(),
+      priority,
+      result
+    });
+
+  } catch (error) {
+    log.error('Error setting log level:', 'systems', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to set log level' });
   }
 });
 
