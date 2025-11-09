@@ -7,7 +7,6 @@
 
 ![GitHub](https://img.shields.io/github/downloads/Anexgohan/pankha/latest/total?label=Latest%20Downloads)
 ![GitHub](https://img.shields.io/github/downloads/Anexgohan/pankha/total?label=Total%20Downloads)
-![GitHub](https://img.shields.io/github/stars/Anexgohan/pankha?style=social)
 ![GitHub](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha)
 
 ![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
