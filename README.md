@@ -56,6 +56,20 @@ Fully Customizable:
 ![Profiles](documentation/public/images/zen_2025-11-05_00-39-25_A8ywDiMWc8.png)  
 ![Import Export](documentation/public/images/zen_2025-11-05_00-41-41_7vx3VRh0Fl.png)  
 
+## Why Pankha?
+
+  - ✅ Reduced Fan Wear - Fewer speed changes extend fan lifespan
+  - ✅ Quieter Operation - Smooth transitions eliminate abrupt noise changes
+  - ✅ Stable UI - No flickering fan speed indicators
+  - ✅ Better UX - Professional, predictable behavior
+  - ✅ Energy Efficiency - Smoother transitions reduce power spikes
+  - ✅ User Control - Tune behavior per system/use case
+  - ✅ Safety - Emergency override ensures critical temps handled immediately
+  - ✅ Multi-System Support - Monitor and control multiple machines from one dashboard
+  - ✅ Open Source - Easy to deploy, manage, and scale
+  - ✅ Real-time Updates - Instant feedback on temperature and fan speed changes
+  - ✅ Real-time Profiles - Customizable fan profiles for different workloads
+  - ✅ Real-time Data - Historical data visualization for better planning
 
 ## Instructions:
 

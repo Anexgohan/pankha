@@ -52,6 +52,7 @@ export class FanProfileController {
   private lastAppliedSpeeds: Map<string, number> = new Map();
   private lastSignificantTemp: Map<string, number> = new Map();
   private lastSpeedChangeTime: Map<string, number> = new Map();
+  private lastTargetSpeeds: Map<string, number> = new Map(); // Track target speed for hysteresis
 
   private constructor() {
     this.db = Database.getInstance();
@@ -284,8 +285,7 @@ export class FanProfileController {
     const lastTemp = this.lastSignificantTemp.get(fanKey);
 
     // Initialize if first run
-    if (lastTemp === undefined) {
-      this.lastSignificantTemp.set(fanKey, currentTemp);
+    if (currentSpeed === 0 && lastTemp === undefined) {
       this.lastAppliedSpeeds.set(fanKey, targetSpeed);
       this.lastSpeedChangeTime.set(fanKey, Date.now());
       await this.sendFanSpeedCommand(agentId, fanName, targetSpeed);
@@ -296,22 +296,7 @@ export class FanProfileController {
       return;
     }
 
-    // HYSTERESIS CHECK: Only react if temp changed significantly
-    if (hysteresis > 0) {
-      const tempDiff = Math.abs(currentTemp - lastTemp);
-      if (tempDiff < hysteresis && currentSpeed === targetSpeed) {
-        // Temperature within hysteresis zone and already at target - no change
-        return;
-      }
-
-      // Update last significant temp if we're outside hysteresis zone
-      if (tempDiff >= hysteresis) {
-        this.lastSignificantTemp.set(fanKey, currentTemp);
-      }
-    } else {
-      // Hysteresis disabled (0°C) - always update last temp
-      this.lastSignificantTemp.set(fanKey, currentTemp);
-    }
+    // Note: Hysteresis is now handled in control loop before calling this method
 
     // FAN STEP: Calculate next speed (incremental change)
     let nextSpeed: number;
@@ -408,8 +393,37 @@ export class FanProfileController {
             continue;
           }
 
-          // Calculate target fan speed from curve
-          const targetSpeed = this.calculateFanSpeed(temperature, curvePoints);
+          // Determine temperature to use for target calculation (hysteresis logic)
+          const fanKey = `${assignment.agent_id}:${assignment.fan_name}`;
+          const hysteresis = this.agentManager.getAgentHysteresis(assignment.agent_id);
+          const lastSignificantTemp = this.lastSignificantTemp.get(fanKey);
+          const lastTargetSpeed = this.lastTargetSpeeds.get(fanKey);
+
+          let tempForTarget: number;
+          let targetSpeed: number;
+
+          // Check if we should recalculate target based on hysteresis
+          if (lastSignificantTemp !== undefined && hysteresis > 0) {
+            const tempDiff = Math.abs(temperature - lastSignificantTemp);
+
+            if (tempDiff < hysteresis && lastTargetSpeed !== undefined) {
+              // Within hysteresis zone - use last target
+              targetSpeed = lastTargetSpeed;
+              tempForTarget = lastSignificantTemp;
+            } else {
+              // Crossed hysteresis threshold - recalculate target
+              tempForTarget = temperature;
+              targetSpeed = this.calculateFanSpeed(temperature, curvePoints);
+              this.lastSignificantTemp.set(fanKey, temperature);
+              this.lastTargetSpeeds.set(fanKey, targetSpeed);
+            }
+          } else {
+            // First run or hysteresis disabled - always calculate
+            tempForTarget = temperature;
+            targetSpeed = this.calculateFanSpeed(temperature, curvePoints);
+            this.lastSignificantTemp.set(fanKey, temperature);
+            this.lastTargetSpeeds.set(fanKey, targetSpeed);
+          }
 
           // Apply min/max constraints from fan configuration
           const constrainedSpeed = this.applySpeedConstraints(
@@ -418,7 +432,7 @@ export class FanProfileController {
             assignment.fan_max_speed
           );
 
-          // Apply fan control with hysteresis and stepping
+          // Apply fan control with stepping (hysteresis already handled above)
           await this.applyFanControl(
             assignment.agent_id,
             assignment.fan_name,

@@ -97,6 +97,8 @@ export class DataAggregator extends EventEmitter {
    * Setup event listeners for agent data
    */
   private setupEventListeners(): void {
+    // AgentCommunication import removed to prevent circular dependency
+    // Data is now received via direct method call: updateSystemData()
     // this.agentCommunication.on('agentData', this.handleAgentData.bind(this));
     this.agentManager.on('agentOffline', this.handleAgentOffline.bind(this));
   }
