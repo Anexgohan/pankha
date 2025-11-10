@@ -503,12 +503,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
     return date.toLocaleDateString();
   };
 
-  const averageTemperature = system.current_temperatures?.length
-    ? system.current_temperatures.reduce((sum, sensor) => sum + sensor.temperature, 0) / system.current_temperatures.length
+  // Filter visible sensors for dashboard stats (exclude hidden sensors and groups)
+  const visibleSensors = system.current_temperatures?.filter(
+    sensor => !isSensorHidden(sensor.id) && !sensor.isHidden
+  ) || [];
+
+  const averageTemperature = visibleSensors.length
+    ? visibleSensors.reduce((sum, sensor) => sum + sensor.temperature, 0) / visibleSensors.length
     : null;
 
-  const highestTemperature = system.current_temperatures?.length
-    ? Math.max(...system.current_temperatures.map(sensor => sensor.temperature))
+  const highestTemperature = visibleSensors.length
+    ? Math.max(...visibleSensors.map(sensor => sensor.temperature))
     : null;
 
   const averageFanRPM = system.current_fan_speeds?.length
@@ -541,7 +546,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   // Check if a sensor is hidden (either individually or via group)
   const isSensorOrGroupHidden = (sensor: SensorReading): boolean => {
-    // Check if sensor itself is hidden
+    // Check backend hidden flag (from database)
+    if (sensor.isHidden) {
+      return true;
+    }
+
+    // Check if sensor itself is hidden in localStorage
     if (isSensorHidden(sensor.id)) {
       return true;
     }
@@ -820,7 +830,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               <div className="sensors-list">
                 {(() => {
                   const filteredSensors = system.current_temperatures
-                    .filter((sensor: SensorReading) => showHiddenSensors || !isSensorHidden(sensor.id));
+                    .filter((sensor: SensorReading) => showHiddenSensors || (!isSensorHidden(sensor.id) && !sensor.isHidden));
 
                   const sensorGroups = groupSensorsByChip(filteredSensors);
 
@@ -862,7 +872,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         </div>
                         <div className="sensor-group-items">
                         {chipSensors.map((sensor: SensorReading) => {
-                          const isHidden = isSensorHidden(sensor.id);
+                          const isHidden = isSensorHidden(sensor.id) || sensor.isHidden;
                           return (
                             <div
                               key={sensor.id}

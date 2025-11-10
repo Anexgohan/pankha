@@ -173,16 +173,20 @@ export class FanProfileController {
 
       // Handle special identifiers
       if (sensorIdentifier && sensorIdentifier.trim() !== '') {
-        // Handle "__highest__" - return highest temperature on the system
+        // Handle "__highest__" - return highest temperature on the system (excluding hidden sensors)
         if (sensorIdentifier === '__highest__') {
-          const temperatures = systemData.sensors.map(s => s.temperature);
+          const visibleSensors = systemData.sensors.filter(s => !s.isHidden);
+          const temperatures = visibleSensors.map(s => s.temperature);
           return temperatures.length > 0 ? Math.max(...temperatures) : null;
         }
 
-        // Handle "__group__<name>" - return highest temperature in that group
+        // Handle "__group__<name>" - return highest temperature in that group (excluding hidden sensors)
         if (sensorIdentifier.startsWith('__group__')) {
           const groupName = sensorIdentifier.replace('__group__', '');
           const groupSensors = systemData.sensors.filter(s => {
+            // Skip hidden sensors
+            if (s.isHidden) return false;
+
             // Extract chip name from sensor ID (e.g., "k10temp_1" -> "k10temp")
             const chipMatch = s.id.match(/^([a-z0-9_]+?)_\d+$/i);
             const chipName = chipMatch ? chipMatch[1] : s.id.split('_')[0];

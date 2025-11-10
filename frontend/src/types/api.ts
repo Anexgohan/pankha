@@ -33,6 +33,7 @@ export interface SensorReading {
   maxTemp?: number;
   critTemp?: number;
   dbId?: number; // Database record ID for fan_profile_assignments
+  isHidden?: boolean; // Sensor is hidden by user (individually or via group)
 }
 
 export interface FanReading {
