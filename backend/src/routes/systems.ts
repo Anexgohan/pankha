@@ -902,4 +902,116 @@ router.put('/:id/fans/:fanId/label', async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/systems/:id/sensors/:sensorId/visibility - Toggle individual sensor visibility
+router.put('/:id/sensors/:sensorId/visibility', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const sensorId = parseInt(req.params.sensorId);
+    const { is_hidden } = req.body;
+
+    if (typeof is_hidden !== 'boolean') {
+      return res.status(400).json({ error: 'is_hidden must be a boolean' });
+    }
+
+    // Verify system exists
+    const system = await db.get('SELECT id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    // Update sensor visibility
+    await db.run(
+      'UPDATE sensors SET is_hidden = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND system_id = $3',
+      [is_hidden, sensorId, systemId]
+    );
+
+    log.info(`Sensor ${sensorId} visibility updated: is_hidden=${is_hidden}`, 'systems');
+
+    res.json({
+      message: 'Sensor visibility updated successfully',
+      sensor_id: sensorId,
+      is_hidden
+    });
+
+  } catch (error) {
+    log.error('Error updating sensor visibility:', 'systems', error);
+    res.status(500).json({ error: 'Failed to update sensor visibility' });
+  }
+});
+
+// PUT /api/systems/:id/sensor-groups/:groupName/visibility - Toggle sensor group visibility
+router.put('/:id/sensor-groups/:groupName/visibility', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const groupName = req.params.groupName;
+    const { is_hidden } = req.body;
+
+    if (typeof is_hidden !== 'boolean') {
+      return res.status(400).json({ error: 'is_hidden must be a boolean' });
+    }
+
+    // Verify system exists
+    const system = await db.get('SELECT id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    // Upsert group visibility
+    await db.run(
+      `INSERT INTO sensor_group_visibility (system_id, group_name, is_hidden, updated_at)
+       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+       ON CONFLICT (system_id, group_name)
+       DO UPDATE SET is_hidden = $3, updated_at = CURRENT_TIMESTAMP`,
+      [systemId, groupName, is_hidden]
+    );
+
+    log.info(`Sensor group ${groupName} visibility updated: is_hidden=${is_hidden}`, 'systems');
+
+    res.json({
+      message: 'Sensor group visibility updated successfully',
+      group_name: groupName,
+      is_hidden
+    });
+
+  } catch (error) {
+    log.error('Error updating sensor group visibility:', 'systems', error);
+    res.status(500).json({ error: 'Failed to update sensor group visibility' });
+  }
+});
+
+// GET /api/systems/:id/sensor-visibility - Get sensor and group visibility preferences
+router.get('/:id/sensor-visibility', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+
+    // Verify system exists
+    const system = await db.get('SELECT id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
+    // Get hidden sensors
+    const hiddenSensors = await db.all(
+      'SELECT id, sensor_name FROM sensors WHERE system_id = $1 AND is_hidden = true',
+      [systemId]
+    );
+
+    // Get hidden groups
+    const hiddenGroups = await db.all(
+      'SELECT group_name FROM sensor_group_visibility WHERE system_id = $1 AND is_hidden = true',
+      [systemId]
+    );
+
+    res.json({
+      hidden_sensors: hiddenSensors.map(s => s.sensor_name),
+      hidden_sensor_ids: hiddenSensors.map(s => s.id),
+      hidden_groups: hiddenGroups.map(g => g.group_name)
+    });
+
+  } catch (error) {
+    log.error('Error fetching sensor visibility:', 'systems', error);
+    res.status(500).json({ error: 'Failed to fetch sensor visibility' });
+  }
+});
+
 export default router;

@@ -478,6 +478,58 @@ export class DataAggregator extends EventEmitter {
   }
 
   /**
+   * Filter out hidden sensors and sensors from hidden groups
+   */
+  private async filterHiddenSensors(data: AggregatedSystemData): Promise<void> {
+    try {
+      // Get individually hidden sensors
+      const hiddenSensors = await this.db.all(
+        'SELECT sensor_name FROM sensors WHERE system_id = $1 AND is_hidden = true',
+        [data.systemId]
+      );
+      const hiddenSensorNames = new Set(hiddenSensors.map(s => s.sensor_name));
+
+      // Get hidden sensor groups
+      const hiddenGroups = await this.db.all(
+        'SELECT group_name FROM sensor_group_visibility WHERE system_id = $1 AND is_hidden = true',
+        [data.systemId]
+      );
+      const hiddenGroupNames = new Set(hiddenGroups.map(g => g.group_name));
+
+      // Filter sensors array
+      const originalCount = data.sensors.length;
+      data.sensors = data.sensors.filter(sensor => {
+        // Check if individually hidden
+        if (hiddenSensorNames.has(sensor.id)) {
+          return false;
+        }
+
+        // Check if part of hidden group
+        // Extract chip name from sensor ID (e.g., "k10temp_1" -> "k10temp")
+        const chipMatch = sensor.id.match(/^([a-z0-9_]+?)_\d+$/i);
+        const chipName = chipMatch ? chipMatch[1] : sensor.id.split('_')[0];
+
+        if (hiddenGroupNames.has(chipName)) {
+          return false;
+        }
+
+        return true;
+      });
+
+      const filteredCount = originalCount - data.sensors.length;
+      if (filteredCount > 0) {
+        log.debug(
+          `[DataAggregator] Filtered ${filteredCount} hidden sensors for system ${data.systemId}`,
+          'DataAggregator'
+        );
+      }
+    } catch (error) {
+      log.error('[DataAggregator] Error filtering hidden sensors:', 'DataAggregator', error);
+      // Don't throw - continue with unfiltered data
+    }
+  }
+
+  /**
    * Get aggregated data for all systems
    */
   public getAllSystemsData(): AggregatedSystemData[] {
@@ -561,7 +613,7 @@ export class DataAggregator extends EventEmitter {
         }
       };
 
-      // Enrich with database information (adds dbId to fans)
+      // Enrich with database information (adds dbId, isHidden flag to sensors)
       await this.enrichAggregatedData(aggregatedData);
 
       this.aggregatedData.set(agentId, aggregatedData);

@@ -38,10 +38,23 @@ CREATE TABLE IF NOT EXISTS sensors (
   is_available BOOLEAN DEFAULT true,        -- Sensor is working/accessible
   is_primary BOOLEAN DEFAULT false,         -- Primary sensor for this type
   user_selected BOOLEAN DEFAULT false,      -- User has manually selected this sensor
+  is_hidden BOOLEAN DEFAULT false,          -- User has hidden this sensor from display
   last_reading TIMESTAMP,                   -- Last successful reading
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE
+);
+
+-- Sensor Group Visibility (tracks which sensor groups are hidden per system)
+CREATE TABLE IF NOT EXISTS sensor_group_visibility (
+  id SERIAL PRIMARY KEY,
+  system_id INTEGER NOT NULL,
+  group_name VARCHAR(255) NOT NULL,         -- e.g., 'k10temp', 'gigabyte_wmi', 'nvme'
+  is_hidden BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
+  UNIQUE(system_id, group_name)
 );
 
 -- Fan Controls with Sensor Assignments

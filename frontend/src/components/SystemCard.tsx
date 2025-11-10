@@ -138,6 +138,44 @@ const SystemCard: React.FC<SystemCardProps> = ({
     }
   }, [system.current_update_interval, system.filter_duplicate_sensors, system.duplicate_sensor_tolerance, system.fan_step_percent, system.hysteresis_temp, system.emergency_temp, system.log_level]);
 
+  // Wrapper to toggle sensor visibility (updates both localStorage and backend)
+  const handleToggleSensorVisibility = async (sensorId: string, sensorDbId?: number) => {
+    // Update localStorage immediately for responsive UI
+    toggleSensorVisibility(sensorId);
+
+    // Sync to backend if we have dbId
+    if (sensorDbId) {
+      try {
+        const isHidden = !isSensorHidden(sensorId); // Will be toggled state
+        await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/systems/${system.id}/sensors/${sensorDbId}/visibility`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_hidden: isHidden })
+        });
+      } catch (error) {
+        console.error('Failed to sync sensor visibility to backend:', error);
+      }
+    }
+  };
+
+  // Wrapper to toggle group visibility (updates both localStorage and backend)
+  const handleToggleGroupVisibility = async (groupId: string) => {
+    // Update localStorage immediately for responsive UI
+    toggleGroupVisibility(groupId);
+
+    // Sync to backend
+    try {
+      const isHidden = !isGroupHidden(groupId); // Will be toggled state
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/systems/${system.id}/sensor-groups/${groupId}/visibility`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_hidden: isHidden })
+      });
+    } catch (error) {
+      console.error('Failed to sync group visibility to backend:', error);
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'online': return '#4CAF50';
@@ -814,7 +852,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           <div className="group-header-right">
                             <button
                               className="visibility-toggle"
-                              onClick={() => toggleGroupVisibility(chipId)}
+                              onClick={() => handleToggleGroupVisibility(chipId)}
                               title={isGroupHiddenState ? "Show group" : "Hide group"}
                             >
                               {isGroupHiddenState ? '👁️‍🗨️' : '👁️'}
@@ -850,7 +888,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                     <span className="sensor-icon">{getSensorIcon(sensor.type)}</span>
                                     <button
                                       className="visibility-toggle"
-                                      onClick={() => toggleSensorVisibility(sensor.id)}
+                                      onClick={() => handleToggleSensorVisibility(sensor.id, sensor.dbId)}
                                       title={isHidden ? "Show sensor" : "Hide sensor"}
                                     >
                                       {isHidden ? '👁️‍🗨️' : '👁️'}
