@@ -376,9 +376,10 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
-   * Handle command response from agent
+   * Process command response from agent
+   * Public API for AgentCommunication to deliver command responses
    */
-  private async handleCommandResponse(event: { agentId: string; response: any }): Promise<void> {
+  public async processCommandResponse(event: { agentId: string; response: any }): Promise<void> {
     const { response } = event;
     const commandId = response.commandId;
     

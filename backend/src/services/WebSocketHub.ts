@@ -5,6 +5,7 @@ import { DataAggregator } from './DataAggregator';
 import { AgentManager } from './AgentManager';
 import { CommandDispatcher } from './CommandDispatcher';
 import { AgentCommunication } from './AgentCommunication';
+import { DeltaComputer } from './DeltaComputer';
 import { log } from '../utils/logger';
 
 interface ClientConnection {
@@ -36,6 +37,7 @@ export class WebSocketHub extends EventEmitter {
   private agentManager: AgentManager;
   private commandDispatcher: CommandDispatcher;
   private agentCommunication: AgentCommunication;
+  private deltaComputer: DeltaComputer;
   private pingInterval: NodeJS.Timeout | null = null;
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -45,7 +47,8 @@ export class WebSocketHub extends EventEmitter {
     this.agentManager = AgentManager.getInstance();
     this.commandDispatcher = CommandDispatcher.getInstance();
     this.agentCommunication = AgentCommunication.getInstance();
-    
+    this.deltaComputer = new DeltaComputer();
+
     this.setupEventListeners();
   }
 
@@ -79,12 +82,22 @@ export class WebSocketHub extends EventEmitter {
    * Setup event listeners for data updates
    */
   private setupEventListeners(): void {
-    // Listen for aggregated data updates
+    // Listen for aggregated data updates - use delta optimization
     this.dataAggregator.on('dataAggregated', (data) => {
-      this.broadcast('systemData', data, [`system:${data.agentId}`, 'systems:all']);
+      const delta = this.deltaComputer.computeDelta(data.agentId, data);
+
+      if (delta) {
+        // Send delta update (changed values only)
+        this.broadcast('systemDelta', delta, [`system:${data.agentId}`, 'systems:all']);
+      } else {
+        // First update for this agent - send full state
+        this.broadcast('fullState', [data], [`system:${data.agentId}`, 'systems:all']);
+      }
     });
 
     this.dataAggregator.on('systemOffline', (data) => {
+      // Clear delta state when agent goes offline
+      this.deltaComputer.clearAgentState(data.agentId);
       this.broadcast('systemOffline', data, [`system:${data.agentId}`, 'systems:all']);
     });
 
@@ -209,6 +222,10 @@ export class WebSocketHub extends EventEmitter {
 
         case 'unsubscribe':
           this.handleUnsubscription(clientId, message.data?.subscriptions || message.subscriptions || []);
+          break;
+
+        case 'requestFullSync':
+          await this.handleFullSyncRequest(clientId);
           break;
 
         case 'getSystemData':
@@ -465,6 +482,50 @@ export class WebSocketHub extends EventEmitter {
   private handleGetOverview(clientId: string): void {
     const overview = this.dataAggregator.getSystemOverview();
     this.sendToClient(clientId, 'overview', overview);
+  }
+
+  /**
+   * Handle full sync request (frontend requests complete state)
+   * Matches the format of GET /api/systems route
+   */
+  private async handleFullSyncRequest(clientId: string): Promise<void> {
+    const client = this.clients.get(clientId);
+    if (!client) return;
+
+    log.info(` Client ${clientId} requested full sync`, 'WebSocketHub');
+
+    try {
+      // Get systems from database (same as /api/systems route)
+      const systems = await this.dataAggregator.getAllSystems();
+
+      // Enhance with real-time data
+      const enhancedSystems = systems.map(system => {
+        const systemData = this.dataAggregator.getSystemData(system.agent_id);
+        const agentStatus = this.agentManager.getAgentStatus(system.agent_id);
+
+        return {
+          ...system,
+          real_time_status: agentStatus?.status || 'unknown',
+          last_data_received: agentStatus?.lastDataReceived || null,
+          current_temperatures: systemData?.sensors || [],
+          current_fan_speeds: systemData?.fans || [],
+          system_health: systemData?.systemHealth || null,
+          current_update_interval: this.agentManager.getAgentUpdateInterval(system.agent_id),
+          filter_duplicate_sensors: this.agentManager.getAgentSensorDeduplication(system.agent_id),
+          duplicate_sensor_tolerance: this.agentManager.getAgentSensorTolerance(system.agent_id),
+          fan_step_percent: this.agentManager.getAgentFanStep(system.agent_id),
+          hysteresis_temp: this.agentManager.getAgentHysteresis(system.agent_id),
+          emergency_temp: this.agentManager.getAgentEmergencyTemp(system.agent_id),
+          log_level: this.agentManager.getAgentLogLevel(system.agent_id)
+        };
+      });
+
+      // Send full state to client
+      this.sendToClient(clientId, 'fullState', enhancedSystems);
+      log.info(` Sent full sync (${enhancedSystems.length} systems) to client ${clientId}`, 'WebSocketHub');
+    } catch (error) {
+      log.error(`Error in handleFullSyncRequest for client ${clientId}`, 'WebSocketHub', error);
+    }
   }
 
   /**

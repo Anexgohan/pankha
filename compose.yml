@@ -4,7 +4,8 @@ services:
   pankha-app:
     image: anexgohan/pankha:latest
     ports:
-      - "${PANKHA_PORT:-3000}:3000"
+      - "${PANKHA_PORT:-3000}:3000"  # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
+      - "${WS_PORT:-3002}:3002"  # WebSocket server for frontend (host:container) (change left side only, set to your desired port, or set WS_PORT environment variable)
     environment:
       - TZ=${TIMEZONE:-UTC}
       - DATABASE_URL=${DATABASE_URL}

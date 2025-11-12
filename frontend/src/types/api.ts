@@ -21,6 +21,11 @@ export interface SystemData {
   hysteresis_temp?: number;
   emergency_temp?: number;
   log_level?: string;
+  system_health?: {
+    cpuUsage: number;
+    memoryUsage: number;
+    agentUptime: number;
+  };
 }
 
 export interface SensorReading {

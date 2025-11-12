@@ -61,7 +61,7 @@ async function initializeServices() {
 
     // Connect AgentCommunication command responses to CommandDispatcher
     agentCommunication.on('commandResponse', (event) => {
-      (commandDispatcher as any).handleCommandResponse(event);
+      commandDispatcher.processCommandResponse(event);
     });
 
     // Start Fan Profile Controller (loads interval from database)

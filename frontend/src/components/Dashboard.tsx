@@ -1,36 +1,50 @@
 import React, { useState } from 'react';
-import { emergencyStop } from '../services/api';
+import { emergencyStop, getOverview } from '../services/api';
 import SystemCard from './SystemCard';
 import OverviewStats from './OverviewStats';
 import ThemeToggle from './ThemeToggle';
-import RefreshRateSelector from './RefreshRateSelector';
 import ControllerIntervalSelector from './ControllerIntervalSelector';
 import FanProfileManager from './FanProfileManager';
-import { useDashboardSettings } from '../contexts/DashboardSettingsContext';
-import { useSystemData } from '../hooks/useSystemData';
+import { useWebSocketData } from '../hooks/useWebSocketData';
 
 type TabType = 'systems' | 'profiles';
 
 const Dashboard: React.FC = () => {
-  const { refreshRate, isPaused } = useDashboardSettings();
   const [activeTab, setActiveTab] = useState<TabType>('systems');
+  const [overview, setOverview] = useState<any>(null);
   // Persistent dropdown states across re-renders
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
 
-  // Use WebSocket with HTTP polling fallback
+  // Pure WebSocket - no HTTP polling!
   const {
     systems,
-    overview,
-    loading,
+    connectionState,
     error,
-    lastUpdate,
-    refreshData,
-    isWebSocketConnected
-  } = useSystemData({
-    enableWebSocket: !isPaused, // Disable WebSocket when paused
-    pollingInterval: refreshRate
-  });
+    reconnect
+  } = useWebSocketData();
+
+  // Fetch overview data separately (could be added to WebSocket later)
+  React.useEffect(() => {
+    const fetchOverview = async () => {
+      try {
+        const data = await getOverview();
+        setOverview(data);
+      } catch (err) {
+        console.error('Failed to fetch overview:', err);
+      }
+    };
+    fetchOverview();
+    const interval = setInterval(fetchOverview, 10000); // Every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Handle updates from SystemCard (no-op with WebSocket - updates come automatically)
+  const handleUpdate = () => {
+    // With WebSocket, updates come automatically via delta updates
+    // This is kept for compatibility but does nothing
+    console.log('Update requested - WebSocket will handle automatically');
+  };
 
   const handleEmergencyStop = async () => {
     if (window.confirm('Are you sure you want to trigger emergency stop for ALL systems? This will set all fans to maximum speed.')) {
@@ -43,27 +57,26 @@ const Dashboard: React.FC = () => {
     }
   };
 
-  // Remove the duplicate refreshData function since we moved it up
-
-  if (loading) {
+  // Show loading only when connecting for the first time
+  if (connectionState === 'connecting' && systems.length === 0) {
     return (
       <div className="dashboard loading">
         <div className="loading-spinner">
           <div className="spinner"></div>
-          <p>Loading dashboard...</p>
+          <p>Connecting to server...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  if (error && systems.length === 0) {
     return (
       <div className="dashboard error">
         <div className="error-message">
-          <h2>Error Loading Dashboard</h2>
+          <h2>Connection Error</h2>
           <p>{error}</p>
-          <button onClick={refreshData} className="retry-button">
-            Retry
+          <button onClick={reconnect} className="retry-button">
+            Reconnect
           </button>
         </div>
       </div>
@@ -75,22 +88,51 @@ const Dashboard: React.FC = () => {
       <header className="dashboard-header">
         <h1>Pankha Fan Control</h1>
         <div className="header-controls">
-          <div className="connection-status">
-            <span className={`status-indicator ${isWebSocketConnected ? 'connected' : 'polling'}`}>
-              {isWebSocketConnected ? '🟢 WebSocket (Real-time)' : '🟡 HTTP Polling'}
-            </span>
-            <span className="last-update">
-              {isWebSocketConnected ? 'Live' : `Refreshed: ${lastUpdate.toLocaleTimeString()}`}
-            </span>
+          {/* Connection Status Indicator */}
+          <div className={`connection-status status-${connectionState}`}>
+            {connectionState === 'connected' && (
+              <>
+                <span className="status-indicator connected">
+                  🟢 Live
+                </span>
+                <span className="last-update">Real-time</span>
+              </>
+            )}
+            {connectionState === 'connecting' && (
+              <>
+                <span className="status-indicator connecting">
+                  🟡 Connecting...
+                </span>
+                <span className="last-update">Please wait</span>
+              </>
+            )}
+            {connectionState === 'disconnected' && (
+              <>
+                <span className="status-indicator disconnected">
+                  🔴 Disconnected
+                </span>
+                <button onClick={reconnect} className="reconnect-btn">
+                  Reconnect
+                </button>
+              </>
+            )}
+            {connectionState === 'error' && (
+              <>
+                <span className="status-indicator error">
+                  ⚠️ Error
+                </span>
+                <button onClick={reconnect} className="reconnect-btn">
+                  Retry
+                </button>
+              </>
+            )}
           </div>
-          <RefreshRateSelector />
+
           <ControllerIntervalSelector />
           <ThemeToggle />
-          <button onClick={refreshData} className="refresh-button">
-            🔄 Refresh
-          </button>
-          <button 
-            onClick={handleEmergencyStop} 
+
+          <button
+            onClick={handleEmergencyStop}
             className="emergency-button"
             title="Emergency stop all fans"
           >
@@ -134,7 +176,7 @@ const Dashboard: React.FC = () => {
                 <SystemCard
                   key={system.id}
                   system={system}
-                  onUpdate={refreshData}
+                  onUpdate={handleUpdate}
                   expandedSensors={expandedSensors[system.id] || false}
                   expandedFans={expandedFans[system.id] || false}
                   onToggleSensors={(expanded) => setExpandedSensors(prev => ({...prev, [system.id]: expanded}))}

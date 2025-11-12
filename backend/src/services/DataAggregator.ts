@@ -1,44 +1,10 @@
 import { EventEmitter } from 'events';
 import Database from '../database/database';
 import { AgentDataPacket, SensorInfo, FanInfo } from '../types/agent';
+import { AggregatedSystemData } from '../types/aggregatedData';
 import { AgentManager } from './AgentManager';
 import { log } from '../utils/logger';
 // Removed AgentCommunication import to prevent circular dependency
-
-interface AggregatedSystemData {
-  systemId: number;
-  agentId: string;
-  systemName: string;
-  status: 'online' | 'offline' | 'error';
-  lastUpdate: Date;
-  sensors: Array<{
-    id: string;
-    name: string;
-    label: string;
-    type: string;
-    temperature: number;
-    status: 'ok' | 'caution' | 'warning' | 'critical';
-    maxTemp?: number;
-    critTemp?: number;
-    dbId?: number;
-    isHidden?: boolean;
-  }>;
-  fans: Array<{
-    id: string;
-    name: string;
-    label: string;
-    speed: number;
-    rpm: number;
-    targetSpeed: number;
-    status: 'ok' | 'error' | 'stopped';
-    dbId?: number;
-  }>;
-  systemHealth: {
-    cpuUsage: number;
-    memoryUsage: number;
-    agentUptime: number;
-  };
-}
 
 // Data buffer for aggregation
 interface DataPoint {
@@ -498,14 +464,32 @@ export class DataAggregator extends EventEmitter {
   }
 
   /**
-   * Get aggregated data for all systems
+   * Get systems from database (for WebSocket fullState)
+   */
+  public async getAllSystems(): Promise<any[]> {
+    const systems = await this.db.all(`
+      SELECT
+        s.*,
+        COUNT(DISTINCT sen.id) as sensor_count,
+        COUNT(DISTINCT f.id) as fan_count
+      FROM systems s
+      LEFT JOIN sensors sen ON s.id = sen.system_id
+      LEFT JOIN fans f ON s.id = f.system_id
+      GROUP BY s.id
+      ORDER BY s.name
+    `);
+    return systems;
+  }
+
+  /**
+   * Get aggregated data for all systems (real-time data only)
    */
   public getAllSystemsData(): AggregatedSystemData[] {
     return Array.from(this.aggregatedData.values());
   }
 
   /**
-   * Get aggregated data for specific system
+   * Get aggregated data for specific system (real-time data only)
    */
   public getSystemData(agentId: string): AggregatedSystemData | undefined {
     return this.aggregatedData.get(agentId);
@@ -578,7 +562,17 @@ export class DataAggregator extends EventEmitter {
           cpuUsage: dataPacket.systemHealth?.cpuUsage || 0,
           memoryUsage: dataPacket.systemHealth?.memoryUsage || 0,
           agentUptime: dataPacket.systemHealth?.agentUptime || 0
-        }
+        },
+        // Agent configuration from AgentManager
+        // NOTE: These values are included so DeltaComputer can detect config changes
+        // and send delta updates when user modifies settings via GUI
+        current_update_interval: this.agentManager.getAgentUpdateInterval(agentId),
+        filter_duplicate_sensors: this.agentManager.getAgentSensorDeduplication(agentId),
+        duplicate_sensor_tolerance: this.agentManager.getAgentSensorTolerance(agentId),
+        fan_step_percent: this.agentManager.getAgentFanStep(agentId),
+        hysteresis_temp: this.agentManager.getAgentHysteresis(agentId),
+        emergency_temp: this.agentManager.getAgentEmergencyTemp(agentId),
+        log_level: this.agentManager.getAgentLogLevel(agentId)
       };
 
       // Enrich with database information (adds dbId, isHidden flag to sensors)

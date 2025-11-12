@@ -1183,4 +1183,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
   );
 };
 
-export default SystemCard;
+// Memoize SystemCard to prevent unnecessary re-renders
+export default React.memo(SystemCard, (prevProps, nextProps) => {
+  // Only re-render if these specific properties changed
+  return (
+    prevProps.system.id === nextProps.system.id &&
+    prevProps.system.last_seen === nextProps.system.last_seen &&
+    prevProps.expandedSensors === nextProps.expandedSensors &&
+    prevProps.expandedFans === nextProps.expandedFans
+  );
+});
