@@ -1,8 +1,15 @@
 # Docker Compose for Pankha Repository
+# run:
+# docker compose down && docker compose pull && docker compose up -d
 
 services:
   pankha-app:
     image: anexgohan/pankha:latest
+    logging:
+      options:
+        max-size: "50m"
+        max-file: "2"
+        compress: "true"
     ports:
       - "${PANKHA_PORT:-3000}:3000"  # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
       - "${WS_PORT:-3002}:3002"  # WebSocket server for frontend (host:container) (change left side only, set to your desired port, or set WS_PORT environment variable)
@@ -25,6 +32,11 @@ services:
 
   pankha-postgres:
     image: postgres:17-alpine
+    logging:
+      options:
+        max-size: "50m"
+        max-file: "2"
+        compress: "true"
     command:
       - "postgres"
       - "-c"
@@ -35,6 +47,11 @@ services:
       - "checkpoint_timeout=${POSTGRES_CHECKPOINT_TIMEOUT:-5min}"
       - "-c"
       - "wal_keep_size=${POSTGRES_WAL_KEEP_SIZE:-128MB}"
+      - "-c"
+      # PostgreSQL logging: only log warnings and errors (reduces noise)
+      # Options: DEBUG5, DEBUG1, INFO, NOTICE, WARNING, ERROR, LOG, FATAL, PANIC
+      # Default: NOTICE (logs notices, warnings, errors) | Using: WARNING (only warnings and errors)
+      - "log_min_messages=WARNING"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
