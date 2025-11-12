@@ -370,7 +370,7 @@ export class CommandDispatcher extends EventEmitter {
       await this.logCommand(command, 'sent');
       
     } catch (error) {
-      console.error(`Error executing command ${command.commandId}:`, error);
+      log.error(`Failed to execute command`, 'CommandDispatcher', { commandId: command.commandId, commandType: command.type, error });
       this.handleCommandError(command.commandId, error);
     }
   }
@@ -518,8 +518,12 @@ export class CommandDispatcher extends EventEmitter {
   private async logCommand(command: FanControlCommand, status: string, details?: any): Promise<void> {
     try {
       // This could be stored in a separate audit table if needed
-      console.log(` Command log: ${command.type} (${command.commandId}) - ${status}`,
-        details ? JSON.stringify(details) : '');
+      log.debug(`Command execution logged`, 'CommandDispatcher', {
+        commandType: command.type,
+        commandId: command.commandId,
+        status,
+        details
+      });
     } catch (error) {
       log.error('Error logging command:', 'CommandDispatcher', error);
     }

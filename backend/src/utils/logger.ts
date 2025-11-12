@@ -11,6 +11,7 @@ export enum LogLevel {
   WARN = 2,
   INFO = 3,
   DEBUG = 4,
+  TRACE = 5,
 }
 
 class Logger {
@@ -46,6 +47,8 @@ class Logger {
       case 'debug':
       case 'verbose':
         return LogLevel.DEBUG;
+      case 'trace':
+        return LogLevel.TRACE;
       default:
         console.warn(`Unknown LOG_LEVEL "${level}", defaulting to "info"`);
         return LogLevel.INFO;
@@ -85,6 +88,8 @@ class Logger {
         return 'info';
       case LogLevel.DEBUG:
         return 'debug';
+      case LogLevel.TRACE:
+        return 'trace';
       default:
         return 'unknown';
     }
@@ -151,6 +156,15 @@ class Logger {
   }
 
   /**
+   * Log a trace message (ultra-detailed)
+   */
+  public trace(message: string, context?: string, ...args: any[]): void {
+    if (this.currentLevel >= LogLevel.TRACE) {
+      console.log(this.formatMessage('TRACE', message, context), ...args);
+    }
+  }
+
+  /**
    * Log a success message (info level)
    */
   public success(message: string, context?: string, ...args: any[]): void {
@@ -185,6 +199,7 @@ export const log = {
   warn: (message: string, context?: string, error?: any) => logger.warn(message, context, error),
   info: (message: string, context?: string, ...args: any[]) => logger.info(message, context, ...args),
   debug: (message: string, context?: string, ...args: any[]) => logger.debug(message, context, ...args),
+  trace: (message: string, context?: string, ...args: any[]) => logger.trace(message, context, ...args),
   success: (message: string, context?: string, ...args: any[]) => logger.success(message, context, ...args),
   important: (message: string, context?: string, ...args: any[]) => logger.important(message, context, ...args),
 };

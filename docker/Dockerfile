@@ -27,6 +27,9 @@ FROM node:20-alpine AS production
 # Install nginx for serving static files
 RUN apk add --no-cache nginx curl
 
+# Symlink nginx error log to stderr for docker logs visibility
+RUN ln -sf /dev/stderr /var/log/nginx/error.log
+
 WORKDIR /app
 
 # Copy built backend

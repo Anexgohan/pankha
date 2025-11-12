@@ -83,7 +83,7 @@ export class AgentCommunication extends EventEmitter {
           const message = JSON.parse(data.toString());
           this.handleAgentMessage(agentId, message);
         } catch (error) {
-          console.error(`Error parsing message from agent ${agentId}:`, error);
+          log.error(`Failed to parse agent message - protocol violation`, 'AgentCommunication', { agentId, error });
         }
       });
 
@@ -93,7 +93,7 @@ export class AgentCommunication extends EventEmitter {
       });
 
       ws.on('error', (error) => {
-        console.error(` WebSocket error for agent ${agentId}:`, error);
+        log.error(`WebSocket error for agent`, 'AgentCommunication', { agentId, error: error.message });
         this.agentManager.markAgentError(agentId, error.message);
         this.handleDisconnection(agentId);
       });
@@ -106,7 +106,7 @@ export class AgentCommunication extends EventEmitter {
       });
 
     } catch (error) {
-      console.error(`Error connecting to agent ${agentId}:`, error);
+      log.error(`Failed to connect to agent`, 'AgentCommunication', { agentId, error });
       throw error;
     }
   }
@@ -153,7 +153,7 @@ export class AgentCommunication extends EventEmitter {
       return true;
       
     } catch (error) {
-      console.error(`Error sending command to agent ${agentId}:`, error);
+      log.error(`Failed to send command to agent`, 'AgentCommunication', { agentId, commandType: command.type, error });
       return false;
     }
   }
@@ -214,7 +214,7 @@ export class AgentCommunication extends EventEmitter {
 
         case 'error':
           // Error from agent
-          console.error(`Agent ${agentId} reported error:`, message.data);
+          log.error(`Agent reported error`, 'AgentCommunication', { agentId, agentError: message.data });
           this.agentManager.markAgentError(agentId, message.data.message || 'Unknown error');
           this.emit('agentError', { agentId, error: message.data });
           break;
@@ -228,10 +228,10 @@ export class AgentCommunication extends EventEmitter {
           break;
 
         default:
-          console.warn(`Unknown message type from agent ${agentId}:`, message.type);
+          log.warn(`Unknown message type from agent`, 'AgentCommunication', { agentId, messageType: message.type });
       }
     } catch (error) {
-      console.error(`Error handling message from agent ${agentId}:`, error);
+      log.error(`Error handling agent message`, 'AgentCommunication', { agentId, error });
     }
   }
 
@@ -274,7 +274,7 @@ export class AgentCommunication extends EventEmitter {
         try {
           await this.connectToAgent(agent);
         } catch (error) {
-          console.error(`Reconnection failed for agent ${agentId}:`, error);
+          log.warn(`Reconnection attempt failed - will retry`, 'AgentCommunication', { agentId, attempt: connection.reconnectAttempts, error });
           this.scheduleReconnection(agentId);
         }
       }
@@ -333,12 +333,12 @@ export class AgentCommunication extends EventEmitter {
    */
   public async connectToAllAgents(): Promise<void> {
     const agents = this.agentManager.getAgents();
-    
+
     for (const agent of agents) {
       try {
         await this.connectToAgent(agent);
       } catch (error) {
-        console.error(`Failed to connect to agent ${agent.agentId}:`, error);
+        log.warn(`Failed to connect to agent during bulk connection`, 'AgentCommunication', { agentId: agent.agentId, error });
       }
     }
   }

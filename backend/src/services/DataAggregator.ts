@@ -138,7 +138,7 @@ export class DataAggregator extends EventEmitter {
       log.info(`[DataAggregator] Data aggregated for system: ${system.name} (${agentId})`, 'DataAggregator');
 
     } catch (error) {
-      console.error(`Error aggregating data for agent ${agentId}:`, error);
+      log.error(`Failed to aggregate data for agent`, 'DataAggregator', { agentId, error });
     }
   }
 
@@ -598,14 +598,14 @@ export class DataAggregator extends EventEmitter {
 
         log.info(`Persisted data to PostgreSQL for ${agentId}`, 'DataAggregator');
       } catch (dbError) {
-        console.error(`Error persisting data to PostgreSQL for ${agentId}:`, dbError);
+        log.error(`Failed to persist data to PostgreSQL`, 'DataAggregator', { agentId, error: dbError });
       }
 
       // Emit event for real-time updates
       this.emit('dataAggregated', aggregatedData);
 
     } catch (error) {
-      console.error(`Error updating system data for ${agentId}:`, error);
+      log.error(`Failed to update system data`, 'DataAggregator', { agentId, error });
     }
   }
 
