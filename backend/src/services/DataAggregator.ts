@@ -135,7 +135,7 @@ export class DataAggregator extends EventEmitter {
       // Emit aggregated data event
       this.emit('dataAggregated', aggregatedData);
 
-      log.info(`[DataAggregator] Data aggregated for system: ${system.name} (${agentId})`, 'DataAggregator');
+      log.debug(`Data aggregated for system`, 'DataAggregator', { systemName: system.name, agentId });
 
     } catch (error) {
       log.error(`Failed to aggregate data for agent`, 'DataAggregator', { agentId, error });
@@ -211,7 +211,7 @@ export class DataAggregator extends EventEmitter {
             sensor.crit_temp || null
           ]
         );
-        log.info(`Created sensor record: ${sensor.id}`, 'DataAggregator');
+        log.debug(`Created sensor record`, 'DataAggregator', { sensorId: sensor.id });
       }
     }
   }
@@ -240,7 +240,7 @@ export class DataAggregator extends EventEmitter {
             fan.id
           ]
         );
-        log.info(`Created fan record: ${fan.id}`, 'DataAggregator');
+        log.debug(`Created fan record`, 'DataAggregator', { fanId: fan.id });
       }
     }
   }
@@ -451,7 +451,7 @@ export class DataAggregator extends EventEmitter {
 
       if (fanInfo) {
         fan.dbId = fanInfo.id; // Database record ID for fan_profile_assignments
-        log.info(`[DataAggregator] Enriched fan ${fan.id} with dbId: ${fanInfo.id}`, 'DataAggregator');
+        log.trace(`Enriched fan with database ID`, 'DataAggregator', { fanId: fan.id, dbId: fanInfo.id });
         fan.name = fanInfo.fan_label || fan.id;
         fan.label = fanInfo.fan_label || fan.id;
         if (fanInfo.target_speed !== null) {
@@ -500,7 +500,7 @@ export class DataAggregator extends EventEmitter {
    */
   public async updateSystemData(agentId: string, dataPacket: AgentDataPacket): Promise<void> {
     try {
-      log.info(`[DataAggregator] Updating system data for ${agentId}`, 'DataAggregator');
+      log.trace(`Updating system data`, 'DataAggregator', { agentId });
 
       // Get system info from database
       const system = await this.db.get('SELECT * FROM systems WHERE agent_id = $1', [agentId]);
@@ -579,7 +579,7 @@ export class DataAggregator extends EventEmitter {
       await this.enrichAggregatedData(aggregatedData);
 
       this.aggregatedData.set(agentId, aggregatedData);
-      log.info(`[DataAggregator] Updated aggregated data for ${agentId}: ${sensors.length} sensors, ${fans.length} fans`, 'DataAggregator');
+      log.debug(`Updated aggregated data`, 'DataAggregator', { agentId, sensorCount: sensors.length, fanCount: fans.length });
 
       // Persist data to PostgreSQL
       try {
@@ -596,7 +596,7 @@ export class DataAggregator extends EventEmitter {
         // Update current fan readings
         await this.updateFanReadings(system.id, dataPacket.fans);
 
-        log.info(`Persisted data to PostgreSQL for ${agentId}`, 'DataAggregator');
+        log.debug(`Persisted data to PostgreSQL`, 'DataAggregator', { agentId });
       } catch (dbError) {
         log.error(`Failed to persist data to PostgreSQL`, 'DataAggregator', { agentId, error: dbError });
       }

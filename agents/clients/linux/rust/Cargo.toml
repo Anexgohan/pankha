@@ -25,6 +25,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time", "local-time"] }
 anyhow = "1.0"
 thiserror = "1.0"
+atty = "0.2"
 
 # Async traits
 async-trait = "0.1"

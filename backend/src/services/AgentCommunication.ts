@@ -149,7 +149,7 @@ export class AgentCommunication extends EventEmitter {
       };
 
       connection.websocket.send(JSON.stringify(message));
-      log.info(` Command sent to agent ${agentId}: ${command.type}`, 'AgentCommunication');
+      log.debug(`Command sent to agent`, 'AgentCommunication', { agentId, commandType: command.type });
       return true;
       
     } catch (error) {
@@ -186,19 +186,19 @@ export class AgentCommunication extends EventEmitter {
    */
   public async handleAgentMessage(agentId: string, message: any): Promise<void> {
     try {
-      log.info(` AgentCommunication handling message from ${agentId}: ${message.type}`, 'AgentCommunication');
+      log.trace(`Handling message from agent`, 'AgentCommunication', { agentId, messageType: message.type });
       switch (message.type) {
         case 'data':
           // Real-time sensor and fan data
-          log.info(` Processing data packet from agent ${agentId}`, 'AgentCommunication');
+          log.debug(`Processing data packet from agent`, 'AgentCommunication', { agentId });
           const dataPacket: AgentDataPacket = message.data;
           await this.agentManager.updateAgentStatus(agentId, dataPacket);
-          
+
           // Forward data to DataAggregator for API consumption
           await this.dataAggregator.updateSystemData(agentId, dataPacket);
-          
+
           this.emit('agentData', { agentId, data: dataPacket });
-          log.info(` Data packet processed for agent ${agentId}`, 'AgentCommunication');
+          log.debug(`Data packet processed`, 'AgentCommunication', { agentId });
           break;
 
         case 'status':

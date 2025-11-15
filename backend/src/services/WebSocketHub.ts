@@ -208,7 +208,7 @@ export class WebSocketHub extends EventEmitter {
   private async handleClientMessage(clientId: string, data: WebSocket.Data): Promise<void> {
     try {
       const message: WebSocketMessage = JSON.parse(data.toString());
-      log.info(` RAW MESSAGE from ${clientId}: ${message.type}`, 'WebSocketHub');
+      log.trace(`RAW MESSAGE received`, 'WebSocketHub', { clientId, messageType: message.type });
       const client = this.clients.get(clientId);
       
       if (!client) return;
@@ -244,9 +244,9 @@ export class WebSocketHub extends EventEmitter {
           // Handle agent data messages
           const dataClient = this.clients.get(clientId);
           if (dataClient?.metadata.isAgent) {
-            log.debug(`Received AGENT data from ${clientId}:`, JSON.stringify(message.data, null, 2));
+            log.trace(`Received AGENT data`, 'WebSocketHub', { clientId, dataSize: JSON.stringify(message.data).length });
             if (message.data?.agentId) {
-              log.info(` Processing agent data for: ${message.data.agentId}`, 'WebSocketHub');
+              log.debug(`Processing agent data`, 'WebSocketHub', { agentId: message.data.agentId });
               // Process agent data directly through AgentCommunication
               const agentMessage = {
                 type: 'data',
@@ -254,10 +254,10 @@ export class WebSocketHub extends EventEmitter {
               };
               await this.agentCommunication.handleAgentMessage(message.data.agentId, agentMessage);
             } else {
-              log.warn(` Agent data from ${clientId} missing agentId`, 'WebSocketHub');
+              log.warn(`Agent data missing agentId`, 'WebSocketHub', { clientId });
             }
           } else {
-            log.info(` Received FRONTEND data from ${clientId} (ignoring)`, 'WebSocketHub');
+            log.trace(`Received FRONTEND data (ignoring)`, 'WebSocketHub', { clientId });
           }
           break;
 
@@ -270,11 +270,15 @@ export class WebSocketHub extends EventEmitter {
           // Handle command response from agent
           const commandClient = this.clients.get(clientId);
           if (commandClient?.metadata.isAgent && (message as any).commandId) {
-            log.info(` Command response from ${commandClient.metadata.agentId}: ${(message as any).commandId}, success: ${(message as any).success}`, 'WebSocketHub');
+            log.debug(`Command response received`, 'WebSocketHub', {
+              agentId: commandClient.metadata.agentId,
+              commandId: (message as any).commandId,
+              success: (message as any).success
+            });
             // Forward to CommandDispatcher to handle response
-            this.agentCommunication.emit('commandResponse', { 
-              agentId: commandClient.metadata.agentId, 
-              response: message 
+            this.agentCommunication.emit('commandResponse', {
+              agentId: commandClient.metadata.agentId,
+              response: message
             });
           }
           break;
@@ -582,7 +586,7 @@ export class WebSocketHub extends EventEmitter {
     }
 
     if (sentCount > 0) {
-      log.info(` Broadcasted ${type} to ${sentCount} clients`, 'WebSocketHub');
+      log.debug(`Broadcasted message`, 'WebSocketHub', { type, clientCount: sentCount });
     }
   }
 
@@ -720,7 +724,7 @@ export class WebSocketHub extends EventEmitter {
               timestamp: new Date().toISOString()
             };
             client.websocket.send(JSON.stringify(message));
-            log.info(` Command sent to agent ${agentId}: ${command.type}`, 'WebSocketHub');
+            log.debug(`Command sent to agent`, 'WebSocketHub', { agentId, commandType: command.type });
             return true;
           } catch (error) {
             log.error(`Error sending command to agent ${agentId}`, "WebSocketHub", error);

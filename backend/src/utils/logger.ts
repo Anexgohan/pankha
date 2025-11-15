@@ -3,7 +3,10 @@
  *
  * Provides a centralized logging system with configurable log levels.
  * Respects the LOG_LEVEL environment variable to control verbosity.
+ * Uses colors matching the Rust agent for consistency.
  */
+
+import chalk from 'chalk';
 
 export enum LogLevel {
   SILENT = 0,
@@ -103,12 +106,33 @@ class Logger {
   }
 
   /**
+   * Colorize log level label (matches Rust agent colors)
+   */
+  private colorizeLevel(level: string): string {
+    switch (level) {
+      case 'ERROR':
+        return chalk.red(`[${level}]`);      // Red (matches \x1b[31m)
+      case 'WARN':
+        return chalk.yellow(`[${level}]`);   // Yellow (matches \x1b[33m)
+      case 'INFO':
+        return chalk.green(`[${level}]`);    // Green (matches \x1b[32m)
+      case 'DEBUG':
+        return chalk.blue(`[${level}]`);     // Blue (matches \x1b[34m)
+      case 'TRACE':
+        return chalk.dim(`[${level}]`);      // Dim/gray (matches \x1b[2m)
+      default:
+        return `[${level}]`;
+    }
+  }
+
+  /**
    * Format log message with optional context
    */
   private formatMessage(level: string, message: string, context?: string): string {
     const timestamp = this.getTimestamp();
+    const coloredLevel = this.colorizeLevel(level);
     const contextStr = context ? `[${context}]` : '';
-    return `${timestamp} [${level}] ${contextStr} ${message}`;
+    return `${timestamp} ${coloredLevel} ${contextStr} ${message}`;
   }
 
   /**

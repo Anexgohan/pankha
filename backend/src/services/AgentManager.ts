@@ -185,14 +185,14 @@ export class AgentManager extends EventEmitter {
       
       // Update database
       try {
-        log.info(` Updating agent status for ${agentId} to online`, 'AgentManager');
+        log.debug(`Updating agent status to online`, 'AgentManager', { agentId });
         const result = await this.db.run(
           'UPDATE systems SET status = $1, last_seen = CURRENT_TIMESTAMP, last_data_received = CURRENT_TIMESTAMP WHERE agent_id = $2',
           ['online', agentId]
         );
-        log.info(` Database update result: ${result.rowCount} rows affected`, 'AgentManager');
+        log.trace(`Database status update complete`, 'AgentManager', { agentId, rowsAffected: result.rowCount });
       } catch (error) {
-        log.error(` Error updating agent status in database: ${error}`, 'AgentManager');
+        log.error(`Failed to update agent status in database`, 'AgentManager', { agentId, error });
       }
       
       this.agentStatuses.set(agentId, status);

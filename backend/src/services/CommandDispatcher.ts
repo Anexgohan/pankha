@@ -77,7 +77,7 @@ export class CommandDispatcher extends EventEmitter {
       // Add to queue with priority
       this.addToQueue(command, resolve, reject);
       
-      log.info(` Command queued for agent ${agentId}: ${type} (Priority: ${priority})`, 'CommandDispatcher');
+      log.debug(`Command queued`, 'CommandDispatcher', { agentId, commandType: type, priority });
     });
   }
 
@@ -401,7 +401,7 @@ export class CommandDispatcher extends EventEmitter {
     this.logCommand(pendingCommand.command, response.success ? 'completed' : 'failed', response);
 
     if (response.success) {
-      log.info(` Command completed: ${pendingCommand.command.type} (${commandId})`, 'CommandDispatcher');
+      log.debug(`Command completed`, 'CommandDispatcher', { commandType: pendingCommand.command.type, commandId });
 
       // Update AgentManager with new values when commands succeed
       if (pendingCommand.command.type === 'setUpdateInterval' && response.data?.interval) {
