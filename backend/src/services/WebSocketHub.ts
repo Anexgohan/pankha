@@ -110,15 +110,19 @@ export class WebSocketHub extends EventEmitter {
 
     // Listen for agent events
     this.agentManager.on('agentRegistered', (agent) => {
-      this.broadcast('agentRegistered', agent, ['agents:all']);
+      // Broadcast to both agents:all AND systems:all so frontend (subscribed to systems:all) receives the event
+      // This ensures frontend can request full sync immediately when agent reconnects
+      this.broadcast('agentRegistered', agent, ['agents:all', 'systems:all']);
     });
 
     this.agentManager.on('agentUnregistered', (event) => {
-      this.broadcast('agentUnregistered', event, ['agents:all']);
+      // Broadcast to systems:all so frontend sees when agents stop/unregister
+      this.broadcast('agentUnregistered', event, ['agents:all', 'systems:all']);
     });
 
     this.agentManager.on('agentError', (event) => {
-      this.broadcast('agentError', event, [`system:${event.agentId}`, 'agents:all']);
+      // Broadcast to systems:all so frontend sees agent errors and status changes
+      this.broadcast('agentError', event, [`system:${event.agentId}`, 'agents:all', 'systems:all']);
     });
 
     // Listen for command events
@@ -200,11 +204,39 @@ export class WebSocketHub extends EventEmitter {
   /**
    * Handle client disconnection
    */
-  private handleClientDisconnection(clientId: string): void {
+  private async handleClientDisconnection(clientId: string): Promise<void> {
     const client = this.clients.get(clientId);
     if (client) {
+      // Check if this is an agent disconnection
+      if (client.metadata.isAgent && client.metadata.agentId) {
+        const agentId = client.metadata.agentId;
+        log.info(`🔌 Agent disconnected via WebSocket: ${agentId} (${clientId})`, 'WebSocketHub');
+
+        // Mark agent as offline in AgentManager (in-memory)
+        this.agentManager.markAgentError(agentId, 'WebSocket connection lost');
+
+        // Update database immediately (don't wait for health check)
+        const Database = (await import('../database/database')).default;
+        const db = Database.getInstance();
+        await db.run(
+          'UPDATE systems SET status = $1, last_seen = CURRENT_TIMESTAMP WHERE agent_id = $2',
+          ['offline', agentId]
+        ).catch(err => {
+          log.error(`Failed to update agent status in database`, 'WebSocketHub', { agentId, error: err });
+        });
+
+        // Clear delta state to ensure full state is sent on reconnection
+        this.deltaComputer.clearAgentState(agentId);
+
+        // Broadcast offline event to frontend clients immediately
+        this.broadcast('systemOffline', { agentId }, [`system:${agentId}`, 'systems:all']);
+
+        log.info(`🔄 Agent ${agentId} marked offline, delta state cleared`, 'WebSocketHub');
+      } else {
+        log.info(` Frontend client disconnected: ${clientId}`, 'WebSocketHub');
+      }
+
       this.clients.delete(clientId);
-      log.info(` Client disconnected: ${clientId}`, 'WebSocketHub');
       this.emit('clientDisconnected', { clientId, client });
     }
   }
@@ -224,7 +256,7 @@ export class WebSocketHub extends EventEmitter {
 
       switch (message.type) {
         case 'subscribe':
-          this.handleSubscription(clientId, message.data?.subscriptions || message.subscriptions || []);
+          await this.handleSubscription(clientId, message.data?.subscriptions || message.subscriptions || []);
           break;
 
         case 'unsubscribe':
@@ -302,7 +334,7 @@ export class WebSocketHub extends EventEmitter {
   /**
    * Handle client subscription
    */
-  private handleSubscription(clientId: string, subscriptions: string[]): void {
+  private async handleSubscription(clientId: string, subscriptions: string[]): Promise<void> {
     const client = this.clients.get(clientId);
     if (!client) return;
 
@@ -311,13 +343,13 @@ export class WebSocketHub extends EventEmitter {
     }
 
     log.info(` Client ${clientId} subscribed to: ${subscriptions.join(', ')}`, 'WebSocketHub');
-    
-    this.sendToClient(clientId, 'subscribed', { 
-      subscriptions: Array.from(client.subscriptions) 
+
+    this.sendToClient(clientId, 'subscribed', {
+      subscriptions: Array.from(client.subscriptions)
     });
 
     // Send initial data for subscriptions
-    this.sendInitialDataForSubscriptions(clientId, subscriptions);
+    await this.sendInitialDataForSubscriptions(clientId, subscriptions);
   }
 
   /**
@@ -453,12 +485,12 @@ export class WebSocketHub extends EventEmitter {
   /**
    * Send initial data for new subscriptions
    */
-  private sendInitialDataForSubscriptions(clientId: string, subscriptions: string[]): void {
+  private async sendInitialDataForSubscriptions(clientId: string, subscriptions: string[]): Promise<void> {
     for (const subscription of subscriptions) {
       if (subscription === 'systems:all') {
-        // Send all current system data
-        const systemsData = this.dataAggregator.getAllSystemsData();
-        this.sendToClient(clientId, 'systemsData', systemsData);
+        // Request full sync instead of sending raw aggregated data
+        // This ensures frontend gets proper database format with all fields
+        await this.handleFullSyncRequest(clientId);
       } else if (subscription.startsWith('system:')) {
         // Send specific system data
         const agentId = subscription.replace('system:', '');

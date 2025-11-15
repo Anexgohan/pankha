@@ -1188,7 +1188,16 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
   // Only re-render if these specific properties changed
   return (
     prevProps.system.id === nextProps.system.id &&
+    prevProps.system.status === nextProps.system.status &&
+    prevProps.system.real_time_status === nextProps.system.real_time_status &&
     prevProps.system.last_seen === nextProps.system.last_seen &&
+    prevProps.system.current_update_interval === nextProps.system.current_update_interval &&
+    prevProps.system.filter_duplicate_sensors === nextProps.system.filter_duplicate_sensors &&
+    prevProps.system.duplicate_sensor_tolerance === nextProps.system.duplicate_sensor_tolerance &&
+    prevProps.system.hysteresis_temp === nextProps.system.hysteresis_temp &&
+    prevProps.system.fan_step_percent === nextProps.system.fan_step_percent &&
+    prevProps.system.emergency_temp === nextProps.system.emergency_temp &&
+    prevProps.system.log_level === nextProps.system.log_level &&
     prevProps.expandedSensors === nextProps.expandedSensors &&
     prevProps.expandedFans === nextProps.expandedFans
   );

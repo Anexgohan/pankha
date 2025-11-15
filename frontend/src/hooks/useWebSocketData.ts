@@ -210,6 +210,56 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     );
   }, []);
 
+
+  /**
+   * Handle agent registered (agent reconnected)
+   */
+  const handleAgentRegistered = useCallback((data: any) => {
+    console.log('✅ Agent registered/reconnected:', data.agentId);
+
+    if (!mountedRef.current) return;
+
+    // Request full sync to get complete data for this agent
+    if (wsRef.current) {
+      console.log('🔄 Requesting full sync after agent registration');
+      wsRef.current.send('requestFullSync');
+    }
+  }, []);
+
+  /**
+   * Handle agent unregistered (agent stopped/gracefully disconnected)
+   */
+  const handleAgentUnregistered = useCallback((data: { agentId: string }) => {
+    console.log('🛑 Agent unregistered/stopped:', data.agentId);
+
+    if (!mountedRef.current) return;
+
+    setSystems(prevSystems =>
+      prevSystems.map(s =>
+        s.agent_id === data.agentId
+          ? { ...s, status: 'offline', real_time_status: 'offline' }
+          : s
+      )
+    );
+  }, []);
+
+  /**
+   * Handle agent error
+   */
+  const handleAgentError = useCallback((data: { agentId: string; error?: any }) => {
+    console.log('⚠️ Agent error:', data.agentId, data.error);
+
+    if (!mountedRef.current) return;
+
+    setSystems(prevSystems =>
+      prevSystems.map(s =>
+        s.agent_id === data.agentId
+          ? { ...s, status: 'error', real_time_status: 'error' }
+          : s
+      )
+    );
+  }, []);
+
   /**
    * Handle WebSocket connection
    */
@@ -260,6 +310,9 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     wsRef.current.on('fullState', (data: unknown) => handleFullState(data as SystemData[]));
     wsRef.current.on('systemDelta', (data: unknown) => handleDelta(data as SystemDelta));
     wsRef.current.on('systemOffline', (data: unknown) => handleSystemOffline(data as { agentId: string }));
+    wsRef.current.on('agentRegistered', (data: unknown) => handleAgentRegistered(data));
+    wsRef.current.on('agentUnregistered', (data: unknown) => handleAgentUnregistered(data as { agentId: string }));
+    wsRef.current.on('agentError', (data: unknown) => handleAgentError(data as { agentId: string; error?: any }));
 
     // Connect
     wsRef.current.connect()
@@ -281,7 +334,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
           }, 5000);
         }
       });
-  }, [handleConnect, handleFullState, handleDelta, handleSystemOffline]);
+  }, [handleConnect, handleFullState, handleDelta, handleSystemOffline, handleAgentRegistered, handleAgentUnregistered, handleAgentError]);
 
   /**
    * Manual reconnect
