@@ -101,6 +101,13 @@ export class WebSocketHub extends EventEmitter {
       this.broadcast('systemOffline', data, [`system:${data.agentId}`, 'systems:all']);
     });
 
+    // Clear delta state when agent disconnects (manual disconnect or reconnect)
+    // This ensures the first update after reconnection sends full state with all enriched data
+    this.agentCommunication.on('agentDisconnected', (agentId: string) => {
+      log.info(`🔄 Agent disconnected, clearing delta state for: ${agentId}`, 'WebSocketHub');
+      this.deltaComputer.clearAgentState(agentId);
+    });
+
     // Listen for agent events
     this.agentManager.on('agentRegistered', (agent) => {
       this.broadcast('agentRegistered', agent, ['agents:all']);

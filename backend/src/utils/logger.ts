@@ -6,8 +6,6 @@
  * Uses colors matching the Rust agent for consistency.
  */
 
-import chalk from 'chalk';
-
 export enum LogLevel {
   SILENT = 0,
   ERROR = 1,
@@ -99,27 +97,34 @@ class Logger {
   }
 
   /**
-   * Format timestamp for log messages
+   * Format timestamp for log messages (matches Rust agent format: YYYY-MM-DD HH:MM:SS)
    */
   private getTimestamp(): string {
-    return new Date().toISOString();
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   }
 
   /**
-   * Colorize log level label (matches Rust agent colors)
+   * Colorize log level label with ANSI codes (matches Rust agent colors exactly)
    */
   private colorizeLevel(level: string): string {
     switch (level) {
       case 'ERROR':
-        return chalk.red(`[${level}]`);      // Red (matches \x1b[31m)
+        return `\x1b[31m[${level}]\x1b[0m`;  // Red
       case 'WARN':
-        return chalk.yellow(`[${level}]`);   // Yellow (matches \x1b[33m)
+        return `\x1b[33m[${level}]\x1b[0m`;  // Yellow
       case 'INFO':
-        return chalk.green(`[${level}]`);    // Green (matches \x1b[32m)
+        return `\x1b[32m[${level}]\x1b[0m`;  // Green
       case 'DEBUG':
-        return chalk.blue(`[${level}]`);     // Blue (matches \x1b[34m)
+        return `\x1b[34m[${level}]\x1b[0m`;  // Blue
       case 'TRACE':
-        return chalk.dim(`[${level}]`);      // Dim/gray (matches \x1b[2m)
+        return `\x1b[2m[${level}]\x1b[0m`;   // Dim/gray
       default:
         return `[${level}]`;
     }

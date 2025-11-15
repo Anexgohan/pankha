@@ -1984,17 +1984,7 @@ impl tracing_subscriber::fmt::time::FormatTime for LocalTimeFormatter {
 }
 
 // Custom event formatter for logs: "YYYY-MM-DD HH:MM:SS [LEVEL] message"
-struct CustomEventFormat {
-    use_colors: bool,
-}
-
-impl CustomEventFormat {
-    fn new() -> Self {
-        Self {
-            use_colors: atty::is(atty::Stream::Stdout),
-        }
-    }
-}
+struct CustomEventFormat;
 
 impl<S, N> tracing_subscriber::fmt::FormatEvent<S, N> for CustomEventFormat
 where
@@ -2013,21 +2003,16 @@ where
         LocalTimeFormatter.format_time(&mut writer)?;
         write!(writer, " ")?;
 
-        // Write level in brackets with color (only if TTY)
+        // Write level in brackets with color
         let level = event.metadata().level();
-
-        if self.use_colors {
-            let level_color = match *level {
-                tracing::Level::TRACE => "\x1b[2m",  // Dim/gray
-                tracing::Level::DEBUG => "\x1b[34m", // Blue
-                tracing::Level::INFO => "\x1b[32m",  // Green
-                tracing::Level::WARN => "\x1b[33m",  // Yellow
-                tracing::Level::ERROR => "\x1b[31m", // Red
-            };
-            write!(writer, "{}[{}]\x1b[0m ", level_color, level)?;
-        } else {
-            write!(writer, "[{}] ", level)?;
-        }
+        let level_color = match *level {
+            tracing::Level::TRACE => "\x1b[2m",  // Dim/gray
+            tracing::Level::DEBUG => "\x1b[34m", // Blue
+            tracing::Level::INFO => "\x1b[32m",  // Green
+            tracing::Level::WARN => "\x1b[33m",  // Yellow
+            tracing::Level::ERROR => "\x1b[31m", // Red
+        };
+        write!(writer, "{}[{}]\x1b[0m ", level_color, level)?;
 
         // Write the message and fields
         ctx.field_format().format_fields(writer.by_ref(), event)?;
@@ -2214,7 +2199,7 @@ async fn main() -> Result<()> {
                 .with_target(false) // Hide the target (crate name)
                 .with_level(true)   // Show level
                 .fmt_fields(tracing_subscriber::fmt::format::DefaultFields::new())
-                .event_format(CustomEventFormat::new())
+                .event_format(CustomEventFormat)
         )
         .init();
 
