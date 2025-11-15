@@ -1175,6 +1175,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
         onApply={handleBulkApply}
         getSensorDisplayName={getSensorDisplayName}
         getFanDisplayName={getFanDisplayName}
+        getChipDisplayName={getChipDisplayName}
+        groupSensorsByChip={groupSensorsByChip}
         highestTemperature={highestTemperature}
         isOpen={isBulkEditOpen}
         onClose={() => setIsBulkEditOpen(false)}

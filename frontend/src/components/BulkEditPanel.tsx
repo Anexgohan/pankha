@@ -10,6 +10,8 @@ interface BulkEditPanelProps {
   onApply: (fanIds: string[], sensorId?: string, profileId?: number) => Promise<void>;
   getSensorDisplayName: (id: string, name: string, label: string) => string;
   getFanDisplayName: (id: string, name: string, label: string) => string;
+  getChipDisplayName: (chipId: string) => string;
+  groupSensorsByChip: (sensors: SensorReading[]) => Record<string, SensorReading[]>;
   highestTemperature: number | null;
   isOpen: boolean;
   onClose: () => void;
@@ -28,6 +30,8 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   onApply,
   getSensorDisplayName,
   getFanDisplayName,
+  getChipDisplayName,
+  groupSensorsByChip,
   highestTemperature,
   isOpen,
   onClose
@@ -158,6 +162,47 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                   🔥 Highest ({highestTemperature?.toFixed(1) || '0.0'}°C)
                 </option>
                 <option disabled>────────────────────</option>
+
+                {/* Sensor Groups */}
+                {(() => {
+                  const sensorGroups = groupSensorsByChip(sensors);
+                  const sortedGroupIds = Object.keys(sensorGroups).sort((a, b) => {
+                    const order = ['k10temp', 'coretemp', 'it8628', 'it87', 'nvme', 'gigabyte_wmi', 'asus_wmi', 'acpitz', 'thermal'];
+                    const aIndex = order.indexOf(a);
+                    const bIndex = order.indexOf(b);
+                    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+                    if (aIndex !== -1) return -1;
+                    if (bIndex !== -1) return 1;
+                    return a.localeCompare(b);
+                  });
+
+                  const groupsWithMultipleSensors = sortedGroupIds.filter(
+                    groupId => sensorGroups[groupId].length > 1
+                  );
+
+                  if (groupsWithMultipleSensors.length === 0) return null;
+
+                  return (
+                    <>
+                      <option disabled>(Groups)</option>
+                      {groupsWithMultipleSensors.map(groupId => {
+                        const groupSensors = sensorGroups[groupId];
+                        const highestTemp = Math.max(...groupSensors.map(s => s.temperature));
+                        return (
+                          <option
+                            key={`group-${groupId}`}
+                            value={`__group__${groupId}`}
+                            title="Selecting a group uses the Highest Temperature of that group"
+                          >
+                            📊 {getChipDisplayName(groupId)} ({highestTemp.toFixed(1)}°C)
+                          </option>
+                        );
+                      })}
+                      <option disabled>────────────────────</option>
+                    </>
+                  );
+                })()}
+
                 <option disabled>(Sensors)</option>
                 {sensors.map((sensor) => (
                   <option key={sensor.id} value={sensor.id}>
