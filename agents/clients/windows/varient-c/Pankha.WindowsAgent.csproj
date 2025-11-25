@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <Platforms>x64</Platforms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Application Info -->
+    <AssemblyName>pankha-agent</AssemblyName>
+    <RootNamespace>Pankha.WindowsAgent</RootNamespace>
+    <Version>1.0.0</Version>
+    <Company>Pankha</Company>
+    <Product>Pankha Windows Agent</Product>
+    <Description>Hardware monitoring and fan control agent for Windows</Description>
+    <Copyright>Copyright © 2025</Copyright>
+
+    <!-- Single-file deployment -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- Administrator privileges required -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Hardware Monitoring -->
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />
+
+    <!-- NVIDIA GPU Control -->
+    <PackageReference Include="NvAPIWrapper.Net" Version="0.8.1.101" />
+
+    <!-- JSON Serialization -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+
+    <!-- Logging -->
+    <PackageReference Include="Serilog" Version="4.1.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+
+    <!-- Configuration -->
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.1" />
+
+    <!-- Windows Service -->
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+
+    <!-- Command Line Parsing -->
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="config.example.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

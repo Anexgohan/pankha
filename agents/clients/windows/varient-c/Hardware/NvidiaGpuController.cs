@@ -1,0 +1,238 @@
+using NvAPIWrapper;
+using NvAPIWrapper.GPU;
+using Serilog;
+
+namespace Pankha.WindowsAgent.Hardware;
+
+/// <summary>
+/// NVIDIA GPU fan control using NvAPIWrapper High-Level API
+/// </summary>
+public class NvidiaGpuController : IDisposable
+{
+    private readonly ILogger _logger;
+    private readonly Dictionary<string, PhysicalGPU> _gpuCache = new();
+    private bool _initialized = false;
+
+    public NvidiaGpuController(ILogger logger)
+    {
+        _logger = logger;
+        InitializeNvAPI();
+    }
+
+    private void InitializeNvAPI()
+    {
+        try
+        {
+            NVIDIA.Initialize();
+            _logger.Information("NvAPI initialized successfully");
+            _initialized = true;
+
+            // Cache all NVIDIA GPUs
+            var gpus = PhysicalGPU.GetPhysicalGPUs();
+            _logger.Information("Found {Count} NVIDIA GPU(s)", gpus.Length);
+
+            for (int i = 0; i < gpus.Length; i++)
+            {
+                var gpu = gpus[i];
+                var gpuId = $"nvidia_gpu_{i}";
+                _gpuCache[gpuId] = gpu;
+                _logger.Information("NVIDIA GPU {Index}: {Name} (Bus ID: {BusId})",
+                    i, gpu.FullName, gpu.BusInformation.BusId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Warning(ex, "Failed to initialize NvAPI (no NVIDIA GPU or driver not available)");
+            _initialized = false;
+        }
+    }
+
+    public bool IsAvailable => _initialized && _gpuCache.Count > 0;
+
+    public bool CanControlFan(string fanId)
+    {
+        if (!IsAvailable) return false;
+
+        // Check if this is an NVIDIA GPU fan
+        return fanId.Contains("nvidia", StringComparison.OrdinalIgnoreCase) ||
+               fanId.Contains("gpunvidia", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public async Task<bool> SetFanSpeedAsync(string fanId, int speedPercent)
+    {
+        if (!IsAvailable) return false;
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                // Find the GPU for this fan
+                var gpu = FindGpuForFan(fanId);
+                if (gpu == null)
+                {
+                    _logger.Warning("GPU not found for fan: {FanId}", fanId);
+                    return false;
+                }
+
+                // Get cooler information
+                var coolerInfo = gpu.CoolerInformation;
+                if (coolerInfo == null)
+                {
+                    _logger.Warning("No cooler information available for GPU: {GPU}", gpu.FullName);
+                    return false;
+                }
+
+                var coolers = coolerInfo.Coolers?.ToArray();
+                if (coolers == null || coolers.Length == 0)
+                {
+                    _logger.Warning("No coolers found for GPU: {GPU}", gpu.FullName);
+                    return false;
+                }
+
+                _logger.Debug("GPU has {Count} cooler(s)", coolers.Length);
+
+                // Try using CoolerInformation.SetCoolerSettings (high-level API)
+                // Method signature: SetCoolerSettings(int coolerId, CoolerPolicy policy, int level)
+                bool success = false;
+                foreach (var cooler in coolers)
+                {
+                    try
+                    {
+                        // Get the specific overload: SetCoolerSettings(Int32, CoolerPolicy, Int32)
+                        var method = coolerInfo.GetType().GetMethod("SetCoolerSettings",
+                            new Type[] { typeof(int), typeof(NvAPIWrapper.Native.GPU.CoolerPolicy), typeof(int) });
+
+                        if (method != null)
+                        {
+                            // CoolerPolicy.Manual = 1
+                            var manualPolicy = (NvAPIWrapper.Native.GPU.CoolerPolicy)1;
+                            method.Invoke(coolerInfo, new object[] { cooler.CoolerId, manualPolicy, speedPercent });
+                            _logger.Debug("Set cooler {Id} to {Speed}% with Manual policy", cooler.CoolerId, speedPercent);
+                            success = true;
+                        }
+                        else
+                        {
+                            _logger.Warning("SetCoolerSettings(int, CoolerPolicy, int) method not found");
+                            return false;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warning(ex, "Failed to set cooler {Id}", cooler.CoolerId);
+                    }
+                }
+
+                if (success)
+                {
+                    _logger.Information("✅ Set NVIDIA GPU fan to {Speed}% for {GPU}", speedPercent, gpu.FullName);
+                    return true;
+                }
+
+                _logger.Error("Failed to set any GPU fan speeds");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to set NVIDIA GPU fan speed for {FanId}", fanId);
+                return false;
+            }
+        });
+    }
+
+    public async Task<bool> ResetToAutoAsync(string fanId)
+    {
+        if (!IsAvailable) return false;
+
+        return await Task.Run(() =>
+        {
+            try
+            {
+                var gpu = FindGpuForFan(fanId);
+                if (gpu == null) return false;
+
+                var coolerInfo = gpu.CoolerInformation;
+                if (coolerInfo == null ||  coolerInfo.Coolers == null || !coolerInfo.Coolers.Any())
+                    return false;
+
+                // Try to restore default control via reflection
+                // Use SetCoolerSettings with Auto policy
+                bool success = false;
+                foreach (var cooler in coolerInfo.Coolers)
+                {
+                    try
+                    {
+                        var method = coolerInfo.GetType().GetMethod("SetCoolerSettings",
+                            new Type[] { typeof(int), typeof(NvAPIWrapper.Native.GPU.CoolerPolicy), typeof(int) });
+
+                        if (method != null)
+                        {
+                            // CoolerPolicy.Auto = 0
+                            var autoPolicy = (NvAPIWrapper.Native.GPU.CoolerPolicy)0;
+                            method.Invoke(coolerInfo, new object[] { cooler.CoolerId, autoPolicy, 0 });
+                            _logger.Debug("Reset cooler {Id} to auto policy", cooler.CoolerId);
+                            success = true;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Warning(ex, "Failed to reset cooler {Id}", cooler.CoolerId);
+                    }
+                }
+
+                if (success)
+                {
+                    _logger.Information("Reset NVIDIA GPU fan to auto for {GPU}", gpu.FullName);
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Failed to reset NVIDIA GPU fan to auto");
+                return false;
+            }
+        });
+    }
+
+    private PhysicalGPU? FindGpuForFan(string fanId)
+    {
+        // Try direct lookup first
+        if (_gpuCache.TryGetValue(fanId, out var gpu))
+        {
+            return gpu;
+        }
+
+        // Fallback: return first GPU (most systems have one NVIDIA GPU)
+        return _gpuCache.Values.FirstOrDefault();
+    }
+
+    public void Dispose()
+    {
+        if (!IsAvailable) return;
+
+        try
+        {
+            // Reset all GPUs to auto before disposing
+            foreach (var (gpuId, gpu) in _gpuCache)
+            {
+                try
+                {
+                    ResetToAutoAsync(gpuId).Wait();
+                    _logger.Debug("Reset GPU {Id} to auto on dispose", gpuId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Warning(ex, "Error resetting GPU {Id} on dispose", gpuId);
+                }
+            }
+
+            _gpuCache.Clear();
+            _logger.Information("NvidiaGpuController disposed");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Error disposing NvidiaGpuController");
+        }
+    }
+}

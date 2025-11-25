@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-PankhaAgent-06f1e95a-a782-4115-8c05-857ac3ab1b57</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="FanTest\**" />
+    <EmbeddedResource Remove="FanTest\**" />
+    <None Remove="FanTest\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Management" Version="9.0.0" />
+    <Reference Include="LibreHardwareMonitorLib">
+      <HintPath>..\libs\LibreHardwareMonitorLib.dll</HintPath>
+    </Reference>
+    <Reference Include="HidSharp">
+      <HintPath>..\libs\HidSharp.dll</HintPath>
+    </Reference>
+    <Reference Include="NvAPIWrapper">
+      <HintPath>..\libs\NvAPIWrapper.dll</HintPath>
+    </Reference>
+    <PackageReference Include="System.IO.Ports" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="9.0.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Websocket.Client" Version="5.3.0" />
+  </ItemGroup>
+</Project>
