@@ -315,6 +315,9 @@ class Program
 
         // Set up cancellation token
         var cts = new CancellationTokenSource();
+
+        // Start watchdog in background
+        _ = watchdog.StartAsync(cts.Token);
         Console.CancelKeyPress += (sender, e) =>
         {
             e.Cancel = true;

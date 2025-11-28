@@ -39,6 +39,9 @@ pub struct Sensor {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chip: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "hardwareName")]
+    pub hardware_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
 }
 
@@ -302,14 +305,81 @@ impl LinuxHardwareMonitor {
 
         Ok(Sensor {
             id: sensor_id,
-            name: format!("{} {}", chip_name, sensor_label),
+            name: format!("{} {}", Self::get_friendly_chip_name(chip_name), sensor_label),
             temperature: temp_celsius.round() * 10.0 / 10.0,
             sensor_type,
             max_temp,
             crit_temp,
             chip: Some(chip_name.to_string()),
+            hardware_name: Some(chip_name.to_string()),
             source: Some(temp_file.to_string_lossy().to_string()),
         })
+    }
+
+    /// Extract hardware brand from chip name for TYPE-first display
+    fn extract_brand(chip_name: &str) -> String {
+        let name = chip_name.to_lowercase();
+
+        // CPU brands
+        if name.contains("amd") || name.contains("k10temp") || name.contains("ryzen") || name.contains("epyc") {
+            return "AMD".to_string();
+        }
+        if name.contains("intel") || name.contains("coretemp") || name.contains("xeon") || name.contains("pentium") {
+            return "Intel".to_string();
+        }
+
+        // Storage brands
+        if name.contains("samsung") { return "Samsung".to_string(); }
+        if name.contains("wd") || name.contains("western digital") { return "WD".to_string(); }
+        if name.contains("seagate") { return "Seagate".to_string(); }
+        if name.contains("crucial") { return "Crucial".to_string(); }
+        if name.contains("kingston") { return "Kingston".to_string(); }
+        if name.contains("corsair") { return "Corsair".to_string(); }
+        if name.contains("sandisk") { return "SanDisk".to_string(); }
+        if name.contains("micron") { return "Micron".to_string(); }
+        if name.contains("hynix") { return "SK Hynix".to_string(); }
+        if name.contains("toshiba") { return "Toshiba".to_string(); }
+        if name.contains("adata") || name.contains("xpg") { return "ADATA".to_string(); }
+
+        // Motherboard/chipset
+        if name.contains("asus") { return "ASUS".to_string(); }
+        if name.contains("gigabyte") { return "Gigabyte".to_string(); }
+        if name.contains("msi") { return "MSI".to_string(); }
+        if name.contains("asrock") { return "ASRock".to_string(); }
+        if name.contains("it8") || name.contains("ite") { return "ITE".to_string(); }
+        if name.contains("nct") || name.contains("nuvoton") { return "Nuvoton".to_string(); }
+
+        String::new()
+    }
+
+    /// Get friendly chip name with TYPE-first ordering (CPU AMD, Storage Samsung, etc.)
+    fn get_friendly_chip_name(chip_name: &str) -> String {
+        let brand = Self::extract_brand(chip_name);
+        let chip_lower = chip_name.to_lowercase();
+
+        if chip_lower.contains("k10temp") || chip_lower.contains("coretemp") || chip_lower.contains("cpu") {
+            if !brand.is_empty() {
+                format!("CPU {}", brand)
+            } else {
+                "CPU".to_string()
+            }
+        } else if chip_lower.contains("nvme") || chip_lower.contains("storage") {
+            if !brand.is_empty() {
+                format!("Storage {}", brand)
+            } else {
+                "Storage".to_string()
+            }
+        } else if chip_lower.contains("it8") || chip_lower.contains("nct") {
+            if !brand.is_empty() {
+                format!("Motherboard {}", brand)
+            } else {
+                "Motherboard".to_string()
+            }
+        } else if chip_lower.contains("acpi") {
+            "ACPI".to_string()
+        } else {
+            chip_name.to_string()
+        }
     }
 
     fn classify_sensor_type(chip_name: &str) -> String {

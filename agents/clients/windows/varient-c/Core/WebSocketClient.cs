@@ -288,6 +288,11 @@ public class WebSocketClient : IDisposable
                         await HandleMessageAsync(json, cancellationToken);
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    // Expected during shutdown, rethrow to exit loop
+                    throw;
+                }
                 catch (WebSocketException wex)
                 {
                     _logger.Error(wex, "❌ WebSocket exception during receive: Code={Code}, State={State}",
@@ -461,9 +466,32 @@ public class WebSocketClient : IDisposable
 
     public void Dispose()
     {
-        _cts?.Cancel();
-        _receiveTask?.Wait(TimeSpan.FromSeconds(5));
-        _dataTask?.Wait(TimeSpan.FromSeconds(5));
+        try
+        {
+            // Cancel operations if CTS is not already disposed
+            if (_cts != null && !_cts.IsCancellationRequested)
+            {
+                _cts.Cancel();
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // CTS already disposed, ignore
+        }
+
+        // Wait for tasks to complete (with timeout for safety)
+        try
+        {
+            _receiveTask?.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException) { }  // Expected on cancellation
+
+        try
+        {
+            _dataTask?.Wait(TimeSpan.FromSeconds(5));
+        }
+        catch (AggregateException) { }  // Expected on cancellation
+
         _webSocket?.Dispose();
         _cts?.Dispose();
     }

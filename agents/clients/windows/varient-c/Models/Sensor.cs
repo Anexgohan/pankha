@@ -34,6 +34,9 @@ public class Sensor
     [JsonProperty("chip")]
     public string Chip { get; set; } = string.Empty;
 
+    [JsonProperty("hardwareName")]
+    public string HardwareName { get; set; } = string.Empty;
+
     [JsonProperty("source")]
     public string Source { get; set; } = string.Empty;
 

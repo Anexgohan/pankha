@@ -163,7 +163,8 @@ public class LibreHardwareAdapter : IHardwareMonitor
                 Label = sensor.Name,  // Short label: "GPU Core", "Tctl/Tdie"
                 Type = DetermineSensorType(hardware.HardwareType),
                 Temperature = sensor.Value.Value,
-                Chip = hardware.Name,
+                Chip = GetStandardizedChipId(hardware),  // Standardized ID for frontend lookup (k10temp, nvme, gpu, etc.)
+                HardwareName = hardware.Name,  // Full hardware name: "AMD Ryzen 9 3900X", "NVIDIA GeForce RTX 2070 SUPER"
                 Source = $"{hardware.HardwareType}/{sensor.Name}",
                 Priority = Sensor.GetChipPriority(hardware.Name)
             };
@@ -215,26 +216,145 @@ public class LibreHardwareAdapter : IHardwareMonitor
     /// Generate short, user-friendly chip names without hardcoding specific models
     /// Examples: "NVIDIA GPU", "AMD CPU", "NVMe Storage", "Motherboard"
     /// </summary>
-    private string GetFriendlyChipName(IHardware hardware)
+    /// <summary>
+    /// Get standardized chip ID for frontend label lookup (matches sensor-labels.json)
+    /// Examples: "k10temp", "nvme", "it8628", "gpu"
+    /// </summary>
+    private string GetStandardizedChipId(IHardware hardware)
     {
         var name = hardware.Name.ToLowerInvariant();
 
-        // Determine manufacturer/type based on hardware name and type
         return hardware.HardwareType switch
         {
-            HardwareType.GpuNvidia => "NVIDIA GPU",
-            HardwareType.GpuAmd => "AMD GPU",
-            HardwareType.GpuIntel => "Intel GPU",
+            // CPU: Use k10temp for AMD, coretemp for Intel
+            HardwareType.Cpu when name.Contains("amd") || name.Contains("ryzen") => "k10temp",
+            HardwareType.Cpu when name.Contains("intel") || name.Contains("core") => "coretemp",
+            HardwareType.Cpu => "cpu_thermal",
 
-            HardwareType.Cpu when name.Contains("amd") => "AMD CPU",
-            HardwareType.Cpu when name.Contains("intel") => "Intel CPU",
-            HardwareType.Cpu => "CPU",
+            // GPU: Just "gpu" - frontend will handle it
+            HardwareType.GpuNvidia => "gpu",
+            HardwareType.GpuAmd => "gpu",
+            HardwareType.GpuIntel => "gpu",
 
-            HardwareType.Storage when name.Contains("nvme") => "NVMe Storage",
-            HardwareType.Storage => "Storage",
+            // Storage: Extract actual chip name or use "nvme"
+            HardwareType.Storage when name.Contains("nvme") => "nvme",
+            HardwareType.Storage => "storage",
 
-            HardwareType.Memory => "Memory",
-            HardwareType.Motherboard => "Motherboard",
+            // Motherboard: Extract specific chipset (IT8628, etc.)
+            HardwareType.Motherboard when name.Contains("it8628") => "it8628",
+            HardwareType.Motherboard when name.Contains("it87") => "it87",
+            HardwareType.Motherboard when name.Contains("gigabyte") => "gigabyte_wmi",
+            HardwareType.Motherboard when name.Contains("asus") => "asus_wmi",
+            HardwareType.Motherboard => "motherboard",
+
+            // ACPI/Thermal zones
+            _ when name.Contains("acpi") => "acpitz",
+            _ when name.Contains("thermal") => "thermal",
+
+            _ => hardware.HardwareType.ToString().ToLowerInvariant()
+        };
+    }
+
+    /// <summary>
+    /// Extract hardware brand from the full hardware name
+    /// Generic pattern matching for common brands across all device types
+    /// </summary>
+    private string ExtractBrand(string hardwareName)
+    {
+        var name = hardwareName.ToLowerInvariant();
+
+        // CPU brands
+        if (name.Contains("amd") || name.Contains("ryzen") || name.Contains("epyc") || name.Contains("threadripper"))
+            return "AMD";
+        if (name.Contains("intel") || name.Contains("core") || name.Contains("xeon") || name.Contains("pentium"))
+            return "Intel";
+        if (name.Contains("qualcomm") || name.Contains("snapdragon"))
+            return "Qualcomm";
+        if (name.Contains("arm") || name.Contains("cortex"))
+            return "ARM";
+
+        // GPU brands
+        if (name.Contains("nvidia") || name.Contains("geforce") || name.Contains("quadro") || name.Contains("rtx") || name.Contains("gtx"))
+            return "NVIDIA";
+        if (name.Contains("radeon") || name.Contains("rx "))
+            return "AMD";
+        if (name.Contains("arc") || name.Contains("iris") || name.Contains("uhd"))
+            return "Intel";
+        if (name.Contains("mali"))
+            return "ARM";
+        if (name.Contains("adreno"))
+            return "Qualcomm";
+
+        // Storage brands
+        if (name.Contains("samsung"))
+            return "Samsung";
+        if (name.Contains("western digital") || name.Contains("wd ") || name.Contains("wd_"))
+            return "WD";
+        if (name.Contains("seagate"))
+            return "Seagate";
+        if (name.Contains("crucial"))
+            return "Crucial";
+        if (name.Contains("kingston"))
+            return "Kingston";
+        if (name.Contains("corsair"))
+            return "Corsair";
+        if (name.Contains("sandisk"))
+            return "SanDisk";
+        if (name.Contains("micron"))
+            return "Micron";
+        if (name.Contains("sk hynix") || name.Contains("hynix"))
+            return "SK Hynix";
+        if (name.Contains("toshiba"))
+            return "Toshiba";
+        if (name.Contains("adata") || name.Contains("xpg"))
+            return "ADATA";
+        if (name.Contains("sabrent"))
+            return "Sabrent";
+        if (name.Contains("plextor"))
+            return "Plextor";
+        if (name.Contains("transcend"))
+            return "Transcend";
+
+        // Motherboard/chipset brands
+        if (name.Contains("asus"))
+            return "ASUS";
+        if (name.Contains("gigabyte"))
+            return "Gigabyte";
+        if (name.Contains("msi"))
+            return "MSI";
+        if (name.Contains("asrock"))
+            return "ASRock";
+        if (name.Contains("evga"))
+            return "EVGA";
+        if (name.Contains("nuvoton") || name.Contains("nct"))
+            return "Nuvoton";
+        if (name.Contains("ite") || name.Contains("it87") || name.Contains("it86"))
+            return "ITE";
+        if (name.Contains("asmedia"))
+            return "ASMedia";
+
+        return string.Empty;
+    }
+
+    private string GetFriendlyChipName(IHardware hardware)
+    {
+        var brand = ExtractBrand(hardware.Name);
+
+        // TYPE-first ordering for better grouping in UI (CPU AMD, GPU NVIDIA, Storage Samsung, etc.)
+        return hardware.HardwareType switch
+        {
+            HardwareType.GpuNvidia => !string.IsNullOrEmpty(brand) ? $"GPU {brand}" : "GPU NVIDIA",
+            HardwareType.GpuAmd => !string.IsNullOrEmpty(brand) ? $"GPU {brand}" : "GPU AMD",
+            HardwareType.GpuIntel => !string.IsNullOrEmpty(brand) ? $"GPU {brand}" : "GPU Intel",
+
+            HardwareType.Cpu => !string.IsNullOrEmpty(brand) ? $"CPU {brand}" : "CPU",
+
+            HardwareType.Storage => !string.IsNullOrEmpty(brand) ? $"Storage {brand}" : "Storage",
+
+            HardwareType.Memory => !string.IsNullOrEmpty(brand) ? $"Memory {brand}" : "Memory",
+
+            HardwareType.Motherboard => !string.IsNullOrEmpty(brand) ? $"Motherboard {brand}" : "Motherboard",
+
             HardwareType.EmbeddedController => "Controller",
 
             _ => hardware.HardwareType.ToString()

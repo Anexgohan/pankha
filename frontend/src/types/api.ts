@@ -37,6 +37,7 @@ export interface SensorReading {
   status: 'ok' | 'warning' | 'critical';
   maxTemp?: number;
   critTemp?: number;
+  hardwareName?: string; // Full hardware name (e.g., "AMD Ryzen 9 3900X", "NVIDIA GeForce RTX 2070 SUPER")
   dbId?: number; // Database record ID for fan_profile_assignments
   isHidden?: boolean; // Sensor is hidden by user (individually or via group)
 }

@@ -541,8 +541,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
     return groups;
   };
 
-  // Get friendly chip display names
-  const getChipDisplayName = (chipId: string): string => getSensorLabel(chipId);
+  // Get friendly chip display names with hardware model
+  const getChipDisplayName = (chipId: string, sensors?: SensorReading[]): string => {
+    const label = getSensorLabel(chipId);
+
+    // If sensors provided, try to get hardware name from first sensor
+    if (sensors && sensors.length > 0 && sensors[0].hardwareName) {
+      return `${label} (${sensors[0].hardwareName})`;
+    }
+
+    return label;
+  };
 
   // Check if a sensor is hidden (either individually or via group)
   const isSensorOrGroupHidden = (sensor: SensorReading): boolean => {
@@ -858,7 +867,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     return (
                       <div key={chipId} className={`sensor-group ${isGroupHiddenState ? 'group-hidden' : ''}`}>
                         <div className="sensor-group-header">
-                          <h5>{getChipDisplayName(chipId)}</h5>
+                          <h5>{getChipDisplayName(chipId, chipSensors)}</h5>
                           <div className="group-header-right">
                             <button
                               className="visibility-toggle"
@@ -1090,7 +1099,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                     value={`__group__${groupId}`}
                                     title="Selecting a group uses the Highest Temperature of that group"
                                   >
-                                    📊 {getChipDisplayName(groupId)} ({highestTemp.toFixed(1)}°C)
+                                    📊 {getChipDisplayName(groupId, groupSensors)} ({highestTemp.toFixed(1)}°C)
                                   </option>
                                 );
                               })}

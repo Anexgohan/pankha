@@ -112,7 +112,8 @@ export class DataAggregator extends EventEmitter {
           temperature: sensor.temperature,
           status: sensor.status || 'ok',
           maxTemp: sensor.max_temp,
-          critTemp: sensor.crit_temp
+          critTemp: sensor.crit_temp,
+          hardwareName: (sensor as any).hardwareName || (sensor as any).hardware_name // From agent data
         })),
         fans: data.fans.map(fan => ({
           id: fan.id,
