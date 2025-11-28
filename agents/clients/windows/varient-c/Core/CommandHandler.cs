@@ -105,10 +105,11 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, "Update interval must be between 0.5 and 30 seconds"));
         }
 
+        var oldInterval = _config.Hardware.UpdateInterval;
         _config.Hardware.UpdateInterval = interval;
-        _config.SaveToFile("config.json");
+        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
 
-        _logger.Information("Update interval set to {Interval}s", interval);
+        _logger.Information("Update interval changed: {Old}s -> {New}s", oldInterval, interval);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { interval }));
     }
@@ -117,10 +118,11 @@ public class CommandHandler
     {
         var enabled = GetPayloadValue<bool>(payload, "enabled");
 
+        var oldEnabled = _config.Monitoring.FilterDuplicateSensors;
         _config.Monitoring.FilterDuplicateSensors = enabled;
-        _config.SaveToFile("config.json");
+        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
 
-        _logger.Information("Sensor deduplication set to {Enabled}", enabled);
+        _logger.Information("Sensor deduplication changed: {Old} -> {New}", oldEnabled, enabled);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { enabled }));
     }
@@ -134,10 +136,11 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, "Tolerance must be between 0.25°C and 5.0°C"));
         }
 
+        var oldTolerance = _config.Monitoring.DuplicateSensorTolerance;
         _config.Monitoring.DuplicateSensorTolerance = tolerance;
-        _config.SaveToFile("config.json");
+        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
 
-        _logger.Information("Sensor tolerance set to {Tolerance}°C", tolerance);
+        _logger.Information("Sensor tolerance changed: {Old}C -> {New}C", oldTolerance, tolerance);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { tolerance }));
     }
@@ -152,10 +155,11 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, $"Step must be one of: {string.Join(", ", validSteps)}"));
         }
 
+        var oldStep = _config.Monitoring.FanStepPercent;
         _config.Monitoring.FanStepPercent = step;
-        _config.SaveToFile("config.json");
+        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
 
-        _logger.Information("Fan step set to {Step}%", step);
+        _logger.Information("Fan step changed: {Old}% -> {New}%", oldStep, step);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { step }));
     }
@@ -169,10 +173,11 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, "Hysteresis must be between 0.0°C and 10.0°C"));
         }
 
+        var oldHysteresis = _config.Monitoring.HysteresisTemp;
         _config.Monitoring.HysteresisTemp = hysteresis;
-        _config.SaveToFile("config.json");
+        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
 
-        _logger.Information("Hysteresis set to {Hysteresis}°C", hysteresis);
+        _logger.Information("Hysteresis changed: {Old}C -> {New}C", oldHysteresis, hysteresis);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { hysteresis }));
     }
@@ -186,10 +191,11 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, "Emergency temperature must be between 70°C and 100°C"));
         }
 
+        var oldTemp = _config.Hardware.EmergencyTemperature;
         _config.Hardware.EmergencyTemperature = temp;
-        _config.SaveToFile("config.json");
+        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
 
-        _logger.Information("Emergency temperature set to {Temp}°C", temp);
+        _logger.Information("Emergency temperature changed: {Old}C -> {New}C", oldTemp, temp);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { temperature = temp }));
     }
@@ -206,12 +212,28 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, $"Log level must be one of: {string.Join(", ", validLevels)}"));
         }
 
+        // Save to config file
         _config.Logging.LogLevel = upperLevel;
-        _config.SaveToFile("config.json");
+        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
 
-        _logger.Information("Log level set to {Level}", upperLevel);
+        // Map to Serilog level
+        var serilogLevel = upperLevel switch
+        {
+            "TRACE" => Serilog.Events.LogEventLevel.Verbose,
+            "DEBUG" => Serilog.Events.LogEventLevel.Debug,
+            "INFO" => Serilog.Events.LogEventLevel.Information,
+            "WARN" => Serilog.Events.LogEventLevel.Warning,
+            "ERROR" => Serilog.Events.LogEventLevel.Error,
+            "CRITICAL" => Serilog.Events.LogEventLevel.Fatal,
+            _ => Serilog.Events.LogEventLevel.Information
+        };
 
-        // TODO: Dynamically update Serilog level
+        // Update the global LoggingLevelSwitch - this dynamically changes ALL loggers
+        // This is the Serilog equivalent of Rust agent's tracing_reload_handle.reload()
+        var oldLevel = _config.Logging.LogLevel;
+        Pankha.WindowsAgent.Program.LogLevelSwitch.MinimumLevel = serilogLevel;
+
+        _logger.Information("Log level changed: {Old} -> {New}", oldLevel, upperLevel);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { level = upperLevel }));
     }

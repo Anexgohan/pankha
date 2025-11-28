@@ -91,30 +91,22 @@ public class NvidiaGpuController : IDisposable
 
                 _logger.Debug("GPU has {Count} cooler(s)", coolers.Length);
 
-                // Try using CoolerInformation.SetCoolerSettings (high-level API)
-                // Method signature: SetCoolerSettings(int coolerId, CoolerPolicy policy, int level)
+                // Direct call to SetCoolerSettings - method is public in NvAPIWrapper.Net 0.8.1.101
                 bool success = false;
                 foreach (var cooler in coolers)
                 {
                     try
                     {
-                        // Get the specific overload: SetCoolerSettings(Int32, CoolerPolicy, Int32)
-                        var method = coolerInfo.GetType().GetMethod("SetCoolerSettings",
-                            new Type[] { typeof(int), typeof(NvAPIWrapper.Native.GPU.CoolerPolicy), typeof(int) });
+                        // Direct call - no reflection needed!
+                        coolerInfo.SetCoolerSettings(
+                            cooler.CoolerId,
+                            NvAPIWrapper.Native.GPU.CoolerPolicy.Manual,
+                            speedPercent
+                        );
 
-                        if (method != null)
-                        {
-                            // CoolerPolicy.Manual = 1
-                            var manualPolicy = (NvAPIWrapper.Native.GPU.CoolerPolicy)1;
-                            method.Invoke(coolerInfo, new object[] { cooler.CoolerId, manualPolicy, speedPercent });
-                            _logger.Debug("Set cooler {Id} to {Speed}% with Manual policy", cooler.CoolerId, speedPercent);
-                            success = true;
-                        }
-                        else
-                        {
-                            _logger.Warning("SetCoolerSettings(int, CoolerPolicy, int) method not found");
-                            return false;
-                        }
+                        _logger.Debug("Set cooler {Id} to {Speed}% with Manual policy",
+                            cooler.CoolerId, speedPercent);
+                        success = true;
                     }
                     catch (Exception ex)
                     {
@@ -124,7 +116,7 @@ public class NvidiaGpuController : IDisposable
 
                 if (success)
                 {
-                    _logger.Information("✅ Set NVIDIA GPU fan to {Speed}% for {GPU}", speedPercent, gpu.FullName);
+                    _logger.Information("Set NVIDIA GPU fan to {Speed}% for {GPU}", speedPercent, gpu.FullName);
                     return true;
                 }
 
@@ -154,24 +146,22 @@ public class NvidiaGpuController : IDisposable
                 if (coolerInfo == null ||  coolerInfo.Coolers == null || !coolerInfo.Coolers.Any())
                     return false;
 
-                // Try to restore default control via reflection
-                // Use SetCoolerSettings with Auto policy
+                // Restore default control with direct call
                 bool success = false;
                 foreach (var cooler in coolerInfo.Coolers)
                 {
                     try
                     {
-                        var method = coolerInfo.GetType().GetMethod("SetCoolerSettings",
-                            new Type[] { typeof(int), typeof(NvAPIWrapper.Native.GPU.CoolerPolicy), typeof(int) });
+                        // Direct call - reset to automatic fan control
+                        // Note: CoolerPolicy.None (value 0) = automatic control mode
+                        coolerInfo.SetCoolerSettings(
+                            cooler.CoolerId,
+                            NvAPIWrapper.Native.GPU.CoolerPolicy.None,
+                            0
+                        );
 
-                        if (method != null)
-                        {
-                            // CoolerPolicy.Auto = 0
-                            var autoPolicy = (NvAPIWrapper.Native.GPU.CoolerPolicy)0;
-                            method.Invoke(coolerInfo, new object[] { cooler.CoolerId, autoPolicy, 0 });
-                            _logger.Debug("Reset cooler {Id} to auto policy", cooler.CoolerId);
-                            success = true;
-                        }
+                        _logger.Debug("Reset cooler {Id} to auto policy", cooler.CoolerId);
+                        success = true;
                     }
                     catch (Exception ex)
                     {
@@ -203,7 +193,22 @@ public class NvidiaGpuController : IDisposable
             return gpu;
         }
 
+        // Parse GPU index from fan ID for multi-GPU systems
+        // Expected format: "gpunvidia_fan_gpu_fan__gpu-nvidia_0_fan_1"
+        // Extract the GPU index (e.g., "0" from "_gpu-nvidia_0_")
+        var match = System.Text.RegularExpressions.Regex.Match(fanId, @"nvidia[_-](\d+)");
+        if (match.Success && int.TryParse(match.Groups[1].Value, out var gpuIndex))
+        {
+            var gpuKey = $"nvidia_gpu_{gpuIndex}";
+            if (_gpuCache.TryGetValue(gpuKey, out var matchedGpu))
+            {
+                _logger.Debug("Matched GPU index {Index} for fan {FanId}", gpuIndex, fanId);
+                return matchedGpu;
+            }
+        }
+
         // Fallback: return first GPU (most systems have one NVIDIA GPU)
+        _logger.Debug("Could not determine specific GPU for {FanId}, using first GPU", fanId);
         return _gpuCache.Values.FirstOrDefault();
     }
 

@@ -52,6 +52,10 @@
               "target": "Package",
               "version": "[9.0.0, )"
             },
+            "Newtonsoft.Json": {
+              "target": "Package",
+              "version": "[13.0.3, )"
+            },
             "Serilog.Extensions.Hosting": {
               "target": "Package",
               "version": "[9.0.0, )"
@@ -71,10 +75,6 @@
             "System.Management": {
               "target": "Package",
               "version": "[9.0.0, )"
-            },
-            "Websocket.Client": {
-              "target": "Package",
-              "version": "[5.3.0, )"
             }
           },
           "imports": [

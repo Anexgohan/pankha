@@ -67,30 +67,34 @@ public class Sensor
     }
 
     /// <summary>
-    /// Determine chip priority for deduplication
+    /// Determine chip priority for deduplication (Windows-specific)
     /// </summary>
     public static int GetChipPriority(string chipName)
     {
         var lowerChip = chipName.ToLowerInvariant();
 
-        // CPU sensors have highest priority
-        if (lowerChip.Contains("k10temp") || lowerChip.Contains("coretemp"))
+        // CPU sensors have highest priority (AMD/Intel)
+        if (lowerChip.Contains("cpu") || lowerChip.Contains("amd") || lowerChip.Contains("intel"))
             return 100;
 
-        // Motherboard sensors
-        if (lowerChip.Contains("it86") || lowerChip.Contains("nct"))
+        // GPU sensors (NVIDIA/AMD)
+        if (lowerChip.Contains("nvidia") || lowerChip.Contains("amd") || lowerChip.Contains("gpu"))
+            return 95;
+
+        // Motherboard sensors (ITE, Nuvoton, etc.)
+        if (lowerChip.Contains("it86") || lowerChip.Contains("nct") || lowerChip.Contains("ite") || lowerChip.Contains("nuvoton"))
             return 90;
 
-        // NVMe sensors
-        if (lowerChip.Contains("nvme"))
+        // NVMe/Storage sensors
+        if (lowerChip.Contains("nvme") || lowerChip.Contains("storage"))
             return 80;
 
-        // WMI sensors
+        // WMI sensors (Windows Management Instrumentation)
         if (lowerChip.Contains("wmi"))
             return 50;
 
-        // ACPI thermal
-        if (lowerChip.Contains("acpi"))
+        // ACPI thermal zones
+        if (lowerChip.Contains("acpi") || lowerChip.Contains("thermal"))
             return 40;
 
         // Default priority

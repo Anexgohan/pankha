@@ -1,57 +1,49 @@
-using System;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Pankha.WindowsAgent;
+using Pankha.WindowsAgent.Core;
+using Pankha.WindowsAgent.Hardware;
+using Pankha.WindowsAgent.Models.Configuration;
 using Serilog;
-using Serilog.Events;
 
-namespace PankhaAgent
+var configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "config.json");
+var config = AgentConfig.LoadFromFile(configPath);
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "PankhaAgent", "logs", "agent.log"), rollingInterval: RollingInterval.Day)
+    .CreateLogger();
+
+try
 {
-    public class Program
+    var builder = Host.CreateApplicationBuilder(args);
+    builder.Services.AddWindowsService(options =>
     {
-        public static void Main(string[] args)
-        {
-            Log.Logger = new LoggerConfiguration()
-                .MinimumLevel.Debug()
-                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-                .Enrich.FromLogContext()
-                .WriteTo.Console()
-                .WriteTo.File("C:\\ProgramData\\PankhaAgent\\logs\\agent.log", rollingInterval: RollingInterval.Day)
-                .CreateLogger();
+        options.ServiceName = "PankhaAgent";
+    });
 
-            try
-            {
-                Log.Information("Starting Pankha Agent Service");
-                CreateHostBuilder(args).Build().Run();
-            }
-            catch (Exception ex)
-            {
-                Log.Fatal(ex, "Service terminated unexpectedly");
-            }
-            finally
-            {
-                Log.CloseAndFlush();
-            }
-        }
+    builder.Services.AddSerilog();
+    
+    // Register Config
+    builder.Services.AddSingleton(config);
+    builder.Services.AddSingleton(provider => configPath); // Inject path for CommandHandler
 
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .UseWindowsService() // Enable running as Windows Service
-                .UseSerilog()
-                .ConfigureServices((hostContext, services) =>
-                {
-                    // Register HardwareMonitor as Singleton
-                    services.AddSingleton<HardwareMonitor>();
+    // Register Hardware
+    builder.Services.AddSingleton<IHardwareMonitor, LibreHardwareAdapter>();
 
-                    // Register PankhaClient as Singleton
-                    services.AddSingleton<PankhaClient>(sp => 
-                    {
-                        var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<PankhaClient>>();
-                        var hardware = sp.GetRequiredService<HardwareMonitor>();
-                        // TODO: Load URL from config
-                        return new PankhaClient("ws://192.168.100.237:3002/websocket", hardware, logger);
-                    });
+    // Register Core
+    builder.Services.AddSingleton<CommandHandler>();
+    builder.Services.AddSingleton<WebSocketClient>();
 
-                    services.AddHostedService<Worker>();
-                });
-    }
+    builder.Services.AddHostedService<Worker>();
+
+    var host = builder.Build();
+    host.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
 }

@@ -4,8 +4,72 @@ param(
     [string]$Configuration = "Release",
     [switch]$Clean,
     [switch]$Test,
-    [switch]$Publish
+    [switch]$Publish,
+    [switch]$Menu
 )
+
+# Function to check if running as administrator
+function Test-Administrator {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+# Function to elevate to administrator
+function Start-ElevatedProcess {
+    param([string]$Arguments)
+
+    $scriptPath = $MyInvocation.PSCommandPath
+    if (-not $scriptPath) {
+        $scriptPath = $PSCommandPath
+    }
+
+    Write-Host "Requesting administrator privileges..." -ForegroundColor Yellow
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $Arguments" -Verb RunAs -Wait
+    exit
+}
+
+# Show interactive menu if no parameters provided
+$hasParams = $PSBoundParameters.Count -gt 0 -and -not $Menu
+if (-not $hasParams -or $Menu) {
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host " Pankha Windows Agent - Build Menu" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  1. Publish Single-File EXE" -ForegroundColor Green
+    Write-Host "  2. Standard Build (Release)" -ForegroundColor White
+    Write-Host "  3. Clean Build Artifacts" -ForegroundColor Yellow
+    Write-Host "  4. Build and Test Hardware" -ForegroundColor Magenta
+    Write-Host "  5. Debug Build" -ForegroundColor Gray
+    Write-Host "  6. Clean + Publish" -ForegroundColor Cyan
+    Write-Host "  0. Exit" -ForegroundColor Red
+    Write-Host ""
+    $choice = Read-Host "Select option"
+
+    switch ($choice) {
+        "1" { $Publish = $true }
+        "2" { <# Standard build - no flags needed #> }
+        "3" { $Clean = $true }
+        "4" {
+            # Auto-elevate for hardware test
+            if (-not (Test-Administrator)) {
+                Start-ElevatedProcess "-Test"
+            }
+            $Test = $true
+        }
+        "5" { $Configuration = "Debug" }
+        "6" { $Clean = $true; $Publish = $true }
+        "0" { Write-Host "Exiting..." -ForegroundColor Gray; exit 0 }
+        default { Write-Host "Invalid option" -ForegroundColor Red; exit 1 }
+    }
+    Write-Host ""
+}
+
+# Auto-elevate for Test parameter (when run with -Test directly)
+if ($Test -and -not (Test-Administrator)) {
+    Start-ElevatedProcess "-Test"
+}
 
 Write-Host "=== Pankha Windows Agent Build Script ===" -ForegroundColor Cyan
 Write-Host ""
@@ -75,10 +139,10 @@ if ($Publish) {
 
     Write-Host "✅ Publish complete" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Output: $OutputDir\pankha-agent.exe" -ForegroundColor Cyan
+    Write-Host "Output: $OutputDir\pankha-agent-windows.exe" -ForegroundColor Cyan
 
     # Show file size
-    $ExePath = "$OutputDir\pankha-agent.exe"
+    $ExePath = "$OutputDir\pankha-agent-windows.exe"
     if (Test-Path $ExePath) {
         $Size = (Get-Item $ExePath).Length / 1MB
         Write-Host "Size: $($Size.ToString('F2')) MB" -ForegroundColor Cyan

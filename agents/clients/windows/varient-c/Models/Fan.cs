@@ -31,9 +31,6 @@ public class Fan
     [JsonProperty("has_pwm_control")]
     public bool HasPwmControl { get; set; }
 
-    [JsonProperty("pwm_file")]
-    public string? PwmFile { get; set; }
-
     /// <summary>
     /// Internal reference to LibreHardwareMonitor sensor
     /// </summary>

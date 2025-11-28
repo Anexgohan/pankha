@@ -11,12 +11,12 @@
         "dependencies": {
           "Microsoft.Extensions.Hosting": "9.0.11",
           "Microsoft.Extensions.Hosting.WindowsServices": "9.0.0",
+          "Newtonsoft.Json": "13.0.3",
           "Serilog.Extensions.Hosting": "9.0.0",
           "Serilog.Sinks.Console": "6.1.1",
           "Serilog.Sinks.File": "7.0.0",
           "System.IO.Ports": "9.0.0",
           "System.Management": "9.0.0",
-          "Websocket.Client": "5.3.0",
           "HidSharp": "2.1.0.0",
           "LibreHardwareMonitorLib": "0.9.4.0",
           "NvAPIWrapper": "0.8.1.100",
@@ -1125,11 +1125,11 @@
           }
         }
       },
-      "Microsoft.IO.RecyclableMemoryStream/3.0.0": {
+      "Newtonsoft.Json/13.0.3": {
         "runtime": {
-          "lib/net6.0/Microsoft.IO.RecyclableMemoryStream.dll": {
-            "assemblyVersion": "3.0.0.0",
-            "fileVersion": "3.0.0.0"
+          "lib/net6.0/Newtonsoft.Json.dll": {
+            "assemblyVersion": "13.0.0.0",
+            "fileVersion": "13.0.3.27908"
           }
         }
       },
@@ -1268,14 +1268,6 @@
           }
         }
       },
-      "System.Reactive/6.0.0": {
-        "runtime": {
-          "lib/net6.0/System.Reactive.dll": {
-            "assemblyVersion": "6.0.0.0",
-            "fileVersion": "6.0.0.1"
-          }
-        }
-      },
       "System.ServiceProcess.ServiceController/9.0.0": {
         "dependencies": {
           "System.Diagnostics.EventLog": "9.0.11"
@@ -1284,19 +1276,6 @@
           "runtimes/win/lib/net9.0/System.ServiceProcess.ServiceController.dll": {
             "assemblyVersion": "9.0.0.0",
             "fileVersion": "9.0.24.52809"
-          }
-        }
-      },
-      "Websocket.Client/5.3.0": {
-        "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "9.0.11",
-          "Microsoft.IO.RecyclableMemoryStream": "3.0.0",
-          "System.Reactive": "6.0.0"
-        },
-        "runtime": {
-          "lib/net8.0/Websocket.Client.dll": {
-            "assemblyVersion": "5.3.0.0",
-            "fileVersion": "5.3.0.0"
           }
         }
       },
@@ -1541,12 +1520,12 @@
       "path": "microsoft.extensions.primitives/9.0.11",
       "hashPath": "microsoft.extensions.primitives.9.0.11.nupkg.sha512"
     },
-    "Microsoft.IO.RecyclableMemoryStream/3.0.0": {
+    "Newtonsoft.Json/13.0.3": {
       "type": "package",
       "serviceable": true,
-      "sha512": "sha512-irv0HuqoH8Ig5i2fO+8dmDNdFdsrO+DoQcedwIlb810qpZHBNQHZLW7C/AHBQDgLLpw2T96vmMAy/aE4Yj55Sg==",
-      "path": "microsoft.io.recyclablememorystream/3.0.0",
-      "hashPath": "microsoft.io.recyclablememorystream.3.0.0.nupkg.sha512"
+      "sha512": "sha512-HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ==",
+      "path": "newtonsoft.json/13.0.3",
+      "hashPath": "newtonsoft.json.13.0.3.nupkg.sha512"
     },
     "runtime.android-arm.runtime.native.System.IO.Ports/9.0.0": {
       "type": "package",
@@ -1730,26 +1709,12 @@
       "path": "system.management/9.0.0",
       "hashPath": "system.management.9.0.0.nupkg.sha512"
     },
-    "System.Reactive/6.0.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-31kfaW4ZupZzPsI5PVe77VhnvFF55qgma7KZr/E0iFTs6fmdhhG8j0mgEx620iLTey1EynOkEfnyTjtNEpJzGw==",
-      "path": "system.reactive/6.0.0",
-      "hashPath": "system.reactive.6.0.0.nupkg.sha512"
-    },
     "System.ServiceProcess.ServiceController/9.0.0": {
       "type": "package",
       "serviceable": true,
       "sha512": "sha512-ciFstNZEWYf40HbwzdQLdgQpgpnjkleC1z0jMqBKRdkEQqQ6I/Aht0x9fTBODnaQTtcF+scvrdimoDbfNap/aQ==",
       "path": "system.serviceprocess.servicecontroller/9.0.0",
       "hashPath": "system.serviceprocess.servicecontroller.9.0.0.nupkg.sha512"
-    },
-    "Websocket.Client/5.3.0": {
-      "type": "package",
-      "serviceable": true,
-      "sha512": "sha512-uhdDM+gruCEhHRCKCoyali1HJp0wSS/HBs5X9XZwULNKM2y5ML188TsvcEgWEFOx0NOaHfGNtfoC0cd1p2NOIg==",
-      "path": "websocket.client/5.3.0",
-      "hashPath": "websocket.client.5.3.0.nupkg.sha512"
     },
     "HidSharp/2.1.0.0": {
       "type": "reference",

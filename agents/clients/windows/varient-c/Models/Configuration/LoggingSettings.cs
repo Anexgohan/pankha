@@ -8,7 +8,7 @@ namespace Pankha.WindowsAgent.Models.Configuration;
 public class LoggingSettings
 {
     [JsonProperty("logLevel")]
-    public string LogLevel { get; set; } = "Information";
+    public string LogLevel { get; set; } = "INFO";
 
     [JsonProperty("logDirectory")]
     public string LogDirectory { get; set; } = "logs";
@@ -21,8 +21,9 @@ public class LoggingSettings
 
     public void Validate()
     {
-        var validLevels = new[] { "Trace", "Debug", "Information", "Warning", "Error", "Critical" };
-        if (!validLevels.Contains(LogLevel, StringComparer.OrdinalIgnoreCase))
+        // Must match Rust agent: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL
+        var validLevels = new[] { "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL" };
+        if (!validLevels.Contains(LogLevel.ToUpperInvariant()))
         {
             throw new InvalidOperationException($"Log level must be one of: {string.Join(", ", validLevels)}");
         }

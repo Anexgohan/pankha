@@ -1,6 +1,7 @@
 using LibreHardwareMonitor.Hardware;
 using Pankha.WindowsAgent.Models;
 using Pankha.WindowsAgent.Models.Configuration;
+using Pankha.WindowsAgent.Utilities;
 using Serilog;
 
 namespace Pankha.WindowsAgent.Hardware;
@@ -17,9 +18,16 @@ public class LibreHardwareAdapter : IHardwareMonitor
     private readonly ILogger _logger;
     private readonly NvidiaGpuController? _nvidiaController;
 
+    // Thread safety lock for hardware access
+    private readonly object _hardwareLock = new();
+
     // Cache for discovered hardware
     private readonly Dictionary<string, Fan> _fanCache = new();
     private readonly Dictionary<string, Sensor> _sensorCache = new();
+
+    // System health cache (1-second TTL like Rust agent)
+    private SystemHealth? _cachedSystemHealth;
+    private DateTime _systemHealthCacheTime = DateTime.MinValue;
 
     public LibreHardwareAdapter(HardwareSettings settings, MonitoringSettings monitoringSettings, ILogger logger)
     {
@@ -57,12 +65,12 @@ public class LibreHardwareAdapter : IHardwareMonitor
             _nvidiaController = new NvidiaGpuController(logger);
             if (_nvidiaController.IsAvailable)
             {
-                _logger.Information("✅ NVIDIA GPU controller initialized");
+                _logger.Information("NVIDIA GPU controller initialized");
             }
             else
             {
                 _nvidiaController = null;
-                _logger.Information("ℹ️ NVIDIA GPU controller not available (no NVIDIA GPU detected)");
+                _logger.Information("NVIDIA GPU controller not available (no NVIDIA GPU detected)");
             }
         }
         catch (Exception ex)
@@ -78,14 +86,17 @@ public class LibreHardwareAdapter : IHardwareMonitor
         {
             try
             {
-                foreach (var hardware in _computer.Hardware)
+                lock (_hardwareLock) // Thread safety for LibreHardwareMonitor access
                 {
-                    hardware.Update();
-
-                    // Update sub-hardware recursively
-                    foreach (var subHardware in hardware.SubHardware)
+                    foreach (var hardware in _computer.Hardware)
                     {
-                        subHardware.Update();
+                        hardware.Update();
+
+                        // Update sub-hardware recursively
+                        foreach (var subHardware in hardware.SubHardware)
+                        {
+                            subHardware.Update();
+                        }
                     }
                 }
             }
@@ -102,24 +113,35 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
         await UpdateAsync();
 
-        foreach (var hardware in _computer.Hardware)
+        lock (_hardwareLock) // Thread safety for hardware enumeration
         {
-            AddSensorsFromHardware(hardware, sensors);
-
-            // Process sub-hardware (e.g., GPU, NVMe drives)
-            foreach (var subHardware in hardware.SubHardware)
+            foreach (var hardware in _computer.Hardware)
             {
-                AddSensorsFromHardware(subHardware, sensors);
+                AddSensorsFromHardware(hardware, sensors);
+
+                // Process sub-hardware (e.g., GPU, NVMe drives)
+                foreach (var subHardware in hardware.SubHardware)
+                {
+                    AddSensorsFromHardware(subHardware, sensors);
+                }
             }
         }
 
         // Apply sensor deduplication if enabled
-        if (_monitoringSettings.FilterDuplicateSensors)
+        if (_monitoringSettings.FilterDuplicateSensors && sensors.Count > 1)
         {
-            sensors = DeduplicateSensors(sensors, _monitoringSettings.DuplicateSensorTolerance);
+            _logger.Debug("Applying sensor deduplication with {Tolerance}°C tolerance",
+                _monitoringSettings.DuplicateSensorTolerance);
+            sensors = SensorDeduplicator.Deduplicate(
+                sensors,
+                _monitoringSettings.DuplicateSensorTolerance,
+                _logger);
+        }
+        else
+        {
+            _logger.Debug("Discovered {Count} sensors (deduplication disabled)", sensors.Count);
         }
 
-        _logger.Information("Discovered {Count} sensors", sensors.Count);
         return sensors;
     }
 
@@ -137,8 +159,8 @@ public class LibreHardwareAdapter : IHardwareMonitor
             var sensorModel = new Sensor
             {
                 Id = GenerateSensorId(hardware, sensor),
-                Name = sensor.Name,
-                Label = sensor.Name,
+                Name = $"{GetFriendlyChipName(hardware)} {sensor.Name}",  // e.g., "NVIDIA GPU Core", "AMD CPU Tctl/Tdie"
+                Label = sensor.Name,  // Short label: "GPU Core", "Tctl/Tdie"
                 Type = DetermineSensorType(hardware.HardwareType),
                 Temperature = sensor.Value.Value,
                 Chip = hardware.Name,
@@ -158,12 +180,22 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
     private string GenerateSensorId(IHardware hardware, ISensor sensor)
     {
-        // Create consistent ID format similar to Rust agent
-        var hardwareType = hardware.HardwareType.ToString().ToLowerInvariant();
-        var sensorName = sensor.Name.Replace(" ", "_").Replace("/", "_").ToLowerInvariant();
-        // Use stable Identifier string instead of GetHashCode() which changes per restart
-        var idSuffix = sensor.Identifier.ToString().Replace("/", "_").Replace("\\", "_");
-        return $"{hardwareType}_{sensorName}_{idSuffix}";
+        // Create simple, stable IDs like Rust agent: "chipname_index"
+        // Example: "rtx2070_1" instead of "gpunvidia_gpu_core__gpu-nvidia_0_temperature_0"
+
+        var chipName = hardware.Name
+            .Replace(" ", "")
+            .Replace("-", "")
+            .Replace("_", "")
+            .ToLowerInvariant();
+
+        // Extract numeric index from identifier (e.g., /nvidiagpu/0/temperature/2 → 2)
+        var identifier = sensor.Identifier.ToString();
+        var lastSlashIndex = identifier.LastIndexOf('/');
+        var sensorIndex = lastSlashIndex >= 0 ? identifier.Substring(lastSlashIndex + 1) : "0";
+
+        // Keep it simple and short like Rust: "nvidiageforertx2070super_2"
+        return $"{chipName}_{sensorIndex}";
     }
 
     private string DetermineSensorType(HardwareType hardwareType)
@@ -179,6 +211,36 @@ public class LibreHardwareAdapter : IHardwareMonitor
         };
     }
 
+    /// <summary>
+    /// Generate short, user-friendly chip names without hardcoding specific models
+    /// Examples: "NVIDIA GPU", "AMD CPU", "NVMe Storage", "Motherboard"
+    /// </summary>
+    private string GetFriendlyChipName(IHardware hardware)
+    {
+        var name = hardware.Name.ToLowerInvariant();
+
+        // Determine manufacturer/type based on hardware name and type
+        return hardware.HardwareType switch
+        {
+            HardwareType.GpuNvidia => "NVIDIA GPU",
+            HardwareType.GpuAmd => "AMD GPU",
+            HardwareType.GpuIntel => "Intel GPU",
+
+            HardwareType.Cpu when name.Contains("amd") => "AMD CPU",
+            HardwareType.Cpu when name.Contains("intel") => "Intel CPU",
+            HardwareType.Cpu => "CPU",
+
+            HardwareType.Storage when name.Contains("nvme") => "NVMe Storage",
+            HardwareType.Storage => "Storage",
+
+            HardwareType.Memory => "Memory",
+            HardwareType.Motherboard => "Motherboard",
+            HardwareType.EmbeddedController => "Controller",
+
+            _ => hardware.HardwareType.ToString()
+        };
+    }
+
     private double GetCriticalTemp(HardwareType hardwareType)
     {
         return hardwareType switch
@@ -190,54 +252,26 @@ public class LibreHardwareAdapter : IHardwareMonitor
         };
     }
 
-    /// <summary>
-    /// Deduplicate sensors based on temperature tolerance
-    /// </summary>
-    private List<Sensor> DeduplicateSensors(List<Sensor> sensors, double tolerance)
-    {
-        var groups = sensors
-            .GroupBy(s => Math.Round(s.Temperature / tolerance) * tolerance)
-            .Where(g => g.Count() > 1);
-
-        var toRemove = new HashSet<Sensor>();
-
-        foreach (var group in groups)
-        {
-            // Keep the sensor with highest priority
-            var best = group.OrderByDescending(s => s.Priority).First();
-            foreach (var sensor in group.Where(s => s != best))
-            {
-                toRemove.Add(sensor);
-            }
-        }
-
-        var result = sensors.Where(s => !toRemove.Contains(s)).ToList();
-
-        if (toRemove.Count > 0)
-        {
-            _logger.Debug("Removed {Count} duplicate sensors", toRemove.Count);
-        }
-
-        return result;
-    }
-
     public async Task<List<Fan>> DiscoverFansAsync()
     {
         var fans = new List<Fan>();
 
         await UpdateAsync();
 
-        foreach (var hardware in _computer.Hardware)
+        lock (_hardwareLock) // Thread safety for hardware enumeration
         {
-            AddFansFromHardware(hardware, fans);
-
-            foreach (var subHardware in hardware.SubHardware)
+            foreach (var hardware in _computer.Hardware)
             {
-                AddFansFromHardware(subHardware, fans);
+                AddFansFromHardware(hardware, fans);
+
+                foreach (var subHardware in hardware.SubHardware)
+                {
+                    AddFansFromHardware(subHardware, fans);
+                }
             }
         }
 
-        _logger.Information("Discovered {Count} fans", fans.Count);
+        _logger.Debug("Discovered {Count} fans", fans.Count);
         return fans;
     }
 
@@ -264,69 +298,105 @@ public class LibreHardwareAdapter : IHardwareMonitor
             var controlSensor = fanControlSensors.FirstOrDefault(c =>
                 c.Name.Contains(rpmSensor.Name.Split(' ')[0]));
 
-            var fan = new Fan
+            // Preserve existing fan control state if already cached
+            Fan fan;
+            if (_fanCache.TryGetValue(fanId, out var existingFan))
             {
-                Id = fanId,
-                Name = rpmSensor.Name,
-                Label = rpmSensor.Name,
-                Rpm = (int)rpmSensor.Value.Value,
-                Speed = controlSensor?.Value.HasValue == true ? (int)controlSensor.Value.Value : 0,
-                TargetSpeed = 0,
-                HasPwmControl = controlSensor != null,
-                HardwareReference = controlSensor
-            };
+                // Update current readings but preserve control state
+                existingFan.Rpm = (int)rpmSensor.Value.Value;
+                existingFan.Speed = controlSensor?.Value.HasValue == true ? (int)controlSensor.Value.Value : 0;
+                existingFan.HardwareReference = controlSensor;
+                // Preserve: LastWriteTime, LastPwmValue (critical for rate limiting/deduplication)
+                existingFan.UpdateStatus();
+                fan = existingFan;
+            }
+            else
+            {
+                // First discovery - create new fan
+                fan = new Fan
+                {
+                    Id = fanId,
+                    Name = $"{GetFriendlyChipName(hardware)} {rpmSensor.Name}",  // e.g., "NVIDIA GPU Fan"
+                    Label = rpmSensor.Name,  // Short label: "Fan"
+                    Rpm = (int)rpmSensor.Value.Value,
+                    Speed = controlSensor?.Value.HasValue == true ? (int)controlSensor.Value.Value : 0,
+                    TargetSpeed = 0,
+                    HasPwmControl = controlSensor != null,
+                    HardwareReference = controlSensor
+                };
+                fan.UpdateStatus();
 
-            fan.UpdateStatus();
+                // Add to cache
+                _fanCache[fanId] = fan;
+            }
+
             fans.Add(fan);
-
-            // Cache the fan for later control operations
-            _fanCache[fanId] = fan;
         }
     }
 
     private string GenerateFanId(IHardware hardware, ISensor sensor)
     {
-        var hardwareType = hardware.HardwareType.ToString().ToLowerInvariant();
-        var fanName = sensor.Name.Replace(" ", "_").ToLowerInvariant();
-        // Use stable Identifier string instead of GetHashCode() which changes per restart
-        var idSuffix = sensor.Identifier.ToString().Replace("/", "_").Replace("\\", "_");
-        return $"{hardwareType}_fan_{fanName}_{idSuffix}";
+        // Create simple, stable IDs like Rust agent
+        var chipName = hardware.Name
+            .Replace(" ", "")
+            .Replace("-", "")
+            .Replace("_", "")
+            .ToLowerInvariant();
+
+        // Extract numeric index from identifier
+        var identifier = sensor.Identifier.ToString();
+        var lastSlashIndex = identifier.LastIndexOf('/');
+        var fanIndex = lastSlashIndex >= 0 ? identifier.Substring(lastSlashIndex + 1) : "0";
+
+        // Simple fan ID: "nvidiagefortertx2070super_fan1"
+        return $"{chipName}_fan{fanIndex}";
     }
 
     public async Task<SystemHealth> GetSystemHealthAsync()
     {
+        // Check cache first (1-second TTL, matching Rust agent)
+        var cacheAge = DateTime.UtcNow - _systemHealthCacheTime;
+        if (_cachedSystemHealth != null && cacheAge.TotalSeconds < 1.0)
+        {
+            _logger.Verbose("System health cache hit ({Age:F2}s old)", cacheAge.TotalSeconds);
+            return _cachedSystemHealth;
+        }
+
         await UpdateAsync();
 
         double cpuUsage = 0;
         double memoryUsage = 0;
         int cpuCount = 0;
 
-        foreach (var hardware in _computer.Hardware)
+        lock (_hardwareLock) // Thread safety for hardware access
         {
-            if (hardware.HardwareType == HardwareType.Cpu)
+            foreach (var hardware in _computer.Hardware)
             {
-                var loadSensor = hardware.Sensors.FirstOrDefault(s =>
-                    s.SensorType == SensorType.Load && s.Name.Contains("Total"));
-
-                if (loadSensor?.Value.HasValue == true)
+                if (hardware.HardwareType == HardwareType.Cpu)
                 {
-                    cpuUsage += loadSensor.Value.Value;
-                    cpuCount++;
+                    var loadSensor = hardware.Sensors.FirstOrDefault(s =>
+                        s.SensorType == SensorType.Load && s.Name.Contains("Total"));
+
+                    if (loadSensor?.Value.HasValue == true)
+                    {
+                        cpuUsage += loadSensor.Value.Value;
+                        cpuCount++;
+                    }
                 }
-            }
-            else if (hardware.HardwareType == HardwareType.Memory)
-            {
-                var usedSensor = hardware.Sensors.FirstOrDefault(s =>
-                    s.SensorType == SensorType.Data && s.Name.Contains("Used"));
-
-                var totalSensor = hardware.Sensors.FirstOrDefault(s =>
-                    s.SensorType == SensorType.Data && s.Name.Contains("Available"));
-
-                if (usedSensor?.Value.HasValue == true && totalSensor?.Value.HasValue == true)
+                else if (hardware.HardwareType == HardwareType.Memory)
                 {
-                    var used = usedSensor.Value.Value;
-                    var total = used + totalSensor.Value.Value;
-                    memoryUsage = (used / total) * 100.0;
+                    var usedSensor = hardware.Sensors.FirstOrDefault(s =>
+                        s.SensorType == SensorType.Data && s.Name.Contains("Used"));
+
+                    var totalSensor = hardware.Sensors.FirstOrDefault(s =>
+                        s.SensorType == SensorType.Data && s.Name.Contains("Available"));
+
+                    if (usedSensor?.Value.HasValue == true && totalSensor?.Value.HasValue == true)
+                    {
+                        var used = usedSensor.Value.Value;
+                        var total = used + totalSensor.Value.Value;
+                        memoryUsage = (used / total) * 100.0;
+                    }
                 }
             }
         }
@@ -338,7 +408,13 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
         var uptime = (DateTime.UtcNow - _startTime).TotalSeconds;
 
-        return new SystemHealth(cpuUsage, memoryUsage, uptime);
+        var health = new SystemHealth(cpuUsage, memoryUsage, uptime);
+
+        // Update cache
+        _cachedSystemHealth = health;
+        _systemHealthCacheTime = DateTime.UtcNow;
+
+        return health;
     }
 
     public async Task SetFanSpeedAsync(string fanId, int speed)

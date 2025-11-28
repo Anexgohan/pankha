@@ -5,6 +5,7 @@ using Pankha.WindowsAgent.Hardware;
 using Pankha.WindowsAgent.Models;
 using Pankha.WindowsAgent.Models.Configuration;
 using Pankha.WindowsAgent.Models.Messages;
+using Pankha.WindowsAgent.Services;
 using Serilog;
 
 namespace Pankha.WindowsAgent.Core;
@@ -18,6 +19,7 @@ public class WebSocketClient : IDisposable
     private readonly IHardwareMonitor _hardwareMonitor;
     private readonly ILogger _logger;
     private readonly CommandHandler _commandHandler;
+    private readonly ConnectionWatchdog? _watchdog;
 
     private ClientWebSocket? _webSocket;
     private CancellationTokenSource? _cts;
@@ -27,16 +29,25 @@ public class WebSocketClient : IDisposable
     private ConnectionState _connectionState = ConnectionState.Disconnected;
     private int _reconnectAttempts = 0;
     private DateTime _lastReconnectAttempt = DateTime.MinValue;
+    private DateTime _lastMessageReceived = DateTime.UtcNow;
+
+    // Connection health check: if no message for 30s, assume dead connection
+    private const int CONNECTION_HEALTH_TIMEOUT_SECS = 30;
 
     public ConnectionState State => _connectionState;
     public bool IsConnected => _connectionState == ConnectionState.Connected;
 
-    public WebSocketClient(AgentConfig config, IHardwareMonitor hardwareMonitor, ILogger logger)
+    public WebSocketClient(
+        AgentConfig config,
+        IHardwareMonitor hardwareMonitor,
+        ILogger logger,
+        ConnectionWatchdog? watchdog = null)
     {
         _config = config;
         _hardwareMonitor = hardwareMonitor;
         _logger = logger;
         _commandHandler = new CommandHandler(hardwareMonitor, config, logger);
+        _watchdog = watchdog;
     }
 
     /// <summary>
@@ -108,7 +119,11 @@ public class WebSocketClient : IDisposable
 
             _connectionState = ConnectionState.Connected;
             _reconnectAttempts = 0;
-            _logger.Information("✅ Connected to backend");
+            _lastMessageReceived = DateTime.UtcNow;
+            _logger.Information("WebSocket connected");
+
+            // Notify watchdog of successful connection
+            _watchdog?.ReportSuccessfulConnection();
 
             // Send registration message
             await SendRegistrationAsync(cancellationToken);
@@ -160,7 +175,7 @@ public class WebSocketClient : IDisposable
             };
 
             await SendMessageAsync(registerMessage, cancellationToken);
-            _logger.Information("✅ Registration sent");
+            _logger.Information("Agent registered: {AgentId}", _config.Agent.AgentId);
         }
         catch (Exception ex)
         {
@@ -176,29 +191,37 @@ public class WebSocketClient : IDisposable
     {
         try
         {
+            _logger.Verbose("Starting hardware data collection");
+
             // Update hardware readings
             await _hardwareMonitor.UpdateAsync();
 
             // Collect current data
             var sensors = await _hardwareMonitor.DiscoverSensorsAsync();
-            var fans = await _hardwareMonitor.DiscoverFansAsync();
-            var health = await _hardwareMonitor.GetSystemHealthAsync();
+            _logger.Verbose("Collected {Count} sensors", sensors.Count);
 
+            var fans = await _hardwareMonitor.DiscoverFansAsync();
+            _logger.Verbose("Collected {Count} fans", fans.Count);
+
+            var health = await _hardwareMonitor.GetSystemHealthAsync();
+            _logger.Verbose("Collected system health info");
+
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
             var dataMessage = new DataMessage
             {
                 Data = new DataPayload
                 {
                     AgentId = _config.Agent.AgentId,
-                    Timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    Timestamp = timestamp,
                     Sensors = sensors,
                     Fans = fans,
                     SystemHealth = health
                 }
             };
 
+            _logger.Verbose("Sending WebSocket message (timestamp: {Timestamp})", timestamp);
             await SendMessageAsync(dataMessage, cancellationToken);
-
-            _logger.Debug("📊 Data sent: {Sensors} sensors, {Fans} fans", sensors.Count, fans.Count);
+            _logger.Debug("Sent telemetry: {Sensors} sensors, {Fans} fans", sensors.Count, fans.Count);
         }
         catch (Exception ex)
         {
@@ -224,7 +247,7 @@ public class WebSocketClient : IDisposable
     }
 
     /// <summary>
-    /// Receive loop for incoming messages
+    /// Receive loop for incoming messages with connection health monitoring
     /// </summary>
     private async Task ReceiveLoop(CancellationToken cancellationToken)
     {
@@ -232,27 +255,58 @@ public class WebSocketClient : IDisposable
 
         try
         {
+            _logger.Debug("📨 ReceiveLoop started");
             while (_webSocket?.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
             {
-                var result = await _webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+                // IMPORTANT: Do NOT use timeout cancellation token with ReceiveAsync
+                // Cancelling receive operations causes ClientWebSocket to abort the connection
+                // Instead, rely on WebSocket's built-in KeepAliveInterval for connection health
 
-                if (result.MessageType == WebSocketMessageType.Close)
+                try
                 {
-                    _logger.Warning("Server requested close");
-                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                    break;
+                    var result = await _webSocket.ReceiveAsync(
+                        new ArraySegment<byte>(buffer),
+                        cancellationToken);
+
+                    _lastMessageReceived = DateTime.UtcNow; // Update health timestamp
+                    _watchdog?.ReportSuccessfulConnection(); // Notify watchdog of healthy connection
+
+                    _logger.Debug("📬 Received: Type={Type}, Count={Count}, EndOfMessage={End}",
+                        result.MessageType, result.Count, result.EndOfMessage);
+
+                    if (result.MessageType == WebSocketMessageType.Close)
+                    {
+                        _logger.Warning("Server requested close: Status={Status}, Description={Description}",
+                            result.CloseStatus, result.CloseStatusDescription);
+                        await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                        break;
+                    }
+
+                    if (result.MessageType == WebSocketMessageType.Text)
+                    {
+                        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                        await HandleMessageAsync(json, cancellationToken);
+                    }
                 }
-
-                if (result.MessageType == WebSocketMessageType.Text)
+                catch (WebSocketException wex)
                 {
-                    var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                    await HandleMessageAsync(json, cancellationToken);
+                    _logger.Error(wex, "❌ WebSocket exception during receive: Code={Code}, State={State}",
+                        wex.WebSocketErrorCode, _webSocket?.State);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "❌ Unexpected exception during receive: State={State}", _webSocket?.State);
+                    throw;
                 }
             }
+
+            _logger.Warning("🛑 ReceiveLoop exited: Cancelled={Cancelled}, State={State}",
+                cancellationToken.IsCancellationRequested, _webSocket?.State);
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown
+            _logger.Debug("ReceiveLoop cancelled (expected on shutdown)");
         }
         catch (WebSocketException ex)
         {
@@ -269,19 +323,25 @@ public class WebSocketClient : IDisposable
     /// </summary>
     private async Task DataTransmissionLoop(CancellationToken cancellationToken)
     {
-        var interval = TimeSpan.FromSeconds(_config.Hardware.UpdateInterval);
-
         try
         {
+            _logger.Debug("🔄 DataTransmissionLoop started");
             while (!cancellationToken.IsCancellationRequested && _webSocket?.State == WebSocketState.Open)
             {
                 await SendDataMessageAsync(cancellationToken);
+
+                // IMPORTANT: Read interval from config on EACH iteration
+                // This allows dynamic updates via setUpdateInterval command without restart
+                var interval = TimeSpan.FromSeconds(_config.Hardware.UpdateInterval);
                 await Task.Delay(interval, cancellationToken);
             }
+
+            _logger.Warning("🛑 DataTransmissionLoop exited: Cancelled={Cancelled}, State={State}",
+                cancellationToken.IsCancellationRequested, _webSocket?.State);
         }
         catch (OperationCanceledException)
         {
-            // Expected on shutdown
+            _logger.Debug("DataTransmissionLoop cancelled (expected on shutdown)");
         }
         catch (Exception ex)
         {
@@ -296,6 +356,8 @@ public class WebSocketClient : IDisposable
     {
         try
         {
+            _logger.Verbose("Received message: {Length} bytes", json.Length);
+
             var baseMessage = JsonConvert.DeserializeObject<BaseMessage>(json);
 
             if (baseMessage == null)
@@ -304,12 +366,12 @@ public class WebSocketClient : IDisposable
                 return;
             }
 
-            _logger.Debug("Received message: {Type}", baseMessage.Type);
+            _logger.Verbose("Parsed message type: {Type}", baseMessage.Type);
 
             switch (baseMessage.Type)
             {
                 case "registered":
-                    _logger.Information("✅ Registration confirmed by backend");
+                    _logger.Information("Registration confirmed by backend");
                     break;
 
                 case "command":
@@ -322,6 +384,7 @@ public class WebSocketClient : IDisposable
 
                 case "ping":
                     await SendMessageAsync(new { type = "pong" }, cancellationToken);
+                    _logger.Verbose("Received keepalive ping/pong");
                     break;
 
                 default:
@@ -373,19 +436,27 @@ public class WebSocketClient : IDisposable
 
     /// <summary>
     /// Calculate reconnect delay with exponential backoff
+    /// Matches Linux agent pattern: max 15s for hardware safety
     /// </summary>
     private int CalculateReconnectDelay()
     {
-        // Exponential backoff: 5s → 7s → 10s → 15s (max)
+        // Hardware-safe exponential backoff from Linux agent:
+        // Attempt 0: 5s, Attempt 1: 7s, Attempt 2: 10s, Attempt 3+: 15s (capped)
         var baseDelay = _config.Backend.ReconnectInterval;
 
-        return _reconnectAttempts switch
+        var delay = _reconnectAttempts switch
         {
-            0 => baseDelay,
-            1 => (int)(baseDelay * 1.4),
-            2 => (int)(baseDelay * 2.0),
-            _ => (int)(baseDelay * 3.0)
+            0 => baseDelay,                    // 5s (first retry)
+            1 => (int)(baseDelay * 1.4),       // 7s (second retry)
+            2 => (int)(baseDelay * 2.0),       // 10s (third retry)
+            _ => (int)(baseDelay * 3.0)        // 15s (max - hardware safety)
         };
+
+        // Increment and cap retry count at 3 to keep delay at 15s maximum
+        _reconnectAttempts++;
+        _reconnectAttempts = Math.Min(_reconnectAttempts, 3);
+
+        return delay;
     }
 
     public void Dispose()
