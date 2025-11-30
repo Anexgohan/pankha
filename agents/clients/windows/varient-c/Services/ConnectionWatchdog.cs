@@ -15,8 +15,8 @@ public class ConnectionWatchdog : BackgroundService
     private DateTime _lastSuccessfulConnection = DateTime.UtcNow;
     private bool _emergencyModeActive = false;
 
-    // From Linux agent: max 15s reconnect delay, so 45s = 3x max delay before emergency
-    private const int MAX_DISCONNECT_SECONDS = 45;
+    // From Linux agent: max 15s reconnect delay, so 30s = 2x max delay before emergency
+    private const int MAX_DISCONNECT_SECONDS = 30;
 
     public ConnectionWatchdog(IHardwareMonitor hardware, ILogger<ConnectionWatchdog> logger)
     {
@@ -38,6 +38,16 @@ public class ConnectionWatchdog : BackgroundService
         }
     }
 
+    /// <summary>
+    /// Called by WebSocketClient when connection is explicitly lost
+    /// </summary>
+    public void ReportDisconnect()
+    {
+        // Force watchdog to trigger immediately by setting last connection to past
+        _lastSuccessfulConnection = DateTime.UtcNow.AddSeconds(-(MAX_DISCONNECT_SECONDS + 1));
+        _logger.LogWarning("Explicit disconnect reported - watchdog will trigger emergency mode");
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Connection watchdog started (emergency threshold: {Seconds}s)",
@@ -52,17 +62,17 @@ public class ConnectionWatchdog : BackgroundService
                 // Check if disconnected too long
                 if (timeSinceConnection.TotalSeconds > MAX_DISCONNECT_SECONDS && !_emergencyModeActive)
                 {
-                    _logger.LogCritical("WARNING: No backend connection for {Seconds}s - ACTIVATING EMERGENCY MODE",
+                    _logger.LogWarning("WARNING: No backend connection for {Seconds}s - RESTORING AUTO CONTROL",
                         (int)timeSinceConnection.TotalSeconds);
 
-                    // Set all fans to 100% for hardware safety
+                    // Restore auto control for safety and quiet operation
                     try
                     {
-                        await _hardware.EmergencyStopAsync();
+                        await _hardware.ResetAllToAutoAsync();
                         _emergencyModeActive = true;
 
-                        _logger.LogWarning("EMERGENCY: All fans set to 100%");
-                        _logger.LogInformation("Will resume normal operation when backend reconnects");
+                        _logger.LogWarning("EMERGENCY: All fans reset to auto/default control");
+                        _logger.LogInformation("Will resume manual control when backend reconnects");
                     }
                     catch (Exception ex)
                     {

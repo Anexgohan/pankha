@@ -100,7 +100,7 @@ class Program
             var stop = context.ParseResult.GetValueForOption(stopOption);
             var restart = context.ParseResult.GetValueForOption(restartOption);
 
-            // Ensure ProgramData directory exists
+            // Ensure "Program Files" directory exists
             Directory.CreateDirectory(Path.GetDirectoryName(CONFIG_PATH)!);
             Directory.CreateDirectory(Path.GetDirectoryName(LOG_PATH)!);
 

@@ -36,4 +36,9 @@ public interface IHardwareMonitor : IDisposable
     /// Update hardware readings
     /// </summary>
     Task UpdateAsync();
+
+    /// <summary>
+    /// Reset all fans to automatic/default control
+    /// </summary>
+    Task ResetAllToAutoAsync();
 }

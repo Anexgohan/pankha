@@ -164,9 +164,9 @@ public class LibreHardwareAdapter : IHardwareMonitor
                 Type = DetermineSensorType(hardware.HardwareType),
                 Temperature = sensor.Value.Value,
                 Chip = GetStandardizedChipId(hardware),  // Standardized ID for frontend lookup (k10temp, nvme, gpu, etc.)
-                HardwareName = hardware.Name,  // Full hardware name: "AMD Ryzen 9 3900X", "NVIDIA GeForce RTX 2070 SUPER"
                 Source = $"{hardware.HardwareType}/{sensor.Name}",
-                Priority = Sensor.GetChipPriority(hardware.Name)
+                Priority = Sensor.GetChipPriority(hardware.Name),
+                HardwareName = hardware.Name  // Full hardware name: "AMD Ryzen 9 3900X", "NVIDIA GeForce RTX 2070 SUPER"
             };
 
             // Try to get max and critical temps
@@ -181,22 +181,18 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
     private string GenerateSensorId(IHardware hardware, ISensor sensor)
     {
-        // Create simple, stable IDs like Rust agent: "chipname_index"
-        // Example: "rtx2070_1" instead of "gpunvidia_gpu_core__gpu-nvidia_0_temperature_0"
-
-        var chipName = hardware.Name
-            .Replace(" ", "")
-            .Replace("-", "")
-            .Replace("_", "")
-            .ToLowerInvariant();
-
-        // Extract numeric index from identifier (e.g., /nvidiagpu/0/temperature/2 → 2)
-        var identifier = sensor.Identifier.ToString();
-        var lastSlashIndex = identifier.LastIndexOf('/');
-        var sensorIndex = lastSlashIndex >= 0 ? identifier.Substring(lastSlashIndex + 1) : "0";
-
-        // Keep it simple and short like Rust: "nvidiageforertx2070super_2"
-        return $"{chipName}_{sensorIndex}";
+        // Use raw LibreHardwareMonitor identifier for stability and parity with Linux agent
+        // Identifier format: /{type}/{index}/{sensorType}/{sensorIndex}
+        // Example: /nvidiagpu/0/temperature/0 -> nvidiagpu_0_temperature_0
+        
+        var id = sensor.Identifier.ToString();
+        
+        // Remove leading slash if present
+        if (id.StartsWith("/"))
+            id = id.Substring(1);
+            
+        // Replace slashes with underscores and lowercase
+        return id.Replace("/", "_").ToLowerInvariant();
     }
 
     private string DetermineSensorType(HardwareType hardwareType)
@@ -212,47 +208,23 @@ public class LibreHardwareAdapter : IHardwareMonitor
         };
     }
 
-    /// <summary>
-    /// Generate short, user-friendly chip names without hardcoding specific models
-    /// Examples: "NVIDIA GPU", "AMD CPU", "NVMe Storage", "Motherboard"
-    /// </summary>
-    /// <summary>
-    /// Get standardized chip ID for frontend label lookup (matches sensor-labels.json)
-    /// Examples: "k10temp", "nvme", "it8628", "gpu"
-    /// </summary>
     private string GetStandardizedChipId(IHardware hardware)
     {
-        var name = hardware.Name.ToLowerInvariant();
-
-        return hardware.HardwareType switch
+        // Return raw chip type for frontend mapping
+        // Examples: "nvidiagpu", "amdcpu", "intelcpu", "genericmemory", "nvme"
+        
+        var id = hardware.Identifier.ToString();
+        
+        // Identifier format: /{type}/{index}
+        // Extract type (e.g., "nvidiagpu" from "/nvidiagpu/0")
+        var parts = id.Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+        
+        if (parts.Length > 0)
         {
-            // CPU: Use k10temp for AMD, coretemp for Intel
-            HardwareType.Cpu when name.Contains("amd") || name.Contains("ryzen") => "k10temp",
-            HardwareType.Cpu when name.Contains("intel") || name.Contains("core") => "coretemp",
-            HardwareType.Cpu => "cpu_thermal",
+            return parts[0].ToLowerInvariant();
+        }
 
-            // GPU: Just "gpu" - frontend will handle it
-            HardwareType.GpuNvidia => "gpu",
-            HardwareType.GpuAmd => "gpu",
-            HardwareType.GpuIntel => "gpu",
-
-            // Storage: Extract actual chip name or use "nvme"
-            HardwareType.Storage when name.Contains("nvme") => "nvme",
-            HardwareType.Storage => "storage",
-
-            // Motherboard: Extract specific chipset (IT8628, etc.)
-            HardwareType.Motherboard when name.Contains("it8628") => "it8628",
-            HardwareType.Motherboard when name.Contains("it87") => "it87",
-            HardwareType.Motherboard when name.Contains("gigabyte") => "gigabyte_wmi",
-            HardwareType.Motherboard when name.Contains("asus") => "asus_wmi",
-            HardwareType.Motherboard => "motherboard",
-
-            // ACPI/Thermal zones
-            _ when name.Contains("acpi") => "acpitz",
-            _ when name.Contains("thermal") => "thermal",
-
-            _ => hardware.HardwareType.ToString().ToLowerInvariant()
-        };
+        return hardware.HardwareType.ToString().ToLowerInvariant();
     }
 
     /// <summary>
@@ -618,6 +590,45 @@ public class LibreHardwareAdapter : IHardwareMonitor
         var tasks = _fanCache.Values
             .Where(f => f.HasPwmControl)
             .Select(f => SetFanSpeedAsync(f.Id, 100));
+
+        await Task.WhenAll(tasks);
+    }
+
+    public async Task ResetAllToAutoAsync()
+    {
+        _logger.Information("Restoring all fans to auto/default control");
+
+        var tasks = new List<Task>();
+
+        foreach (var fan in _fanCache.Values.Where(f => f.HasPwmControl))
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                try
+                {
+                    // 1. Handle NVIDIA GPUs
+                    if (_nvidiaController != null && _nvidiaController.CanControlFan(fan.Id))
+                    {
+                        await _nvidiaController.ResetToAutoAsync(fan.Id);
+                        return;
+                    }
+
+                    // 2. Handle Generic Fans (LibreHardwareMonitor)
+                    // Find the control sensor for this fan
+                    var controlSensor = fan.HardwareReference as ISensor;
+
+                    if (controlSensor?.Control != null)
+                    {
+                        controlSensor.Control.SetDefault();
+                        _logger.Information("Reset fan {FanId} to default", fan.Id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Failed to reset fan {FanId} to auto", fan.Id);
+                }
+            }));
+        }
 
         await Task.WhenAll(tasks);
     }

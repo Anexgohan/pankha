@@ -535,7 +535,8 @@ export class DataAggregator extends EventEmitter {
           temperature: temp,
           status: status,
           maxTemp: sensor.max_temp,
-          critTemp: sensor.crit_temp
+          critTemp: sensor.crit_temp,
+          hardwareName: (sensor as any).hardwareName || (sensor as any).hardware_name
         };
       }) || [];
 

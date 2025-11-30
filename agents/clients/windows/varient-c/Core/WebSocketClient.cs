@@ -76,6 +76,9 @@ public class WebSocketClient : IDisposable
 
                     _logger.Warning("WebSocket disconnected");
                     _connectionState = ConnectionState.Disconnected;
+                    
+                    // Explicitly report disconnect to watchdog
+                    _watchdog?.ReportDisconnect();
                 }
             }
             catch (OperationCanceledException)
@@ -86,6 +89,7 @@ public class WebSocketClient : IDisposable
             {
                 _logger.Error(ex, "Error in WebSocket client");
                 _connectionState = ConnectionState.Error;
+                _watchdog?.ReportDisconnect();
             }
 
             // Reconnection logic with exponential backoff
@@ -134,6 +138,7 @@ public class WebSocketClient : IDisposable
             _lastReconnectAttempt = DateTime.UtcNow;
             _connectionState = ConnectionState.Error;
             _logger.Error(ex, "Failed to connect to backend");
+            _watchdog?.ReportDisconnect();
             throw;
         }
     }
@@ -252,57 +257,63 @@ public class WebSocketClient : IDisposable
     private async Task ReceiveLoop(CancellationToken cancellationToken)
     {
         var buffer = new byte[8192];
+        var bufferSegment = new ArraySegment<byte>(buffer);
+        Task<WebSocketReceiveResult>? receiveTask = null;
 
         try
         {
             _logger.Debug("📨 ReceiveLoop started");
             while (_webSocket?.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
             {
-                // IMPORTANT: Do NOT use timeout cancellation token with ReceiveAsync
-                // Cancelling receive operations causes ClientWebSocket to abort the connection
-                // Instead, rely on WebSocket's built-in KeepAliveInterval for connection health
+                // Heartbeat Check:
+                // We use Task.WhenAny to wake up periodically (every 5s) even if no message arrives.
+                // This allows us to check _webSocket.State. If it's still Open, it means the internal
+                // Keep-Alive (ping/pong) is working, so the connection is healthy.
 
-                try
+                // Only start a new receive task if the previous one completed (or hasn't started)
+                if (receiveTask == null)
                 {
-                    var result = await _webSocket.ReceiveAsync(
-                        new ArraySegment<byte>(buffer),
-                        cancellationToken);
+                    receiveTask = _webSocket.ReceiveAsync(bufferSegment, cancellationToken);
+                }
 
-                    _lastMessageReceived = DateTime.UtcNow; // Update health timestamp
-                    _watchdog?.ReportSuccessfulConnection(); // Notify watchdog of healthy connection
+                var heartbeatTask = Task.Delay(5000, cancellationToken);
 
-                    _logger.Debug("📬 Received: Type={Type}, Count={Count}, EndOfMessage={End}",
-                        result.MessageType, result.Count, result.EndOfMessage);
+                var completedTask = await Task.WhenAny(receiveTask, heartbeatTask);
 
-                    if (result.MessageType == WebSocketMessageType.Close)
+                if (completedTask == heartbeatTask)
+                {
+                    // Heartbeat interval elapsed
+                    if (_webSocket.State == WebSocketState.Open)
                     {
-                        _logger.Warning("Server requested close: Status={Status}, Description={Description}",
-                            result.CloseStatus, result.CloseStatusDescription);
-                        await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
-                        break;
+                        // Connection is still open (internal Keep-Alive passed), so report health
+                        _watchdog?.ReportSuccessfulConnection();
                     }
+                    // Continue loop, keeping the existing receiveTask pending
+                    continue; 
+                }
 
-                    if (result.MessageType == WebSocketMessageType.Text)
-                    {
-                        var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        await HandleMessageAsync(json, cancellationToken);
-                    }
-                }
-                catch (OperationCanceledException)
+                // Message received (receiveTask completed)
+                var result = await receiveTask;
+                receiveTask = null; // Reset for next iteration
+
+                _lastMessageReceived = DateTime.UtcNow; // Update health timestamp
+                _watchdog?.ReportSuccessfulConnection(); // Notify watchdog of healthy connection
+
+                _logger.Debug("📬 Received: Type={Type}, Count={Count}, EndOfMessage={End}",
+                    result.MessageType, result.Count, result.EndOfMessage);
+
+                if (result.MessageType == WebSocketMessageType.Close)
                 {
-                    // Expected during shutdown, rethrow to exit loop
-                    throw;
+                    _logger.Warning("Server requested close: Status={Status}, Description={Description}",
+                        result.CloseStatus, result.CloseStatusDescription);
+                    await _webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None);
+                    break;
                 }
-                catch (WebSocketException wex)
+
+                if (result.MessageType == WebSocketMessageType.Text)
                 {
-                    _logger.Error(wex, "❌ WebSocket exception during receive: Code={Code}, State={State}",
-                        wex.WebSocketErrorCode, _webSocket?.State);
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    _logger.Error(ex, "❌ Unexpected exception during receive: State={State}", _webSocket?.State);
-                    throw;
+                    var json = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                    await HandleMessageAsync(json, cancellationToken);
                 }
             }
 

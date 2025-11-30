@@ -184,7 +184,7 @@ public class CommandHandler
 
     private Task<CommandResponse> HandleSetEmergencyTempAsync(string commandId, Dictionary<string, object> payload)
     {
-        var temp = GetPayloadValue<double>(payload, "temperature");
+        var temp = GetPayloadValue<double>(payload, "temp");
 
         if (temp < 70.0 || temp > 100.0)
         {

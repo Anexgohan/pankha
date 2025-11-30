@@ -71,7 +71,7 @@ public class AgentConfig
         {
             Agent = new AgentSettings
             {
-                Name = $"Windows Agent - {hostname}",
+                Name = $"{hostname}",
                 AgentId = agentId,
                 Hostname = hostname
             },
@@ -97,7 +97,7 @@ public class AgentConfig
             },
             Logging = new LoggingSettings
             {
-                LogLevel = "Information",
+                LogLevel = "INFO",
                 LogDirectory = "logs",
                 MaxLogFiles = 7,
                 MaxLogFileSizeMB = 50
