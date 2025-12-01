@@ -202,6 +202,9 @@ pub struct LinuxHardwareMonitor {
     config: HardwareSettings,
     system_info: Arc<RwLock<sysinfo::System>>,
     system_info_cache: Arc<RwLock<Option<(SystemHealth, std::time::Instant)>>>,
+    cpu_brand: String,
+    motherboard_name: String,
+    storage_cache: Arc<RwLock<HashMap<String, String>>>,
 }
 
 #[cfg(target_os = "linux")]
@@ -217,14 +220,134 @@ struct FanInfo {
 #[cfg(target_os = "linux")]
 impl LinuxHardwareMonitor {
     pub fn new(config: HardwareSettings) -> Self {
-        Self {
+        // Initialize sysinfo synchronously
+        let mut sys = sysinfo::System::new_all();
+        // We need to refresh CPU to ensure brand is available
+        sys.refresh_cpu();
+        
+        let mut cpu_brand = sys.global_cpu_info().brand().to_string();
+        
+        // Fallback: Try reading /proc/cpuinfo if sysinfo fails
+        if cpu_brand.is_empty() || cpu_brand == "Unknown CPU" {
+            if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
+                for line in cpuinfo.lines() {
+                    if line.starts_with("model name") {
+                        if let Some(name) = line.split(':').nth(1) {
+                            cpu_brand = name.trim().to_string();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let cpu_brand = if cpu_brand.is_empty() {
+            "Unknown CPU".to_string()
+        } else {
+            cpu_brand
+        };
+
+        let mut monitor = Self {
             hwmon_base: PathBuf::from("/sys/class/hwmon"),
             thermal_base: PathBuf::from("/sys/class/thermal"),
             discovered_fans: Arc::new(RwLock::new(HashMap::new())),
             config,
-            system_info: Arc::new(RwLock::new(sysinfo::System::new_all())),
+            system_info: Arc::new(RwLock::new(sys)),
             system_info_cache: Arc::new(RwLock::new(None)),
+            cpu_brand,
+            motherboard_name: String::new(),
+            storage_cache: Arc::new(RwLock::new(HashMap::new())),
+        };
+
+        // Initialize other static hardware names
+        monitor.motherboard_name = monitor.get_motherboard_name();
+        
+        monitor
+    }
+
+    // Removed get_cpu_brand as it's now handled in new()
+
+    fn get_motherboard_name(&self) -> String {
+        // Try to read DMI info
+        let vendor = std::fs::read_to_string("/sys/class/dmi/id/board_vendor")
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        let name = std::fs::read_to_string("/sys/class/dmi/id/board_name")
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+
+        if !vendor.is_empty() && !name.is_empty() {
+            format!("{} {}", vendor, name)
+        } else if !name.is_empty() {
+            name
+        } else {
+            String::new() // Fallback to empty, will use default logic
         }
+    }
+
+    async fn resolve_storage_model(&self, hwmon_dir: &Path, chip_name: &str) -> Option<String> {
+        // Check cache first using chip_name as key
+        {
+            let cache = self.storage_cache.read().await;
+            if let Some(model) = cache.get(chip_name) {
+                return Some(model.clone());
+            }
+        }
+
+        let mut found_model = None;
+
+        // Strategy 1: Check if 'device/model' exists directly in hwmon dir (some drivers do this)
+        let direct_model = hwmon_dir.join("device/model");
+        if direct_model.exists() {
+             if let Ok(model) = self.read_file(&direct_model).await {
+                 found_model = Some(model);
+             }
+        }
+
+        // Strategy 2: Check for block devices under 'device/block' (common for NVMe/SATA)
+        // Path: hwmonX/device/block/nvme0n1/device/model
+        if found_model.is_none() {
+             let device_block = hwmon_dir.join("device/block");
+             if device_block.exists() {
+                 if let Ok(mut entries) = tokio::fs::read_dir(&device_block).await {
+                     while let Ok(Some(entry)) = entries.next_entry().await {
+                         let model_path = entry.path().join("device/model");
+                         if model_path.exists() {
+                             if let Ok(model) = self.read_file(&model_path).await {
+                                 found_model = Some(model);
+                                 break;
+                             }
+                         }
+                     }
+                 }
+             }
+        }
+
+        // Strategy 3: Fallback to /sys/class/block lookup if we can guess the name
+        if found_model.is_none() {
+             let device_name = if chip_name.starts_with("nvme") && !chip_name.contains("n") {
+                format!("{}n1", chip_name)
+            } else {
+                chip_name.to_string()
+            };
+            let model_path = PathBuf::from(format!("/sys/class/block/{}/device/model", device_name));
+            if model_path.exists() {
+                if let Ok(model) = self.read_file(&model_path).await {
+                    found_model = Some(model);
+                }
+            }
+        }
+
+        if let Some(model) = found_model {
+            let model = model.trim().to_string();
+            let mut cache = self.storage_cache.write().await;
+            cache.insert(chip_name.to_string(), model.clone());
+            return Some(model);
+        }
+        
+        None
     }
 
     async fn read_file(&self, path: &Path) -> Result<String> {
@@ -303,6 +426,20 @@ impl LinuxHardwareMonitor {
         let sensor_id = format!("{}_{}", chip_name.to_lowercase().replace(" ", "_"), temp_num);
         let sensor_type = Self::classify_sensor_type(chip_name);
 
+        // Determine full hardware name based on type
+        let mut hardware_name = chip_name.to_string();
+        
+        if sensor_type == "cpu" && !self.cpu_brand.is_empty() {
+             hardware_name = self.cpu_brand.clone();
+        } else if sensor_type == "motherboard" && !self.motherboard_name.is_empty() {
+             hardware_name = self.motherboard_name.clone();
+        } else if sensor_type == "nvme" || chip_name.contains("nvme") || chip_name.contains("sd") {
+            // Try to resolve storage model using the hwmon path
+            if let Some(model) = self.resolve_storage_model(hwmon_dir, chip_name).await {
+                hardware_name = model;
+            }
+        }
+
         Ok(Sensor {
             id: sensor_id,
             name: format!("{} {}", Self::get_friendly_chip_name(chip_name), sensor_label),
@@ -311,7 +448,7 @@ impl LinuxHardwareMonitor {
             max_temp,
             crit_temp,
             chip: Some(chip_name.to_string()),
-            hardware_name: Some(chip_name.to_string()),
+            hardware_name: Some(hardware_name),
             source: Some(temp_file.to_string_lossy().to_string()),
         })
     }
