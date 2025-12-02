@@ -214,26 +214,33 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   const deriveSensorGroupId = (sensor: SensorReading): string => {
     // Hardware-agnostic pattern extraction for sensor grouping
+    
     // Pattern 1: Standard format ending with _<number> (e.g., k10temp_1, acpitz_2, nvme_3)
-    const standardMatch = sensor.id.match(/^([a-z0-9_]+?)_\d+$/i);
-    if (standardMatch?.[1]) {
-      const result = standardMatch[1];
-      console.log('deriveSensorGroupId (standard):', sensor.id, '->', result);
-      return result;
+    // This also handles cases like nvidiagpu_0_temperature_0 (extracts nvidiagpu_0_temperature)
+    // BUT we want to prioritize extracting the CHIP ID if possible.
+    
+    // Strategy:
+    // 1. Look for "Chip ID" pattern: [alphanumeric]_[digits] (e.g. nvidiagpu_0, amdcpu_0)
+    //    This covers most Windows/Linux indexed chips.
+    const indexedChipMatch = sensor.id.match(/^([a-z0-9]+_\d+)/i);
+    if (indexedChipMatch?.[1]) {
+      return indexedChipMatch[1];
     }
 
-    // Pattern 2: Complex IDs without trailing number - extract primary prefix
-    // (e.g., thermal_thermal_zone0_acpitz -> thermal, gigabyte_wmi_sensor -> gigabyte)
-    // Use the first meaningful segment before underscore+number or multiple underscores
-    const prefixMatch = sensor.id.match(/^([a-z]+)/i);
-    if (prefixMatch?.[1]) {
-      const result = prefixMatch[1];
-      console.log('deriveSensorGroupId (prefix):', sensor.id, '->', result);
-      return result;
+    // 2. Look for "Chip ID" pattern without index: [alphanumeric]_ (e.g. k10temp_tctl, it8628_fan1)
+    //    This covers Linux chips that don't have an index suffix on the chip name itself.
+    const nonIndexedChipMatch = sensor.id.match(/^([a-z0-9]+)_/i);
+    if (nonIndexedChipMatch?.[1]) {
+      return nonIndexedChipMatch[1];
+    }
+
+    // 3. Fallback to old logic for safety (e.g. if ID has no underscores)
+    const standardMatch = sensor.id.match(/^([a-z0-9_]+?)_\d+$/i);
+    if (standardMatch?.[1]) {
+      return standardMatch[1];
     }
 
     // Fallback to sensor type
-    console.log('deriveSensorGroupId fallback:', sensor.id, '-> type:', sensor.type);
     return sensor.type || 'other';
   };
 

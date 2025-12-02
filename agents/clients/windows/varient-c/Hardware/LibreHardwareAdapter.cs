@@ -181,18 +181,28 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
     private string GenerateSensorId(IHardware hardware, ISensor sensor)
     {
-        // Use raw LibreHardwareMonitor identifier for stability and parity with Linux agent
-        // Identifier format: /{type}/{index}/{sensorType}/{sensorIndex}
-        // Example: /nvidiagpu/0/temperature/0 -> nvidiagpu_0_temperature_0
+        // Create descriptive, stable IDs
+        // Old format: /nvidiagpu/0/temperature/0 -> nvidiagpu_0_temperature_0
+        // New format: nvidiagpu_0_gpu_core
         
-        var id = sensor.Identifier.ToString();
-        
-        // Remove leading slash if present
-        if (id.StartsWith("/"))
-            id = id.Substring(1);
-            
-        // Replace slashes with underscores and lowercase
-        return id.Replace("/", "_").ToLowerInvariant();
+        // 1. Get standardized chip ID (e.g., nvidiagpu_0)
+        var chipId = hardware.Identifier.ToString()
+            .Replace("/", "_")
+            .TrimStart('_')
+            .ToLowerInvariant();
+
+        // 2. Sanitize sensor name
+        var sensorName = sensor.Name
+            .Replace(" ", "_")
+            .Replace("-", "_")
+            .Replace("/", "_")
+            .Replace("(", "")
+            .Replace(")", "")
+            .Replace("#", "")
+            .ToLowerInvariant();
+
+        // 3. Combine
+        return $"{chipId}_{sensorName}";
     }
 
     private string DetermineSensorType(HardwareType hardwareType)

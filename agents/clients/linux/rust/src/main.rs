@@ -231,7 +231,8 @@ impl LinuxHardwareMonitor {
         if cpu_brand.is_empty() || cpu_brand == "Unknown CPU" {
             if let Ok(cpuinfo) = std::fs::read_to_string("/proc/cpuinfo") {
                 for line in cpuinfo.lines() {
-                    if line.starts_with("model name") {
+                    // Check for "model name" (x86) or "Model" (ARM/RPi)
+                    if line.starts_with("model name") || line.starts_with("Model") {
                         if let Some(name) = line.split(':').nth(1) {
                             cpu_brand = name.trim().to_string();
                             break;
@@ -423,7 +424,20 @@ impl LinuxHardwareMonitor {
             .and_then(|s| s.parse::<i32>().ok())
             .map(|v| v as f64 / 1000.0);
 
-        let sensor_id = format!("{}_{}", chip_name.to_lowercase().replace(" ", "_"), temp_num);
+        // Generate descriptive ID
+        // Old: k10temp_1
+        // New: k10temp_tctl
+        let sanitized_label = sensor_label.to_lowercase()
+            .replace(" ", "_")
+            .replace("-", "_")
+            .replace("/", "_")
+            .replace("(", "")
+            .replace(")", "");
+            
+        // Ensure ID is unique by combining chip and label
+        // Note: This assumes chip_name is unique or we don't have identical sensors.
+        // For identical chips, we might need a better strategy later, but this matches Windows parity.
+        let sensor_id = format!("{}_{}", chip_name.to_lowercase().replace(" ", "_"), sanitized_label);
         let sensor_type = Self::classify_sensor_type(chip_name);
 
         // Determine full hardware name based on type
