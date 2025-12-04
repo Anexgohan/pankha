@@ -1,0 +1,32 @@
+<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputName>PankhaAgent</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <EnableDefaultItems>false</EnableDefaultItems>
+  </PropertyGroup>
+
+  <!-- Reference to WiX extensions -->
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.2" />
+  </ItemGroup>
+
+  <!-- Source files for the installer -->
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+  </ItemGroup>
+
+  <!-- Copy files from agent build output -->
+  <Target Name="BeforeBuild">
+    <PropertyGroup>
+      <AgentBuildDir>$(MSBuildProjectDirectory)\..\publish\win-x64</AgentBuildDir>
+    </PropertyGroup>
+
+    <Message Importance="High" Text="Checking for agent build output at: $(AgentBuildDir)" />
+
+    <Error Condition="!Exists('$(AgentBuildDir)\pankha-agent-windows.exe')"
+           Text="Agent executable not found. Please run build.ps1 -Publish first." />
+  </Target>
+</Project>

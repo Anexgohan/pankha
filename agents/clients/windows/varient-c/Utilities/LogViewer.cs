@@ -44,10 +44,19 @@ public static class LogViewer
 
         try
         {
-            var lines = File.ReadAllLines(logFile.FullName);
-            var startIndex = Math.Max(0, lines.Length - lineCount);
+            // Open with FileShare.ReadWrite to allow reading while service is logging
+            using var fileStream = new FileStream(logFile.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(fileStream);
+            var lines = new List<string>();
 
-            for (int i = startIndex; i < lines.Length; i++)
+            while (!reader.EndOfStream)
+            {
+                var line = reader.ReadLine();
+                if (line != null) lines.Add(line);
+            }
+
+            var startIndex = Math.Max(0, lines.Count - lineCount);
+            for (int i = startIndex; i < lines.Count; i++)
             {
                 Console.WriteLine(lines[i]);
             }

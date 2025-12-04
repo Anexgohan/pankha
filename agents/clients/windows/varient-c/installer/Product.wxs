@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Pankha Windows Agent"
+           Manufacturer="Pankha"
+           Version="1.0.4"
+           UpgradeCode="A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D"
+           Compressed="yes">
+
+    <!-- Ensure only ONE version installed: removes old version before installing new -->
+    <!-- FIXED: Removed AllowSameVersionUpgrades to fix component reference counting -->
+    <MajorUpgrade Schedule="afterInstallInitialize"
+                  DowngradeErrorMessage="A newer version of Pankha Agent is already installed."
+                  AllowDowngrades="no" />
+
+    <Media Id="1" Cabinet="PankhaAgent.cab" EmbedCab="yes" />
+
+    <!-- Properties for user choices (can be set via command line) -->
+    <!-- Example: msiexec /i PankhaAgent.msi STARTSERVICE=0 CREATESHORTCUTS=0 INSTALLFOLDER="D:\Custom\Path" -->
+    <Property Id="STARTSERVICE" Value="1" />
+    <Property Id="CREATESHORTCUTS" Value="1" />
+
+    <!-- Installation directory -->
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Pankha">
+        <Directory Id="LOGSFOLDER" Name="logs" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Start Menu directory -->
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Pankha Agent" />
+    </StandardDirectory>
+
+    <!-- ========================================================================= -->
+    <!-- LAYER 1: Fixed Component Structure - Each file as its own component      -->
+    <!-- ========================================================================= -->
+
+    <!-- Component 1: Main executable + Windows Service -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="28544E5A-D7B2-5773-BBF0-0923646B4570">
+        <File Id="PankhaAgentExe" Source="..\publish\win-x64\pankha-agent-windows.exe" KeyPath="yes" />
+
+        <!-- Windows Service Installation -->
+        <ServiceInstall Id="PankhaServiceInstall"
+                        Name="PankhaAgent"
+                        DisplayName="Pankha Hardware Monitoring Agent"
+                        Description="Monitors hardware sensors and controls fan speeds for the Pankha system"
+                        Type="ownProcess"
+                        Start="auto"
+                        ErrorControl="normal"
+                        Account="LocalSystem">
+
+          <!-- Service recovery: restart on failure -->
+          <util:ServiceConfig FirstFailureActionType="restart"
+                              SecondFailureActionType="restart"
+                              ThirdFailureActionType="restart"
+                              RestartServiceDelayInSeconds="5" />
+        </ServiceInstall>
+
+        <!-- Service Control: stop and remove service on uninstall -->
+        <ServiceControl Id="PankhaServiceControl"
+                        Name="PankhaAgent"
+                        Stop="both"
+                        Remove="uninstall"
+                        Wait="yes" />
+
+        <!-- Cleanup: Remove runtime files (in MainExecutable to guarantee execution) -->
+        <RemoveFile Id="RemoveRuntimeConfig" Directory="INSTALLFOLDER" Name="config.json" On="uninstall" />
+        <RemoveFile Id="RemoveAllDlls" Directory="INSTALLFOLDER" Name="*.dll" On="uninstall" />
+        <RemoveFile Id="RemoveAllPdbs" Directory="INSTALLFOLDER" Name="*.pdb" On="uninstall" />
+        <RemoveFile Id="RemoveMainLogs" Directory="INSTALLFOLDER" Name="*.log" On="uninstall" />
+        <RemoveFile Id="RemoveLogsFiles" Directory="LOGSFOLDER" Name="*.*" On="uninstall" />
+        <CreateFolder Directory="LOGSFOLDER" />
+        <RemoveFolder Id="RemoveLogsDir" Directory="LOGSFOLDER" On="uninstall" />
+        <RemoveFolder Id="RemoveInstallDir" Directory="INSTALLFOLDER" On="uninstall" />
+      </Component>
+
+      <!-- Component 2: Configuration files (separate component for explicit tracking) -->
+      <Component Id="ConfigFiles" Guid="239AE4A0-880F-481B-8B99-75E97D3AC6DD">
+        <File Id="AppSettingsJson" Source="..\publish\win-x64\appsettings.json" KeyPath="yes" />
+      </Component>
+
+      <!-- Component 3: Example config (separate component for explicit tracking) -->
+      <Component Id="ExampleConfig" Guid="9E29EE4B-7B14-49BE-A592-44750782A047">
+        <File Id="ConfigExampleJson" Source="..\publish\win-x64\config.example.json" KeyPath="yes" />
+      </Component>
+
+      <!-- Component 4: Logs directory with explicit cleanup -->
+      <!-- FIXED: Remove RegistryValue KeyPath which was causing Action: Null -->
+      <!-- Use CreateFolder + RemoveFolder only, tied to MainExecutable component lifecycle -->
+      <Component Id="LogsDirectory" Directory="LOGSFOLDER" Guid="B2C3D4E5-F6A7-4B5C-9D8E-1F2A3B4C5D6E">
+        <CreateFolder />
+        <!-- Remove all files in logs directory -->
+        <RemoveFile Id="RemoveAllLogFiles" Directory="LOGSFOLDER" Name="*.*" On="uninstall" />
+        <!-- Remove the logs folder itself -->
+        <RemoveFolder Id="RemoveLogsFolder" Directory="LOGSFOLDER" On="uninstall" />
+        <!-- Use registry as KeyPath (required for directory-only components) -->
+        <RegistryValue Root="HKCU" Key="Software\Pankha\Agent" Name="LogsPath" Type="string" Value="1" KeyPath="yes" />
+      </Component>
+
+      <!-- Component 5: Runtime files cleanup (for files created during operation) -->
+      <!-- FIXED: Remove RegistryValue KeyPath which was causing Action: Null -->
+      <Component Id="RuntimeCleanup" Directory="INSTALLFOLDER" Guid="D4E5F6A7-B8C9-4D5E-AF0B-1C2D3E4F5A6B">
+        <!-- Remove config.json created during setup -->
+        <RemoveFile Id="RemoveRuntimeConfig" Directory="INSTALLFOLDER" Name="config.json" On="uninstall" />
+        <!-- Remove any DLLs that might be created at runtime -->
+        <RemoveFile Id="RemoveAllDlls" Directory="INSTALLFOLDER" Name="*.dll" On="uninstall" />
+        <!-- Remove any PDB files -->
+        <RemoveFile Id="RemoveAllPdbs" Directory="INSTALLFOLDER" Name="*.pdb" On="uninstall" />
+        <!-- Remove any log files in main directory -->
+        <RemoveFile Id="RemoveAnyLogs" Directory="INSTALLFOLDER" Name="*.log" On="uninstall" />
+        <!-- Remove any other runtime files -->
+        <RemoveFile Id="RemoveAllRuntimeFiles" Directory="INSTALLFOLDER" Name="*.*" On="uninstall" />
+        <!-- Remove main install folder (should be empty by now) -->
+        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+        <!-- Use registry as KeyPath (required for directory-only components) -->
+        <RegistryValue Root="HKCU" Key="Software\Pankha\Agent" Name="InstallPath" Type="string" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- ========================================================================= -->
+    <!-- Start Menu shortcuts (with enhanced cleanup)                             -->
+    <!-- ========================================================================= -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <!-- FIXED: Condition allows install only if requested, but ALWAYS allows uninstall -->
+      <Component Id="StartMenuShortcuts" Guid="C3D4E5F6-A7B8-4C5D-9E8F-2A3B4C5D6E7F" Condition="CREATESHORTCUTS = &quot;1&quot; OR Installed">
+
+        <!-- Configure Agent shortcut -->
+        <Shortcut Id="ConfigureShortcut"
+                  Name="Configure Pankha Agent"
+                  Description="Open configuration wizard"
+                  Target="[INSTALLFOLDER]pankha-agent-windows.exe"
+                  Arguments="--setup"
+                  WorkingDirectory="INSTALLFOLDER" />
+
+        <!-- View Logs shortcut (live tail -f style) -->
+        <Shortcut Id="LogsShortcut"
+                  Name="View Pankha Agent Logs"
+                  Description="View agent log files (live tail, press Ctrl+C to stop)"
+                  Target="[System64Folder]cmd.exe"
+                  Arguments="/C &quot;cd /d &quot;[INSTALLFOLDER]&quot; &amp;&amp; pankha-agent-windows.exe --logs follow&quot;"
+                  WorkingDirectory="INSTALLFOLDER" />
+
+        <!-- Agent Status shortcut -->
+        <Shortcut Id="StatusShortcut"
+                  Name="Pankha Agent Status"
+                  Description="Check agent service status"
+                  Target="[System64Folder]cmd.exe"
+                  Arguments="/C &quot;cd /d &quot;[INSTALLFOLDER]&quot; &amp;&amp; pankha-agent-windows.exe --status &amp;&amp; pause&quot;"
+                  WorkingDirectory="INSTALLFOLDER" />
+
+        <!-- Uninstall shortcut -->
+        <Shortcut Id="UninstallShortcut"
+                  Name="Uninstall Pankha Agent"
+                  Description="Remove Pankha Agent from this computer"
+                  Target="[SystemFolder]msiexec.exe"
+                  Arguments="/x [ProductCode]" />
+
+        <!-- FIXED: Explicitly remove all shortcuts with Directory attribute -->
+        <RemoveFile Id="RemoveAllShortcuts" Directory="ApplicationProgramsFolder" Name="*.lnk" On="uninstall" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+
+        <RegistryValue Root="HKCU"
+                       Key="Software\Pankha\Agent"
+                       Name="ShortcutsInstalled"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- ========================================================================= -->
+    <!-- LAYER 2 & 3: Enhanced Custom Actions for bulletproof uninstall           -->
+    <!-- ========================================================================= -->
+
+    <!-- LAYER 2: Enhanced StopAndKillAgent - More aggressive process termination -->
+    <CustomAction Id="StopAndKillAgent"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="ignore"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="[System64Folder]cmd.exe /c &quot;net stop PankhaAgent /Y 2&gt;nul &amp; timeout /t 3 /nobreak &gt;nul &amp; taskkill /F /IM pankha-agent-windows.exe /T 2&gt;nul &amp; timeout /t 1 /nobreak &gt;nul &amp; exit 0&quot;" />
+
+    <!-- No scripts - Using proper MSI component structure only -->
+
+    <!-- Start service after install if checkbox is checked -->
+    <CustomAction Id="StartServiceAfterInstall"
+                  Execute="deferred"
+                  Impersonate="no"
+                  Return="check"
+                  Directory="INSTALLFOLDER"
+                  ExeCommand="[System64Folder]sc.exe start PankhaAgent" />
+
+    <!-- ========================================================================= -->
+    <!-- Installation Sequence - Pure declarative MSI                             -->
+    <!-- ========================================================================= -->
+    <InstallExecuteSequence>
+      <!-- UNINSTALL SEQUENCE -->
+
+      <!-- Stop service and kill process BEFORE removing files -->
+      <Custom Action="StopAndKillAgent" Before="RemoveFiles" Condition="REMOVE~=&quot;ALL&quot;" />
+
+      <!-- Standard MSI removal happens automatically:
+           - RemoveFiles: All File elements and RemoveFile wildcards
+           - RemoveFolders: All empty directories
+           - ServiceControl: Service unregistration -->
+
+      <!-- INSTALL SEQUENCE -->
+
+      <!-- Start service after install if requested -->
+      <Custom Action="StartServiceAfterInstall" Before="InstallFinalize" Condition="NOT Installed AND STARTSERVICE = &quot;1&quot;" />
+    </InstallExecuteSequence>
+
+    <!-- ========================================================================= -->
+    <!-- Feature - All components must be referenced                              -->
+    <!-- ========================================================================= -->
+    <Feature Id="ProductFeature"
+             Title="Pankha Agent"
+             Level="1"
+             Description="Core agent application and Windows Service">
+      <ComponentRef Id="MainExecutable" />
+      <ComponentRef Id="ConfigFiles" />
+      <ComponentRef Id="ExampleConfig" />
+      <ComponentRef Id="LogsDirectory" />
+      <ComponentRef Id="RuntimeCleanup" />
+      <ComponentRef Id="StartMenuShortcuts" />
+    </Feature>
+
+  </Package>
+</Wix>

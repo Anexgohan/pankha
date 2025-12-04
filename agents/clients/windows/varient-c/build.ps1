@@ -5,6 +5,7 @@ param(
     [switch]$Clean,
     [switch]$Test,
     [switch]$Publish,
+    [switch]$BuildInstaller,
     [switch]$Menu
 )
 
@@ -43,6 +44,8 @@ if (-not $hasParams -or $Menu) {
     Write-Host "  4. Build and Test Hardware" -ForegroundColor Magenta
     Write-Host "  5. Debug Build" -ForegroundColor Gray
     Write-Host "  6. Clean + Publish" -ForegroundColor Cyan
+    Write-Host "  7. Build MSI Installer" -ForegroundColor Magenta
+    Write-Host "  8. Clean + Build MSI Installer" -ForegroundColor Cyan
     Write-Host "  0. Exit" -ForegroundColor Red
     Write-Host ""
     $choice = Read-Host "Select option"
@@ -60,6 +63,8 @@ if (-not $hasParams -or $Menu) {
         }
         "5" { $Configuration = "Debug" }
         "6" { $Clean = $true; $Publish = $true }
+        "7" { $Publish = $true; $BuildInstaller = $true }
+        "8" { $Clean = $true; $Publish = $true; $BuildInstaller = $true }
         "0" { Write-Host "Exiting..." -ForegroundColor Gray; exit 0 }
         default { Write-Host "Invalid option" -ForegroundColor Red; exit 1 }
     }
@@ -80,6 +85,14 @@ if ($Clean) {
     dotnet clean -c $Configuration
     if (Test-Path "bin") { Remove-Item -Recurse -Force "bin" }
     if (Test-Path "obj") { Remove-Item -Recurse -Force "obj" }
+
+    # Also clean installer cache if building MSI
+    if ($BuildInstaller -and (Test-Path "installer")) {
+        Write-Host "  Cleaning installer cache..." -ForegroundColor Gray
+        if (Test-Path "installer\bin") { Remove-Item -Recurse -Force "installer\bin" }
+        if (Test-Path "installer\obj") { Remove-Item -Recurse -Force "installer\obj" }
+    }
+
     Write-Host "✅ Clean complete" -ForegroundColor Green
     Write-Host ""
 }
@@ -146,6 +159,103 @@ if ($Publish) {
     if (Test-Path $ExePath) {
         $Size = (Get-Item $ExePath).Length / 1MB
         Write-Host "Size: $($Size.ToString('F2')) MB" -ForegroundColor Cyan
+    }
+}
+
+# Build MSI installer if requested
+if ($BuildInstaller) {
+    Write-Host ""
+    Write-Host "=== Building MSI Installer ===" -ForegroundColor Cyan
+    Write-Host ""
+
+    # Check if WiX is available
+    Write-Host "Checking for WiX Toolset..." -ForegroundColor Yellow
+    $wixCommand = Get-Command wix -ErrorAction SilentlyContinue
+
+    if (-not $wixCommand) {
+        Write-Host "⚠️  WiX Toolset not found, installing locally..." -ForegroundColor Yellow
+
+        Push-Location installer
+        try {
+            # Create tool manifest if missing
+            if (-not (Test-Path ".config\dotnet-tools.json")) {
+                dotnet new tool-manifest --force 2>$null | Out-Null
+            }
+
+            # Install WiX locally
+            dotnet tool install wix --version 6.0.2 2>$null | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                dotnet tool restore 2>$null | Out-Null
+            }
+
+            # Verify
+            $localWix = dotnet tool run wix -- --version 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "✅ WiX installed locally (version: $localWix)" -ForegroundColor Green
+            }
+            else {
+                throw "Failed to install WiX"
+            }
+        }
+        catch {
+            Write-Host "❌ Failed to install WiX Toolset: $_" -ForegroundColor Red
+            Write-Host "Install manually: dotnet tool install --global wix" -ForegroundColor Yellow
+            Pop-Location
+            exit 1
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    else {
+        $wixVersion = & wix --version 2>$null
+        Write-Host "✅ WiX found (version: $wixVersion)" -ForegroundColor Green
+    }
+
+    Write-Host ""
+    Write-Host "Restoring WiX packages..." -ForegroundColor Yellow
+
+    Push-Location installer
+    try {
+        dotnet restore Pankha.Installer.wixproj
+        if ($LASTEXITCODE -ne 0) {
+            throw "WiX package restore failed"
+        }
+        Write-Host "✅ Restore complete" -ForegroundColor Green
+        Write-Host ""
+
+        Write-Host "Building MSI..." -ForegroundColor Yellow
+        dotnet build Pankha.Installer.wixproj -c Release
+        if ($LASTEXITCODE -ne 0) {
+            throw "MSI build failed"
+        }
+
+        Write-Host "✅ MSI build complete" -ForegroundColor Green
+        Write-Host ""
+
+        # Show MSI location
+        $MsiPath = "bin\x64\Release\PankhaAgent.msi"
+        if (Test-Path $MsiPath) {
+            $MsiSize = (Get-Item $MsiPath).Length / 1MB
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host " MSI Installer Ready!" -ForegroundColor Green
+            Write-Host "========================================" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "Location: installer\$MsiPath" -ForegroundColor Cyan
+            Write-Host "Size: $($MsiSize.ToString('F2')) MB" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "To install:" -ForegroundColor Yellow
+            Write-Host "  msiexec /i `"installer\$MsiPath`" /l*v install.log" -ForegroundColor Gray
+            Write-Host "  (or double-click the MSI file)" -ForegroundColor Gray
+        }
+    }
+    catch {
+        Write-Host "❌ Installer build failed: $_" -ForegroundColor Red
+        Pop-Location
+        exit 1
+    }
+    finally {
+        Pop-Location
     }
 }
 
