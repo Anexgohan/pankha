@@ -162,75 +162,29 @@ if ($Publish) {
     }
 }
 
-# Build MSI installer if requested
+# Build MSI installer if requested (WixSharp)
 if ($BuildInstaller) {
     Write-Host ""
-    Write-Host "=== Building MSI Installer ===" -ForegroundColor Cyan
+    Write-Host "=== Building WixSharp MSI Installer ===" -ForegroundColor Cyan
     Write-Host ""
-
-    # Check if WiX is available
-    Write-Host "Checking for WiX Toolset..." -ForegroundColor Yellow
-    $wixCommand = Get-Command wix -ErrorAction SilentlyContinue
-
-    if (-not $wixCommand) {
-        Write-Host "⚠️  WiX Toolset not found, installing locally..." -ForegroundColor Yellow
-
-        Push-Location installer
-        try {
-            # Create tool manifest if missing
-            if (-not (Test-Path ".config\dotnet-tools.json")) {
-                dotnet new tool-manifest --force 2>$null | Out-Null
-            }
-
-            # Install WiX locally
-            dotnet tool install wix --version 6.0.2 2>$null | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-                dotnet tool restore 2>$null | Out-Null
-            }
-
-            # Verify
-            $localWix = dotnet tool run wix -- --version 2>$null
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "✅ WiX installed locally (version: $localWix)" -ForegroundColor Green
-            }
-            else {
-                throw "Failed to install WiX"
-            }
-        }
-        catch {
-            Write-Host "❌ Failed to install WiX Toolset: $_" -ForegroundColor Red
-            Write-Host "Install manually: dotnet tool install --global wix" -ForegroundColor Yellow
-            Pop-Location
-            exit 1
-        }
-        finally {
-            Pop-Location
-        }
-    }
-    else {
-        $wixVersion = & wix --version 2>$null
-        Write-Host "✅ WiX found (version: $wixVersion)" -ForegroundColor Green
-    }
-
-    Write-Host ""
-    Write-Host "Restoring WiX packages..." -ForegroundColor Yellow
 
     Push-Location installer
     try {
-        dotnet restore Pankha.Installer.wixproj
-        if ($LASTEXITCODE -ne 0) {
-            throw "WiX package restore failed"
+        # Call the WixSharp build script
+        $buildArgs = @()
+        if ($Clean) {
+            $buildArgs += "-Clean"
         }
-        Write-Host "✅ Restore complete" -ForegroundColor Green
+
+        Write-Host "Running WixSharp installer builder..." -ForegroundColor Yellow
+        & .\build-wixsharp.ps1 @buildArgs
+
+        if ($LASTEXITCODE -ne 0) {
+            throw "WixSharp installer build failed"
+        }
+
         Write-Host ""
-
-        Write-Host "Building MSI..." -ForegroundColor Yellow
-        dotnet build Pankha.Installer.wixproj -c Release
-        if ($LASTEXITCODE -ne 0) {
-            throw "MSI build failed"
-        }
-
-        Write-Host "✅ MSI build complete" -ForegroundColor Green
+        Write-Host "✅ MSI Installer build complete!" -ForegroundColor Green
         Write-Host ""
 
         # Show MSI location
@@ -247,6 +201,10 @@ if ($BuildInstaller) {
             Write-Host "To install:" -ForegroundColor Yellow
             Write-Host "  msiexec /i `"installer\$MsiPath`" /l*v install.log" -ForegroundColor Gray
             Write-Host "  (or double-click the MSI file)" -ForegroundColor Gray
+            Write-Host ""
+            Write-Host "To uninstall:" -ForegroundColor Yellow
+            Write-Host "  msiexec /x `"installer\$MsiPath`" /l*v uninstall.log" -ForegroundColor Gray
+            Write-Host ""
         }
     }
     catch {

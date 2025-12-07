@@ -8,7 +8,8 @@ namespace Pankha.WindowsAgent.Utilities;
 /// </summary>
 public static class LogViewer
 {
-    private const string LOG_DIRECTORY = @"C:\Program Files\Pankha\logs";
+    // Dynamically determine log directory from executable location
+    private static readonly string LOG_DIRECTORY = Path.Combine(AppContext.BaseDirectory, "logs");
 
     /// <summary>
     /// Get the most recent log file

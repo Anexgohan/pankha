@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net472</TargetFramework>
+    <Platforms>x64</Platforms>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixSharp" Version="1.26.0" />
+    <PackageReference Include="WixSharp.bin" Version="1.26.0" />
+    <PackageReference Include="WixSharp.wix.bin" Version="1.26.0" />
+  </ItemGroup>
+
+</Project>

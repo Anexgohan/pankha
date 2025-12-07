@@ -107,7 +107,7 @@ public class CommandHandler
 
         var oldInterval = _config.Hardware.UpdateInterval;
         _config.Hardware.UpdateInterval = interval;
-        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Update interval changed: {Old}s -> {New}s", oldInterval, interval);
 
@@ -120,7 +120,7 @@ public class CommandHandler
 
         var oldEnabled = _config.Monitoring.FilterDuplicateSensors;
         _config.Monitoring.FilterDuplicateSensors = enabled;
-        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Sensor deduplication changed: {Old} -> {New}", oldEnabled, enabled);
 
@@ -138,7 +138,7 @@ public class CommandHandler
 
         var oldTolerance = _config.Monitoring.DuplicateSensorTolerance;
         _config.Monitoring.DuplicateSensorTolerance = tolerance;
-        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Sensor tolerance changed: {Old}C -> {New}C", oldTolerance, tolerance);
 
@@ -157,7 +157,7 @@ public class CommandHandler
 
         var oldStep = _config.Monitoring.FanStepPercent;
         _config.Monitoring.FanStepPercent = step;
-        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Fan step changed: {Old}% -> {New}%", oldStep, step);
 
@@ -175,7 +175,7 @@ public class CommandHandler
 
         var oldHysteresis = _config.Monitoring.HysteresisTemp;
         _config.Monitoring.HysteresisTemp = hysteresis;
-        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Hysteresis changed: {Old}C -> {New}C", oldHysteresis, hysteresis);
 
@@ -193,7 +193,7 @@ public class CommandHandler
 
         var oldTemp = _config.Hardware.EmergencyTemperature;
         _config.Hardware.EmergencyTemperature = temp;
-        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Emergency temperature changed: {Old}C -> {New}C", oldTemp, temp);
 
@@ -214,7 +214,7 @@ public class CommandHandler
 
         // Save to config file
         _config.Logging.LogLevel = upperLevel;
-        _config.SaveToFile(@"C:\Program Files\Pankha\config.json");
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         // Map to Serilog level
         var serilogLevel = upperLevel switch

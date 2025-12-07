@@ -10,10 +10,10 @@ namespace Pankha.WindowsAgent.Platform;
 public static class PathResolver
 {
     /// <summary>
-    /// Base installation directory (C:\Program Files\Pankha\)
+    /// Base installation directory (Dynamic based on executable location)
     /// Contains: executable, config, logs
     /// </summary>
-    public static readonly string InstallPath = @"C:\Program Files\Pankha";
+    public static readonly string InstallPath = AppContext.BaseDirectory;
 
     /// <summary>
     /// Directory for log files

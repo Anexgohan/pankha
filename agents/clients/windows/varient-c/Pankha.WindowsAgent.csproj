@@ -27,6 +27,7 @@
 
     <!-- Administrator privileges required -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>graphics\pankha_icon_256x256.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -65,6 +66,9 @@
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <Compile Remove="installer\**" />
+    <EmbeddedResource Remove="installer\**" />
+    <None Remove="installer\**" />
   </ItemGroup>
 
 </Project>
