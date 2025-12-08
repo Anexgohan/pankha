@@ -4,15 +4,29 @@ param([switch]$Clean)
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "Building Pankha Agent MSI Installer using WixSharp" -ForegroundColor Cyan
-
-# Check prerequisites
-$agentExe = Resolve-Path "..\publish\win-x64\pankha-agent-windows.exe" -ErrorAction SilentlyContinue
-if (-not $agentExe) {
-    Write-Host "ERROR: Agent executable not found" -ForegroundColor Red
-    Write-Host "Please build the agent first: cd .. && .\build.ps1 -Publish" -ForegroundColor Yellow
+# Read build configuration
+$ConfigPath = Join-Path $PSScriptRoot "..\build-config.json"
+if (-not (Test-Path $ConfigPath)) {
+    Write-Host "❌ build-config.json not found at $ConfigPath" -ForegroundColor Red
     exit 1
 }
+$Config = Get-Content $ConfigPath | ConvertFrom-Json
+
+Write-Host "Building Pankha Agent MSI Installer using WixSharp" -ForegroundColor Cyan
+Write-Host "Configuration: $($Config.Product)" -ForegroundColor Gray
+
+# Check prerequisites
+$ProjectRoot = Resolve-Path "$PSScriptRoot\.."
+$ArtifactsDir = Join-Path $ProjectRoot $Config.Paths.BuildArtifacts
+$AgentExePath = Join-Path $ArtifactsDir $Config.Filenames.AgentExe
+
+# Resolve-Path throws if not found, so use Test-Path first?
+if (-not (Test-Path $AgentExePath)) {
+    Write-Host "ERROR: Agent executable not found at: $AgentExePath" -ForegroundColor Red
+    Write-Host "Please build the agent first: cd .. ; .\build.ps1 -Publish" -ForegroundColor Yellow
+    exit 1
+}
+
 
 Write-Host "Agent executable found" -ForegroundColor Green
 
@@ -46,9 +60,12 @@ Write-Host "Build successful" -ForegroundColor Green
 # WixSharp integrates with MSBuild and automatically generates the MSI during build
 
 # Verify output
-$msiPath = ".\bin\x64\Release\PankhaAgent.msi"
+# Verify output
+$InstallerOutputDir = Join-Path $ProjectRoot $Config.Paths.InstallerOutput
+$msiPath = Join-Path $InstallerOutputDir $Config.Filenames.InstallerMsi
+
 if (-not (Test-Path $msiPath)) {
-    Write-Host "MSI file not found" -ForegroundColor Red
+    Write-Host "MSI file not found at: $msiPath" -ForegroundColor Red
     exit 1
 }
 

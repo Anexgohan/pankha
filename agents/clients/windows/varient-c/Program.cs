@@ -115,22 +115,53 @@ class Program
             try
             {
                 // Service management commands (don't need full initialization)
+                // Service management commands (don't need full initialization)
                 if (start)
                 {
+                    if (!IsAdministrator())
+                    {
+                        RunAsAdmin(args);
+                        return;
+                    }
                     await ServiceManager.StartServiceAsync();
                     return;
                 }
 
                 if (stop)
                 {
+                    if (!IsAdministrator())
+                    {
+                        RunAsAdmin(args);
+                        return;
+                    }
                     await ServiceManager.StopServiceAsync();
                     return;
                 }
 
                 if (restart)
                 {
+                    if (!IsAdministrator())
+                    {
+                        RunAsAdmin(args);
+                        return;
+                    }
                     await ServiceManager.RestartServiceAsync();
                     return;
+                }
+
+                // Log viewing commands (don't need full initialization)
+                
+                // ... (skip logs block)
+
+                // Setup mode (Requires Admin for writing config to Program Files)
+                if (setup)
+                {
+                    if (!IsAdministrator())
+                    {
+                        RunAsAdmin(args);
+                        return;
+                    }
+                    // Continue to setup...
                 }
 
                 // Log viewing commands (don't need full initialization)
@@ -241,6 +272,17 @@ class Program
 
     static void InitializeLogging(string logLevel)
     {
+        // Ensure directories exist first
+        Directory.CreateDirectory(Path.GetDirectoryName(LOG_PATH)!);
+
+        // 1. Cleanup old logs (Retain last 10)
+        CleanupOldLogs(Path.GetDirectoryName(LOG_PATH)!, 10);
+
+        // 2. Generate unique filename for this session
+        // Format: agent-YYYYMMDD_HHMMSS.log
+        string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string uniqueLogPath = Path.Combine(Path.GetDirectoryName(LOG_PATH)!, $"agent-{timestamp}.log");
+
         var level = logLevel.ToLowerInvariant() switch
         {
             "trace" => Serilog.Events.LogEventLevel.Verbose,
@@ -261,12 +303,50 @@ class Program
             .WriteTo.Console(
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .WriteTo.File(
-                path: LOG_PATH,
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 7,
+                path: uniqueLogPath,
+                rollingInterval: RollingInterval.Infinite, // We handle rotation manually per session
                 fileSizeLimitBytes: 52428800, // 50MB
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
+            
+        // Log the file we are using
+        // Log.Information("Logging to file: {Path}", uniqueLogPath); // Too early? Logger just created.
+    }
+
+    /// <summary>
+    /// Cleanup old log files, keeping only the most recent N files.
+    /// </summary>
+    static void CleanupOldLogs(string logDir, int maxFiles)
+    {
+        try
+        {
+            if (!Directory.Exists(logDir)) return;
+
+            var dirInfo = new DirectoryInfo(logDir);
+            var files = dirInfo.GetFiles("agent-*.log")
+                               .OrderByDescending(f => f.LastWriteTime)
+                               .ToList();
+
+            if (files.Count > maxFiles)
+            {
+                var filesToDelete = files.Skip(maxFiles);
+                foreach (var file in filesToDelete)
+                {
+                    try
+                    {
+                        file.Delete();
+                    }
+                    catch (Exception) 
+                    { 
+                        // Ignore lock errors or permissions issues during cleanup
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Fail safe - do not crash application just because cleanup failed
+        }
     }
 
     /// <summary>
@@ -463,11 +543,24 @@ class Program
 
         Log.Information("");
         Log.Information("=== Setup Complete ===");
-        Log.Information("To install as Windows Service, run:");
-        Log.Information("  install-service.ps1");
         Log.Information("");
-        Log.Information("To test in foreground:");
-        Log.Information("  pankha-agent-windows.exe --foreground");
+        Log.Information("=== Setup Complete ===");
+        
+        Log.Information("Restarting Windows Service to apply changes...");
+        try 
+        {
+            await ServiceManager.RestartServiceAsync();
+            Log.Information("✅ Service restarted successfully.");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("⚠️ Failed to restart service automatically: {Message}", ex.Message);
+            Log.Information("Please restart the service manually: net stop PankhaAgent && net start PankhaAgent");
+        }
+
+        Log.Information("");
+        Log.Information("Press any key to exit...");
+        Console.ReadKey();
     }
 
     static void ShowConfiguration(AgentConfig config)
@@ -541,6 +634,40 @@ class Program
         // Last few log lines
         Log.Information("📋 Recent Logs (last 5 lines):");
         LogViewer.ShowLastLines(5);
+    }
+
+    /// <summary>
+    /// Check if running as Administrator
+    /// </summary>
+    static bool IsAdministrator()
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        var principal = new System.Security.Principal.WindowsPrincipal(identity);
+        return principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
+    }
+
+    /// <summary>
+    /// Restart the current process with Administrator privileges
+    /// </summary>
+    static void RunAsAdmin(string[] args)
+    {
+        var exeName = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
+        var startInfo = new System.Diagnostics.ProcessStartInfo(exeName)
+        {
+            UseShellExecute = true,
+            Verb = "runas",
+            Arguments = string.Join(" ", args)
+        };
+
+        try
+        {
+            System.Diagnostics.Process.Start(startInfo);
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // User cancelled UAC
+            Console.WriteLine("Operation cancelled. Administrator privileges are required.");
+        }
     }
 }
 

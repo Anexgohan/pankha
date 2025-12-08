@@ -7,36 +7,78 @@ using System.Windows.Forms;
 using IO = System.IO;
 using System.Security.Principal;
 using Microsoft.Deployment.WindowsInstaller;
+using Newtonsoft.Json;
+using System.Collections.Generic;
 
 namespace Pankha.WixSharpInstaller
 {
+    // Configuration Classes
+    public class BuildConfig
+    {
+        public string Manufacturer { get; set; }
+        public string Product { get; set; }
+        public BuildPaths Paths { get; set; }
+        public BuildFilenames Filenames { get; set; }
+    }
+
+    public class BuildPaths
+    {
+        public string WixBin { get; set; }
+        public string BuildArtifacts { get; set; }
+        public string InstallerOutput { get; set; }
+        public string AppIcon_256 { get; set; }
+    }
+
+    public class BuildFilenames
+    {
+        public string AgentExe { get; set; }
+        public string InstallerMsi { get; set; }
+        public string InstallerExe { get; set; }
+        public string ShortName { get; set; }
+    }
+
     class Program
     {
         public static bool IsSelfElevating = false;
-        // ... (UpgradeCode remains)
         static readonly Guid UpgradeCode = new Guid("A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D");
+        
+        // Static config to be accessible
+        static BuildConfig Config;
 
         static void Main(string[] args)
         {
             try
             {
-                // Set WiX binaries location
-                var wixBinPath = IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                    @".nuget\packages\wixsharp.wix.bin\3.10.0\bin");
+                // 1. Load Configuration
+                LoadConfiguration();
+
+                // 2. Set WiX binaries location
+                // Resolve %UserProfile% if present
+                string wixBinPath = Config.Paths.WixBin.Replace("%UserProfile%", Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
                 if (IO.Directory.Exists(wixBinPath))
                 {
                     Compiler.WixLocation = wixBinPath;
                 }
+                else
+                {
+                   Console.WriteLine($"WARNING: WiX Bin path not found: {wixBinPath}. Using default.");
+                }
 
-                // Define the service executable
-                var agentExe = new WixSharp.File(@"..\publish\win-x64\pankha-agent-windows.exe");
+                // 3. Define the service executable
+                // Path is relative to the installer project folder, or where we run it.
+                // Config.Paths.BuildArtifacts is relative to project root ("publish/win-x64").
+                // If running from 'installer' folder, we need "..\publish\win-x64".
+                // Since we assume we run from 'installer' folder (as per build.ps1), we prepend "..\"
+                string artifactPath = IO.Path.Combine("..", Config.Paths.BuildArtifacts.Replace("/", "\\"));
+                string exePath = IO.Path.Combine(artifactPath, Config.Filenames.AgentExe);
+                
+                var agentExe = new WixSharp.File(exePath);
 
                 // Configure Windows Service
                 agentExe.ServiceInstaller = new ServiceInstaller
                 {
                     Name = "PankhaAgent",
-                    DisplayName = "Pankha Hardware Monitoring Agent",
+                    DisplayName = Config.Product, // "Pankha Windows Agent" or similar (Service Name stays formal)
                     Description = "Monitors hardware sensors and controls fan speeds for the Pankha system",
                     StartOn = SvcEvent.Install,
                     StopOn = SvcEvent.InstallUninstall_Wait,
@@ -45,44 +87,50 @@ namespace Pankha.WixSharpInstaller
                     Interactive = false
                 };
 
-                // Create the project
-                var project = new ManagedProject("Pankha Windows Agent",
-                    new Dir(@"%ProgramFiles%\Pankha",
+                // Helper for ShortName (Fallback to Product if missing)
+                string shortName = !string.IsNullOrEmpty(Config.Filenames.ShortName) ? Config.Filenames.ShortName : Config.Product;
+
+                // 4. Create the project
+                // InstallDir: %ProgramFiles%\<Manufacturer>
+                var project = new ManagedProject(Config.Product,
+                    new Dir($@"%ProgramFiles%\{Config.Manufacturer}",
                         agentExe,
-                        new WixSharp.File(@"..\publish\win-x64\appsettings.json"),
-                        new WixSharp.File(@"..\publish\win-x64\config.example.json"),
+                        // Removed appsettings.json and config.example.json as they are not needed
                         new Dir("logs"),
 
                         // Installation folder shortcuts
-                        new ExeFileShortcut("Configure Pankha Agent", "[INSTALLDIR]pankha-agent-windows.exe", "--setup") { WorkingDirectory = "[INSTALLDIR]" },
-                        new ExeFileShortcut("View Pankha Agent Logs", "[INSTALLDIR]pankha-agent-windows.exe", "--logs follow") { WorkingDirectory = "[INSTALLDIR]" },
-                        new ExeFileShortcut("Pankha Agent Status", "[System64Folder]cmd.exe",
-                            "/K \"cd /d \"[INSTALLDIR]\" && pankha-agent-windows.exe --status && pause\"") { WorkingDirectory = "[INSTALLDIR]" },
-                        // Uninstall shortcut with VERBOSE LOGGING (Direct to ProgramData)
-                        new ExeFileShortcut("Uninstall Pankha Agent", "[SystemFolder]msiexec.exe", 
-                            "/i [ProductCode] /l*v \"[CommonAppDataFolder]Pankha Fan Control\\logs\\uninstall_full.log\"") { WorkingDirectory = "[INSTALLDIR]" }
+                        // INSTALLDIR is the directory where the app is installed
+                        new ExeFileShortcut($"Configure {shortName}", $"[INSTALLDIR]{Config.Filenames.AgentExe}", "--setup") { WorkingDirectory = "[INSTALLDIR]" },
+                        new ExeFileShortcut($"View {shortName} Logs", $"[INSTALLDIR]{Config.Filenames.AgentExe}", "--logs follow") { WorkingDirectory = "[INSTALLDIR]" },
+                        new ExeFileShortcut($"{shortName} Status", "[System64Folder]cmd.exe",
+                            $"/K \"cd /d \"[INSTALLDIR]\" && {Config.Filenames.AgentExe} --status && pause\"") { WorkingDirectory = "[INSTALLDIR]" },
+                        
+                        // Uninstall shortcut
+                        new ExeFileShortcut($"Uninstall {shortName}", "[SystemFolder]msiexec.exe", 
+                            $"/i [ProductCode] /l*v \"[CommonAppDataFolder]{Config.Manufacturer}\\logs\\uninstall_full.log\"") { WorkingDirectory = "[INSTALLDIR]" }
                     ),
 
                     // Start Menu shortcuts
-                    new Dir(@"%ProgramMenu%\Pankha Agent",
-                        new ExeFileShortcut("Configure Pankha Agent", "[INSTALLDIR]pankha-agent-windows.exe", "--setup"),
-                        new ExeFileShortcut("View Pankha Agent Logs", "[INSTALLDIR]pankha-agent-windows.exe", "--logs follow"),
-                        new ExeFileShortcut("Pankha Agent Status", "[System64Folder]cmd.exe",
-                            "/K \"cd /d \"[INSTALLDIR]\" && pankha-agent-windows.exe --status && pause\""),
-                        new ExeFileShortcut("Uninstall Pankha Agent", "[SystemFolder]msiexec.exe", 
-                            "/i [ProductCode] /l*v \"[CommonAppDataFolder]Pankha Fan Control\\logs\\uninstall_full.log\"")
+                    new Dir($@"%ProgramMenu%\{Config.Product}",
+                        new ExeFileShortcut($"Configure {shortName}", $"[INSTALLDIR]{Config.Filenames.AgentExe}", "--setup"),
+                        new ExeFileShortcut($"View {shortName} Logs", $"[INSTALLDIR]{Config.Filenames.AgentExe}", "--logs follow"),
+                        new ExeFileShortcut($"{shortName} Status", "[System64Folder]cmd.exe",
+                            $"/K \"cd /d \"[INSTALLDIR]\" && {Config.Filenames.AgentExe} --status && pause\""),
+                        new ExeFileShortcut($"Uninstall {shortName}", "[SystemFolder]msiexec.exe", 
+                            $"/i [ProductCode] /l*v \"[CommonAppDataFolder]{Config.Manufacturer}\\logs\\uninstall_full.log\"")
                     )
                 );
 
                 // ... (Metadata) ...
                 project.GUID = Guid.NewGuid();
                 project.UpgradeCode = UpgradeCode;
-                project.Version = new Version("1.0.14");
+                project.Version = new Version("1.0.14"); // Could also be read from config or AssemblyInfo
                 project.Platform = Platform.x64;
                 project.InstallScope = InstallScope.perMachine;
                 
                 // Icon
-                project.ControlPanelInfo.ProductIcon = @"..\graphics\pankha_icon_256x256.ico";
+                project.ControlPanelInfo.Manufacturer = Config.Manufacturer;
+                project.ControlPanelInfo.ProductIcon = IO.Path.Combine("..", Config.Paths.AppIcon_256);
 
                 // Automatic upgrades
                 project.MajorUpgrade = new MajorUpgrade
@@ -93,7 +141,7 @@ namespace Pankha.WixSharpInstaller
 
                 // Setup ManagedUI
                 project.ManagedUI = new ManagedUI();
-                project.ManagedUI.Icon = @"..\graphics\pankha_icon_256x256.ico";
+                project.ManagedUI.Icon = IO.Path.Combine("..", Config.Paths.AppIcon_256);
 
                 // Install dialogs
                 project.ManagedUI.InstallDialogs.Add<WelcomeDialog>()
@@ -110,30 +158,63 @@ namespace Pankha.WixSharpInstaller
                 // Add Custom Properties
                 project.Properties = new[]
                 {
-                    new Property("KEEP_CONFIG", "1") { Attributes = new System.Collections.Generic.Dictionary<string, string> { { "Secure", "yes" } } }, 
-                    new Property("RESET_CONFIG", "0") { Attributes = new System.Collections.Generic.Dictionary<string, string> { { "Secure", "yes" } } },
-                    new Property("KEEP_LOGS", "1") { Attributes = new System.Collections.Generic.Dictionary<string, string> { { "Secure", "yes" } } }
+                    new Property("KEEP_CONFIG", "1") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } }, 
+                    new Property("RESET_CONFIG", "0") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } },
+                    new Property("KEEP_LOGS", "1") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } }
                 };
 
                 // Enable full UI for uninstall
                 project.EnableUninstallFullUI();
 
+                // Define Properties to carry config values to Runtime
+                // Manufacturer and Product are already standard properties set via project.ControlPanelInfo
+                project.Properties = new[] 
+                {
+                    new Property("AgentExe", Config.Filenames.AgentExe)
+                };
+
                 // CRITICAL: Pass these properties to Deferred Actions
-                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR";
+                // Note: Manufacturer and ProductName are standard properties available in Immediate sequence.
+                // We pass them to Deferred here.
+                // Note: WixSharp property "Product" might be "ProductName" in MSI? 
+                // Let's check wxs. <Product Name="..."/> -> Property `ProductName`.
+                // So we should pass `ProductName` instead of `Product`?
+                // The wxs shows: <Property Id="Product" Value="Pankha Windows Agent" /> (Line 159) - This was my manual addition colliding.
+                // The WXS Product Element has `Name="Pankha Windows Agent"`.
+                // In MSI, the property is `ProductName`.
+                
+                // So my manual property `Product` was creating a valid property named `Product`, 
+                // but if I remove it, does `Product` property exist? No. `ProductName` exists.
+                
+                // So getting `Product` in `OnAfterInstall` using `GetProperty("Product")` failed?
+                // Or I should use `ProductName`.
+                
+                // Let's use standard `ProductName`.
+                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe";
 
                 // Event handlers
                 project.BeforeInstall += OnBeforeInstall;
                 project.AfterInstall += OnAfterInstall;
                 project.UIInitialized += Project_UIInitialized;
 
-                // Build
-                project.OutDir = @"bin\x64\Release";
-                project.OutFileName = "PankhaAgent";
+                // Build Output
+                // Config path is relative to PROJECT ROOT.
+                // We are running in 'installer' folder.
+                // So we need to prepend "..\" to get to Project Root.
+                string outDir = IO.Path.Combine("..", Config.Paths.InstallerOutput.Replace("/", "\\"));
+                
+                // Attempt to make it relative to current execution (installer folder)
+                if (outDir.StartsWith("installer\\"))
+                {
+                    outDir = outDir.Substring("installer\\".Length);
+                }
+
+                project.OutDir = outDir;
+                project.OutFileName = Config.Filenames.InstallerMsi.Replace(".msi", ""); 
 
                 Console.WriteLine("Building Pankha Agent MSI installer...");
-                project.BuildMsi();
-
-                Console.WriteLine($"\n✅ MSI built: {IO.Path.GetFullPath(project.OutDir)}\\{project.OutFileName}.msi");
+                string msiPath = project.BuildMsi();
+                Console.WriteLine($"\n✅ MSI built: {msiPath}");
             }
             catch (Exception ex)
             {
@@ -141,6 +222,29 @@ namespace Pankha.WixSharpInstaller
                 Environment.Exit(1);
             }
 
+        }
+
+        static void LoadConfiguration()
+        {
+            // Try to find build-config.json
+            // We expect it to be one level up if running from 'installer' folder
+            string configPath = IO.Path.GetFullPath(@"..\build-config.json");
+            
+            if (!IO.File.Exists(configPath))
+            {
+                // Fallback: Check current directory
+                configPath = "build-config.json";
+                if (!IO.File.Exists(configPath))
+                {
+                    throw new IO.FileNotFoundException("Could not find build-config.json at " + IO.Path.GetFullPath(@"..\build-config.json"));
+                }
+            }
+            
+            string json = IO.File.ReadAllText(configPath);
+            Config = JsonConvert.DeserializeObject<BuildConfig>(json);
+            
+            if (Config == null) throw new Exception("Failed to deserialize build-config.json");
+            Console.WriteLine($"Loaded configuration: Manufacturer='{Config.Manufacturer}', Product='{Config.Product}'");
         }
 
         static void Project_UIInitialized(SetupEventArgs e)
@@ -173,16 +277,18 @@ namespace Pankha.WixSharpInstaller
             }
         }
 
-        static string GetCommonAppLogDir()
+        static string GetCommonAppLogDir(string manufacturer = null)
         {
-            // Use C:\ProgramData\Pankha Fan Control\logs
+            // Use defaults if not provided (runtime fallback) or Config fallback (build time)
+            string mf = manufacturer ?? Config?.Manufacturer ?? "Pankha Fan Control";
+            
             string commonData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            return IO.Path.Combine(commonData, "Pankha Fan Control", "logs");
+            return IO.Path.Combine(commonData, mf, "logs");
         }
 
         static void LogToDebugFile(string basePath, string logType, string message)
         {
-             // Overridden behavior: Ignroe 'basePath' if we are doing install/uninstall logs 
+             // Overridden behavior: Ignore 'basePath' if we are doing install/uninstall logs 
              // and ALWAYS write to the CommonAppDir, unless explicitly directed otherwise?
              // Actually, the caller should just pass GetCommonAppLogDir() as basePath.
              
@@ -212,7 +318,9 @@ namespace Pankha.WixSharpInstaller
                 string logType = isUninstall ? "uninstall" : "install";
 
                 // Always log to Central Location
-                string logPath = GetCommonAppLogDir();
+                // During Immediate execution, we can access Properties efficiently
+                string manufacturer = e.Session["Manufacturer"];
+                string logPath = GetCommonAppLogDir(manufacturer);
 
                 LogToDebugFile(logPath, logType, "==========================================");
                 LogToDebugFile(logPath, logType, "=== SEQUENCE STARTED (OnBeforeInstall) ===");
@@ -250,13 +358,16 @@ namespace Pankha.WixSharpInstaller
                 string keepLogs = GetProperty("KEEP_LOGS");
                 string resetConfig = GetProperty("RESET_CONFIG");
                 string installDirProp = GetProperty("INSTALLDIR");
+                string manufacturer = GetProperty("Manufacturer");
+                string product = GetProperty("ProductName");
 
-                // LOGGING: Use Central Directory
-                string logBaseDir = GetCommonAppLogDir();
+                // LOGGING: Use Central Directory with Dynamic Manufacturer
+                string logBaseDir = GetCommonAppLogDir(manufacturer);
                 
                 LogToDebugFile(logBaseDir, logType, "=== OnAfterInstall Triggered (Deferred) ===");
                 LogToDebugFile(logBaseDir, logType, $"Context: IsUninstalling={isUninstalling}");
                 LogToDebugFile(logBaseDir, logType, $"Target InstallDir (for Cleanup): '{installDirProp}'");
+                LogToDebugFile(logBaseDir, logType, $"Manufacturer (Dynamic): '{manufacturer}'");
 
                 // ... (Cleanup Logic: Reset Config & Uninstall) ...
 
@@ -266,8 +377,18 @@ namespace Pankha.WixSharpInstaller
                     try
                     {
                         var dir = installDirProp; 
-                        // If dir is null here (rare), fallback
-                        if (string.IsNullOrEmpty(dir)) dir = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Pankha");
+                        
+                        // Fallback using Dynamic Manufacturer
+                        if (string.IsNullOrEmpty(dir) && !string.IsNullOrEmpty(manufacturer))
+                        {
+                             dir = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), manufacturer);
+                        }
+                        // Ultimate safe fallback
+                        if (string.IsNullOrEmpty(dir)) 
+                        {
+                            // This should rarely happen if Manufacturer is passed correctly
+                             dir = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Pankha Fan Control");
+                        }
                         
                         LogToDebugFile(logBaseDir, logType, $"Target Directory Resolved: '{dir}'");
 
@@ -291,7 +412,16 @@ namespace Pankha.WixSharpInstaller
 
                         // Kill processes
                         LogToDebugFile(logBaseDir, logType, "Phase: Killing Processes...");
-                        foreach (var proc in Process.GetProcessesByName("pankha-agent-windows"))
+                        
+                        // Dynamically determine process name from configured Exe name passed via CustomActionData
+                        string agentExeName = GetProperty("AgentExe");
+                        string processName = !string.IsNullOrEmpty(agentExeName) 
+                            ? IO.Path.GetFileNameWithoutExtension(agentExeName) 
+                            : "pankha-agent-windows"; // Fallback
+
+                        LogToDebugFile(logBaseDir, logType, $"Targeting process name: '{processName}'");
+
+                        foreach (var proc in Process.GetProcessesByName(processName))
                         {
                             try 
                             { 
@@ -355,12 +485,7 @@ namespace Pankha.WixSharpInstaller
                                 catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"ERROR deleting config.json: {ex.Message}"); }
                             }
                             
-                            // B. Logs folder - NOTE: Since we log to ProgramData now, 
-                            // we only delete the [INSTALLDIR]\logs if the user strictly requested valid cleanup?
-                            // Actually, [INSTALLDIR]\logs shouldn't really be used anymore with the new strategy, 
-                            // except for the shortcuts we made earlier.
-                            // But since we are moving to ProgramData, this folder might be empty or non-existent in new installs.
-                            // We will keep the logic to clean it just in case.
+                            // B. Logs folder
                             if (!shouldKeepLogs)
                             {
                                 try 
@@ -395,7 +520,9 @@ namespace Pankha.WixSharpInstaller
                         }
 
                         // 4. Start Menu Shortcuts
-                        var shortcuts = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "Pankha Agent");
+                        string shortcutProduct = !string.IsNullOrEmpty(product) ? product : "Pankha Windows Agent";
+                        
+                        var shortcuts = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), shortcutProduct);
                         if (IO.Directory.Exists(shortcuts))
                         {
                             try 
@@ -407,7 +534,6 @@ namespace Pankha.WixSharpInstaller
                         }
                         
                         LogToDebugFile(logBaseDir, logType, "=== Cleanup Phase Complete ===");
-                        // LOG MIGRATION LOGIC REMOVED - Logs stay in ProgramData
                     }
                     catch (Exception ex)
                     {
@@ -417,8 +543,7 @@ namespace Pankha.WixSharpInstaller
             }
             catch {}
         }
-        }
-
+    }
 
     public class ConditionalExitDialog : ExitDialog
     {

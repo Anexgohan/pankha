@@ -30,6 +30,14 @@ function Start-ElevatedProcess {
     exit
 }
 
+# Read build configuration
+$ConfigPath = Join-Path $PSScriptRoot "build-config.json"
+if (-not (Test-Path $ConfigPath)) {
+    Write-Host "❌ build-config.json not found!" -ForegroundColor Red
+    exit 1
+}
+$Config = Get-Content $ConfigPath | ConvertFrom-Json
+
 # Show interactive menu if no parameters provided
 $hasParams = $PSBoundParameters.Count -gt 0 -and -not $Menu
 if (-not $hasParams -or $Menu) {
@@ -38,33 +46,29 @@ if (-not $hasParams -or $Menu) {
     Write-Host " Pankha Windows Agent - Build Menu" -ForegroundColor Cyan
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "  1. Publish Single-File EXE" -ForegroundColor Green
-    Write-Host "  2. Standard Build (Release)" -ForegroundColor White
-    Write-Host "  3. Clean Build Artifacts" -ForegroundColor Yellow
-    Write-Host "  4. Build and Test Hardware" -ForegroundColor Magenta
-    Write-Host "  5. Debug Build" -ForegroundColor Gray
-    Write-Host "  6. Clean + Publish" -ForegroundColor Cyan
-    Write-Host "  7. Build MSI Installer" -ForegroundColor Magenta
-    Write-Host "  8. Clean + Build MSI Installer" -ForegroundColor Cyan
+    Write-Host "  1. Build Full Release (Clean + Publish + MSI)" -ForegroundColor Green
+    Write-Host "  2. Clean + Publish Agent Only (Single-File EXE)" -ForegroundColor Cyan
+    Write-Host "  3. Publish Agent Only (Single-File EXE)" -ForegroundColor Cyan
+    Write-Host "  4. Build Only (Quick check for build errors)" -ForegroundColor White
+    Write-Host "  5. Run Hardware Test" -ForegroundColor Magenta
+    Write-Host "  6. Cleanup" -ForegroundColor Yellow
     Write-Host "  0. Exit" -ForegroundColor Red
     Write-Host ""
     $choice = Read-Host "Select option"
 
     switch ($choice) {
-        "1" { $Publish = $true }
-        "2" { <# Standard build - no flags needed #> }
-        "3" { $Clean = $true }
-        "4" {
+        "1" { $Clean = $true; $Publish = $true; $BuildInstaller = $true }
+        "2" { $Clean = $true; $Publish = $true }
+        "3" { $Publish = $true }
+        "4" { <# Standard build - no flags needed #> }
+        "5" {
             # Auto-elevate for hardware test
             if (-not (Test-Administrator)) {
                 Start-ElevatedProcess "-Test"
             }
             $Test = $true
         }
-        "5" { $Configuration = "Debug" }
-        "6" { $Clean = $true; $Publish = $true }
-        "7" { $Publish = $true; $BuildInstaller = $true }
-        "8" { $Clean = $true; $Publish = $true; $BuildInstaller = $true }
+        "6" { $Clean = $true }
         "0" { Write-Host "Exiting..." -ForegroundColor Gray; exit 0 }
         default { Write-Host "Invalid option" -ForegroundColor Red; exit 1 }
     }
@@ -85,6 +89,7 @@ if ($Clean) {
     dotnet clean -c $Configuration
     if (Test-Path "bin") { Remove-Item -Recurse -Force "bin" }
     if (Test-Path "obj") { Remove-Item -Recurse -Force "obj" }
+    if (Test-Path "publish") { Remove-Item -Recurse -Force "publish" }
 
     # Also clean installer cache if building MSI
     if ($BuildInstaller -and (Test-Path "installer")) {
@@ -107,9 +112,21 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✅ Restore complete" -ForegroundColor Green
 Write-Host ""
 
+# Resolve Icon Path from Config (for MSBuild injection)
+$AppIconPath = $null
+if ($Config.Paths.AppIcon_256) {
+    $AppIconPath = Join-Path $PSScriptRoot $Config.Paths.AppIcon_256
+    if (-not (Test-Path $AppIconPath)) {
+         Write-Host "WARNING: Configured icon not found at $AppIconPath" -ForegroundColor Yellow
+    }
+}
+
 # Build
 Write-Host "Building ($Configuration)..." -ForegroundColor Yellow
-dotnet build -c $Configuration
+$BuildParams = @("-c", $Configuration)
+if ($AppIconPath) { $BuildParams += "/p:ApplicationIcon=$AppIconPath" }
+
+dotnet build @BuildParams
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Build failed" -ForegroundColor Red
     exit 1
@@ -133,14 +150,24 @@ if ($Test) {
 if ($Publish) {
     Write-Host "Publishing single-file executable..." -ForegroundColor Yellow
 
-    $OutputDir = "publish\win-x64"
+    # Resolve relative path from config
+    $OutputDir = Join-Path $PSScriptRoot $Config.Paths.BuildArtifacts
+    
+    # Clean output dir
+    if (Test-Path $OutputDir) { Remove-Item -Recurse -Force $OutputDir }
 
-    dotnet publish -c Release -r win-x64 `
-        --self-contained true `
-        /p:PublishSingleFile=true `
-        /p:IncludeNativeLibrariesForSelfExtract=true `
-        /p:PublishReadyToRun=true `
-        -o $OutputDir
+    $PublishArgs = @(
+        "-c", "Release",
+        "-r", "win-x64",
+        "--self-contained", "true",
+        "/p:PublishSingleFile=true",
+        "/p:IncludeNativeLibrariesForSelfExtract=true",
+        "/p:PublishReadyToRun=true",
+        "-o", $OutputDir
+    )
+    if ($AppIconPath) { $PublishArgs += "/p:ApplicationIcon=$AppIconPath" }
+
+    dotnet publish @PublishArgs
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Publish failed" -ForegroundColor Red
@@ -150,12 +177,26 @@ if ($Publish) {
     # Copy configuration example
     Copy-Item "config.example.json" "$OutputDir\config.example.json"
 
+    # Rename Executable if needed (Default is project name pankha-agent-windows.exe)
+    # If Config.Filenames.AgentExe differs, we rename it.
+    $DefaultExeName = "pankha-agent-windows.exe"
+    $TargetExeName = $Config.Filenames.AgentExe
+    
+    if ($TargetExeName -and $TargetExeName -ne $DefaultExeName) {
+        $SourceExe = Join-Path $OutputDir $DefaultExeName
+        $TargetExe = Join-Path $OutputDir $TargetExeName
+        if (Test-Path $SourceExe) {
+            Move-Item -Force $SourceExe $TargetExe
+            Write-Host "Renamed executable to: $TargetExeName" -ForegroundColor Gray
+        }
+    }
+
     Write-Host "✅ Publish complete" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Output: $OutputDir\pankha-agent-windows.exe" -ForegroundColor Cyan
+    Write-Host "Output: $OutputDir\$TargetExeName" -ForegroundColor Cyan
 
     # Show file size
-    $ExePath = "$OutputDir\pankha-agent-windows.exe"
+    $ExePath = "$OutputDir\$TargetExeName"
     if (Test-Path $ExePath) {
         $Size = (Get-Item $ExePath).Length / 1MB
         Write-Host "Size: $($Size.ToString('F2')) MB" -ForegroundColor Cyan
@@ -187,23 +228,33 @@ if ($BuildInstaller) {
         Write-Host "✅ MSI Installer build complete!" -ForegroundColor Green
         Write-Host ""
 
-        # Show MSI location
-        $MsiPath = "bin\x64\Release\PankhaAgent.msi"
+        # Show MSI location - Resolve from Config
+        # Config path is relative to root, but we are inside 'installer' now because of Push-Location? 
+        # No, $Config.Paths.InstallerOutput is likely "..\\publish..." relative to root? 
+        # Wait, if I am in 'installer', and config says "..\\publish", that resolves to "installer\..\publish" = "publish".
+        # If I am in Root, "..\\publish" resolves to "..\publish" (outside root).
+        # Let's assume paths in config are relative to PROJECT ROOT (varient-c).
+        # So I should resolve them relative to PSScriptRoot.
+        
+        $MsiOutputDir = Join-Path $PSScriptRoot $Config.Paths.InstallerOutput
+        $MsiFileName = $Config.Filenames.InstallerMsi
+        $MsiPath = Join-Path $MsiOutputDir $MsiFileName
+        
         if (Test-Path $MsiPath) {
             $MsiSize = (Get-Item $MsiPath).Length / 1MB
             Write-Host "========================================" -ForegroundColor Cyan
             Write-Host " MSI Installer Ready!" -ForegroundColor Green
             Write-Host "========================================" -ForegroundColor Cyan
             Write-Host ""
-            Write-Host "Location: installer\$MsiPath" -ForegroundColor Cyan
+            Write-Host "Location: $MsiPath" -ForegroundColor Cyan
             Write-Host "Size: $($MsiSize.ToString('F2')) MB" -ForegroundColor Cyan
             Write-Host ""
             Write-Host "To install:" -ForegroundColor Yellow
-            Write-Host "  msiexec /i `"installer\$MsiPath`" /l*v install.log" -ForegroundColor Gray
+            Write-Host "  msiexec /i `"$MsiPath`" /l*v install.log" -ForegroundColor Gray
             Write-Host "  (or double-click the MSI file)" -ForegroundColor Gray
             Write-Host ""
             Write-Host "To uninstall:" -ForegroundColor Yellow
-            Write-Host "  msiexec /x `"installer\$MsiPath`" /l*v uninstall.log" -ForegroundColor Gray
+            Write-Host "  msiexec /x `"$MsiPath`" /l*v uninstall.log" -ForegroundColor Gray
             Write-Host ""
         }
     }

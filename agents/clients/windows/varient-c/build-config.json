@@ -1,0 +1,16 @@
+{
+    "Manufacturer": "Pankha Fan Control",
+    "Product": "Pankha Windows Agent",
+    "Paths": {
+        "WixBin": "%UserProfile%\\.nuget\\packages\\wixsharp.wix.bin\\3.10.0\\bin",
+        "BuildArtifacts": "publish\\win-x64\\agent\\",
+        "InstallerOutput": "publish\\win-x64\\installer\\",
+        "AppIcon_256": "graphics\\icons\\pankha_icon_256x256_6-fins.ico"
+    },
+    "Filenames": {
+        "AgentExe": "pankha-agent.exe",
+        "InstallerMsi": "pankha-agent-windows_x64.msi",
+        "InstallerExe": "pankha-agent-windows_setup_x64.exe",
+        "ShortName": "Pankha Agent"
+    }
+}

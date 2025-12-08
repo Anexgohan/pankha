@@ -33,7 +33,7 @@ public static class PathResolver
     /// <summary>
     /// Executable path
     /// </summary>
-    public static readonly string ExecutablePath = Path.Combine(InstallPath, "pankha-agent-windows.exe");
+    public static readonly string ExecutablePath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
 
     /// <summary>
     /// Ensures all required directories exist

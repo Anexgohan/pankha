@@ -27,7 +27,6 @@
 
     <!-- Administrator privileges required -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>graphics\pankha_icon_256x256.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
