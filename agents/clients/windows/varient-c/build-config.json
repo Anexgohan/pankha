@@ -9,6 +9,7 @@
     },
     "Filenames": {
         "AgentExe": "pankha-agent.exe",
+        "AgentUI": "pankha-tray.exe",
         "InstallerMsi": "pankha-agent-windows_x64.msi",
         "InstallerExe": "pankha-agent-windows_setup_x64.exe",
         "ShortName": "Pankha Agent"

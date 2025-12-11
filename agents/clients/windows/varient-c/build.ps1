@@ -98,6 +98,10 @@ if ($Clean) {
         if (Test-Path "installer\obj") { Remove-Item -Recurse -Force "installer\obj" }
     }
 
+    # Clean UI artifacts
+    if (Test-Path "Pankha.UI\bin") { Remove-Item -Recurse -Force "Pankha.UI\bin" }
+    if (Test-Path "Pankha.UI\obj") { Remove-Item -Recurse -Force "Pankha.UI\obj" }
+
     Write-Host "✅ Clean complete" -ForegroundColor Green
     Write-Host ""
 }
@@ -106,7 +110,12 @@ if ($Clean) {
 Write-Host "Restoring NuGet packages..." -ForegroundColor Yellow
 dotnet restore
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Restore failed" -ForegroundColor Red
+    Write-Host "❌ Restore (Agent) failed" -ForegroundColor Red
+    exit 1
+}
+dotnet restore "Pankha.UI\Pankha.UI.csproj"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Restore (UI) failed" -ForegroundColor Red
     exit 1
 }
 Write-Host "✅ Restore complete" -ForegroundColor Green
@@ -132,6 +141,18 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 Write-Host "✅ Build complete" -ForegroundColor Green
+Write-Host ""
+
+# Build UI
+Write-Host "Building UI ($Configuration)..." -ForegroundColor Yellow
+$UiBuildParams = @("Pankha.UI\Pankha.UI.csproj", "-c", $Configuration)
+if ($AppIconPath) { $UiBuildParams += "/p:AppIconPath=$AppIconPath" }
+dotnet build @UiBuildParams
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ UI Build failed" -ForegroundColor Red
+    exit 1
+}
+Write-Host "✅ UI Build complete" -ForegroundColor Green
 Write-Host ""
 
 # Test if requested
@@ -172,6 +193,41 @@ if ($Publish) {
     if ($LASTEXITCODE -ne 0) {
         Write-Host "❌ Publish failed" -ForegroundColor Red
         exit 1
+    }
+
+    # Publish UI
+    Write-Host "Publishing UI..." -ForegroundColor Yellow
+    $UiPublishArgs = @(
+        "Pankha.UI\Pankha.UI.csproj",
+        "-c", "Release",
+        "-r", "win-x64",
+        "--self-contained", "true",
+        "/p:PublishSingleFile=true",
+        "/p:IncludeNativeLibrariesForSelfExtract=true",
+        "-o", $OutputDir
+    )
+    if ($AppIconPath) { 
+        $UiPublishArgs += "/p:ApplicationIcon=$AppIconPath"
+        $UiPublishArgs += "/p:AppIconPath=$AppIconPath"
+    }
+
+    dotnet publish @UiPublishArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ UI Publish failed" -ForegroundColor Red
+        exit 1
+    }
+
+    # Rename UI Executable
+    $DefaultUiName = "Pankha.UI.exe"
+    $TargetUiName = $Config.Filenames.AgentUI
+    
+    if ($TargetUiName -and $TargetUiName -ne $DefaultUiName) {
+        $SourceUi = Join-Path $OutputDir $DefaultUiName
+        $TargetUi = Join-Path $OutputDir $TargetUiName
+        if (Test-Path $SourceUi) {
+            Move-Item -Force $SourceUi $TargetUi
+            Write-Host "Renamed UI executable to: $TargetUiName" -ForegroundColor Gray
+        }
     }
 
     # Copy configuration example

@@ -32,6 +32,7 @@ namespace Pankha.WixSharpInstaller
     public class BuildFilenames
     {
         public string AgentExe { get; set; }
+        public string AgentUI { get; set; }
         public string InstallerMsi { get; set; }
         public string InstallerExe { get; set; }
         public string ShortName { get; set; }
@@ -50,7 +51,9 @@ namespace Pankha.WixSharpInstaller
             try
             {
                 // 1. Load Configuration
+                IO.File.AppendAllText("debug.log", $"DEBUG: CWD = {Environment.CurrentDirectory}\n");
                 LoadConfiguration();
+                IO.File.AppendAllText("debug.log", $"DEBUG: Config loaded. AgentUI = '{Config.Filenames.AgentUI}'\n");
 
                 // 2. Set WiX binaries location
                 // Resolve %UserProfile% if present
@@ -71,7 +74,14 @@ namespace Pankha.WixSharpInstaller
                 // Since we assume we run from 'installer' folder (as per build.ps1), we prepend "..\"
                 string artifactPath = IO.Path.Combine("..", Config.Paths.BuildArtifacts.Replace("/", "\\"));
                 string exePath = IO.Path.Combine(artifactPath, Config.Filenames.AgentExe);
+                string uiPath = IO.Path.Combine(artifactPath, Config.Filenames.AgentUI);
                 
+                IO.File.AppendAllText("debug.log", $"DEBUG: Checking AgentExe at '{IO.Path.GetFullPath(exePath)}'\n");
+                if (!IO.File.Exists(exePath)) IO.File.AppendAllText("debug.log", "ERROR: AgentExe not found!\n");
+                
+                IO.File.AppendAllText("debug.log", $"DEBUG: Checking AgentUI at '{IO.Path.GetFullPath(uiPath)}'\n");
+                if (!IO.File.Exists(uiPath)) IO.File.AppendAllText("debug.log", "ERROR: AgentUI not found!\n");
+
                 var agentExe = new WixSharp.File(exePath);
 
                 // Configure Windows Service
@@ -95,6 +105,8 @@ namespace Pankha.WixSharpInstaller
                 var project = new ManagedProject(Config.Product,
                     new Dir($@"%ProgramFiles%\{Config.Manufacturer}",
                         agentExe,
+                        new WixSharp.File(uiPath),
+                        
                         // Removed appsettings.json and config.example.json as they are not needed
                         new Dir("logs"),
 
@@ -112,12 +124,18 @@ namespace Pankha.WixSharpInstaller
 
                     // Start Menu shortcuts
                     new Dir($@"%ProgramMenu%\{Config.Product}",
+                        new ExeFileShortcut($"Pankha Tray", $"[INSTALLDIR]{Config.Filenames.AgentUI}", ""),
                         new ExeFileShortcut($"Configure {shortName}", $"[INSTALLDIR]{Config.Filenames.AgentExe}", "--setup"),
                         new ExeFileShortcut($"View {shortName} Logs", $"[INSTALLDIR]{Config.Filenames.AgentExe}", "--logs follow"),
                         new ExeFileShortcut($"{shortName} Status", "[System64Folder]cmd.exe",
                             $"/K \"cd /d \"[INSTALLDIR]\" && {Config.Filenames.AgentExe} --status && pause\""),
                         new ExeFileShortcut($"Uninstall {shortName}", "[SystemFolder]msiexec.exe", 
                             $"/i [ProductCode] /l*v \"[CommonAppDataFolder]{Config.Manufacturer}\\logs\\uninstall_full.log\"")
+                    ),
+
+                    // Auto-Start via Startup Folder (More robust than Registry Key)
+                    new Dir("%Startup%",
+                        new ExeFileShortcut("Pankha Tray", $"[INSTALLDIR]{Config.Filenames.AgentUI}", "")
                     )
                 );
 
@@ -129,8 +147,13 @@ namespace Pankha.WixSharpInstaller
                 project.InstallScope = InstallScope.perMachine;
                 
                 // Icon
+                // Icon
+                string iconPath = IO.Path.Combine("..", Config.Paths.AppIcon_256);
+                IO.File.AppendAllText("debug.log", $"DEBUG: Checking Icon at '{IO.Path.GetFullPath(iconPath)}'\n");
+                if (!IO.File.Exists(iconPath)) IO.File.AppendAllText("debug.log", "ERROR: Icon not found!\n");
+
                 project.ControlPanelInfo.Manufacturer = Config.Manufacturer;
-                project.ControlPanelInfo.ProductIcon = IO.Path.Combine("..", Config.Paths.AppIcon_256);
+                project.ControlPanelInfo.ProductIcon = iconPath;
 
                 // Automatic upgrades
                 project.MajorUpgrade = new MajorUpgrade
@@ -170,7 +193,8 @@ namespace Pankha.WixSharpInstaller
                 // Manufacturer and Product are already standard properties set via project.ControlPanelInfo
                 project.Properties = new[] 
                 {
-                    new Property("AgentExe", Config.Filenames.AgentExe)
+                    new Property("AgentExe", Config.Filenames.AgentExe),
+                    new Property("AgentUI", Config.Filenames.AgentUI)
                 };
 
                 // CRITICAL: Pass these properties to Deferred Actions
@@ -190,7 +214,7 @@ namespace Pankha.WixSharpInstaller
                 // Or I should use `ProductName`.
                 
                 // Let's use standard `ProductName`.
-                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe";
+                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI";
 
                 // Event handlers
                 project.BeforeInstall += OnBeforeInstall;
@@ -213,11 +237,14 @@ namespace Pankha.WixSharpInstaller
                 project.OutFileName = Config.Filenames.InstallerMsi.Replace(".msi", ""); 
 
                 Console.WriteLine("Building Pankha Agent MSI installer...");
+                IO.File.AppendAllText("debug.log", "DEBUG: Calling project.BuildMsi()...\n");
                 string msiPath = project.BuildMsi();
+                IO.File.AppendAllText("debug.log", $"DEBUG: BuildMsi returned. Path: {msiPath}\n");
                 Console.WriteLine($"\n✅ MSI built: {msiPath}");
             }
             catch (Exception ex)
             {
+                IO.File.AppendAllText("debug.log", $"\n❌ FATAL ERROR: {ex}\n");
                 Console.WriteLine($"\n❌ FATAL ERROR: {ex}");
                 Environment.Exit(1);
             }
@@ -368,6 +395,40 @@ namespace Pankha.WixSharpInstaller
                 LogToDebugFile(logBaseDir, logType, $"Context: IsUninstalling={isUninstalling}");
                 LogToDebugFile(logBaseDir, logType, $"Target InstallDir (for Cleanup): '{installDirProp}'");
                 LogToDebugFile(logBaseDir, logType, $"Manufacturer (Dynamic): '{manufacturer}'");
+
+                if (!isUninstalling)
+                {
+                     // LAUNCH TRAY APP
+                     try
+                     {
+                         string agentUiName = GetProperty("AgentUI");
+                         if (!string.IsNullOrEmpty(agentUiName) && !string.IsNullOrEmpty(installDirProp))
+                         {
+                             string uiPath = IO.Path.Combine(installDirProp, agentUiName);
+                             if (IO.File.Exists(uiPath))
+                             {
+                                 LogToDebugFile(logBaseDir, logType, $"Launching Tray App: {uiPath}");
+                                 Process.Start(new ProcessStartInfo
+                                 {
+                                     FileName = uiPath,
+                                     UseShellExecute = true
+                                 });
+                             }
+                             else
+                             {
+                                 LogToDebugFile(logBaseDir, logType, $"Tray App not found at {uiPath}");
+                             }
+                         }
+                         else
+                         {
+                              LogToDebugFile(logBaseDir, logType, "Skipping launch: InstallDir or AgentUI property missing.");
+                         }
+                     }
+                     catch (Exception ex)
+                     {
+                         LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
+                     }
+                }
 
                 // ... (Cleanup Logic: Reset Config & Uninstall) ...
 

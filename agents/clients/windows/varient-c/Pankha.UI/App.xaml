@@ -1,0 +1,25 @@
+﻿<Application x:Class="Pankha.UI.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:tb="http://www.hardcodet.net/taskbar"
+             xmlns:local="clr-namespace:Pankha.UI"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <local:TrayViewModel x:Key="TrayViewModel" />
+        
+        <ContextMenu x:Key="TrayMenu" DataContext="{StaticResource TrayViewModel}">
+            <MenuItem Header="Configure" Command="{Binding ShowWindowCommand}" FontWeight="Bold" />
+            <Separator />
+            <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
+        </ContextMenu>
+
+        <tb:TaskbarIcon x:Key="TrayIcon"
+                        DataContext="{StaticResource TrayViewModel}"
+                        ToolTipText="{Binding StatusText}"
+                        ContextMenu="{StaticResource TrayMenu}"
+                        DoubleClickCommand="{Binding ShowWindowCommand}"
+                        Visibility="Visible"
+                        IconSource="/AppIcon.ico">
+        </tb:TaskbarIcon>
+    </Application.Resources>
+</Application>

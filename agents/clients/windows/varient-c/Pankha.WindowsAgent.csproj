@@ -8,6 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Pankha.UI\**</DefaultItemExcludes>
 
     <!-- Application Info -->
     <AssemblyName>pankha-agent-windows</AssemblyName>

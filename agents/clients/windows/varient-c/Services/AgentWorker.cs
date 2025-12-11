@@ -16,6 +16,7 @@ public class AgentWorker : BackgroundService
     private IHardwareMonitor? _hardwareMonitor;
     private WebSocketClient? _webSocketClient;
     private ConnectionWatchdog? _connectionWatchdog;
+    private NamedPipeHost? _namedPipeHost;
 
     public AgentWorker(ILogger<AgentWorker> logger, AgentConfig config)
     {
@@ -60,6 +61,11 @@ public class AgentWorker : BackgroundService
                 Serilog.Log.Logger,
                 _connectionWatchdog);
 
+            // Initialize and Start Named Pipe Host (IPC)
+            _namedPipeHost = new NamedPipeHost(_config, _webSocketClient);
+            _namedPipeHost.Start();
+            _logger.LogInformation("IPC: Named Pipe Host started");
+
             // Start WebSocket communication (blocks until cancellation)
             await _webSocketClient.StartAsync(stoppingToken);
         }
@@ -81,6 +87,7 @@ public class AgentWorker : BackgroundService
         try
         {
             // Dispose resources
+            _namedPipeHost?.Dispose();
             _webSocketClient?.Dispose();
             _hardwareMonitor?.Dispose();
 
@@ -96,6 +103,7 @@ public class AgentWorker : BackgroundService
 
     public override void Dispose()
     {
+        _namedPipeHost?.Dispose();
         _webSocketClient?.Dispose();
         _hardwareMonitor?.Dispose();
         base.Dispose();
