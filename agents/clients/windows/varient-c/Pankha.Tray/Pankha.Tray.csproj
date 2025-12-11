@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon>$(AppIconPath)</ApplicationIcon>
+    <AssemblyName>Pankha.Tray</AssemblyName>
+    <RootNamespace>Pankha.Tray</RootNamespace>
+
+    <!-- Single-file publish settings -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- Assembly info -->
+    <Company>Pankha Fan Control</Company>
+    <Product>Pankha Tray Application</Product>
+    <Description>System tray application for Pankha Windows Agent</Description>
+    <Copyright>Copyright 2025</Copyright>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Serilog" Version="4.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+  </ItemGroup>
+
+  <!-- Reference shared Models from main agent project -->
+  <ItemGroup>
+    <Compile Include="..\Models\Ipc\IpcMessages.cs" Link="Models\IpcMessages.cs" />
+    <Compile Include="..\Models\Configuration\*.cs" Link="Models\Configuration\%(Filename)%(Extension)" />
+  </ItemGroup>
+
+</Project>

@@ -88,10 +88,21 @@ public class NamedPipeHost : IDisposable
                 }
 
                 Log.Information("IPC: Client connected. Spawning handler...");
-                
+
                 // Handle client in background (Fire and Forget)
                 // This allows the loop to immediately accept the NEXT connection
-                _ = Task.Run(() => HandleClientAsync(server));
+                // Use async lambda to properly await and log any errors
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await HandleClientAsync(server);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "IPC: Unhandled error in client handler");
+                    }
+                });
             }
             catch (OperationCanceledException)
             {
@@ -107,15 +118,18 @@ public class NamedPipeHost : IDisposable
 
     private async Task HandleClientAsync(NamedPipeServerStream server)
     {
+        Log.Information("IPC: Handler entered for client");
+
         // Take ownership of the server stream - ensure it is disposed!
         await using var serverStream = server;
-        
+
         try
         {
+            Log.Debug("IPC: Creating StreamReader/Writer...");
             using var reader = new StreamReader(serverStream, Encoding.UTF8, leaveOpen: true);
             using var writer = new StreamWriter(serverStream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
 
-            Log.Information("IPC: Handler started. Waiting to read...");
+            Log.Information("IPC: Handler ready, waiting to read...");
             
             // Add a timeout for reading the request to prevent stuck connections
             using var readCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);

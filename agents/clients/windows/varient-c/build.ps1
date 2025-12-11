@@ -98,9 +98,9 @@ if ($Clean) {
         if (Test-Path "installer\obj") { Remove-Item -Recurse -Force "installer\obj" }
     }
 
-    # Clean UI artifacts
-    if (Test-Path "Pankha.UI\bin") { Remove-Item -Recurse -Force "Pankha.UI\bin" }
-    if (Test-Path "Pankha.UI\obj") { Remove-Item -Recurse -Force "Pankha.UI\obj" }
+    # Clean Tray app artifacts
+    if (Test-Path "Pankha.Tray\bin") { Remove-Item -Recurse -Force "Pankha.Tray\bin" }
+    if (Test-Path "Pankha.Tray\obj") { Remove-Item -Recurse -Force "Pankha.Tray\obj" }
 
     Write-Host "✅ Clean complete" -ForegroundColor Green
     Write-Host ""
@@ -113,9 +113,9 @@ if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Restore (Agent) failed" -ForegroundColor Red
     exit 1
 }
-dotnet restore "Pankha.UI\Pankha.UI.csproj"
+dotnet restore "Pankha.Tray\Pankha.Tray.csproj"
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Restore (UI) failed" -ForegroundColor Red
+    Write-Host "❌ Restore (Tray) failed" -ForegroundColor Red
     exit 1
 }
 Write-Host "✅ Restore complete" -ForegroundColor Green
@@ -143,16 +143,16 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "✅ Build complete" -ForegroundColor Green
 Write-Host ""
 
-# Build UI
-Write-Host "Building UI ($Configuration)..." -ForegroundColor Yellow
-$UiBuildParams = @("Pankha.UI\Pankha.UI.csproj", "-c", $Configuration)
-if ($AppIconPath) { $UiBuildParams += "/p:AppIconPath=$AppIconPath" }
-dotnet build @UiBuildParams
+# Build Tray App
+Write-Host "Building Tray App ($Configuration)..." -ForegroundColor Yellow
+$TrayBuildParams = @("Pankha.Tray\Pankha.Tray.csproj", "-c", $Configuration)
+if ($AppIconPath) { $TrayBuildParams += "/p:AppIconPath=$AppIconPath" }
+dotnet build @TrayBuildParams
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ UI Build failed" -ForegroundColor Red
+    Write-Host "❌ Tray App Build failed" -ForegroundColor Red
     exit 1
 }
-Write-Host "✅ UI Build complete" -ForegroundColor Green
+Write-Host "✅ Tray App Build complete" -ForegroundColor Green
 Write-Host ""
 
 # Test if requested
@@ -195,10 +195,10 @@ if ($Publish) {
         exit 1
     }
 
-    # Publish UI
-    Write-Host "Publishing UI..." -ForegroundColor Yellow
-    $UiPublishArgs = @(
-        "Pankha.UI\Pankha.UI.csproj",
+    # Publish Tray App
+    Write-Host "Publishing Tray App..." -ForegroundColor Yellow
+    $TrayPublishArgs = @(
+        "Pankha.Tray\Pankha.Tray.csproj",
         "-c", "Release",
         "-r", "win-x64",
         "--self-contained", "true",
@@ -206,27 +206,27 @@ if ($Publish) {
         "/p:IncludeNativeLibrariesForSelfExtract=true",
         "-o", $OutputDir
     )
-    if ($AppIconPath) { 
-        $UiPublishArgs += "/p:ApplicationIcon=$AppIconPath"
-        $UiPublishArgs += "/p:AppIconPath=$AppIconPath"
+    if ($AppIconPath) {
+        $TrayPublishArgs += "/p:ApplicationIcon=$AppIconPath"
+        $TrayPublishArgs += "/p:AppIconPath=$AppIconPath"
     }
 
-    dotnet publish @UiPublishArgs
+    dotnet publish @TrayPublishArgs
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "❌ UI Publish failed" -ForegroundColor Red
+        Write-Host "❌ Tray App Publish failed" -ForegroundColor Red
         exit 1
     }
 
-    # Rename UI Executable
-    $DefaultUiName = "Pankha.UI.exe"
-    $TargetUiName = $Config.Filenames.AgentUI
-    
-    if ($TargetUiName -and $TargetUiName -ne $DefaultUiName) {
-        $SourceUi = Join-Path $OutputDir $DefaultUiName
-        $TargetUi = Join-Path $OutputDir $TargetUiName
-        if (Test-Path $SourceUi) {
-            Move-Item -Force $SourceUi $TargetUi
-            Write-Host "Renamed UI executable to: $TargetUiName" -ForegroundColor Gray
+    # Rename Tray Executable
+    $DefaultTrayName = "Pankha.Tray.exe"
+    $TargetTrayName = $Config.Filenames.AgentUI
+
+    if ($TargetTrayName -and $TargetTrayName -ne $DefaultTrayName) {
+        $SourceTray = Join-Path $OutputDir $DefaultTrayName
+        $TargetTray = Join-Path $OutputDir $TargetTrayName
+        if (Test-Path $SourceTray) {
+            Move-Item -Force $SourceTray $TargetTray
+            Write-Host "Renamed Tray executable to: $TargetTrayName" -ForegroundColor Gray
         }
     }
 
