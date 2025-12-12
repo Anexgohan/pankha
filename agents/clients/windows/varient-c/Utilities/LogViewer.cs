@@ -12,7 +12,7 @@ public static class LogViewer
     private static readonly string LOG_DIRECTORY = Path.Combine(AppContext.BaseDirectory, "logs");
 
     /// <summary>
-    /// Get the most recent log file
+    /// Get the current log file
     /// </summary>
     private static FileInfo? GetLatestLogFile()
     {
@@ -21,10 +21,14 @@ public static class LogViewer
             return null;
         }
 
-        var directory = new DirectoryInfo(LOG_DIRECTORY);
-        return directory.GetFiles("agent-*.log")
-            .OrderByDescending(f => f.LastWriteTime)
-            .FirstOrDefault();
+        string logFileName = Path.ChangeExtension(AppDomain.CurrentDomain.FriendlyName, ".log");
+        var path = Path.Combine(LOG_DIRECTORY, logFileName);
+        if (File.Exists(path))
+        {
+            return new FileInfo(path);
+        }
+        
+        return null;
     }
 
     /// <summary>
@@ -145,7 +149,7 @@ public static class LogViewer
         }
 
         var directory = new DirectoryInfo(LOG_DIRECTORY);
-        var logFiles = directory.GetFiles("agent-*.log")
+        var logFiles = directory.GetFiles("*.log")
             .OrderByDescending(f => f.LastWriteTime)
             .ToList();
 

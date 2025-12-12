@@ -32,6 +32,9 @@ public class ConfigForm : Form
     private NumericUpDown _fanStepNumeric = null!;
     private NumericUpDown _hysteresisNumeric = null!;
 
+    // Logging Settings
+    private ComboBox _logLevelComboBox = null!;
+
     // Buttons
     private Button _saveButton = null!;
     private Button _cancelButton = null!;
@@ -50,7 +53,7 @@ public class ConfigForm : Form
     private void InitializeComponents()
     {
         Text = "Pankha Agent Configuration";
-        Size = new Size(450, 520);
+        Size = new Size(450, 700); // Increased Height
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -88,7 +91,7 @@ public class ConfigForm : Form
 
         var backendY = 22;
         AddTextBoxRow(backendGroup, "URL:", ref _backendUrlTextBox, ref backendY, 80);
-        AddNumericRow(backendGroup, "Reconnect (ms):", ref _reconnectIntervalNumeric, ref backendY, 80, 1000, 60000, 1000);
+        AddNumericRow(backendGroup, "Reconnect (ms):", ref _reconnectIntervalNumeric, ref backendY, 80, 1000, 60000, 0, 1000);
 
         y += backendGroup.Height + 10;
 
@@ -124,21 +127,36 @@ public class ConfigForm : Form
         AddNumericRow(monitorGroup, "Fan Step (%):", ref _fanStepNumeric, ref monY, 100, 1, 50, 0);
         AddNumericRow(monitorGroup, "Hysteresis (°C):", ref _hysteresisNumeric, ref monY, 100, 0, 10, 1, 1);
 
-        y += monitorGroup.Height + 15;
+        y += monitorGroup.Height + 10;
+
+        // === Logging Group ===
+        var logGroup = new GroupBox
+        {
+            Text = "Logging",
+            Location = new Point(padding, y),
+            Size = new Size(ClientSize.Width - (padding * 2), 60)
+        };
+        Controls.Add(logGroup);
+
+        var logY = 22;
+        AddComboBoxRow(logGroup, "Log Level:", ref _logLevelComboBox, ref logY, 80, 
+            new[] { "Trace", "Debug", "Information", "Warning", "Error", "Fatal" });
+
+        y += logGroup.Height + 15;
 
         // === Buttons ===
         _saveButton = new Button
         {
-            Text = "Save && Restart Service",
-            Location = new Point(ClientSize.Width - 240, y),
-            Size = new Size(140, 30)
+            Text = "Save",
+            Location = new Point(ClientSize.Width - 190, y),
+            Size = new Size(90, 30)
         };
         _saveButton.Click += async (s, e) => await SaveConfigAsync();
         Controls.Add(_saveButton);
 
         _cancelButton = new Button
         {
-            Text = "Cancel",
+            Text = "Close",
             Location = new Point(ClientSize.Width - 90, y),
             Size = new Size(70, 30)
         };
@@ -216,6 +234,29 @@ public class ConfigForm : Form
         y += 26;
     }
 
+    private void AddComboBoxRow(Control parent, string label, ref ComboBox comboBox, ref int y, int labelWidth, string[] items)
+    {
+         var lbl = new Label
+         {
+             Text = label,
+             Location = new Point(10, y + 3),
+             Size = new Size(labelWidth, 20),
+             TextAlign = ContentAlignment.MiddleRight
+         };
+         parent.Controls.Add(lbl);
+
+         comboBox = new ComboBox
+         {
+             Location = new Point(labelWidth + 15, y),
+             Size = new Size(120, 23),
+             DropDownStyle = ComboBoxStyle.DropDownList
+         };
+         comboBox.Items.AddRange(items);
+         parent.Controls.Add(comboBox);
+
+         y += 28;
+    }
+
     private async Task LoadConfigAsync()
     {
         _statusLabel.Text = "Loading...";
@@ -244,6 +285,17 @@ public class ConfigForm : Form
                 _toleranceNumeric.Value = (decimal)_currentConfig.Monitoring.DuplicateSensorTolerance;
                 _fanStepNumeric.Value = _currentConfig.Monitoring.FanStepPercent;
                 _hysteresisNumeric.Value = (decimal)_currentConfig.Monitoring.HysteresisTemp;
+
+                // Set Log Level (default Information if unknown)
+                var level = _currentConfig.Logging.LogLevel ?? "Information";
+                // Capitalize first letter to match items
+                if (!string.IsNullOrEmpty(level) && level.Length > 1) 
+                     level = char.ToUpper(level[0]) + level.Substring(1).ToLower();
+
+                if (_logLevelComboBox.Items.Contains(level))
+                    _logLevelComboBox.SelectedItem = level;
+                else
+                    _logLevelComboBox.SelectedItem = "Information";
 
                 _statusLabel.Text = "Ready";
                 _saveButton.Enabled = true;
@@ -288,25 +340,14 @@ public class ConfigForm : Form
             _currentConfig.Monitoring.FanStepPercent = (int)_fanStepNumeric.Value;
             _currentConfig.Monitoring.HysteresisTemp = (double)_hysteresisNumeric.Value;
 
+            _currentConfig.Logging.LogLevel = _logLevelComboBox.SelectedItem?.ToString() ?? "Information";
+
             var success = await _ipcClient.SetConfigAsync(_currentConfig);
 
             if (success)
             {
-                _statusLabel.Text = "Saved! Restart service to apply.";
+                _statusLabel.Text = "Saved successfully.";
                 _statusLabel.ForeColor = Color.Green;
-
-                // Offer to restart service
-                var result = MessageBox.Show(
-                    "Configuration saved. Would you like to restart the service now?",
-                    "Configuration Saved",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Question);
-
-                if (result == DialogResult.Yes)
-                {
-                    // Use same method as tray context
-                    RestartService();
-                }
             }
             else
             {

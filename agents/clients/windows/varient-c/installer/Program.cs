@@ -183,7 +183,9 @@ namespace Pankha.WixSharpInstaller
                 {
                     new Property("KEEP_CONFIG", "1") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } }, 
                     new Property("RESET_CONFIG", "0") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } },
-                    new Property("KEEP_LOGS", "1") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } }
+                    new Property("KEEP_LOGS", "1") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } },
+                    new Property("MSIRESTARTMANAGERCONTROL", "Disable"), // Prevent killing apps like procexp
+                    new Property("MSIDISABLERMRESTART", "1") // Legacy disable for Restart Manager interaction
                 };
 
                 // Enable full UI for uninstall
@@ -475,13 +477,34 @@ namespace Pankha.WixSharpInstaller
                         LogToDebugFile(logBaseDir, logType, "Phase: Killing Processes...");
                         
                         // Dynamically determine process name from configured Exe name passed via CustomActionData
+                        // Dynamically determine process name from configured Exe name passed via CustomActionData
                         string agentExeName = GetProperty("AgentExe");
+                        string agentUiName = GetProperty("AgentUI"); // Get UI name
+
                         string processName = !string.IsNullOrEmpty(agentExeName) 
                             ? IO.Path.GetFileNameWithoutExtension(agentExeName) 
                             : "pankha-agent-windows"; // Fallback
 
-                        LogToDebugFile(logBaseDir, logType, $"Targeting process name: '{processName}'");
+                        string uiProcessName = !string.IsNullOrEmpty(agentUiName)
+                            ? IO.Path.GetFileNameWithoutExtension(agentUiName)
+                            : "pankha-tray";
 
+                        LogToDebugFile(logBaseDir, logType, $"Targeting Agent process: '{processName}'");
+                        LogToDebugFile(logBaseDir, logType, $"Targeting UI process: '{uiProcessName}'");
+
+                        // Kill UI first
+                        foreach (var proc in Process.GetProcessesByName(uiProcessName))
+                        {
+                            try 
+                            { 
+                                proc.Kill(); 
+                                proc.WaitForExit(5000);
+                                LogToDebugFile(logBaseDir, logType, $"Killed UI process {proc.Id}");
+                            } 
+                            catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Failed to kill UI process {proc.Id}: {ex.Message}"); }
+                        }
+
+                        // Kill Agent
                         foreach (var proc in Process.GetProcessesByName(processName))
                         {
                             try 

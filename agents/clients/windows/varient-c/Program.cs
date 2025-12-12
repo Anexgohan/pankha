@@ -275,13 +275,10 @@ class Program
         // Ensure directories exist first
         Directory.CreateDirectory(Path.GetDirectoryName(LOG_PATH)!);
 
-        // 1. Cleanup old logs (Retain last 10)
-        CleanupOldLogs(Path.GetDirectoryName(LOG_PATH)!, 10);
-
-        // 2. Generate unique filename for this session
-        // Format: agent-YYYYMMDD_HHMMSS.log
-        string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-        string uniqueLogPath = Path.Combine(Path.GetDirectoryName(LOG_PATH)!, $"agent-{timestamp}.log");
+        // 1. Generate dynamic filename based on executable name
+        // This ensures compatibility if the executable name changes in build-config.json
+        string logFileName = Path.ChangeExtension(AppDomain.CurrentDomain.FriendlyName, ".log");
+        string logPath = Path.Combine(Path.GetDirectoryName(LOG_PATH)!, logFileName);
 
         var level = logLevel.ToLowerInvariant() switch
         {
@@ -303,50 +300,15 @@ class Program
             .WriteTo.Console(
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .WriteTo.File(
-                path: uniqueLogPath,
-                rollingInterval: RollingInterval.Infinite, // We handle rotation manually per session
-                fileSizeLimitBytes: 52428800, // 50MB
+                path: logPath,
+                rollingInterval: RollingInterval.Infinite, // Single file
+                fileSizeLimitBytes: 10485760, // 10MB limit
+                rollOnFileSizeLimit: true, // Roll to .1, .2 if too big (keep 31 max default)
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
             
         // Log the file we are using
-        // Log.Information("Logging to file: {Path}", uniqueLogPath); // Too early? Logger just created.
-    }
-
-    /// <summary>
-    /// Cleanup old log files, keeping only the most recent N files.
-    /// </summary>
-    static void CleanupOldLogs(string logDir, int maxFiles)
-    {
-        try
-        {
-            if (!Directory.Exists(logDir)) return;
-
-            var dirInfo = new DirectoryInfo(logDir);
-            var files = dirInfo.GetFiles("agent-*.log")
-                               .OrderByDescending(f => f.LastWriteTime)
-                               .ToList();
-
-            if (files.Count > maxFiles)
-            {
-                var filesToDelete = files.Skip(maxFiles);
-                foreach (var file in filesToDelete)
-                {
-                    try
-                    {
-                        file.Delete();
-                    }
-                    catch (Exception) 
-                    { 
-                        // Ignore lock errors or permissions issues during cleanup
-                    }
-                }
-            }
-        }
-        catch (Exception)
-        {
-            // Fail safe - do not crash application just because cleanup failed
-        }
+        // Log.Information("Logging to file: {Path}", logPath);
     }
 
     /// <summary>

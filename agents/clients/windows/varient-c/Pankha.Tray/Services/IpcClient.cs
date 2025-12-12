@@ -55,12 +55,13 @@ public class IpcClient
             using var connectCts = new CancellationTokenSource(CONNECT_TIMEOUT_MS);
             try
             {
+                Log.Debug("IPC: Client calling ConnectAsync...");
                 await client.ConnectAsync(connectCts.Token);
                 Log.Debug("IPC: Connected to pipe");
             }
             catch (OperationCanceledException)
             {
-                Log.Debug("IPC: Connection timeout ({Timeout}ms)", CONNECT_TIMEOUT_MS);
+                Log.Warning("IPC: Connection timeout ({Timeout}ms)", CONNECT_TIMEOUT_MS);
                 return default;
             }
             catch (Exception ex)
@@ -69,8 +70,9 @@ public class IpcClient
                 return default;
             }
 
-            using var reader = new StreamReader(client, Encoding.UTF8, leaveOpen: true);
-            using var writer = new StreamWriter(client, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+            Log.Debug("IPC: Creating StreamWriter...");
+            var encoding = new UTF8Encoding(false);
+            using var writer = new StreamWriter(client, encoding, leaveOpen: true) { AutoFlush = true };
 
             // Build and send request
             var request = new IpcMessage
@@ -83,6 +85,10 @@ public class IpcClient
             Log.Debug("IPC: Sending {Bytes} bytes", requestJson.Length);
             await writer.WriteLineAsync(requestJson);
 
+            // Create Reader
+            Log.Debug("IPC: Creating StreamReader...");
+            using var reader = new StreamReader(client, encoding, leaveOpen: true);
+            
             // Read response with timeout
             using var readCts = new CancellationTokenSource(READ_TIMEOUT_MS);
             try

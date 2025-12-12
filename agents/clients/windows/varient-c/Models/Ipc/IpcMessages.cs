@@ -15,6 +15,7 @@ public class IpcMessage
 public class AgentStatus
 {
     public string AgentId { get; set; } = string.Empty;
+    public string AgentName { get; set; } = string.Empty;
     public string Version { get; set; } = string.Empty;
     public string ConnectionState { get; set; } = "Disconnected"; // "Connected", "Connecting", "Disconnected"
     public int SensorsDiscovered { get; set; }

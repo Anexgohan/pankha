@@ -194,31 +194,39 @@ public class TrayApplicationContext : ApplicationContext
     {
         try
         {
-            // Try common app data first
-            string logDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-                "Pankha Fan Control", "logs");
+            // Use --logs follow command via RunServiceCommand logic
+            // But we want to run it as a standalone client command, not a service command.
+            // Actually, we can reuse the agent executable finding logic.
+            
+            string trayDir = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
+            string agentExe = Path.Combine(trayDir, "pankha-agent.exe");
 
-            if (!Directory.Exists(logDir))
+            if (!File.Exists(agentExe))
             {
-                // Fallback to install directory logs
-                string installDir = Path.GetDirectoryName(Application.ExecutablePath) ?? "";
-                logDir = Path.Combine(installDir, "logs");
+                agentExe = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "Pankha", "pankha-agent.exe");
             }
 
-            if (Directory.Exists(logDir))
+            if (File.Exists(agentExe))
             {
-                Process.Start("explorer.exe", logDir);
+                 var psi = new ProcessStartInfo
+                 {
+                     FileName = agentExe,
+                     Arguments = "--logs follow",
+                     UseShellExecute = true // Opens new console window
+                 };
+                 Process.Start(psi);
             }
             else
             {
-                MessageBox.Show("Log directory not found.", "Pankha Tray",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Agent executable not found. Cannot view logs.", "Pankha Tray",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to open logs folder");
+            Log.Error(ex, "Failed to open logs viewer");
             MessageBox.Show($"Error: {ex.Message}", "Pankha Tray",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -282,13 +290,22 @@ public class TrayApplicationContext : ApplicationContext
 
     private Icon GetConnectedIcon()
     {
-        // Use system icon as placeholder - in production, embed custom icon
-        return SystemIcons.Application;
+        // Extract icon from executable itself (it has the correct embedded icon)
+        try 
+        {
+             return Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+        }
+        catch
+        {
+             return SystemIcons.Application;
+        }
     }
 
     private Icon GetDisconnectedIcon()
     {
-        // Use system icon as placeholder - in production, embed custom icon
+         // For disconnected, maybe use a Warning icon, or we could grayscale the main icon?
+         // For now, let's keep the main icon but maybe add a tooltip?
+         // Or Stick to SystemIcons.Warning to clearly indicate "Not Running"
         return SystemIcons.Warning;
     }
 

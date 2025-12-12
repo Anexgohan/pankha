@@ -5,6 +5,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Pankha.WindowsAgent.Models.Configuration;
 using Pankha.WindowsAgent.Models.Ipc;
+using Pankha.WindowsAgent.Platform;
 using Serilog;
 
 namespace Pankha.WindowsAgent.Services;
@@ -87,7 +88,7 @@ public class NamedPipeHost : IDisposable
                     throw;
                 }
 
-                Log.Information("IPC: Client connected. Spawning handler...");
+                // Log.Information("IPC: Client connected. Spawning handler...");
 
                 // Handle client in background (Fire and Forget)
                 // This allows the loop to immediately accept the NEXT connection
@@ -96,11 +97,13 @@ public class NamedPipeHost : IDisposable
                 {
                     try
                     {
+                        // Log.Information("IPC: Background task started for client {Handle}", server.SafePipeHandle.IsInvalid ? "Invalid" : "Valid");
                         await HandleClientAsync(server);
                     }
                     catch (Exception ex)
                     {
                         Log.Error(ex, "IPC: Unhandled error in client handler");
+                        try { await server.DisposeAsync(); } catch { }
                     }
                 });
             }
@@ -118,18 +121,20 @@ public class NamedPipeHost : IDisposable
 
     private async Task HandleClientAsync(NamedPipeServerStream server)
     {
-        Log.Information("IPC: Handler entered for client");
+        // Log.Information("IPC: Handler entered for client (Thread {Id})", Environment.CurrentManagedThreadId);
 
         // Take ownership of the server stream - ensure it is disposed!
         await using var serverStream = server;
 
         try
         {
-            Log.Debug("IPC: Creating StreamReader/Writer...");
-            using var reader = new StreamReader(serverStream, Encoding.UTF8, leaveOpen: true);
-            using var writer = new StreamWriter(serverStream, Encoding.UTF8, leaveOpen: true) { AutoFlush = true };
+            // Log.Information("IPC: Creating StreamReader/Writer...");
+            // Use UTF8 without BOM to prevent constructor blocking on Preamble detection
+            var encoding = new UTF8Encoding(false);
+            using var reader = new StreamReader(serverStream, encoding, leaveOpen: true);
+            using var writer = new StreamWriter(serverStream, encoding, leaveOpen: true) { AutoFlush = true };
 
-            Log.Information("IPC: Handler ready, waiting to read...");
+            // Log.Information("IPC: Handler ready, waiting to read...");
             
             // Add a timeout for reading the request to prevent stuck connections
             using var readCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
@@ -142,7 +147,7 @@ public class NamedPipeHost : IDisposable
                 Log.Warning("IPC: Client disconnected or sent empty line.");
                 return;
             }
-            Log.Information("IPC: Received {Bytes} chars. Processing...", line.Length);
+            // Log.Information("IPC: Received {Bytes} chars. Processing...", line.Length);
 
             var request = JsonConvert.DeserializeObject<IpcMessage>(line);
             if (request == null) return;
@@ -155,6 +160,7 @@ public class NamedPipeHost : IDisposable
                     response = new AgentStatus
                     {
                         AgentId = _config.Agent.AgentId,
+                        AgentName = _config.Agent.Name,
                         Version = "1.2.0",
                         ConnectionState = _wsClient.State.ToString(),
                         SensorsDiscovered = 0, // Mock
@@ -177,7 +183,18 @@ public class NamedPipeHost : IDisposable
                             if (newConfig != null)
                             {
                                 newConfig.Agent.Validate(); 
-                                Log.Information("IPC: Configuration updated via Named Pipe");
+                                
+                                // Fix: Explicitly save to disk
+                                newConfig.SaveToFile(PathResolver.ConfigPath);
+
+                                // Update in-memory config references
+                                _config.Agent = newConfig.Agent;
+                                _config.Backend = newConfig.Backend;
+                                _config.Hardware = newConfig.Hardware;
+                                _config.Monitoring = newConfig.Monitoring;
+                                _config.Logging = newConfig.Logging;
+
+                                Log.Information("IPC: Configuration saved to {Path}", PathResolver.ConfigPath);
                                 response = new { Success = true };
                             }
                         }

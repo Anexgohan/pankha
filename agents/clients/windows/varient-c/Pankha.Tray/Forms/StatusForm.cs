@@ -158,7 +158,7 @@ public class StatusForm : Form
                 _uptimeLabel.Text = FormatUptime(status.Uptime);
                 _lastUpdateLabel.Text = DateTime.Now.ToString("HH:mm:ss");
                 _agentIdLabel.Text = status.AgentId;
-                _agentNameLabel.Text = status.AgentId; // TODO: Get from config
+                _agentNameLabel.Text = status.AgentName;
                 _versionLabel.Text = status.Version;
                 _backendLabel.Text = "Connected"; // TODO: Get actual URL
             }
