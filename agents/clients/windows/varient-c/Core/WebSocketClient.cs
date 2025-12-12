@@ -144,6 +144,17 @@ public class WebSocketClient : IDisposable
     }
 
     /// <summary>
+    /// Manually trigger a registration update (e.g. after config change)
+    /// </summary>
+    public async Task TriggerConfigurationUpdateAsync()
+    {
+        if (IsConnected)
+        {
+            await SendRegistrationAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>
     /// Send registration message to backend
     /// </summary>
     private async Task SendRegistrationAsync(CancellationToken cancellationToken)

@@ -195,6 +195,11 @@ public class NamedPipeHost : IDisposable
                                 _config.Logging = newConfig.Logging;
 
                                 Log.Information("IPC: Configuration saved to {Path}", PathResolver.ConfigPath);
+                                
+                                // FORCE FRONTEND UPDATE:
+                                Log.Information("IPC: Triggering backend registration update...");
+                                await _wsClient.TriggerConfigurationUpdateAsync();
+
                                 response = new { Success = true };
                             }
                         }

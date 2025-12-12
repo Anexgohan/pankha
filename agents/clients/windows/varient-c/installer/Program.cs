@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using WixSharp;
 using WixSharp.CommonTasks;
 using WixSharp.UI.Forms;
@@ -142,7 +143,7 @@ namespace Pankha.WixSharpInstaller
                 // ... (Metadata) ...
                 project.GUID = Guid.NewGuid();
                 project.UpgradeCode = UpgradeCode;
-                project.Version = new Version("1.0.14"); // Could also be read from config or AssemblyInfo
+                project.Version = new Version("1.0.15"); // Could also be read from config or AssemblyInfo
                 project.Platform = Platform.x64;
                 project.InstallScope = InstallScope.perMachine;
                 
@@ -159,7 +160,8 @@ namespace Pankha.WixSharpInstaller
                 project.MajorUpgrade = new MajorUpgrade
                 {
                     Schedule = UpgradeSchedule.afterInstallInitialize,
-                    DowngradeErrorMessage = "A newer version is already installed."
+                    DowngradeErrorMessage = "A newer version is already installed.",
+                    AllowSameVersionUpgrades = true
                 };
 
                 // Setup ManagedUI
@@ -169,6 +171,7 @@ namespace Pankha.WixSharpInstaller
                 // Install dialogs
                 project.ManagedUI.InstallDialogs.Add<WelcomeDialog>()
                                                  .Add<InstallDirDialog>()
+                                                 .Add<ConfigurationDialog>() // Add our custom dialog
                                                  .Add<ProgressDialog>()
                                                  .Add<ConditionalExitDialog>();
 
@@ -216,7 +219,7 @@ namespace Pankha.WixSharpInstaller
                 // Or I should use `ProductName`.
                 
                 // Let's use standard `ProductName`.
-                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI";
+                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI,UPGRADINGPRODUCTCODE";
 
                 // Event handlers
                 project.BeforeInstall += OnBeforeInstall;
@@ -389,6 +392,7 @@ namespace Pankha.WixSharpInstaller
                 string installDirProp = GetProperty("INSTALLDIR");
                 string manufacturer = GetProperty("Manufacturer");
                 string product = GetProperty("ProductName");
+                string upgradingProductCode = GetProperty("UPGRADINGPRODUCTCODE");
 
                 // LOGGING: Use Central Directory with Dynamic Manufacturer
                 string logBaseDir = GetCommonAppLogDir(manufacturer);
@@ -397,6 +401,9 @@ namespace Pankha.WixSharpInstaller
                 LogToDebugFile(logBaseDir, logType, $"Context: IsUninstalling={isUninstalling}");
                 LogToDebugFile(logBaseDir, logType, $"Target InstallDir (for Cleanup): '{installDirProp}'");
                 LogToDebugFile(logBaseDir, logType, $"Manufacturer (Dynamic): '{manufacturer}'");
+                LogToDebugFile(logBaseDir, logType, $"Upgrade Code Detected: '{upgradingProductCode}'");
+
+                bool isUpgrade = !string.IsNullOrEmpty(upgradingProductCode);
 
                 if (!isUninstalling)
                 {
@@ -547,6 +554,22 @@ namespace Pankha.WixSharpInstaller
                         catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Driver file delete error: {ex.Message}"); }
                         
                         // 3. Files Cleanup
+                        if (isUpgrade && resetConfig != "1")
+                        {
+                            LogToDebugFile(logBaseDir, logType, "UPGRADE DETECTED & KEEP CONFIG (Default): Skipping deletion of Config, Logs, and Shortcuts.");
+                            // We return early from cleanup
+                            LogToDebugFile(logBaseDir, logType, "=== Cleanup Phase Complete (Upgrade Preserved) ===");
+                            return; 
+                        }
+
+                        if (resetConfig == "1")
+                        {
+                             LogToDebugFile(logBaseDir, logType, "CLEAN INSTALL REQUESTED (ResetConfig=1). Forcing deletion of config/logs.");
+                             // Force variables to false to ensure deletion logic runs
+                             keepConfig = "0";
+                             keepLogs = "0";
+                        }
+
                         LogToDebugFile(logBaseDir, logType, "Phase: File Cleanup...");
                         bool shouldKeep = (keepConfig == "1");
                         bool shouldKeepLogs = (keepLogs == "1");
@@ -629,15 +652,126 @@ namespace Pankha.WixSharpInstaller
         }
     }
 
+
+
+    public class ConfigurationDialog : ManagedForm, IManagedDialog
+    {
+        private CheckBox resetConfigCheckBox;
+        private Label descriptionLabel;
+        private Panel bottomPanel;
+        private Button backButton;
+        private Button nextButton;
+        private Button cancelButton;
+        private Panel topBorder;
+        private Panel bottomBorder; // We will use predefined panels if possible or create standard shell
+        
+        // Standard Banner components
+        private PictureBox banner;
+        private Label bannerTitle;
+        private Label bannerDescription;
+
+        public ConfigurationDialog()
+        {
+            // Basic Form Init
+            this.ClientSize = new System.Drawing.Size(494, 312);
+            this.Text = "Pankha Windows Agent Setup";
+            
+            InitializeComponent();
+        }
+
+        private void InitializeComponent()
+        {
+            // 1. Banner
+            this.banner = new PictureBox();
+            this.banner.Size = new System.Drawing.Size(494, 58);
+            this.banner.Location = new System.Drawing.Point(0, 0);
+            this.banner.BackColor = System.Drawing.Color.White;
+            // banner.Image = ... (ManagedUI handles resources usually, or we skip image)
+            
+            this.bannerTitle = new Label();
+            this.bannerTitle.Text = "Configuration Options";
+            this.bannerTitle.Font = new System.Drawing.Font("Tahoma", 9F, System.Drawing.FontStyle.Bold);
+            this.bannerTitle.Location = new System.Drawing.Point(15, 15);
+            this.bannerTitle.AutoSize = true;
+            this.bannerTitle.BackColor = System.Drawing.Color.White;
+
+            this.bannerDescription = new Label();
+            this.bannerDescription.Text = "Choose how to handle existing configuration.";
+            this.bannerDescription.Location = new System.Drawing.Point(25, 35);
+            this.bannerDescription.AutoSize = true;
+            this.bannerDescription.BackColor = System.Drawing.Color.White;
+
+            // Lines
+            var line1 = new Panel { Location = new Point(0, 58), Size = new Size(494, 1), BackColor = SystemColors.ControlDark };
+            var line2 = new Panel { Location = new Point(0, 268), Size = new Size(494, 1), BackColor = SystemColors.ControlDark };
+
+            // 2. Content
+            this.descriptionLabel = new Label();
+            this.descriptionLabel.Text = "If you are upgrading or reinstalling, you can choose to keep your existing configuration logic and logs, or perform a clean install.";
+            this.descriptionLabel.Location = new Point(25, 80);
+            this.descriptionLabel.Size = new Size(440, 40);
+
+            this.resetConfigCheckBox = new CheckBox();
+            this.resetConfigCheckBox.Text = "Reset configuration (Clean Install)";
+            this.resetConfigCheckBox.Location = new Point(25, 140);
+            this.resetConfigCheckBox.Size = new Size(400, 20);
+            this.resetConfigCheckBox.Font = new Font("Tahoma", 9F, FontStyle.Bold); // Emphasize
+            
+            var resetDesc = new Label();
+            resetDesc.Text = "WARNING: If checked, your existing 'config.json' and 'logs' folder will be DELETED.\nSelect this if you want to start fresh.";
+            resetDesc.Location = new Point(42, 165); // Indented under checkbox
+            resetDesc.Size = new Size(400, 40);
+            resetDesc.ForeColor = Color.DarkRed;
+
+            // 3. Buttons (Bottom Panel)
+            
+            this.backButton = new Button { Text = "< Back", Location = new Point(224, 279), Size = new Size(75, 23) };
+            this.nextButton = new Button { Text = "Next >", Location = new Point(304, 279), Size = new Size(75, 23) };
+            this.cancelButton = new Button { Text = "Cancel", Location = new Point(404, 279), Size = new Size(75, 23) };
+
+            this.backButton.Click += (s, e) => Shell.GoPrev();
+            this.nextButton.Click += (s, e) => Shell.GoNext();
+            this.cancelButton.Click += (s, e) => Shell.Cancel();
+
+            // Add Controls
+            this.Controls.Add(bannerTitle);
+            this.Controls.Add(bannerDescription);
+            this.Controls.Add(banner);
+            this.Controls.Add(line1);
+            
+            this.Controls.Add(descriptionLabel);
+            this.Controls.Add(resetConfigCheckBox);
+            this.Controls.Add(resetDesc);
+            
+            this.Controls.Add(line2);
+            this.Controls.Add(backButton);
+            this.Controls.Add(nextButton);
+            this.Controls.Add(cancelButton);
+
+            this.Load += ConfigurationDialog_Load;
+        }
+
+        private void ConfigurationDialog_Load(object sender, EventArgs e)
+        {
+            // Bind Property
+            string val = MsiRuntime.Session["RESET_CONFIG"];
+            this.resetConfigCheckBox.Checked = (val == "1");
+
+            // Save on change
+            this.resetConfigCheckBox.CheckedChanged += (s, ev) => 
+            {
+                MsiRuntime.Session["RESET_CONFIG"] = this.resetConfigCheckBox.Checked ? "1" : "0";
+            };
+        }
+    }
+
+
     public class ConditionalExitDialog : ExitDialog
     {
         protected override void OnLoad(EventArgs e)
         {
             if (Program.IsSelfElevating)
             {
-                // Signalling exit to the shell is enough. 
-                // DO NOT call Close() here as it causes ObjectDisposedException during form creation.
-                // Just hide it and let the shell loop terminate.
                 this.Opacity = 0;
                 this.ShowInTaskbar = false;
                 this.Visible = false;
