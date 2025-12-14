@@ -1,3 +1,4 @@
+using Pankha.WindowsAgent.Platform;
 using Serilog;
 
 namespace Pankha.WindowsAgent.Utilities;
@@ -5,29 +6,24 @@ namespace Pankha.WindowsAgent.Utilities;
 /// <summary>
 /// Log file viewer utility
 /// Provides log viewing capabilities similar to tail command
+/// Note: Log file is single file (named after executable from build-config.json)
+///       and is overwritten on each service start for clean troubleshooting
 /// </summary>
 public static class LogViewer
 {
-    // Dynamically determine log directory from executable location
-    private static readonly string LOG_DIRECTORY = Path.Combine(AppContext.BaseDirectory, "logs");
-
     /// <summary>
-    /// Get the current log file
+    /// Get the current log file (single file matching executable name)
     /// </summary>
     private static FileInfo? GetLatestLogFile()
     {
-        if (!Directory.Exists(LOG_DIRECTORY))
+        // Use PathResolver for consistent log file path
+        string logPath = PathResolver.LogFilePath;
+
+        if (File.Exists(logPath))
         {
-            return null;
+            return new FileInfo(logPath);
         }
 
-        string logFileName = Path.ChangeExtension(AppDomain.CurrentDomain.FriendlyName, ".log");
-        var path = Path.Combine(LOG_DIRECTORY, logFileName);
-        if (File.Exists(path))
-        {
-            return new FileInfo(path);
-        }
-        
         return null;
     }
 
@@ -40,7 +36,7 @@ public static class LogViewer
 
         if (logFile == null || !logFile.Exists)
         {
-            Log.Warning("❌ No log files found in {Directory}", LOG_DIRECTORY);
+            Log.Warning("❌ Log file not found: {Path}", PathResolver.LogFilePath);
             return;
         }
 
@@ -81,7 +77,7 @@ public static class LogViewer
 
         if (logFile == null || !logFile.Exists)
         {
-            Log.Warning("❌ No log files found in {Directory}", LOG_DIRECTORY);
+            Log.Warning("❌ Log file not found: {Path}", PathResolver.LogFilePath);
             return;
         }
 
@@ -138,30 +134,33 @@ public static class LogViewer
     }
 
     /// <summary>
-    /// List all available log files
+    /// List all available log files (shows current log + any old files from previous versions)
     /// </summary>
     public static void ListLogFiles()
     {
-        if (!Directory.Exists(LOG_DIRECTORY))
+        string logDirectory = PathResolver.LogPath;
+
+        if (!Directory.Exists(logDirectory))
         {
-            Log.Warning("❌ Log directory not found: {Directory}", LOG_DIRECTORY);
+            Log.Warning("❌ Log directory not found: {Directory}", logDirectory);
             return;
         }
 
-        var directory = new DirectoryInfo(LOG_DIRECTORY);
-        var logFiles = directory.GetFiles("*.log")
+        var directory = new DirectoryInfo(logDirectory);
+        var logFiles = directory.GetFiles("*.log*")  // Include .log.1, .log.2 from old config
             .OrderByDescending(f => f.LastWriteTime)
             .ToList();
 
         if (!logFiles.Any())
         {
-            Log.Information("No log files found in {Directory}", LOG_DIRECTORY);
+            Log.Information("No log files found in {Directory}", logDirectory);
             return;
         }
 
-        Log.Information("📂 Log files in {Directory}:", LOG_DIRECTORY);
+        Log.Information("📂 Log files in {Directory}:", logDirectory);
         Log.Information("");
 
+        var currentLog = PathResolver.LogFilePath;
         foreach (var file in logFiles)
         {
             var sizeKb = file.Length / 1024.0;
@@ -173,12 +172,16 @@ public static class LogViewer
                     ? $"{(int)age.TotalHours}h ago"
                     : $"{(int)age.TotalMinutes}m ago";
 
-            Log.Information("  • {Name} - {Size:F1} KB - {Age}", file.Name, sizeKb, ageStr);
+            var marker = file.FullName == currentLog ? "→ " : "  ";
+            Log.Information("{Marker}• {Name} - {Size:F1} KB - {Age}", marker, file.Name, sizeKb, ageStr);
         }
 
         Log.Information("");
+        Log.Information("Note: Current log file is overwritten on each service start.");
+        Log.Information("      Old numbered files (.1, .2) are from previous configuration.");
+        Log.Information("");
         Log.Information("To view logs:");
-        Log.Information("  pankha-agent-windows.exe --logs 50      # Last 50 lines");
-        Log.Information("  pankha-agent-windows.exe --logs follow  # Live tail");
+        Log.Information("  {ExeName} --logs 50      # Last 50 lines", Path.GetFileName(PathResolver.ExecutablePath));
+        Log.Information("  {ExeName} --logs follow  # Live tail", Path.GetFileName(PathResolver.ExecutablePath));
     }
 }

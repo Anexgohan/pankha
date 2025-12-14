@@ -177,13 +177,19 @@ public class NamedPipeHost : IDisposable
                 case IpcCommands.SET_CONFIG:
                    if (request.Payload != null)
                    {
-                        try 
+                        try
                         {
                             var newConfig = JsonConvert.DeserializeObject<AgentConfig>(request.Payload);
                             if (newConfig != null)
                             {
-                                newConfig.Agent.Validate(); 
-                                
+                                newConfig.Agent.Validate();
+
+                                // Check if log level changed
+                                bool logLevelChanged = !string.Equals(
+                                    _config.Logging.LogLevel,
+                                    newConfig.Logging.LogLevel,
+                                    StringComparison.OrdinalIgnoreCase);
+
                                 // Fix: Explicitly save to disk
                                 newConfig.SaveToFile(PathResolver.ConfigPath);
 
@@ -195,7 +201,27 @@ public class NamedPipeHost : IDisposable
                                 _config.Logging = newConfig.Logging;
 
                                 Log.Information("IPC: Configuration saved to {Path}", PathResolver.ConfigPath);
-                                
+
+                                // Apply log level change immediately (same logic as CommandHandler)
+                                if (logLevelChanged && !string.IsNullOrEmpty(newConfig.Logging.LogLevel))
+                                {
+                                    var upperLevel = newConfig.Logging.LogLevel.ToUpperInvariant();
+                                    var serilogLevel = upperLevel switch
+                                    {
+                                        "TRACE" => Serilog.Events.LogEventLevel.Verbose,
+                                        "DEBUG" => Serilog.Events.LogEventLevel.Debug,
+                                        "INFO" or "INFORMATION" => Serilog.Events.LogEventLevel.Information,
+                                        "WARN" or "WARNING" => Serilog.Events.LogEventLevel.Warning,
+                                        "ERROR" => Serilog.Events.LogEventLevel.Error,
+                                        "CRITICAL" or "FATAL" => Serilog.Events.LogEventLevel.Fatal,
+                                        _ => Serilog.Events.LogEventLevel.Information
+                                    };
+
+                                    // Update the global LoggingLevelSwitch (same as CommandHandler does)
+                                    Program.LogLevelSwitch.MinimumLevel = serilogLevel;
+                                    Log.Information("IPC: Log level changed to {Level}", newConfig.Logging.LogLevel);
+                                }
+
                                 // FORCE FRONTEND UPDATE:
                                 Log.Information("IPC: Triggering backend registration update...");
                                 await _wsClient.TriggerConfigurationUpdateAsync();

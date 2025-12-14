@@ -26,9 +26,12 @@ public static class PathResolver
     public static readonly string ConfigPath = Path.Combine(InstallPath, "config.json");
 
     /// <summary>
-    /// Main log file path (with rolling date suffix)
+    /// Main log file path (matches executable name from build-config.json)
+    /// Example: If AgentExe is "pankha-agent.exe", log file is "pankha-agent.log"
+    /// Uses actual executable filename, not assembly name
     /// </summary>
-    public static readonly string LogFilePath = Path.Combine(LogPath, "agent-.log");
+    public static readonly string LogFilePath = Path.Combine(LogPath,
+        Path.ChangeExtension(Path.GetFileName(ExecutablePath), ".log"));
 
     /// <summary>
     /// Executable path

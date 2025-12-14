@@ -275,10 +275,22 @@ class Program
         // Ensure directories exist first
         Directory.CreateDirectory(Path.GetDirectoryName(LOG_PATH)!);
 
-        // 1. Generate dynamic filename based on executable name
-        // This ensures compatibility if the executable name changes in build-config.json
-        string logFileName = Path.ChangeExtension(AppDomain.CurrentDomain.FriendlyName, ".log");
-        string logPath = Path.Combine(Path.GetDirectoryName(LOG_PATH)!, logFileName);
+        // Use PathResolver for consistent log file path (matches AgentExe from build-config.json)
+        string logPath = PathResolver.LogFilePath;
+
+        // Delete existing log file to start fresh on each service start
+        // This prevents accumulation of multiple log files and makes troubleshooting cleaner
+        if (File.Exists(logPath))
+        {
+            try
+            {
+                File.Delete(logPath);
+            }
+            catch
+            {
+                // If we can't delete (file locked), Serilog will append instead
+            }
+        }
 
         var level = logLevel.ToLowerInvariant() switch
         {
@@ -301,14 +313,14 @@ class Program
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .WriteTo.File(
                 path: logPath,
-                rollingInterval: RollingInterval.Infinite, // Single file
-                fileSizeLimitBytes: 10485760, // 10MB limit
-                rollOnFileSizeLimit: true, // Roll to .1, .2 if too big (keep 31 max default)
+                rollingInterval: RollingInterval.Infinite,  // No time-based rolling
+                fileSizeLimitBytes: null,                    // No size limit (single file grows indefinitely)
+                rollOnFileSizeLimit: false,                  // Disable size-based rolling (no .1, .2, etc.)
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
-            
+
         // Log the file we are using
-        // Log.Information("Logging to file: {Path}", logPath);
+        Log.Information("Logging to file: {Path}", logPath);
     }
 
     /// <summary>

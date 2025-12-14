@@ -36,4 +36,7 @@
     <Compile Include="..\Models\Configuration\*.cs" Link="Models\Configuration\%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- Note: UI options are code-generated at build-time by build.ps1 -->
+  <!-- See: Pankha.Tray/Models/ui-options_auto-generated.cs (auto-generated) -->
+
 </Project>
