@@ -15,11 +15,9 @@ class Program
 {
     // Installation paths - dynamically determined from executable location
     // This allows the agent to work regardless of where it's installed
-    // Installation paths - dynamically determined from executable location
-    // This allows the agent to work regardless of where it's installed
-    private static readonly string INSTALL_DIR = PathResolver.InstallPath;
-    private static readonly string CONFIG_PATH = PathResolver.ConfigPath;
-    private static readonly string LOG_PATH = PathResolver.LogFilePath;
+    private static string INSTALL_DIR => PathResolver.InstallPath;
+    private static string CONFIG_PATH => PathResolver.ConfigPath;
+    private static string LOG_PATH => PathResolver.LogFilePath;
 
     // Global LoggingLevelSwitch for dynamic log level changes
     // This allows the CommandHandler to change log level at runtime

@@ -9,9 +9,41 @@ namespace Pankha.WindowsAgent.Platform;
 /// </summary>
 public static class PathResolver
 {
+    private static string? _executablePath;
+
     /// <summary>
-    /// Base installation directory (Dynamic based on executable location)
-    /// Contains: executable, config, logs
+    /// Executable path (Lazy loaded to avoid static initialization order issues and Service startup crashes)
+    /// </summary>
+    public static string ExecutablePath
+    {
+        get
+        {
+            if (_executablePath == null)
+            {
+                // Try safe method first for .NET 6+
+                _executablePath = Environment.ProcessPath;
+
+                // Fallback if needed (though ProcessPath is reliable in modern .NET)
+                if (string.IsNullOrEmpty(_executablePath))
+                {
+                    try
+                    {
+                        using var process = System.Diagnostics.Process.GetCurrentProcess();
+                        _executablePath = process.MainModule?.FileName;
+                    }
+                    catch
+                    {
+                        // Ultimate fallback: construct from BaseDirectory + FriendlyName
+                        _executablePath = Path.Combine(AppContext.BaseDirectory, AppDomain.CurrentDomain.FriendlyName);
+                    }
+                }
+            }
+            return _executablePath ?? string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Base installation directory
     /// </summary>
     public static readonly string InstallPath = AppContext.BaseDirectory;
 
@@ -28,22 +60,21 @@ public static class PathResolver
     /// <summary>
     /// Main log file path (matches executable name from build-config.json)
     /// Example: If AgentExe is "pankha-agent.exe", log file is "pankha-agent.log"
-    /// Uses actual executable filename, not assembly name
+    /// Uses lazy ExecutablePath to avoid static init crashes.
     /// </summary>
     public static readonly string LogFilePath = Path.Combine(LogPath,
         Path.ChangeExtension(Path.GetFileName(ExecutablePath), ".log"));
-
-    /// <summary>
-    /// Executable path
-    /// </summary>
-    public static readonly string ExecutablePath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
 
     /// <summary>
     /// Ensures all required directories exist
     /// </summary>
     public static void EnsureDirectoriesExist()
     {
-        Directory.CreateDirectory(InstallPath);
-        Directory.CreateDirectory(LogPath);
+        try 
+        {
+            Directory.CreateDirectory(InstallPath);
+            Directory.CreateDirectory(LogPath);
+        }
+        catch { /* Best effort */ }
     }
 }
