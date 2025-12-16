@@ -1138,7 +1138,7 @@ impl WebSocketClient {
                 "agentId": config.agent.id,
                 "name": config.agent.name,
                 "agent_version": "1.0.0-rust",
-                "update_interval": (config.agent.update_interval * 1000.0) as u64,
+                "update_interval": config.agent.update_interval as u64, // Send in seconds to match frontend/backend format
                 "filter_duplicate_sensors": config.hardware.filter_duplicate_sensors,
                 "duplicate_sensor_tolerance": config.hardware.duplicate_sensor_tolerance,
                 "fan_step_percent": config.hardware.fan_step_percent,
