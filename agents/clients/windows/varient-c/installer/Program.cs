@@ -354,6 +354,24 @@ namespace Pankha.WixSharpInstaller
                 string manufacturer = e.Session["Manufacturer"];
                 string logPath = GetCommonAppLogDir(manufacturer);
 
+                // Start fresh: Delete existing log to overwrite instead of append
+                try
+                {
+                    // Ensure directory exists first, otherwise GetFiles/Delete might fail or path logic might be weird
+                    if (IO.Directory.Exists(logPath))
+                    {
+                        string file = IO.Path.Combine(logPath, $"{logType}.log");
+                        if (IO.File.Exists(file)) 
+                        {
+                            IO.File.Delete(file);
+                        }
+                    }
+                }
+                catch 
+                { 
+                    // Best effort: if file is locked or access denied, we just continue appending/ignoring
+                }
+
                 LogToDebugFile(logPath, logType, "==========================================");
                 LogToDebugFile(logPath, logType, "=== SEQUENCE STARTED (OnBeforeInstall) ===");
                 LogToDebugFile(logPath, logType, "==========================================");

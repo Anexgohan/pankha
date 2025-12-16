@@ -125,6 +125,11 @@ export class WebSocketHub extends EventEmitter {
       this.broadcast('agentError', event, [`system:${event.agentId}`, 'agents:all', 'systems:all']);
     });
 
+    this.agentManager.on('agentConfigUpdated', (event) => {
+      // Broadcast config updates so frontend reflects changes immediately
+      this.broadcast('agentConfigUpdated', event, [`system:${event.agentId}`, 'systems:all']);
+    });
+
     // Listen for command events
     this.commandDispatcher.on('commandCompleted', (event) => {
       this.broadcast('commandCompleted', event, [`system:${event.command.agentId}`, 'commands:all']);
@@ -304,6 +309,23 @@ export class WebSocketHub extends EventEmitter {
           // Handle agent registration via WebSocket
           await this.handleAgentRegistration(clientId, message.data);
           break;
+
+        case 'updateConfig':
+           // Handle agent config update via WebSocket
+           const configClient = this.clients.get(clientId);
+           if (configClient?.metadata.isAgent && message.data?.config) {
+             const agentId = message.data.agentId || configClient.metadata.agentId;
+             if (agentId) {
+                log.info(`Received config update via WebSocket for ${agentId}`, 'WebSocketHub');
+                // Forward to AgentCommunication
+                const agentMessage = {
+                  type: 'updateConfig',
+                  data: message.data
+                };
+                await this.agentCommunication.handleAgentMessage(agentId, agentMessage);
+             }
+           }
+           break;
 
         case 'commandResponse':
           // Handle command response from agent

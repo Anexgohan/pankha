@@ -310,6 +310,8 @@ if ($Publish) {
         "-r", "win-x64",
         "--self-contained", "true",
         "/p:PublishSingleFile=true",
+        "/p:PublishTrimmed=true",
+        "/p:TrimMode=partial",
         "/p:IncludeNativeLibrariesForSelfExtract=true",
         "/p:PublishReadyToRun=true",
         "-o", $OutputDir
@@ -456,4 +458,5 @@ if ($BuildInstaller) {
 }
 
 Write-Host ""
+Write-Host "Finished at: $(Get-Date -Format 'yyyy-MM-dd hh:mm:ss tt')" -ForegroundColor Gray
 Write-Host "=== Build Complete ===" -ForegroundColor Cyan

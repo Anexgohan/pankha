@@ -227,6 +227,40 @@ export class AgentCommunication extends EventEmitter {
           }
           break;
 
+        case 'updateConfig':
+          // Handle explicit configuration update from agent (e.g. triggered by Tray App)
+          if (message.data?.config) {
+            log.info(`Received config update from agent ${agentId}`, 'AgentCommunication');
+            const config = message.data.config;
+            
+            // Update individual settings and PERSIST to database
+            if (config.update_interval !== undefined) {
+              await this.agentManager.setAgentUpdateInterval(agentId, config.update_interval, true);
+            }
+            if (config.filter_duplicate_sensors !== undefined) {
+              await this.agentManager.setAgentSensorDeduplication(agentId, config.filter_duplicate_sensors, true);
+            }
+            if (config.duplicate_sensor_tolerance !== undefined) {
+              await this.agentManager.setAgentSensorTolerance(agentId, config.duplicate_sensor_tolerance, true);
+            }
+            if (config.fan_step_percent !== undefined) {
+              await this.agentManager.setAgentFanStep(agentId, config.fan_step_percent, true);
+            }
+            if (config.hysteresis_temp !== undefined) {
+              await this.agentManager.setAgentHysteresis(agentId, config.hysteresis_temp, true);
+            }
+            if (config.emergency_temp !== undefined) {
+              await this.agentManager.setAgentEmergencyTemp(agentId, config.emergency_temp, true);
+            }
+            if (config.log_level !== undefined) {
+              await this.agentManager.setAgentLogLevel(agentId, config.log_level, true);
+            }
+            if (config.name !== undefined) {
+              await this.agentManager.setAgentName(agentId, config.name, true);
+            }
+          }
+          break;
+
         default:
           log.warn(`Unknown message type from agent`, 'AgentCommunication', { agentId, messageType: message.type });
       }

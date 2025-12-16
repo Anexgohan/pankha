@@ -342,6 +342,31 @@ export class AgentManager extends EventEmitter {
   }
 
   /**
+   * Set agent name
+   */
+  public async setAgentName(agentId: string, name: string, persist: boolean = false): Promise<void> {
+    const agent = this.agents.get(agentId);
+    if (agent) {
+      agent.name = name;
+      this.agents.set(agentId, agent);
+    }
+
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET name = $1 WHERE agent_id = $2',
+          [name, agentId]
+        );
+      } catch (error) {
+        log.error(`Failed to persist name for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} name set to ${name} (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { name: name } });
+  }
+
+  /**
    * Extract IP address from endpoint URL
    */
   private extractIpFromEndpoint(endpoint: string): string {
@@ -376,9 +401,22 @@ export class AgentManager extends EventEmitter {
   /**
    * Set agent current update interval
    */
-  public setAgentUpdateInterval(agentId: string, interval: number): void {
+  public async setAgentUpdateInterval(agentId: string, interval: number, persist: boolean = false): Promise<void> {
     this.agentUpdateIntervals.set(agentId, interval);
-    log.info(` Agent ${agentId} update interval set to ${interval}s`, 'AgentManager');
+    
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, \'{}\'), \'{update_interval}\', $1::jsonb) WHERE agent_id = $2',
+          [interval, agentId]
+        );
+      } catch (error) {
+        log.error(`Failed to persist update_interval for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} update interval set to ${interval}s (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { current_update_interval: interval } });
   }
 
   /**
@@ -391,9 +429,22 @@ export class AgentManager extends EventEmitter {
   /**
    * Set agent sensor deduplication setting
    */
-  public setAgentSensorDeduplication(agentId: string, enabled: boolean): void {
+  public async setAgentSensorDeduplication(agentId: string, enabled: boolean, persist: boolean = false): Promise<void> {
     this.agentSensorDeduplication.set(agentId, enabled);
-    log.info(` Agent ${agentId} sensor deduplication set to ${enabled}`, 'AgentManager');
+
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, \'{}\'), \'{filter_duplicate_sensors}\', $1::jsonb) WHERE agent_id = $2',
+          [enabled, agentId]
+        );
+      } catch (error) {
+        log.error(`Failed to persist filter_duplicate_sensors for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} sensor deduplication set to ${enabled} (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { filter_duplicate_sensors: enabled } });
   }
 
   /**
@@ -406,9 +457,22 @@ export class AgentManager extends EventEmitter {
   /**
    * Set agent sensor tolerance setting
    */
-  public setAgentSensorTolerance(agentId: string, tolerance: number): void {
+  public async setAgentSensorTolerance(agentId: string, tolerance: number, persist: boolean = false): Promise<void> {
     this.agentSensorTolerance.set(agentId, tolerance);
-    log.info(` Agent ${agentId} sensor tolerance set to ${tolerance}°C`, 'AgentManager');
+
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, \'{}\'), \'{duplicate_sensor_tolerance}\', $1::jsonb) WHERE agent_id = $2',
+          [tolerance, agentId]
+        );
+      } catch (error) {
+        log.error(`Failed to persist duplicate_sensor_tolerance for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} sensor tolerance set to ${tolerance}°C (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { duplicate_sensor_tolerance: tolerance } });
   }
 
   /**
@@ -421,9 +485,22 @@ export class AgentManager extends EventEmitter {
   /**
    * Set agent fan step percentage
    */
-  public setAgentFanStep(agentId: string, step: number): void {
+  public async setAgentFanStep(agentId: string, step: number, persist: boolean = false): Promise<void> {
     this.agentFanStep.set(agentId, step);
-    log.info(` Agent ${agentId} fan step set to ${step}%`, 'AgentManager');
+
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, \'{}\'), \'{fan_step_percent}\', $1::jsonb) WHERE agent_id = $2',
+          [step, agentId]
+        );
+      } catch (error) {
+        log.error(`Failed to persist fan_step_percent for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} fan step set to ${step}% (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { fan_step_percent: step } });
   }
 
   /**
@@ -436,9 +513,22 @@ export class AgentManager extends EventEmitter {
   /**
    * Set agent hysteresis temperature
    */
-  public setAgentHysteresis(agentId: string, hysteresis: number): void {
+  public async setAgentHysteresis(agentId: string, hysteresis: number, persist: boolean = false): Promise<void> {
     this.agentHysteresis.set(agentId, hysteresis);
-    log.info(` Agent ${agentId} hysteresis set to ${hysteresis}°C`, 'AgentManager');
+
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, \'{}\'), \'{hysteresis_temp}\', $1::jsonb) WHERE agent_id = $2',
+          [hysteresis, agentId]
+        );
+      } catch (error) {
+        log.error(`Failed to persist hysteresis_temp for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} hysteresis set to ${hysteresis}°C (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { hysteresis_temp: hysteresis } });
   }
 
   /**
@@ -451,9 +541,22 @@ export class AgentManager extends EventEmitter {
   /**
    * Set agent emergency temperature
    */
-  public setAgentEmergencyTemp(agentId: string, temp: number): void {
+  public async setAgentEmergencyTemp(agentId: string, temp: number, persist: boolean = false): Promise<void> {
     this.agentEmergencyTemp.set(agentId, temp);
-    log.info(` Agent ${agentId} emergency temp set to ${temp}°C`, 'AgentManager');
+
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, \'{}\'), \'{emergency_temp}\', $1::jsonb) WHERE agent_id = $2',
+          [temp, agentId]
+        );
+      } catch (error) {
+        log.error(`Failed to persist emergency_temp for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} emergency temp set to ${temp}°C (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { emergency_temp: temp } });
   }
 
   /**
@@ -466,9 +569,22 @@ export class AgentManager extends EventEmitter {
   /**
    * Set agent log level
    */
-  public setAgentLogLevel(agentId: string, level: string): void {
+  public async setAgentLogLevel(agentId: string, level: string, persist: boolean = false): Promise<void> {
     this.agentLogLevel.set(agentId, level);
-    log.info(` Agent ${agentId} log level set to ${level}`, 'AgentManager');
+
+    if (persist) {
+      try {
+        await this.db.run(
+          'UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, \'{}\'), \'{log_level}\', $1::jsonb) WHERE agent_id = $2',
+          [JSON.stringify(level), agentId] // JSON.stringify string values for jsonb
+        );
+      } catch (error) {
+        log.error(`Failed to persist log_level for ${agentId}`, 'AgentManager', error);
+      }
+    }
+
+    log.info(` Agent ${agentId} log level set to ${level} (persisted: ${persist})`, 'AgentManager');
+    this.emit('agentConfigUpdated', { agentId, config: { log_level: level } });
   }
 
   /**

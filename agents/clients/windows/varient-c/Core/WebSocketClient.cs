@@ -144,13 +144,52 @@ public class WebSocketClient : IDisposable
     }
 
     /// <summary>
-    /// Manually trigger a registration update (e.g. after config change)
+    /// Manually trigger a configuration update (e.g. after config change)
     /// </summary>
     public async Task TriggerConfigurationUpdateAsync()
     {
         if (IsConnected)
         {
-            await SendRegistrationAsync(CancellationToken.None);
+            await SendConfigUpdateAsync(CancellationToken.None);
+        }
+    }
+
+    /// <summary>
+    /// Send configuration update message to backend
+    /// </summary>
+    private async Task SendConfigUpdateAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.Information("Sending configuration update...");
+
+            var updateMessage = new
+            {
+                type = "updateConfig",
+                data = new
+                {
+                    agentId = _config.Agent.AgentId,
+                    config = new
+                    {
+                        update_interval = (int)_config.Hardware.UpdateInterval, // send as seconds
+                        filter_duplicate_sensors = _config.Monitoring.FilterDuplicateSensors,
+                        duplicate_sensor_tolerance = _config.Monitoring.DuplicateSensorTolerance,
+                        fan_step_percent = _config.Monitoring.FanStepPercent,
+                        hysteresis_temp = _config.Monitoring.HysteresisTemp,
+                        emergency_temp = _config.Hardware.EmergencyTemperature,
+                        log_level = _config.Logging.LogLevel.ToUpperInvariant(),
+                        name = _config.Agent.Name
+                    }
+                }
+            };
+
+            await SendMessageAsync(updateMessage, cancellationToken);
+            _logger.Information("Configuration update sent");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to send configuration update");
+            throw;
         }
     }
 

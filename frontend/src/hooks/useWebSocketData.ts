@@ -285,6 +285,32 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   // auto-reconnection logic and the connect() catch block
 
   /**
+   * Handle agent config updated
+   */
+  const handleAgentConfigUpdated = useCallback((data: { agentId: string; config: any }) => {
+    console.log('⚙️ Agent config updated:', data.agentId, data.config);
+
+    if (!mountedRef.current) return;
+
+    setSystems(prevSystems => {
+      const updated = prevSystems.map(s => {
+        if (s.agent_id === data.agentId) {
+          const newConfig: any = { ...data.config };
+          
+          if (newConfig.update_interval !== undefined) {
+             newConfig.current_update_interval = newConfig.update_interval;
+             delete newConfig.update_interval;
+          }
+
+          return { ...s, ...newConfig };
+        }
+        return s;
+      });
+      return updated;
+    });
+  }, []);
+
+  /**
    * Connect to WebSocket
    */
   const connect = useCallback(() => {
@@ -305,7 +331,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     // Create WebSocket instance
     wsRef.current = new WebSocketService(wsUrl);
 
-    // Setup event handlers (with type assertions for unknown -> specific types)
+    // Setup event handlers
     wsRef.current.on('connected', handleConnect);
     wsRef.current.on('fullState', (data: unknown) => handleFullState(data as SystemData[]));
     wsRef.current.on('systemDelta', (data: unknown) => handleDelta(data as SystemDelta));
@@ -313,6 +339,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     wsRef.current.on('agentRegistered', (data: unknown) => handleAgentRegistered(data));
     wsRef.current.on('agentUnregistered', (data: unknown) => handleAgentUnregistered(data as { agentId: string }));
     wsRef.current.on('agentError', (data: unknown) => handleAgentError(data as { agentId: string; error?: any }));
+    wsRef.current.on('agentConfigUpdated', (data: unknown) => handleAgentConfigUpdated(data as { agentId: string; config: any }));
 
     // Connect
     wsRef.current.connect()
@@ -334,46 +361,25 @@ export function useWebSocketData(): UseWebSocketDataReturn {
           }, 5000);
         }
       });
-  }, [handleConnect, handleFullState, handleDelta, handleSystemOffline, handleAgentRegistered, handleAgentUnregistered, handleAgentError]);
+  }, [handleConnect, handleFullState, handleDelta, handleSystemOffline, handleAgentRegistered, handleAgentUnregistered, handleAgentError, handleAgentConfigUpdated]);
 
   /**
-   * Manual reconnect
-   */
-  const reconnect = useCallback(() => {
-    console.log('🔄 Manual reconnect requested');
-    connect();
-  }, [connect]);
-
-  /**
-   * Initialize WebSocket on mount
+   * Initial connection
    */
   useEffect(() => {
-    mountedRef.current = true;
     connect();
 
-    // Periodic full sync every 5 minutes (catches new sensors/fans)
-    const fullSyncInterval = setInterval(() => {
-      if (isConnected && wsRef.current) {
-        console.log('⏰ Periodic full sync');
-        wsRef.current.send('requestFullSync');
-      }
-    }, 5 * 60 * 1000);
-
     return () => {
+      // Cleanup on unmount
       mountedRef.current = false;
-
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
-
-      clearInterval(fullSyncInterval);
-
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
     };
-  }, [connect, isConnected]);
+  }, [connect]);
 
   return {
     systems,
@@ -381,6 +387,6 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     connectionState,
     error,
     lastUpdate,
-    reconnect
+    reconnect: connect
   };
 }
