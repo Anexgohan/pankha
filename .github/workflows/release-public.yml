@@ -156,6 +156,7 @@ jobs:
           file: docker/Dockerfile
           platforms: ${{ matrix.platform }}
           push: true
+          provenance: false
           tags: |
             anexgohan/pankha:${{ steps.version.outputs.version }}-${{ matrix.tag_suffix }}
           cache-from: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }}
