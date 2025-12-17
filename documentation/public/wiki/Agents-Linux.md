@@ -15,14 +15,14 @@ Download the binary for your architecture from the [Releases Page](https://githu
 
 **x86_64 (Intel/AMD)**:
 ```bash
-wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
-chmod +x pankha-agent
+wget -O pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+chmod +x pankha-agent-linux_x86_64
 ```
 
 **ARM64 (Raspberry Pi/SBC)**:
 ```bash
-wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
-chmod +x pankha-agent
+wget -O pankha-agent-linux_arm64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+chmod +x pankha-agent-linux_arm64
 ```
 
 ### 2. Interactive Setup
@@ -30,7 +30,7 @@ chmod +x pankha-agent
 Run the setup wizard to generate your configuration file and connect to your server.
 
 ```bash
-./pankha-agent --setup
+./pankha-agent-linux_x86_64 --setup
 ```
 
 You will be asked for:
@@ -49,7 +49,7 @@ Description=Pankha Fan Control Agent
 After=network.target
 
 [Service]
-ExecStart=/opt/pankha/pankha-agent --start
+ExecStart=/opt/pankha/pankha-agent-linux_x86_64 --start
 WorkingDirectory=/opt/pankha
 Restart=always
 User=root

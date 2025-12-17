@@ -10,6 +10,7 @@ on:
 
 jobs:
   deploy-wiki:
+    if: github.repository == 'Anexgohan/pankha'
     runs-on: ubuntu-latest
     permissions:
       contents: write
