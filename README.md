@@ -127,10 +127,21 @@ That's it! The backend is now running with:
     ```
 
 # Agent Installation Guide:  
-***CAUTION***: Currently only Linux agents are supported and Windows support is coming soon.  
-***CAUTION***: Manual Start is needed every reboot for now, automatic service start is being worked on.
+# Agent Installation Guide:  
 
-### Deploy Agent on target system (Linux Client)
+### 1. Windows Agent (New!)
+**Requirements**: Windows 10/11, .NET 8 Runtime.
+
+1. **Download Installer**:
+   - Download `PankhaAgentSetup.msi` from [Latest Releases](https://github.com/Anexgohan/pankha/releases/latest).
+2. **Install**:
+   - Run the installer. It will install the Background Service and Tray Application.
+3. **Configure**:
+   - Launch "Pankha Fan Control" from the Start Menu.
+   - Right-click the Tray Icon -> **Settings** to configure the backend URL.
+
+### 2. Linux Client Agent (Rust)
+**Performance**: Single binary, <10MB RAM, <1% CPU. Zero dependencies.
 
 ## *For x86_64 systems (Intel/AMD):*
   - With wget
@@ -221,7 +232,9 @@ Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardw
 
 - **Backend**: Node.js + Express + WebSocket + PostgreSQL (Dockerized)
 - **Frontend**: React + TypeScript + Vite (served by nginx)
-- **Agents**: Rust single binary processes with direct hardware access and WebSocket communication.
+- **Agents**: 
+  - **Linux**: Rust single binary processes (sysfs)
+  - **Windows**: .NET 8 Service (LibreHardwareMonitor)
 
 ## Extra:
 - **Verify installation**
@@ -285,10 +298,10 @@ NODE_ENV=production
 ### Agent Configuration
 Generate Agent config with 
 ```bash
-./pankha-agent setup
+./pankha-agent --setup
 ```
 
-Agent configuration file: `pankha-agent/config/config.json`
+Agent configuration file: `config.json` (running directory)
 
 ```json
 {
@@ -366,8 +379,7 @@ curl http://your-backend:3000/health
 tail -f /var/log/pankha-agent/agent.log
 
 # Verify config
-cat pankha-agent/config/config.json
-./pankha-agent -c
+./pankha-agent --config
 ```
 
 **Issue: No sensors detected**
