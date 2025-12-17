@@ -259,29 +259,36 @@ if ($Config.Paths.AppIcon_256) {
 }
 
 # Build
-Write-Host "Building ($Configuration)..." -ForegroundColor Yellow
-$BuildParams = @("-c", $Configuration)
-if ($AppIconPath) { $BuildParams += "/p:ApplicationIcon=`"$AppIconPath`"" }
+# Optimization: Skip explicit build if we are going to publish (which does a build)
+if (-not $Publish) {
+    Write-Host "Building ($Configuration)..." -ForegroundColor Yellow
+    $BuildParams = @("-c", $Configuration)
+    if ($AppIconPath) { $BuildParams += "/p:ApplicationIcon=`"$AppIconPath`"" }
 
-dotnet build @BuildParams
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Build failed" -ForegroundColor Red
-    exit 1
+    dotnet build @BuildParams
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Build failed" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "✅ Build complete" -ForegroundColor Green
+    Write-Host ""
+} else {
+    Write-Host "Skipping explicit build (will be built during publish)..." -ForegroundColor Gray
 }
+
 Write-Host "✅ Build complete" -ForegroundColor Green
 Write-Host ""
 
 # Build Tray App
-Write-Host "Building Tray App ($Configuration)..." -ForegroundColor Yellow
-$TrayBuildParams = @("Pankha.Tray\Pankha.Tray.csproj", "-c", $Configuration)
-if ($AppIconPath) { $TrayBuildParams += "/p:AppIconPath=`"$AppIconPath`"" }
-dotnet build @TrayBuildParams
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Tray App Build failed" -ForegroundColor Red
-    exit 1
+# Optimization: Skip explicit build if we are going to publish
+if (-not $Publish) {
+    Write-Host "Building Tray App ($Configuration)..." -ForegroundColor Yellow
+    $TrayBuildParams = @("Pankha.Tray\Pankha.Tray.csproj", "-c", $Configuration)
+    if ($AppIconPath) { $TrayBuildParams += "/p:AppIconPath=`"$AppIconPath`"" }
+    dotnet build @TrayBuildParams
+    Write-Host "✅ Tray App Build complete" -ForegroundColor Green
+    Write-Host ""
 }
-Write-Host "✅ Tray App Build complete" -ForegroundColor Green
-Write-Host ""
 
 # Test if requested
 if ($Test) {
