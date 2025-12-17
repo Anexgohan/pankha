@@ -1,0 +1,418 @@
+name: Release Build and Publish
+
+# This workflow runs on the PUBLIC repo (pankha) to take advantage of FREE ARM64 runners.
+# Triggered by repository_dispatch from pankha-dev when a version tag is pushed.
+
+on:
+  repository_dispatch:
+    types: [release-build]
+  workflow_dispatch:  # Manual trigger for testing
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+
+env:
+  # Extract version from dispatch or manual input
+  VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
+
+jobs:
+  # Job 1: Build Rust agents (parallel matrix with FREE ARM64 runner)
+  build-rust-agents:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            target: x86_64-unknown-linux-gnu
+            runner: ubuntu-22.04
+          - arch: arm64
+            target: aarch64-unknown-linux-gnu
+            runner: ubuntu-24.04-arm  # FREE ARM64 runner!
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: agents/clients/linux/rust
+          shared-key: rust-cache-${{ matrix.arch }}
+
+      # Cross-compilation setup only needed for ARM64 on x86_64 (not needed with native runner)
+      - name: Add target (if cross-compiling)
+        if: matrix.arch == 'arm64' && matrix.runner == 'ubuntu-22.04'
+        run: |
+          rustup target add aarch64-unknown-linux-gnu
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
+      - name: Build Rust agent (${{ matrix.arch }})
+        working-directory: agents/clients/linux/rust
+        run: |
+          echo "🦀 Building Rust agent for ${{ matrix.arch }} on ${{ matrix.runner }}..."
+
+          if [ "${{ matrix.arch }}" = "arm64" ] && [ "${{ matrix.runner }}" = "ubuntu-22.04" ]; then
+            # Cross-compile (fallback if native runner unavailable)
+            cargo build --release --target ${{ matrix.target }}
+            BINARY_PATH="target/${{ matrix.target }}/release/pankha-agent-linux"
+          else
+            # Native build (x86_64 or native ARM64)
+            cargo build --release
+            BINARY_PATH="target/release/pankha-agent-linux"
+          fi
+
+          # Rename with architecture suffix
+          mv $BINARY_PATH ${BINARY_PATH}_${{ matrix.arch }}
+
+          echo "✅ ${{ matrix.arch }} agent built"
+          ls -lh target/release/pankha-agent-linux_${{ matrix.arch }} 2>/dev/null || \
+          ls -lh target/${{ matrix.target }}/release/pankha-agent-linux_${{ matrix.arch }} 2>/dev/null
+
+      - name: Upload agent binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pankha-agent-${{ matrix.arch }}
+          path: |
+            agents/clients/linux/rust/target/release/pankha-agent-linux_${{ matrix.arch }}
+            agents/clients/linux/rust/target/${{ matrix.target }}/release/pankha-agent-linux_${{ matrix.arch }}
+          if-no-files-found: error
+          retention-days: 1
+
+  # Job 2: Build Windows Agent
+  build-windows-agent:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/packages.lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Build Windows Installer
+        working-directory: agents/clients/windows/varient-c
+        run: .\build.ps1 -Configuration Release -Clean -Publish -BuildInstaller
+
+      - name: Upload MSI Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pankha-agent-windows-msi
+          path: agents/clients/windows/varient-c/publish/win-x64/installer/pankha-agent-windows_x64.msi
+          if-no-files-found: error
+          retention-days: 1
+
+  # Job 3: Build Docker images (parallel with FREE ARM64 runner - NO QEMU!)
+  build-docker:
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-22.04
+            tag_suffix: amd64
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm  # FREE ARM64 runner - NO QEMU needed!
+            tag_suffix: arm64
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "🐳 Building Docker for ${{ matrix.platform }}: ${VERSION}"
+
+      - name: Build and push Docker image (${{ matrix.tag_suffix }})
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: |
+            anexgohan/pankha:${{ steps.version.outputs.version }}-${{ matrix.tag_suffix }}
+          cache-from: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }}
+          cache-to: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }},mode=max
+
+  # Job 4: Create multi-arch manifest and release
+  release:
+    needs: [build-rust-agents, build-windows-agent, build-docker]
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
+          echo "📦 Creating release: ${VERSION}"
+
+      # Download all artifacts
+      - name: Download x86_64 agent
+        uses: actions/download-artifact@v4
+        with:
+          name: pankha-agent-x86_64
+          path: artifacts/x86_64
+
+      - name: Download ARM64 agent
+        uses: actions/download-artifact@v4
+        with:
+          name: pankha-agent-arm64
+          path: artifacts/arm64
+
+      - name: Download Windows MSI
+        uses: actions/download-artifact@v4
+        with:
+          name: pankha-agent-windows-msi
+          path: artifacts/windows
+
+      # Prepare release assets
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+
+          # Find and copy agent binaries
+          find artifacts -name "pankha-agent-linux_*" -exec cp {} release-assets/ \;
+
+          # Copy Windows MSI
+          cp artifacts/windows/*.msi release-assets/
+
+          # Copy config example
+          cp agents/clients/linux/rust/config.example.json release-assets/
+
+          # Copy Docker deployment files
+          cp compose.yml release-assets/
+          cp example.env release-assets/
+
+          # Make binaries executable
+          chmod +x release-assets/pankha-agent-linux_* 2>/dev/null || true
+
+          # Generate checksums
+          cd release-assets
+          sha256sum * > checksums.txt
+
+          echo "📦 Release assets prepared:"
+          ls -lh
+
+      # Login to Docker Hub for manifest creation
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      # Create and push multi-arch manifest
+      - name: Create Docker manifest
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          echo "🐳 Creating multi-arch manifest for ${VERSION}..."
+
+          # Create versioned manifest
+          docker manifest create anexgohan/pankha:${VERSION} \
+            anexgohan/pankha:${VERSION}-amd64 \
+            anexgohan/pankha:${VERSION}-arm64
+
+          docker manifest push anexgohan/pankha:${VERSION}
+
+          # Create/update latest manifest
+          docker manifest create anexgohan/pankha:latest \
+            anexgohan/pankha:${VERSION}-amd64 \
+            anexgohan/pankha:${VERSION}-arm64
+
+          docker manifest push anexgohan/pankha:latest
+
+          echo "✅ Pushed: anexgohan/pankha:${VERSION}"
+          echo "✅ Pushed: anexgohan/pankha:latest"
+
+      # Create version tag (if not exists)
+      - name: Create version tag
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          git config user.name "Anexgohan"
+          git config user.email "monish05m@gmail.com"
+
+          # Create and push tag (force update for re-runs)
+          git tag -f ${VERSION} -m "Release ${VERSION}"
+          git push -f origin ${VERSION}
+
+          echo "✅ Tag ${VERSION} created/updated"
+
+      # Copy binaries to repo for direct download
+      - name: Update agent releases in repo
+        run: |
+          mkdir -p agents/releases/linux
+
+          cp release-assets/pankha-agent-linux_x86_64 agents/releases/linux/
+          cp release-assets/pankha-agent-linux_arm64 agents/releases/linux/
+          cp release-assets/config.example.json agents/releases/linux/
+
+          chmod +x agents/releases/linux/pankha-agent-linux_*
+
+          git config user.name "Anexgohan"
+          git config user.email "monish05m@gmail.com"
+
+          git add agents/releases/
+
+          if ! git diff --cached --quiet; then
+            git commit -m "Update agent binaries for ${{ steps.version.outputs.version }}"
+            git push origin main
+            echo "✅ Agent binaries updated in repository"
+          else
+            echo "✅ Agent binaries already up to date"
+          fi
+
+      # Create GitHub Release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            release-assets/pankha-agent-linux_x86_64
+            release-assets/pankha-agent-linux_arm64
+            release-assets/pankha-agent-windows_x64.msi
+            release-assets/config.example.json
+            release-assets/compose.yml
+            release-assets/example.env
+            release-assets/checksums.txt
+          body: |
+            ## 🎉 Pankha Release ${{ steps.version.outputs.version }}
+
+            ### 📦 Downloads
+
+            **Windows Agent:**
+             - `pankha-agent-windows_x64.msi` - **Windows Installer** (Recommended)
+
+            **Linux Agent Binaries (Ready to Run):**
+            - `pankha-agent-linux_x86_64` - For Intel/AMD x86_64 systems
+            - `pankha-agent-linux_arm64` - For Raspberry Pi 5 / ARM64 systems
+            - `config.example.json` - Example agent configuration file (generate with `pankha-agent --setup`)
+
+            **Docker Deployment Files:**
+            - `compose.yml` - Docker Compose configuration
+            - `example.env` - Environment variables template
+
+            **Verification:**
+            - `checksums.txt` - SHA256 checksums for all files
+
+            ## ✨ Quick Start (Pankha Server)
+            **Docker Compose Method:**
+            ```bash
+            # Download Docker Compose files from release
+            wget -O compose.yml https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/compose.yml
+            wget -O .env https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/example.env
+
+            # Edit .env with your settings, then start
+            docker compose up -d
+            ```
+
+            **Docker Image:**
+            ```bash
+            # Specific version (recommended for production)
+            docker pull anexgohan/pankha:${{ steps.version.outputs.version }}
+
+            # Latest version
+            docker pull anexgohan/pankha:latest
+            ```
+
+            ## 🚀 Quick Start (Linux Agent)
+
+            ### For x86_64 systems:
+            ```bash
+            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x86_64
+            chmod +x pankha-agent
+            ./pankha-agent --setup
+            ./pankha-agent --start
+            ```
+
+            ### For ARM64 systems (Raspberry Pi 5):
+            ```bash
+            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_arm64
+            chmod +x pankha-agent
+            ./pankha-agent --setup
+            ./pankha-agent --start
+            ```
+
+            ### Verify Download Integrity
+            ```bash
+            wget -O checksums.txt https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/checksums.txt
+            sha256sum -c checksums.txt
+            ```
+
+            ## 📚 Documentation
+
+            - [Installation Guide](https://github.com/Anexgohan/pankha/wiki/Installation)
+            - [Agent Setup Guide](https://github.com/Anexgohan/pankha/wiki/Agent-Setup)
+            - [Configuration](https://github.com/Anexgohan/pankha/wiki/Configuration)
+            - [API Documentation](https://github.com/Anexgohan/pankha/wiki/API-Reference)
+            - [Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)
+
+          draft: false
+          prerelease: false
+
+      # Summary
+      - name: Release Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          echo "## 🎉 Release ${VERSION} Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Published Artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Docker Images (Multi-arch):**" >> $GITHUB_STEP_SUMMARY
+          echo "- \`anexgohan/pankha:${VERSION}\` (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY
+          echo "- \`anexgohan/pankha:latest\` (updated)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release Assets:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ pankha-agent-linux_x86_64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ pankha-agent-linux_arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ pankha-agent-windows_x64.msi" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ config.example.json" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ compose.yml" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ example.env" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ checksums.txt" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Links:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Release Page](https://github.com/Anexgohan/pankha/releases/tag/${VERSION})" >> $GITHUB_STEP_SUMMARY
+          echo "- [Docker Hub](https://hub.docker.com/r/anexgohan/pankha)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### ⚡ Build Performance:" >> $GITHUB_STEP_SUMMARY
+          echo "- Rust agents: Native builds (x86_64 + ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker images: Native builds (NO QEMU!)" >> $GITHUB_STEP_SUMMARY
+          echo "- Windows agent: Native build" >> $GITHUB_STEP_SUMMARY
