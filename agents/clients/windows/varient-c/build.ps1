@@ -24,11 +24,22 @@ function Get-GitVersion {
     }
 }
 
-# Determine Version
+# Determine Version and InfoVersion
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $Version = Get-GitVersion
-    Write-Host "Auto-detected Version: $Version" -ForegroundColor Gray
+    $RawVersion = Get-GitVersion
+    
+    # Check if format is X.Y.Z (basic regex)
+    if ($RawVersion -match '^\d+(\.\d+)+') {
+        $Version = $RawVersion.Split('-')[0] # Remove suffixes like -dirty or -hash
+    } else {
+        # Fallback for pure hashes (e.g. 749b59b)
+        $Version = "0.0.0" 
+    }
+    
+    $InfoVersion = $RawVersion
+    Write-Host "Auto-detected Version: $Version (Info: $InfoVersion)" -ForegroundColor Gray
 } else {
+    $InfoVersion = $Version
     Write-Host "Using Version: $Version" -ForegroundColor Gray
 }
 
@@ -293,6 +304,7 @@ $PropsContent = @"
     <Version>$Version</Version>
     <FileVersion>$Version</FileVersion>
     <AssemblyVersion>$Version</AssemblyVersion>
+    <InformationalVersion>$InfoVersion</InformationalVersion>
   </PropertyGroup>
 </Project>
 "@
