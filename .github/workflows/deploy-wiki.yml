@@ -22,4 +22,4 @@ jobs:
         uses: Andrew-Chen-Wang/github-wiki-action@v4
         with:
           path: documentation/public/wiki
-          wiki-push-msg: "Auto-update from main repo documentation/public/wiki"
+          commit-message: "Auto-update from main repo documentation/public/wiki"
