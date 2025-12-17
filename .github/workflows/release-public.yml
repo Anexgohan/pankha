@@ -12,9 +12,6 @@ on:
         description: 'Version tag (e.g., v1.0.0)'
         required: true
 
-env:
-  # Extract version from dispatch or manual input
-  VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
 
 jobs:
   # Job 1: Build Rust agents (parallel matrix with FREE ARM64 runner)
