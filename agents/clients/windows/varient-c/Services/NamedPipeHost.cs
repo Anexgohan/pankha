@@ -1,3 +1,4 @@
+using System.Reflection;
 using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -6,6 +7,7 @@ using Newtonsoft.Json;
 using Pankha.WindowsAgent.Models.Configuration;
 using Pankha.WindowsAgent.Models.Ipc;
 using Pankha.WindowsAgent.Platform;
+using Pankha.WindowsAgent.Hardware; // Required for IHardwareMonitor
 using Serilog;
 
 namespace Pankha.WindowsAgent.Services;
@@ -18,13 +20,15 @@ public class NamedPipeHost : IDisposable
     private const string PIPE_NAME = "PankhaAgent";
     private readonly AgentConfig _config;
     private readonly Core.WebSocketClient _wsClient;
+    private readonly IHardwareMonitor _hardware;
     private readonly CancellationTokenSource _cts = new();
     private Task? _serverTask;
 
-    public NamedPipeHost(AgentConfig config, Core.WebSocketClient wsClient)
+    public NamedPipeHost(AgentConfig config, Core.WebSocketClient wsClient, IHardwareMonitor hardware)
     {
         _config = config;
         _wsClient = wsClient;
+        _hardware = hardware;
     }
 
     public void Start()
@@ -149,24 +153,32 @@ public class NamedPipeHost : IDisposable
             }
             // Log.Information("IPC: Received {Bytes} chars. Processing...", line.Length);
 
-            var request = JsonConvert.DeserializeObject<IpcMessage>(line);
+            // The snippet uses IpcRequest and request.Command, assuming IpcMessage is now IpcRequest
+            var request = JsonConvert.DeserializeObject<IpcMessage>(line); // Kept IpcMessage as per original code
             if (request == null) return;
 
             object response = new { Success = false, Error = "Unknown command" };
 
-            switch (request.Type)
+            switch (request.Type) // Kept request.Type as per original code
             {
                 case IpcCommands.GET_STATUS:
+                    // Get Hardware Info
+                    var sensors = await _hardware.DiscoverSensorsAsync();
+                    var fans = await _hardware.DiscoverFansAsync();
+                    
+                    // Get Version dynamically
+                    var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.0.0";
+
                     response = new AgentStatus
                     {
                         AgentId = _config.Agent.AgentId,
                         AgentName = _config.Agent.Name,
-                        Version = "1.2.0",
+                        Version = version, 
                         ConnectionState = _wsClient.State.ToString(),
-                        SensorsDiscovered = 0, // Mock
-                        FansDiscovered = 0,    // Mock
-                        Uptime = TimeSpan.Zero,
-                        IsService = true
+                        SensorsDiscovered = sensors.Count,
+                        FansDiscovered = fans.Count,
+                        Uptime = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime(),
+                        IsService = !Environment.UserInteractive // Approximate check
                     };
                     break;
 

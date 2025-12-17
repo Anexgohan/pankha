@@ -103,6 +103,10 @@ namespace Pankha.WixSharpInstaller
 
                 // 4. Create the project
                 // InstallDir: %ProgramFiles%\<Manufacturer>
+                // NOTE: LibreHardwareMonitor 0.9.4 extracts its kernel driver at runtime
+                // The driver is embedded in LibreHardwareMonitorLib.dll and extracted automatically
+                // No need to ship driver files (.sys) with the installer
+
                 var project = new ManagedProject(Config.Product,
                     new Dir($@"%ProgramFiles%\{Config.Manufacturer}",
                         agentExe,
@@ -143,7 +147,11 @@ namespace Pankha.WixSharpInstaller
                 // ... (Metadata) ...
                 project.GUID = Guid.NewGuid();
                 project.UpgradeCode = UpgradeCode;
-                project.Version = new Version("1.0.15"); // Could also be read from config or AssemblyInfo
+                var agentVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(exePath).FileVersion;
+                if (agentVersion == null) agentVersion = "1.0.0";
+                
+                project.Version = new Version(agentVersion);
+                Console.WriteLine($"Building MSI version: {project.Version}");
                 project.Platform = Platform.x64;
                 project.InstallScope = InstallScope.perMachine;
                 
@@ -543,29 +551,48 @@ namespace Pankha.WixSharpInstaller
 
                         System.Threading.Thread.Sleep(1000);
 
-                        // Unload Driver
-                        LogToDebugFile(logBaseDir, logType, "Phase: Unloading Driver...");
+                        // Unload and clean up runtime-extracted driver
+                        // LibreHardwareMonitor 0.9.4 extracts driver at runtime as {processname}.sys
+                        LogToDebugFile(logBaseDir, logType, "Phase: Unloading Runtime Driver...");
                         try
                         {
-                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = "stop pankha-agent-windows", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
+                            // Derive driver service and file name from AgentExe property
+                            // Example: pankha-agent.exe -> service: pankha-agent, file: pankha-agent.sys
+
+                            string driverServiceName = !string.IsNullOrEmpty(agentExeName)
+                                ? agentExeName.Replace(".exe", "")
+                                : "pankha-agent"; // Fallback
+
+                            string driverFileName = driverServiceName + ".sys";
+
+                            // Stop and delete driver service
+                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"stop {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
                             System.Threading.Thread.Sleep(1000);
-                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = "delete pankha-agent-windows", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
-                            LogToDebugFile(logBaseDir, logType, "Driver stop/delete commands executed.");
+                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"delete {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
+                            LogToDebugFile(logBaseDir, logType, $"Driver stop/delete executed for service: {driverServiceName}");
                         }
                         catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Driver unload error: {ex.Message}"); }
 
                         System.Threading.Thread.Sleep(1000);
 
-                        // Clean up driver file
+                        // Delete runtime-extracted driver file
                         try
                         {
                             if (!string.IsNullOrEmpty(dir))
                             {
-                                var driverFile = IO.Path.Combine(dir, "pankha-agent-windows.sys");
-                                if (IO.File.Exists(driverFile)) 
+                                string driverFileName = !string.IsNullOrEmpty(agentExeName)
+                                    ? agentExeName.Replace(".exe", ".sys")
+                                    : "pankha-agent.sys"; // Fallback
+
+                                var driverFile = IO.Path.Combine(dir, driverFileName);
+                                if (IO.File.Exists(driverFile))
                                 {
                                     IO.File.Delete(driverFile);
-                                    LogToDebugFile(logBaseDir, logType, $"Deleted driver file: {driverFile}");
+                                    LogToDebugFile(logBaseDir, logType, $"Deleted runtime driver: {driverFile}");
+                                }
+                                else
+                                {
+                                    LogToDebugFile(logBaseDir, logType, $"Runtime driver not found: {driverFile}");
                                 }
                             }
                         }

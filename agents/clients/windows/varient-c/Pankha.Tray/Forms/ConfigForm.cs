@@ -298,6 +298,7 @@ public class ConfigForm : Form
                 _agentIdTextBox.Text = _currentConfig.Agent.AgentId;
 
                 _backendUrlTextBox.Text = _currentConfig.Backend.Url;
+                SetupUrlPlaceholder(); // Apply placeholder logic
                 _reconnectIntervalNumeric.Value = _currentConfig.Backend.ReconnectInterval;
 
                 // Set Update Interval ComboBox
@@ -364,6 +365,42 @@ public class ConfigForm : Form
         }
     }
 
+    // Placeholder text logic
+    private const string URL_PLACEHOLDER = "192.168.xxx.xxx:3000";
+
+    private void SetupUrlPlaceholder()
+    {
+        // Initial state check
+        if (string.IsNullOrWhiteSpace(_backendUrlTextBox.Text) || _backendUrlTextBox.Text == URL_PLACEHOLDER)
+        {
+            _backendUrlTextBox.Text = URL_PLACEHOLDER;
+            _backendUrlTextBox.ForeColor = Color.Gray;
+        }
+        else
+        {
+            _backendUrlTextBox.ForeColor = SystemColors.WindowText;
+        }
+
+        // Events
+        _backendUrlTextBox.Enter += (s, e) =>
+        {
+            if (_backendUrlTextBox.Text == URL_PLACEHOLDER)
+            {
+                _backendUrlTextBox.Text = "";
+                _backendUrlTextBox.ForeColor = SystemColors.WindowText;
+            }
+        };
+
+        _backendUrlTextBox.Leave += (s, e) =>
+        {
+            if (string.IsNullOrWhiteSpace(_backendUrlTextBox.Text))
+            {
+                _backendUrlTextBox.Text = URL_PLACEHOLDER;
+                _backendUrlTextBox.ForeColor = Color.Gray;
+            }
+        };
+    }
+
     private async Task SaveConfigAsync()
     {
         if (_currentConfig == null) return;
@@ -377,7 +414,38 @@ public class ConfigForm : Form
             // Update config from form
             _currentConfig.Agent.Name = _agentNameTextBox.Text;
 
-            _currentConfig.Backend.Url = _backendUrlTextBox.Text;
+            // URL Formatting Logic
+            var url = _backendUrlTextBox.Text.Trim();
+            if (url == URL_PLACEHOLDER || string.IsNullOrWhiteSpace(url))
+            {
+                url = ""; // Handle as empty or keep previous? Assume empty if placeholder
+            }
+            else
+            {
+                // Auto-formatting
+                // 1. Remove trailing slash if inside generic path but keep /websocket
+                if (url.EndsWith("/")) url = url.TrimEnd('/');
+
+                // 2. Add scheme if missing
+                if (!url.StartsWith("ws://") && !url.StartsWith("wss://"))
+                {
+                    url = "ws://" + url;
+                }
+
+                // 3. Add /websocket if missing
+                if (!url.EndsWith("/websocket"))
+                {
+                    url += "/websocket";
+                }
+            }
+            _currentConfig.Backend.Url = url;
+            // Update the textbox to show the formatted URL (optional, but good UX)
+            if (url != "") 
+            {
+                 _backendUrlTextBox.Text = url;
+                 _backendUrlTextBox.ForeColor = SystemColors.WindowText;
+            }
+
             _currentConfig.Backend.ReconnectInterval = (int)_reconnectIntervalNumeric.Value;
 
             // Read Update Interval from ComboBox

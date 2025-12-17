@@ -41,4 +41,9 @@ public interface IHardwareMonitor : IDisposable
     /// Reset all fans to automatic/default control
     /// </summary>
     Task ResetAllToAutoAsync();
+
+    /// <summary>
+    /// Dump full hardware info for debugging/reporting
+    /// </summary>
+    Task<List<HardwareDumpItem>> DumpFullHardwareInfoAsync();
 }

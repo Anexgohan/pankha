@@ -51,6 +51,21 @@ public class AgentWorker : BackgroundService
                 _hardwareMonitor,
                 Microsoft.Extensions.Logging.Abstractions.NullLogger<ConnectionWatchdog>.Instance);
 
+            // DUMP HARDWARE INFO (User Request)
+            try 
+            {
+                _logger.LogInformation("Generating hardware-info.json dump...");
+                var dump = await _hardwareMonitor.DumpFullHardwareInfoAsync();
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(dump, Newtonsoft.Json.Formatting.Indented);
+                var dumpPath = Path.Combine(Pankha.WindowsAgent.Platform.PathResolver.InstallPath, "hardware-info.json");
+                await File.WriteAllTextAsync(dumpPath, json);
+                _logger.LogInformation("Saved hardware dump to {Path}", dumpPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate hardware-info.json");
+            }
+
             // Start watchdog in background
             _ = _connectionWatchdog.StartAsync(stoppingToken);
 
@@ -62,8 +77,11 @@ public class AgentWorker : BackgroundService
                 _connectionWatchdog);
 
             // Initialize and Start Named Pipe Host (IPC)
-            _namedPipeHost = new NamedPipeHost(_config, _webSocketClient);
+            _namedPipeHost = new NamedPipeHost(_config, _webSocketClient, _hardwareMonitor);
+            
+            // Start IPC in background
             _namedPipeHost.Start();
+            
             _logger.LogInformation("IPC: Named Pipe Host started");
 
             // Start WebSocket communication (blocks until cancellation)

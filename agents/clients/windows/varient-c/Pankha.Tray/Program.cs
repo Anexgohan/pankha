@@ -56,39 +56,36 @@ static class Program
 
     private static void ConfigureLogging()
     {
-        // Try common app data first, fallback to local app data
-        string[] pathsToTry = new[]
+        // Use "Install Path/logs" as requested by user
+        // We use the linked PathResolver from the Platform project
+        try
         {
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
-        };
+            // PathResolver.LogFilePath includes the filename based on executable name
+            // For Tray, we want "pankha-tray.log" in the "logs" folder
+            string logDir = Pankha.WindowsAgent.Platform.PathResolver.LogPath;
+            Directory.CreateDirectory(logDir);
+            
+            string logFile = Path.Combine(logDir, "pankha-tray.log");
 
-        foreach (var basePath in pathsToTry)
+            Log.Logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.File(logFile,
+                    rollingInterval: RollingInterval.Infinite, // Single file, no rolling
+                    fileSizeLimitBytes: 10 * 1024 * 1024, // 10MB max
+                    rollOnFileSizeLimit: true,
+                    retainedFileCountLimit: 2,
+                    shared: true,
+                    outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                .CreateLogger();
+
+            Log.Debug("Logging initialized at {Path}", logFile);
+        }
+        catch (Exception ex)
         {
-            try
-            {
-                string logDir = Path.Combine(basePath, "Pankha Fan Control", "logs");
-                Directory.CreateDirectory(logDir);
-                string logFile = Path.Combine(logDir, "pankha-tray.log");
-
-                Log.Logger = new LoggerConfiguration()
-                    .MinimumLevel.Debug()
-                    .WriteTo.File(logFile,
-                        rollingInterval: RollingInterval.Infinite, // Single file, no rolling
-                        fileSizeLimitBytes: 10 * 1024 * 1024, // 10MB max
-                        rollOnFileSizeLimit: true,
-                        retainedFileCountLimit: 2,
-                        shared: true,
-                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
-                    .CreateLogger();
-
-                Log.Debug("Logging initialized at {Path}", logFile);
-                return;
-            }
-            catch
-            {
-                // Try next path
-            }
+            // Fallback to temp if Install Path is not writable (though user said they want Install Path)
+            string tempPath = Path.Combine(Path.GetTempPath(), "pankha-tray.log");
+            Log.Logger = new LoggerConfiguration().WriteTo.File(tempPath).CreateLogger();
+            Log.Error(ex, "Failed to initialize logging in Install Path. Falling back to {Path}", tempPath);
         }
     }
 }

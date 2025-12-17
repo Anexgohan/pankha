@@ -42,11 +42,13 @@ public class LibreHardwareAdapter : IHardwareMonitor
             IsCpuEnabled = true,
             IsGpuEnabled = true,
             IsMemoryEnabled = true,
-            IsMotherboardEnabled = true,
+            IsMotherboardEnabled = true, 
             IsControllerEnabled = true,
-            IsNetworkEnabled = false,
+            IsNetworkEnabled = true,
             IsStorageEnabled = true
         };
+
+        _logger.Information("Initializing LibreHardwareMonitor with all hardware enabled");
 
         try
         {
@@ -117,13 +119,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
         {
             foreach (var hardware in _computer.Hardware)
             {
-                AddSensorsFromHardware(hardware, sensors);
-
-                // Process sub-hardware (e.g., GPU, NVMe drives)
-                foreach (var subHardware in hardware.SubHardware)
-                {
-                    AddSensorsFromHardware(subHardware, sensors);
-                }
+                CollectSensorsRecursive(hardware, sensors);
             }
         }
 
@@ -145,11 +141,22 @@ public class LibreHardwareAdapter : IHardwareMonitor
         return sensors;
     }
 
+    private void CollectSensorsRecursive(IHardware hardware, List<Sensor> sensors)
+    {
+        AddSensorsFromHardware(hardware, sensors);
+
+        foreach (var subHardware in hardware.SubHardware)
+        {
+            CollectSensorsRecursive(subHardware, sensors);
+        }
+    }
+
     private void AddSensorsFromHardware(IHardware hardware, List<Sensor> sensors)
     {
         foreach (var sensor in hardware.Sensors)
         {
-            // Only interested in temperature sensors
+            // Allow Temperature and other useful types (throughput, etc. if needed later)
+            // For now, let's keep it to Temperature but log if we skip something interesting
             if (sensor.SensorType != SensorType.Temperature)
                 continue;
 
@@ -211,7 +218,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
         {
             HardwareType.Cpu => "cpu",
             HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel => "gpu",
-            HardwareType.Motherboard => "motherboard",
+            HardwareType.Motherboard or HardwareType.SuperIO => "motherboard",
             HardwareType.Storage => "storage",
             HardwareType.Memory => "memory",
             _ => "other"
@@ -379,6 +386,12 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
     private void AddFansFromHardware(IHardware hardware, List<Fan> fans)
     {
+        // Recursive fan discovery
+        CollectFansRecursive(hardware, fans);
+    }
+
+    private void CollectFansRecursive(IHardware hardware, List<Fan> fans)
+    {
         // Find RPM sensors
         var fanRpmSensors = hardware.Sensors
             .Where(s => s.SensorType == SensorType.Fan)
@@ -397,6 +410,8 @@ public class LibreHardwareAdapter : IHardwareMonitor
             var fanId = GenerateFanId(hardware, rpmSensor);
 
             // Try to find matching control sensor
+            // Match "Fan #1" with "Fan Control #1" by simpler name parsing
+            // This is heuristic but works for most mobos (Nuvoton/ITE)
             var controlSensor = fanControlSensors.FirstOrDefault(c =>
                 c.Name.Contains(rpmSensor.Name.Split(' ')[0]));
 
@@ -433,6 +448,11 @@ public class LibreHardwareAdapter : IHardwareMonitor
             }
 
             fans.Add(fan);
+        }
+
+        foreach (var sub in hardware.SubHardware)
+        {
+            CollectFansRecursive(sub, fans);
         }
     }
 
@@ -641,6 +661,52 @@ public class LibreHardwareAdapter : IHardwareMonitor
         }
 
         await Task.WhenAll(tasks);
+    }
+
+    public async Task<List<HardwareDumpItem>> DumpFullHardwareInfoAsync()
+    {
+        await UpdateAsync();
+
+        var result = new List<HardwareDumpItem>();
+
+        lock (_hardwareLock)
+        {
+            foreach (var hardware in _computer.Hardware)
+            {
+                result.Add(MapToDumpItem(hardware));
+            }
+        }
+
+        return result;
+    }
+
+    private HardwareDumpItem MapToDumpItem(IHardware hardware)
+    {
+        var item = new HardwareDumpItem
+        {
+            Name = hardware.Name,
+            Identifier = hardware.Identifier.ToString(),
+            Type = hardware.HardwareType.ToString(),
+            Sensors = hardware.Sensors.Select(s => new HardwareDumpSensor
+            {
+                Name = s.Name,
+                Identifier = s.Identifier.ToString(),
+                Type = s.SensorType.ToString(),
+                Value = s.Value,
+                Min = s.Min?.ToString() ?? "null",
+                Max = s.Max?.ToString() ?? "null",
+                IsMonitored = s.SensorType == SensorType.Temperature || 
+                              s.SensorType == SensorType.Fan || 
+                              s.SensorType == SensorType.Control
+            }).ToList()
+        };
+
+        foreach (var sub in hardware.SubHardware)
+        {
+            item.SubHardware.Add(MapToDumpItem(sub));
+        }
+
+        return item;
     }
 
     public void Dispose()

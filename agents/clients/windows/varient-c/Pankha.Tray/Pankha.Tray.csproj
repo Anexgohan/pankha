@@ -21,8 +21,12 @@
     <Product>Pankha Tray Application</Product>
     <Description>System tray application for Pankha Windows Agent</Description>
     <Copyright>Copyright 2025</Copyright>
-    <Version>1.0.0</Version>
+
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Platform\PathResolver.cs" Link="Services\PathResolver.cs" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />

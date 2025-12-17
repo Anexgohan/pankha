@@ -11,9 +11,9 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);Pankha.UI\**;Pankha.Tray\**</DefaultItemExcludes>
 
     <!-- Application Info -->
-    <AssemblyName>pankha-agent-windows</AssemblyName>
+    <!-- AssemblyName is defined in Directory.Build.props generated from build-config.json -->
     <RootNamespace>Pankha.WindowsAgent</RootNamespace>
-    <Version>1.0.0</Version>
+
     <Company>Pankha</Company>
     <Product>Pankha Windows Agent</Product>
     <Description>Hardware monitoring and fan control agent for Windows</Description>

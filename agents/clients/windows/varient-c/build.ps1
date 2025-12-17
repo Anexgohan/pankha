@@ -2,12 +2,36 @@
 
 param(
     [string]$Configuration = "Release",
+    [string]$Version,  # Allow passing version explicitly (e.g. from CI)
     [switch]$Clean,
     [switch]$Test,
     [switch]$Publish,
     [switch]$BuildInstaller,
     [switch]$Menu
 )
+
+# Function to get version from Git
+function Get-GitVersion {
+    try {
+        $gitVersion = git describe --tags --always --dirty
+        # Remove 'v' prefix if present
+        if ($gitVersion.StartsWith("v")) {
+            $gitVersion = $gitVersion.Substring(1)
+        }
+        return $gitVersion
+    } catch {
+        return "0.0.0"
+    }
+}
+
+# Determine Version
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = Get-GitVersion
+    Write-Host "Auto-detected Version: $Version" -ForegroundColor Gray
+} else {
+    Write-Host "Using Version: $Version" -ForegroundColor Gray
+}
+
 
 # Function to check if running as administrator
 function Test-Administrator {
@@ -258,6 +282,23 @@ if ($Config.Paths.AppIcon_256) {
     }
 }
 
+# Generate Directory.Build.props to control AssemblyName from build-config.json
+$PropsPath = Join-Path $PSScriptRoot "Directory.Build.props"
+$AgentExeName = [System.IO.Path]::GetFileNameWithoutExtension($Config.Filenames.AgentExe)
+
+$PropsContent = @"
+<Project>
+  <PropertyGroup>
+    <AssemblyName>$AgentExeName</AssemblyName>
+    <Version>$Version</Version>
+    <FileVersion>$Version</FileVersion>
+    <AssemblyVersion>$Version</AssemblyVersion>
+  </PropertyGroup>
+</Project>
+"@
+$PropsContent | Out-File -FilePath $PropsPath -Encoding UTF8 -Force
+Write-Host "Generated Directory.Build.props with AssemblyName: $AgentExeName" -ForegroundColor Gray
+
 # Build
 # Optimization: Skip explicit build if we are going to publish (which does a build)
 if (-not $Publish) {
@@ -317,8 +358,6 @@ if ($Publish) {
         "-r", "win-x64",
         "--self-contained", "true",
         "/p:PublishSingleFile=true",
-        "/p:PublishTrimmed=true",
-        "/p:TrimMode=partial",
         "/p:IncludeNativeLibrariesForSelfExtract=true",
         "/p:PublishReadyToRun=true",
         "-o", $OutputDir
@@ -375,15 +414,22 @@ if ($Publish) {
 
     # Rename Executable if needed (Default is project name pankha-agent-windows.exe)
     # If Config.Filenames.AgentExe differs, we rename it.
-    $DefaultExeName = "pankha-agent-windows.exe"
-    $TargetExeName = $Config.Filenames.AgentExe
     
-    if ($TargetExeName -and $TargetExeName -ne $DefaultExeName) {
-        $SourceExe = Join-Path $OutputDir $DefaultExeName
-        $TargetExe = Join-Path $OutputDir $TargetExeName
-        if (Test-Path $SourceExe) {
-            Move-Item -Force $SourceExe $TargetExe
-            Write-Host "Renamed executable to: $TargetExeName" -ForegroundColor Gray
+    $TargetExeName = $Config.Filenames.AgentExe
+    $ExpectedOutput = Join-Path $OutputDir $TargetExeName
+
+    if (-not (Test-Path $ExpectedOutput)) {
+        # Fallback: Check if it was output with default name (if props failed)
+        $DefaultProjectName = "pankha-agent-windows.exe"
+        $PossibleDefault = Join-Path $OutputDir $DefaultProjectName
+        if (Test-Path $PossibleDefault) {
+             Move-Item -Force $PossibleDefault $ExpectedOutput
+             Write-Host "Renamed executable to: $TargetExeName" -ForegroundColor Gray
+        } else {
+             # It might already be named correctly if Directory.Build.props worked
+             # But if Test-Path $ExpectedOutput failed, then it's NOT there.
+             # So we warn.
+             Write-Host "WARNING: Expected executable not found at $ExpectedOutput" -ForegroundColor Yellow
         }
     }
 
@@ -425,13 +471,6 @@ if ($BuildInstaller) {
         Write-Host ""
 
         # Show MSI location - Resolve from Config
-        # Config path is relative to root, but we are inside 'installer' now because of Push-Location? 
-        # No, $Config.Paths.InstallerOutput is likely "..\\publish..." relative to root? 
-        # Wait, if I am in 'installer', and config says "..\\publish", that resolves to "installer\..\publish" = "publish".
-        # If I am in Root, "..\\publish" resolves to "..\publish" (outside root).
-        # Let's assume paths in config are relative to PROJECT ROOT (varient-c).
-        # So I should resolve them relative to PSScriptRoot.
-        
         $MsiOutputDir = Join-Path $PSScriptRoot $Config.Paths.InstallerOutput
         $MsiFileName = $Config.Filenames.InstallerMsi
         $MsiPath = Join-Path $MsiOutputDir $MsiFileName
