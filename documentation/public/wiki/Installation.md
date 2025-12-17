@@ -53,6 +53,22 @@ volumes:
   pgdata:
 ```
 
+### Environment Configuration (.env)
+
+The `compose.yml` relies on an `.env` file for secrets. You can download the default one:
+
+```bash
+wget https://github.com/Anexgohan/pankha/releases/latest/download/example.env -O .env
+```
+
+Or create it manually:
+
+```properties
+PORT=3000
+DATABASE_URL=postgresql://pankha:secure_password@postgres:5432/db_pankha
+...
+```
+
 > **Note**: Change `secure_password` to a strong, unique password in both the `postgres` and `app` services.
 
 ## Verification
