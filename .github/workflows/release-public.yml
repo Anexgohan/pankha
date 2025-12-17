@@ -110,7 +110,7 @@ jobs:
 
       - name: Build Windows Installer
         working-directory: agents/clients/windows/varient-c
-        run: .\build.ps1 -Configuration Release -Clean -Publish -BuildInstaller
+        run: .\build.ps1 -Configuration Release -Clean -Publish -BuildInstaller -Version "${{ github.event.client_payload.version || github.event.inputs.version }}"
 
       - name: Upload MSI Artifact
         uses: actions/upload-artifact@v4
@@ -325,7 +325,7 @@ jobs:
             **Linux Agent Binaries (Ready to Run):**
             - `pankha-agent-linux_x86_64` - For Intel/AMD x86_64 systems
             - `pankha-agent-linux_arm64` - For Raspberry Pi 5 / ARM64 systems
-            - `config.example.json` - Example agent configuration file (generate with `pankha-agent --setup`)
+            - `config.example.json` - Example agent configuration file (generate with `pankha-agent-linux_arm64 --setup`)
 
             **Docker Deployment Files:**
             - `compose.yml` - Docker Compose configuration
@@ -358,18 +358,18 @@ jobs:
 
             ### For x86_64 systems:
             ```bash
-            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x86_64
-            chmod +x pankha-agent
-            ./pankha-agent --setup
-            ./pankha-agent --start
+            wget -O pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x86_64
+            chmod +x pankha-agent-linux_x86_64
+            ./pankha-agent-linux_x86_64 --setup
+            ./pankha-agent-linux_x86_64 --start
             ```
 
             ### For ARM64 systems (Raspberry Pi 5):
             ```bash
-            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_arm64
-            chmod +x pankha-agent
-            ./pankha-agent --setup
-            ./pankha-agent --start
+            wget -O pankha-agent-linux_arm64 https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_arm64
+            chmod +x pankha-agent-linux_arm64
+            ./pankha-agent-linux_arm64 --setup
+            ./pankha-agent-linux_arm64 --start
             ```
 
             ### Verify Download Integrity

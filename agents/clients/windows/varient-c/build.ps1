@@ -36,9 +36,13 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
         $Version = "0.0.0" 
     }
     
-    $InfoVersion = $RawVersion
+    $InfoVersion = $Version
     Write-Host "Auto-detected Version: $Version (Info: $InfoVersion)" -ForegroundColor Gray
 } else {
+    # Sanitize provided version (strip 'v' if present)
+    if ($Version.StartsWith("v")) {
+        $Version = $Version.Substring(1)
+    }
     $InfoVersion = $Version
     Write-Host "Using Version: $Version" -ForegroundColor Gray
 }
