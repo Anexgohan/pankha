@@ -1,0 +1,30 @@
+# Welcome to Pankha (पंखा)
+
+Pankha is an open-source, distributed fan control system designed for self-hosters and hardware enthusiasts. It allows you to monitor and control hardware cooling across multiple physical machines from a single, centralized dashboard.
+
+![Centralized Dashboard](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/zen_2025-11-05_00-38-15_IutnWbxl11.png)
+
+## Key Features
+
+*   ** centralized Control**: Manage fan curves and speeds for your NAS, gaming PC, and servers from one UI.
+*   **Real-time Monitoring**: WebSocket-based architecture provides instant feedback (<100ms latency).
+*   **Hardware Safety**:
+    *   **Emergency Stop**: Hard override to max fans if critical temps are reached.
+    *   **Connectivity Watchdog**: Agents auto-reconnect; Backend alerts if an agent goes offline.
+*   **Cross-Platform Agents**:
+    *   **Linux**: Rust-based single binary (<10MB RAM).
+    *   **Windows**: Native .NET 8 Service with System Tray control.
+*   **Historical Data**: PostgreSQL time-series storage for temperature and fan speed analysis.
+
+## Architecture
+
+```
+[ Browser / Dashboard ] <—— WebSocket ——> [ Backend Server ] <—— WebSocket ——> [ Agents ] <——> [ Hardware ]
+      (React)                              (Node.js + PG)                    (Rust/C#)
+```
+
+## Getting Started
+
+1.  **[Installation](Installation)**: Deploy the server using Docker Compose.
+2.  **[agents](Agents-Linux)**: Deploy agents to your machines.
+3.  **[Configuration](Configuration)**: Customize your setup.
