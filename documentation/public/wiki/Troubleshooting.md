@@ -11,7 +11,7 @@
 
 ### "WebSocket Handshake Failed"
 *   **Cause**: Protocol mismatch or proxy issue.
-*   **Fix**: Ensure your URL starts with `ws://`. If you are running behind a reverse proxy (like Nginx Proxy Manager), ensure WebSocket support is enabled.
+*   **Fix**: Ensure your URL starts with `ws://`. If you are running behind a reverse proxy (like Nginx Proxy Manager), ensure that WebSocket support is enabled.
 
 ## Hardware Issues
 
@@ -34,3 +34,4 @@
 ### Why do my fans spin up on boot?
 *   **Reason**: Before the agent starts, the BIOS/UEFI controls the fans.
 *   **Fix**: Configure a silent curve in your BIOS as a fallback, so the fans stay quiet until the OS/Agent loads and takes over.
+
