@@ -29,7 +29,8 @@ jobs:
             runner: ubuntu-22.04
           - arch: arm64
             target: aarch64-unknown-linux-gnu
-            runner: ubuntu-24.04-arm  # FREE ARM64 runner!
+            runner: ubuntu-22.04  # Use older Ubuntu for GLIBC 2.35 compatibility
+            cross: true           # Enable cross-compilation
 
     runs-on: ${{ matrix.runner }}
 
@@ -48,9 +49,9 @@ jobs:
           workspaces: agents/clients/linux/rust
           shared-key: rust-cache-${{ matrix.arch }}
 
-      # Cross-compilation setup only needed for ARM64 on x86_64 (not needed with native runner)
-      - name: Add target (if cross-compiling)
-        if: matrix.arch == 'arm64' && matrix.runner == 'ubuntu-22.04'
+      # Cross-compilation setup for ARM64 on x86_64
+      - name: Setup cross-compilation (ARM64)
+        if: matrix.cross == true
         run: |
           rustup target add aarch64-unknown-linux-gnu
           sudo apt-get update -qq
@@ -61,12 +62,13 @@ jobs:
         run: |
           echo "🦀 Building Rust agent for ${{ matrix.arch }} on ${{ matrix.runner }}..."
 
-          if [ "${{ matrix.arch }}" = "arm64" ] && [ "${{ matrix.runner }}" = "ubuntu-22.04" ]; then
-            # Cross-compile (fallback if native runner unavailable)
+          if [ "${{ matrix.cross }}" = "true" ]; then
+            # Cross-compile for ARM64 using older glibc from Ubuntu 22.04
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
             cargo build --release --target ${{ matrix.target }}
             BINARY_PATH="target/${{ matrix.target }}/release/pankha-agent-linux"
           else
-            # Native build (x86_64 or native ARM64)
+            # Native build (x86_64)
             cargo build --release
             BINARY_PATH="target/release/pankha-agent-linux"
           fi
