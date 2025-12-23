@@ -101,12 +101,11 @@ pub struct HardwareSettings {
     pub enable_fan_control: bool,
     pub enable_sensor_monitoring: bool,
     pub fan_safety_minimum: u8,
-    pub temperature_critical: f64,
     pub filter_duplicate_sensors: bool,
     pub duplicate_sensor_tolerance: f64,
     pub fan_step_percent: u8,        // 3, 5, 10, 15, 25, 50, 100 (disable)
     pub hysteresis_temp: f64,        // 0.5-10.0°C (0.0 = disable)
-    pub emergency_temp: f64,         // 70-100°C
+    pub emergency_temp: f64,         // 70-100°C - used for local failsafe mode
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,7 +146,6 @@ impl Default for AgentConfig {
                 enable_fan_control: true,
                 enable_sensor_monitoring: true,
                 fan_safety_minimum: 30,
-                temperature_critical: 85.0,
                 filter_duplicate_sensors: false,
                 duplicate_sensor_tolerance: 1.0,
                 fan_step_percent: 5,
@@ -743,7 +741,8 @@ impl HardwareMonitor for LinuxHardwareMonitor {
             }
             Err(e) => {
                 error!("Failed to write PWM for fan {}: {}", fan_id, e);
-                // Don't update cache on failure
+                // Clear cache on failure to force retry on next attempt (self-healing)
+                *fan_info.last_pwm_value.write().await = None;
                 Err(e)
             }
         }
@@ -948,6 +947,8 @@ pub struct WebSocketClient {
     config: Arc<RwLock<AgentConfig>>,
     hardware_monitor: Arc<dyn HardwareMonitor>,
     running: Arc<RwLock<bool>>,
+    // Failsafe mode tracking - activates when disconnected from backend
+    failsafe_active: Arc<RwLock<bool>>,
 }
 
 impl WebSocketClient {
@@ -956,6 +957,96 @@ impl WebSocketClient {
             config: Arc::new(RwLock::new(config)),
             hardware_monitor,
             running: Arc::new(RwLock::new(false)),
+            failsafe_active: Arc::new(RwLock::new(false)),
+        }
+    }
+
+    // TODO: Make failsafe_speed configurable via config.json
+    const FAILSAFE_SPEED: u8 = 70;
+
+    /// Enter failsafe mode - set all fans to failsafe speed and enable local temp monitoring
+    async fn enter_failsafe_mode(&self) -> Result<()> {
+        let mut failsafe = self.failsafe_active.write().await;
+        if *failsafe {
+            return Ok(()); // Already in failsafe mode
+        }
+        *failsafe = true;
+        drop(failsafe);
+
+        warn!("⚠️ ENTERING FAILSAFE MODE - Backend disconnected");
+        warn!("Setting all fans to {}% (failsafe speed)", Self::FAILSAFE_SPEED);
+
+        // Set all fans to failsafe speed
+        if let Err(e) = self.set_all_fans_to_speed(Self::FAILSAFE_SPEED).await {
+            error!("Failed to set failsafe fan speed: {}", e);
+        }
+
+        Ok(())
+    }
+
+    /// Exit failsafe mode - backend connection restored
+    async fn exit_failsafe_mode(&self) {
+        let mut failsafe = self.failsafe_active.write().await;
+        if *failsafe {
+            *failsafe = false;
+            info!("✅ EXITING FAILSAFE MODE - Backend connection restored");
+            info!("Backend will resume fan control");
+        }
+    }
+
+    /// Set all fans to a specific speed percentage
+    async fn set_all_fans_to_speed(&self, speed: u8) -> Result<()> {
+        let fans = self.hardware_monitor.discover_fans().await?;
+        let mut success_count = 0;
+        let mut fail_count = 0;
+
+        for fan in fans.iter() {
+            match self.hardware_monitor.set_fan_speed(&fan.id, speed).await {
+                Ok(_) => {
+                    debug!("Set fan {} to {}%", fan.id, speed);
+                    success_count += 1;
+                }
+                Err(e) => {
+                    error!("Failed to set fan {} to {}%: {}", fan.id, speed, e);
+                    fail_count += 1;
+                }
+            }
+        }
+
+        info!("Fan speed set to {}%: {} succeeded, {} failed", speed, success_count, fail_count);
+        Ok(())
+    }
+
+    /// Check emergency temperature while in failsafe mode
+    /// If any sensor >= emergency_temp, set all fans to 100%
+    async fn check_emergency_temp(&self) -> Result<()> {
+        let config = self.config.read().await;
+        let emergency_temp = config.hardware.emergency_temp;
+        drop(config);
+
+        // Read current sensor temps
+        let sensors = self.hardware_monitor.discover_sensors().await?;
+        let max_temp = sensors.iter()
+            .map(|s| s.temperature)
+            .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap_or(0.0);
+
+        // If emergency temp reached, override to 100%
+        if max_temp >= emergency_temp {
+            warn!("🚨 FAILSAFE EMERGENCY: {:.1}°C >= {:.1}°C threshold - ALL FANS TO 100%",
+                  max_temp, emergency_temp);
+            self.hardware_monitor.emergency_stop().await?;
+        }
+
+        Ok(())
+    }
+
+    /// Run failsafe checks during disconnected period
+    async fn run_failsafe_check(&self) {
+        if *self.failsafe_active.read().await {
+            if let Err(e) = self.check_emergency_temp().await {
+                error!("Failed to check emergency temp in failsafe mode: {}", e);
+            }
         }
     }
 
@@ -976,6 +1067,11 @@ impl WebSocketClient {
                 Err(e) => error!("WebSocket error: {}", e),
             }
 
+            // Connection lost or failed - enter failsafe mode
+            if let Err(e) = self.enter_failsafe_mode().await {
+                error!("Failed to enter failsafe mode: {}", e);
+            }
+
             if *self.running.read().await {
                 let config = self.config.read().await;
                 // Hardware-safe exponential backoff: max 15s to prevent thermal issues
@@ -986,10 +1082,33 @@ impl WebSocketClient {
                     2 => base_interval * 2.0,     // 10s (third retry)
                     _ => base_interval * 3.0,     // 15s (max - hardware safety)
                 };
+                let update_interval = config.agent.update_interval;
+                drop(config);
                 retry_count = (retry_count + 1).min(3);
 
                 info!("Reconnecting in {:.1}s... (attempt {})", wait_time, retry_count);
-                time::sleep(Duration::from_secs_f64(wait_time)).await;
+
+                // During reconnection wait, periodically check emergency temps
+                // Check every update_interval seconds (same as normal data cycle)
+                let wait_duration = Duration::from_secs_f64(wait_time);
+                let check_interval = Duration::from_secs_f64(update_interval);
+                let start = std::time::Instant::now();
+
+                while start.elapsed() < wait_duration {
+                    if !*self.running.read().await {
+                        break;
+                    }
+
+                    // Run failsafe check (monitors emergency_temp)
+                    self.run_failsafe_check().await;
+
+                    // Sleep for check interval or remaining time, whichever is shorter
+                    let remaining = wait_duration.saturating_sub(start.elapsed());
+                    let sleep_time = check_interval.min(remaining);
+                    if sleep_time > Duration::ZERO {
+                        time::sleep(sleep_time).await;
+                    }
+                }
             }
         }
 
@@ -1013,6 +1132,9 @@ impl WebSocketClient {
             .context("Connection timeout")??;
         drop(config); // Release read lock
         info!("✅ WebSocket connected");
+
+        // Exit failsafe mode - backend connection restored
+        self.exit_failsafe_mode().await;
 
         let (write, read) = ws_stream.split();
         let write = Arc::new(tokio::sync::Mutex::new(write));
@@ -1828,7 +1950,6 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
             enable_fan_control,
             enable_sensor_monitoring: true,
             fan_safety_minimum,
-            temperature_critical: 85.0,
             filter_duplicate_sensors: filter_duplicates,
             duplicate_sensor_tolerance: tolerance,
             fan_step_percent: 5,

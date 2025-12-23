@@ -46,10 +46,11 @@ public class AgentWorker : BackgroundService
                 _config.Monitoring,
                 Serilog.Log.Logger);
 
-            // Initialize connection watchdog
+            // Initialize connection watchdog with config for emergency_temp monitoring
             _connectionWatchdog = new ConnectionWatchdog(
                 _hardwareMonitor,
-                Microsoft.Extensions.Logging.Abstractions.NullLogger<ConnectionWatchdog>.Instance);
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<ConnectionWatchdog>.Instance,
+                _config);
 
             // DUMP HARDWARE INFO (User Request)
             try 

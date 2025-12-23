@@ -36,8 +36,20 @@ export class CommandDispatcher extends EventEmitter {
     super();
     this.db = Database.getInstance();
     this.agentManager = AgentManager.getInstance();
-    
+
     this.startQueueProcessing();
+    this.setupEventListeners();
+  }
+
+  /**
+   * Setup event listeners for agent lifecycle events
+   */
+  private setupEventListeners(): void {
+    // Clean up pending commands when an agent goes offline
+    this.agentManager.on('agentOffline', ({ agentId }: { agentId: string }) => {
+      log.debug(`Agent ${agentId} went offline, cleaning up pending commands`, 'CommandDispatcher');
+      this.handleAgentDisconnected(agentId);
+    });
   }
 
   /**

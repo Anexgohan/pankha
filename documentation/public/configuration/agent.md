@@ -34,7 +34,6 @@ Here's a complete example configuration with explanations:
     "enable_fan_control": true,
     "enable_sensor_monitoring": true,
     "fan_safety_minimum": 30,
-    "temperature_critical": 80.0,
     "filter_duplicate_sensors": false,
     "duplicate_sensor_tolerance": 2.0,
     "fan_step_percent": 5,
@@ -84,8 +83,6 @@ Example: `ws://192.168.1.100:3000/websocket`
 
 This prevents fans from stopping completely, which could damage hardware.
 
-**temperature_critical**: Temperature in Celsius that triggers emergency mode (default: 80)
-
 **filter_duplicate_sensors**: Remove sensors with identical readings (default: false)
 
 **duplicate_sensor_tolerance**: Temperature difference threshold for duplicate detection (default: 2.0)
@@ -94,7 +91,9 @@ This prevents fans from stopping completely, which could damage hardware.
 
 **hysteresis_temp**: Temperature hysteresis to prevent rapid fan speed changes (default: 3.0)
 
-**emergency_temp**: Temperature that triggers maximum fan speed (default: 80.0)
+**emergency_temp**: Temperature threshold that triggers maximum fan speed (default: 80.0)
+
+When disconnected from the backend, the agent monitors temperatures locally. If any sensor reaches this threshold, all fans are immediately set to 100%.
 
 ## Logging Section
 

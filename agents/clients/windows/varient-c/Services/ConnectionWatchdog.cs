@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Pankha.WindowsAgent.Hardware;
+using Pankha.WindowsAgent.Models.Configuration;
 
 namespace Pankha.WindowsAgent.Services;
 
@@ -12,16 +13,21 @@ public class ConnectionWatchdog : BackgroundService
 {
     private readonly IHardwareMonitor _hardware;
     private readonly ILogger<ConnectionWatchdog> _logger;
+    private readonly AgentConfig _config;
     private DateTime _lastSuccessfulConnection = DateTime.UtcNow;
-    private bool _emergencyModeActive = false;
+    private bool _failsafeModeActive = false;
 
     // From Linux agent: max 15s reconnect delay, so 30s = 2x max delay before emergency
     private const int MAX_DISCONNECT_SECONDS = 30;
 
-    public ConnectionWatchdog(IHardwareMonitor hardware, ILogger<ConnectionWatchdog> logger)
+    // Check interval during failsafe mode (same as update interval for consistency)
+    private const int FAILSAFE_CHECK_INTERVAL_SECONDS = 3;
+
+    public ConnectionWatchdog(IHardwareMonitor hardware, ILogger<ConnectionWatchdog> logger, AgentConfig config)
     {
         _hardware = hardware;
         _logger = logger;
+        _config = config;
     }
 
     /// <summary>
@@ -31,10 +37,11 @@ public class ConnectionWatchdog : BackgroundService
     {
         _lastSuccessfulConnection = DateTime.UtcNow;
 
-        if (_emergencyModeActive)
+        if (_failsafeModeActive)
         {
-            _logger.LogInformation("Connection restored, deactivating emergency mode");
-            _emergencyModeActive = false;
+            _logger.LogInformation("✅ Connection restored, exiting failsafe mode");
+            _logger.LogInformation("Backend will resume fan control");
+            _failsafeModeActive = false;
         }
     }
 
@@ -45,43 +52,54 @@ public class ConnectionWatchdog : BackgroundService
     {
         // Force watchdog to trigger immediately by setting last connection to past
         _lastSuccessfulConnection = DateTime.UtcNow.AddSeconds(-(MAX_DISCONNECT_SECONDS + 1));
-        _logger.LogWarning("Explicit disconnect reported - watchdog will trigger emergency mode");
+        _logger.LogWarning("Explicit disconnect reported - watchdog will trigger failsafe mode");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Connection watchdog started (emergency threshold: {Seconds}s)",
-            MAX_DISCONNECT_SECONDS);
+        _logger.LogInformation("Connection watchdog started (failsafe threshold: {Seconds}s, emergency temp: {Temp}°C)",
+            MAX_DISCONNECT_SECONDS, _config.Hardware.EmergencyTemperature);
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 var timeSinceConnection = DateTime.UtcNow - _lastSuccessfulConnection;
+                var isDisconnected = timeSinceConnection.TotalSeconds > MAX_DISCONNECT_SECONDS;
 
-                // Check if disconnected too long
-                if (timeSinceConnection.TotalSeconds > MAX_DISCONNECT_SECONDS && !_emergencyModeActive)
+                // Enter failsafe mode if disconnected too long
+                if (isDisconnected && !_failsafeModeActive)
                 {
-                    _logger.LogWarning("WARNING: No backend connection for {Seconds}s - RESTORING AUTO CONTROL",
+                    _logger.LogWarning("⚠️ No backend connection for {Seconds}s - ENTERING FAILSAFE MODE",
                         (int)timeSinceConnection.TotalSeconds);
 
-                    // Restore auto control for safety and quiet operation
                     try
                     {
-                        await _hardware.ResetAllToAutoAsync();
-                        _emergencyModeActive = true;
+                        // GPU fans → auto, other fans → 70%
+                        await _hardware.EnterFailsafeModeAsync();
+                        _failsafeModeActive = true;
 
-                        _logger.LogWarning("EMERGENCY: All fans reset to auto/default control");
-                        _logger.LogInformation("Will resume manual control when backend reconnects");
+                        _logger.LogWarning("FAILSAFE MODE ACTIVE: GPU fans on auto, others at 70%");
+                        _logger.LogInformation("Local temperature monitoring enabled");
+                        _logger.LogInformation("Will resume backend control when connection restores");
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "CRITICAL: Failed to activate emergency mode!");
+                        _logger.LogError(ex, "CRITICAL: Failed to enter failsafe mode!");
                     }
                 }
 
-                // Check every 10 seconds
-                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+                // While in failsafe mode, monitor temperatures
+                if (_failsafeModeActive)
+                {
+                    await CheckEmergencyTemperatureAsync();
+                }
+
+                // Check interval: faster during failsafe for temp monitoring
+                var checkInterval = _failsafeModeActive
+                    ? FAILSAFE_CHECK_INTERVAL_SECONDS
+                    : 10;
+                await Task.Delay(TimeSpan.FromSeconds(checkInterval), stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -96,5 +114,28 @@ public class ConnectionWatchdog : BackgroundService
         }
 
         _logger.LogInformation("Connection watchdog stopped");
+    }
+
+    /// <summary>
+    /// Check if any sensor exceeds emergency temperature and trigger 100% fans if needed
+    /// </summary>
+    private async Task CheckEmergencyTemperatureAsync()
+    {
+        try
+        {
+            var maxTemp = await _hardware.GetMaxTemperatureAsync();
+            var emergencyTemp = _config.Hardware.EmergencyTemperature;
+
+            if (maxTemp >= emergencyTemp)
+            {
+                _logger.LogWarning("🚨 FAILSAFE EMERGENCY: {MaxTemp:F1}°C >= {EmergencyTemp:F1}°C - ALL FANS TO 100%",
+                    maxTemp, emergencyTemp);
+                await _hardware.EmergencyStopAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to check emergency temperature");
+        }
     }
 }

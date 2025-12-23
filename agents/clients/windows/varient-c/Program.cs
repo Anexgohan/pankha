@@ -420,7 +420,8 @@ class Program
 
         using var watchdog = new ConnectionWatchdog(
             hardware,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger<ConnectionWatchdog>.Instance);
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ConnectionWatchdog>.Instance,
+            config);
 
         using var wsClient = new Pankha.WindowsAgent.Core.WebSocketClient(
             config,

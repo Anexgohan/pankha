@@ -663,6 +663,77 @@ public class LibreHardwareAdapter : IHardwareMonitor
         await Task.WhenAll(tasks);
     }
 
+    // TODO: Make FAILSAFE_SPEED configurable via config.json
+    private const int FAILSAFE_SPEED = 70;
+
+    /// <summary>
+    /// Enter failsafe mode: GPU fans → auto, other fans → 70%
+    /// </summary>
+    public async Task EnterFailsafeModeAsync()
+    {
+        _logger.Information("Entering failsafe mode: GPU→auto, others→{Speed}%", FAILSAFE_SPEED);
+
+        var tasks = new List<Task>();
+
+        foreach (var fan in _fanCache.Values.Where(f => f.HasPwmControl))
+        {
+            tasks.Add(Task.Run(async () =>
+            {
+                try
+                {
+                    // NVIDIA GPUs: Reset to auto (works reliably)
+                    if (_nvidiaController != null && _nvidiaController.CanControlFan(fan.Id))
+                    {
+                        await _nvidiaController.ResetToAutoAsync(fan.Id);
+                        _logger.Information("GPU fan {FanId} reset to auto", fan.Id);
+                        return;
+                    }
+
+                    // All other fans: Set to failsafe speed (70%)
+                    await SetFanSpeedAsync(fan.Id, FAILSAFE_SPEED);
+                    _logger.Information("Fan {FanId} set to {Speed}% (failsafe)", fan.Id, FAILSAFE_SPEED);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error(ex, "Failed to set failsafe for fan {FanId}", fan.Id);
+                }
+            }));
+        }
+
+        await Task.WhenAll(tasks);
+        _logger.Warning("FAILSAFE MODE ACTIVE: GPU fans on auto, others at {Speed}%", FAILSAFE_SPEED);
+    }
+
+    /// <summary>
+    /// Set all fans to a specific speed percentage
+    /// </summary>
+    public async Task SetAllFansToSpeedAsync(int speed)
+    {
+        _logger.Information("Setting all fans to {Speed}%", speed);
+
+        var tasks = _fanCache.Values
+            .Where(f => f.HasPwmControl)
+            .Select(f => SetFanSpeedAsync(f.Id, speed));
+
+        await Task.WhenAll(tasks);
+    }
+
+    /// <summary>
+    /// Get the maximum temperature across all sensors
+    /// </summary>
+    public async Task<double> GetMaxTemperatureAsync()
+    {
+        await UpdateAsync();
+
+        var maxTemp = _sensorCache.Values
+            .Where(s => s.Type == "temperature")
+            .Select(s => s.Temperature)
+            .DefaultIfEmpty(0.0)
+            .Max();
+
+        return maxTemp;
+    }
+
     public async Task<List<HardwareDumpItem>> DumpFullHardwareInfoAsync()
     {
         await UpdateAsync();

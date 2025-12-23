@@ -321,12 +321,11 @@ Agent configuration file: `config.json` (running directory)
     "enable_fan_control": true,
     "enable_sensor_monitoring": true,
     "fan_safety_minimum": 30,
-    "temperature_critical": 80.0,
     "filter_duplicate_sensors": false,
     "duplicate_sensor_tolerance": 2.0,
     "fan_step_percent": 5,
     "hysteresis_temp": 3.0,
-    "emergency_temp": 80.0
+    "emergency_temp": 85.0
   },
   "logging": {
     "enable_file_logging": true,

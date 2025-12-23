@@ -43,6 +43,21 @@ public interface IHardwareMonitor : IDisposable
     Task ResetAllToAutoAsync();
 
     /// <summary>
+    /// Enter failsafe mode: GPU fans → auto, other fans → failsafe speed (70%)
+    /// </summary>
+    Task EnterFailsafeModeAsync();
+
+    /// <summary>
+    /// Set all fans to a specific speed percentage
+    /// </summary>
+    Task SetAllFansToSpeedAsync(int speed);
+
+    /// <summary>
+    /// Get the maximum temperature across all sensors
+    /// </summary>
+    Task<double> GetMaxTemperatureAsync();
+
+    /// <summary>
     /// Dump full hardware info for debugging/reporting
     /// </summary>
     Task<List<HardwareDumpItem>> DumpFullHardwareInfoAsync();
