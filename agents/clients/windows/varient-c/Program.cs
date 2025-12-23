@@ -366,13 +366,14 @@ class Program
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.ControlledBy(LogLevelSwitch)  // Use switch instead of .Is()
             .WriteTo.Console(
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u}] {Message:lj}{NewLine}{Exception}",
+                theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code)
             .WriteTo.File(
                 path: logPath,
                 rollingInterval: RollingInterval.Infinite,  // No time-based rolling
                 fileSizeLimitBytes: null,                    // No size limit (single file grows indefinitely)
                 rollOnFileSizeLimit: false,                  // Disable size-based rolling (no .1, .2, etc.)
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u}] {Message:lj}{NewLine}{Exception}")
             .CreateLogger();
 
         // Log the file we are using

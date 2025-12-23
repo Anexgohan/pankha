@@ -59,7 +59,7 @@ public static class LogViewer
             var startIndex = Math.Max(0, lines.Count - lineCount);
             for (int i = startIndex; i < lines.Count; i++)
             {
-                Console.WriteLine(lines[i]);
+                WriteColorizedLogLine(lines[i]);
             }
         }
         catch (Exception ex)
@@ -104,7 +104,7 @@ public static class LogViewer
 
                 if (line != null)
                 {
-                    Console.WriteLine(line);
+                    WriteColorizedLogLine(line);
                 }
                 else
                 {
@@ -183,5 +183,108 @@ public static class LogViewer
         Log.Information("To view logs:");
         Log.Information("  {ExeName} --logs 50      # Last 50 lines", Path.GetFileName(PathResolver.ExecutablePath));
         Log.Information("  {ExeName} --logs follow  # Live tail", Path.GetFileName(PathResolver.ExecutablePath));
+    }
+
+    /// <summary>
+    /// Write a log line with ANSI colors matching Rust agent's theme
+    /// Colors: [INF]=Green, [WRN]=Yellow, [ERR]=Red, [DBG]=Blue, [VRB]=Gray, [FTL]=Magenta
+    /// </summary>
+    private static void WriteColorizedLogLine(string line)
+    {
+        // ANSI escape codes (same as Rust agent)
+        const string Reset = "\x1b[0m";
+        const string Green = "\x1b[32m";   // INFO
+        const string Yellow = "\x1b[33m";  // WARNING
+        const string Red = "\x1b[31m";     // ERROR
+        const string Blue = "\x1b[34m";    // DEBUG
+        const string Gray = "\x1b[2m";     // VERBOSE/TRACE (dim)
+        const string Magenta = "\x1b[35m"; // FATAL
+        const string Cyan = "\x1b[36m";    // Values/highlights
+
+        // Detect log level and apply color to the [LEVEL] tag
+        // Format: "2025-12-23 18:34:16 [INFORMATION] Message..."
+        // Serilog uses: VERBOSE, DEBUG, INFORMATION, WARNING, ERROR, FATAL
+        if (line.Contains("[INFORMATION]"))
+        {
+            line = line.Replace("[INFORMATION]", $"{Green}[INFO]{Reset}");
+        }
+        else if (line.Contains("[WARNING]"))
+        {
+            line = line.Replace("[WARNING]", $"{Yellow}[WARN]{Reset}");
+        }
+        else if (line.Contains("[ERROR]"))
+        {
+            line = line.Replace("[ERROR]", $"{Red}[ERROR]{Reset}");
+        }
+        else if (line.Contains("[DEBUG]"))
+        {
+            line = line.Replace("[DEBUG]", $"{Blue}[DEBUG]{Reset}");
+        }
+        else if (line.Contains("[VERBOSE]"))
+        {
+            line = line.Replace("[VERBOSE]", $"{Gray}[TRACE]{Reset}");
+        }
+        else if (line.Contains("[FATAL]"))
+        {
+            line = line.Replace("[FATAL]", $"{Magenta}[FATAL]{Reset}");
+        }
+        // Also handle old 3-letter format for backwards compatibility with existing log files
+        else if (line.Contains("[INF]"))
+        {
+            line = line.Replace("[INF]", $"{Green}[INFO]{Reset}");
+        }
+        else if (line.Contains("[WRN]"))
+        {
+            line = line.Replace("[WRN]", $"{Yellow}[WARN]{Reset}");
+        }
+        else if (line.Contains("[ERR]"))
+        {
+            line = line.Replace("[ERR]", $"{Red}[ERROR]{Reset}");
+        }
+        else if (line.Contains("[DBG]"))
+        {
+            line = line.Replace("[DBG]", $"{Blue}[DEBUG]{Reset}");
+        }
+        else if (line.Contains("[VRB]"))
+        {
+            line = line.Replace("[VRB]", $"{Gray}[TRACE]{Reset}");
+        }
+        else if (line.Contains("[FTL]"))
+        {
+            line = line.Replace("[FTL]", $"{Magenta}[FATAL]{Reset}");
+        }
+
+        // Highlight common value patterns (True, False, numbers, paths)
+        // This matches Serilog's default behavior of cyan for structured values
+        line = HighlightValues(line, Cyan, Reset);
+
+        Console.WriteLine(line);
+    }
+
+    /// <summary>
+    /// Highlight common values in log messages (True, False, paths, etc.)
+    /// </summary>
+    private static string HighlightValues(string line, string color, string reset)
+    {
+        // Highlight True/False values
+        line = System.Text.RegularExpressions.Regex.Replace(
+            line, 
+            @"\b(True|False)\b", 
+            $"{color}$1{reset}");
+
+        // Highlight file paths (C:\... or /path/...)
+        line = System.Text.RegularExpressions.Regex.Replace(
+            line, 
+            @"([A-Za-z]:\\[^\s,\]]+|/[a-z][^\s,\]]+)", 
+            $"{color}$1{reset}",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        // Highlight numbers with units (e.g., "14544 bytes", "3s", "100%")
+        line = System.Text.RegularExpressions.Regex.Replace(
+            line, 
+            @"\b(\d+(?:\.\d+)?)\s*(%|bytes|KB|MB|GB|ms|s|°C)\b", 
+            $"{color}$1 $2{reset}");
+
+        return line;
     }
 }
