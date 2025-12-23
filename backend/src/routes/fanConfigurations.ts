@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { Database } from '../database/database';
+import { FanProfileController } from '../services/FanProfileController';
 import { log } from '../utils/logger';
 
 const router = Router();
@@ -45,6 +46,20 @@ router.post('/sensor', async (req: Request, res: Response) => {
     );
 
     log.info(` Fan configuration updated: Fan ${fan_id} -> Sensor ${sensorIdentifier || sensorDbId || 'none'}`, 'fanConfigurations');
+
+    // Clear cached hysteresis/stepping state for this fan so the new sensor takes effect immediately
+    // Look up the fan details to get agent_id and fan_name
+    const fanDetails = await db.get(`
+      SELECT f.fan_name, s.agent_id
+      FROM fans f
+      JOIN systems s ON f.system_id = s.id
+      WHERE f.id = $1
+    `, [fan_id]);
+    
+    if (fanDetails) {
+      const fanProfileController = FanProfileController.getInstance();
+      fanProfileController.clearFanState(fanDetails.agent_id, fanDetails.fan_name);
+    }
 
     res.json({
       success: true,

@@ -395,7 +395,7 @@ export class AgentManager extends EventEmitter {
    * Get agent current update interval
    */
   public getAgentUpdateInterval(agentId: string): number {
-    return this.agentUpdateIntervals.get(agentId) || 3; // Default 3 seconds
+    return this.agentUpdateIntervals.get(agentId) ?? 3; // Default 3 seconds
   }
 
   /**
@@ -451,7 +451,7 @@ export class AgentManager extends EventEmitter {
    * Get agent sensor tolerance setting
    */
   public getAgentSensorTolerance(agentId: string): number {
-    return this.agentSensorTolerance.get(agentId) || 0.5; // Default 0.5°C
+    return this.agentSensorTolerance.get(agentId) ?? 0.5; // Default 0.5°C
   }
 
   /**
@@ -479,7 +479,7 @@ export class AgentManager extends EventEmitter {
    * Get agent fan step percentage
    */
   public getAgentFanStep(agentId: string): number {
-    return this.agentFanStep.get(agentId) || 5; // Default 5%
+    return this.agentFanStep.get(agentId) ?? 5; // Default 5%
   }
 
   /**
@@ -507,7 +507,7 @@ export class AgentManager extends EventEmitter {
    * Get agent hysteresis temperature
    */
   public getAgentHysteresis(agentId: string): number {
-    return this.agentHysteresis.get(agentId) || 3.0; // Default 3°C
+    return this.agentHysteresis.get(agentId) ?? 3.0; // Default 3°C
   }
 
   /**
@@ -535,7 +535,7 @@ export class AgentManager extends EventEmitter {
    * Get agent emergency temperature
    */
   public getAgentEmergencyTemp(agentId: string): number {
-    return this.agentEmergencyTemp.get(agentId) || 85.0; // Default 85°C
+    return this.agentEmergencyTemp.get(agentId) ?? 85.0; // Default 85°C
   }
 
   /**

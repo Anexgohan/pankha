@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { FanProfileManager } from '../services/FanProfileManager';
+import { FanProfileController } from '../services/FanProfileController';
+import Database from '../database/database';
 import {
   CreateFanProfileRequest,
   UpdateFanProfileRequest,
@@ -299,6 +301,21 @@ router.post('/assign', async (req: Request, res: Response) => {
     }
     
     const assignment = await fanProfileManager.assignProfileToFan(request);
+    
+    // Clear cached hysteresis/stepping state for this fan so the new profile takes effect immediately
+    // Look up the fan details to get agent_id and fan_name
+    const db = Database.getInstance();
+    const fanDetails = await db.get(`
+      SELECT f.fan_name, s.agent_id
+      FROM fans f
+      JOIN systems s ON f.system_id = s.id
+      WHERE f.id = $1
+    `, [request.fan_id]);
+    
+    if (fanDetails) {
+      const fanProfileController = FanProfileController.getInstance();
+      fanProfileController.clearFanState(fanDetails.agent_id, fanDetails.fan_name);
+    }
     
     res.json({
       success: true,

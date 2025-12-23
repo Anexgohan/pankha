@@ -581,4 +581,22 @@ export class FanProfileController {
       consecutiveErrors: this.consecutiveErrors
     };
   }
+
+  /**
+   * Clear cached hysteresis/stepping state for a fan when assignment changes
+   * This forces recalculation of the TARGET speed on the next control loop iteration
+   * Note: We preserve lastAppliedSpeeds so stepping continues smoothly from current position
+   */
+  public clearFanState(agentId: string, fanName: string): void {
+    const fanKey = `${agentId}:${fanName}`;
+    // Only clear target calculation state - NOT the current speed state
+    // This ensures stepping continues from current position toward new target
+    this.lastSignificantTemp.delete(fanKey);
+    this.lastTargetSpeeds.delete(fanKey);
+    this.sensorAvailabilityState.delete(fanKey);
+    // Intentionally NOT clearing:
+    // - lastAppliedSpeeds (current fan speed - needed for smooth stepping)
+    // - lastSpeedChangeTime (timing info - harmless to keep)
+    log.info(`Cleared target state for fan ${fanName} on agent ${agentId} (current speed preserved)`, 'FanProfileController');
+  }
 }
