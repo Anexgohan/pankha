@@ -336,7 +336,7 @@ jobs:
             **Verification:**
             - `checksums.txt` - SHA256 checksums for all files
 
-            ## ✨ Quick Start (Pankha Server)
+            ## Quick Start (Pankha Server)
             **Docker Compose Method:**
             ```bash
             # Download Docker Compose files from release
@@ -356,8 +356,9 @@ jobs:
             docker pull anexgohan/pankha:latest
             ```
 
-            ## 🚀 Quick Start (Linux Agent)
-
+            ## Quick Start 
+            
+            ### 🐧 (Linux Agents)
             ### For x86_64 systems:
             ```bash
             wget -O pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x86_64
@@ -372,6 +373,13 @@ jobs:
             chmod +x pankha-agent-linux_arm64
             ./pankha-agent-linux_arm64 --setup
             ./pankha-agent-linux_arm64 --start
+            ```
+
+            ### 🪟 (Windows Agent)
+            ### For x64 systems:
+            ```bash
+            # Download MSI form release assets below, then run it
+            wget -O pankha-agent-windows_x64.msi https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-windows_x64.msi
             ```
 
             ### Verify Download Integrity
