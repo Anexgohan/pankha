@@ -129,6 +129,9 @@ public class WebSocketClient : IDisposable
             // Notify watchdog of successful connection
             _watchdog?.ReportSuccessfulConnection();
 
+            // Invalidate hardware cache on connection/reconnection to ensure fresh discovery
+            _hardwareMonitor.InvalidateCache();
+
             // Send registration message
             await SendRegistrationAsync(cancellationToken);
         }

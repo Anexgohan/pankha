@@ -29,6 +29,15 @@ public class LibreHardwareAdapter : IHardwareMonitor
     private SystemHealth? _cachedSystemHealth;
     private DateTime _systemHealthCacheTime = DateTime.MinValue;
 
+    // Hardware update deduplication - single UpdateAsync() per data cycle
+    private DateTime _lastHardwareUpdateTime = DateTime.MinValue;
+    private const double HARDWARE_UPDATE_TTL_SECONDS = 0.5; // 500ms TTL for hardware updates
+
+    // Periodic hardware rediscovery (5 minutes)
+    private DateTime _lastFullDiscoveryTime = DateTime.MinValue;
+    private const double FULL_DISCOVERY_INTERVAL_MINUTES = 5.0;
+    private bool _forceRediscovery = true; // Force rediscovery on startup/reconnection
+
     public LibreHardwareAdapter(HardwareSettings settings, MonitoringSettings monitoringSettings, ILogger logger)
     {
         _settings = settings;
@@ -84,6 +93,14 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
     public async Task UpdateAsync()
     {
+        // Deduplication: Skip if updated recently (within TTL)
+        var timeSinceLastUpdate = (DateTime.UtcNow - _lastHardwareUpdateTime).TotalSeconds;
+        if (timeSinceLastUpdate < HARDWARE_UPDATE_TTL_SECONDS)
+        {
+            _logger.Verbose("Hardware update skipped (last update {Ms:F0}ms ago)", timeSinceLastUpdate * 1000);
+            return;
+        }
+
         await Task.Run(() =>
         {
             try
@@ -101,6 +118,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
                         }
                     }
                 }
+                _lastHardwareUpdateTime = DateTime.UtcNow;
             }
             catch (Exception ex)
             {
@@ -732,6 +750,41 @@ public class LibreHardwareAdapter : IHardwareMonitor
             .Max();
 
         return maxTemp;
+    }
+
+    /// <summary>
+    /// Invalidate hardware cache (call on startup/reconnection to force rediscovery)
+    /// </summary>
+    public void InvalidateCache()
+    {
+        _forceRediscovery = true;
+        _lastHardwareUpdateTime = DateTime.MinValue;
+        _lastFullDiscoveryTime = DateTime.MinValue;
+        _logger.Debug("Hardware cache invalidated - next discovery will be full rediscovery");
+    }
+
+    /// <summary>
+    /// Check if full hardware rediscovery is needed (periodic or forced)
+    /// </summary>
+    public bool NeedsFullRediscovery()
+    {
+        if (_forceRediscovery)
+        {
+            _forceRediscovery = false;
+            _lastFullDiscoveryTime = DateTime.UtcNow;
+            _logger.Information("Full hardware rediscovery triggered (forced/reconnection)");
+            return true;
+        }
+
+        var timeSinceLastDiscovery = (DateTime.UtcNow - _lastFullDiscoveryTime).TotalMinutes;
+        if (timeSinceLastDiscovery >= FULL_DISCOVERY_INTERVAL_MINUTES)
+        {
+            _lastFullDiscoveryTime = DateTime.UtcNow;
+            _logger.Information("Full hardware rediscovery triggered (periodic, {Minutes:F1} min elapsed)", timeSinceLastDiscovery);
+            return true;
+        }
+
+        return false;
     }
 
     public async Task<List<HardwareDumpItem>> DumpFullHardwareInfoAsync()

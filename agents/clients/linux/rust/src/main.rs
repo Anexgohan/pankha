@@ -182,6 +182,12 @@ pub trait HardwareMonitor: Send + Sync {
 
     /// Emergency stop - set all fans to maximum
     async fn emergency_stop(&self) -> Result<()>;
+
+    /// Invalidate hardware cache (call on startup/reconnection to force rediscovery)
+    async fn invalidate_cache(&self);
+
+    /// Check if last sensor discovery was from cache (for logging)
+    async fn last_discovery_from_cache(&self) -> bool;
 }
 
 // ============================================================================
@@ -197,6 +203,9 @@ pub struct LinuxHardwareMonitor {
     #[allow(dead_code)]
     thermal_base: PathBuf,
     discovered_fans: Arc<RwLock<HashMap<String, FanInfo>>>,
+    discovered_sensors: Arc<RwLock<HashMap<String, SensorInfo>>>,
+    cached_hwmon_count: Arc<RwLock<usize>>,
+    last_discovery_from_cache: Arc<RwLock<bool>>,
     config: HardwareSettings,
     system_info: Arc<RwLock<sysinfo::System>>,
     system_info_cache: Arc<RwLock<Option<(SystemHealth, std::time::Instant)>>>,
@@ -213,6 +222,21 @@ struct FanInfo {
     chip_name: String,
     last_pwm_value: Arc<RwLock<Option<u8>>>,
     last_write_time: Arc<RwLock<std::time::Instant>>,
+}
+
+/// Cached sensor metadata and path for efficient reading
+#[cfg(target_os = "linux")]
+#[derive(Clone)]
+struct SensorInfo {
+    temp_input_path: PathBuf,
+    id: String,
+    name: String,
+    sensor_type: String,
+    max_temp: Option<f64>,
+    crit_temp: Option<f64>,
+    chip: Option<String>,
+    hardware_name: Option<String>,
+    source: Option<String>,
 }
 
 #[cfg(target_os = "linux")]
@@ -250,6 +274,9 @@ impl LinuxHardwareMonitor {
             hwmon_base: PathBuf::from("/sys/class/hwmon"),
             thermal_base: PathBuf::from("/sys/class/thermal"),
             discovered_fans: Arc::new(RwLock::new(HashMap::new())),
+            discovered_sensors: Arc::new(RwLock::new(HashMap::new())),
+            cached_hwmon_count: Arc::new(RwLock::new(0)),
+            last_discovery_from_cache: Arc::new(RwLock::new(false)),
             config,
             system_info: Arc::new(RwLock::new(sys)),
             system_info_cache: Arc::new(RwLock::new(None)),
@@ -284,6 +311,61 @@ impl LinuxHardwareMonitor {
         } else {
             String::new() // Fallback to empty, will use default logic
         }
+    }
+
+    /// Count hwmon directories for hot-plug detection
+    async fn count_hwmon_dirs(&self) -> usize {
+        match tokio::fs::read_dir(&self.hwmon_base).await {
+            Ok(mut entries) => {
+                let mut count = 0;
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    if entry.path().is_dir() {
+                        count += 1;
+                    }
+                }
+                count
+            }
+            Err(_) => 0,
+        }
+    }
+
+    /// Read sensor values from cache (fast path - no discovery)
+    async fn read_sensors_from_cache(&self) -> Result<Vec<Sensor>> {
+        let cache = self.discovered_sensors.read().await;
+        let mut sensors = Vec::with_capacity(cache.len());
+
+        for info in cache.values() {
+            // Read current temperature from cached path
+            let temp_celsius = match self.read_file(&info.temp_input_path).await {
+                Ok(raw) => {
+                    match raw.parse::<i32>() {
+                        Ok(millidegrees) => millidegrees as f64 / 1000.0,
+                        Err(_) => continue, // Skip if parse fails
+                    }
+                }
+                Err(_) => continue, // Skip if read fails (sensor may have been removed)
+            };
+
+            sensors.push(Sensor {
+                id: info.id.clone(),
+                name: info.name.clone(),
+                temperature: (temp_celsius * 10.0).round() / 10.0,
+                sensor_type: info.sensor_type.clone(),
+                max_temp: info.max_temp,
+                crit_temp: info.crit_temp,
+                chip: info.chip.clone(),
+                hardware_name: info.hardware_name.clone(),
+                source: info.source.clone(),
+            });
+        }
+
+        Ok(sensors)
+    }
+
+    /// Invalidate sensor cache (call on reconnection)
+    pub async fn invalidate_sensor_cache(&self) {
+        self.discovered_sensors.write().await.clear();
+        *self.cached_hwmon_count.write().await = 0;
     }
 
     async fn resolve_storage_model(&self, hwmon_dir: &Path, chip_name: &str) -> Option<String> {
@@ -643,8 +725,49 @@ impl LinuxHardwareMonitor {
 #[async_trait]
 impl HardwareMonitor for LinuxHardwareMonitor {
     async fn discover_sensors(&self) -> Result<Vec<Sensor>> {
-        // Always perform fresh sensor discovery (no caching)
-        let sensors = self.discover_hwmon_sensors().await?;
+        // Count-based hot-plug detection
+        let current_hwmon_count = self.count_hwmon_dirs().await;
+        let cached_count = *self.cached_hwmon_count.read().await;
+        let cache_empty = self.discovered_sensors.read().await.is_empty();
+
+        let sensors = if current_hwmon_count != cached_count || cache_empty {
+            // Hardware changed or cache empty - full rediscovery
+            debug!("Sensor discovery triggered: hwmon_count {} -> {} (cache_empty: {})",
+                   cached_count, current_hwmon_count, cache_empty);
+
+            let discovered = self.discover_hwmon_sensors().await?;
+
+            // Populate cache with discovered sensors
+            {
+                let mut cache = self.discovered_sensors.write().await;
+                cache.clear();
+                for sensor in &discovered {
+                    if let Some(source_path) = &sensor.source {
+                        cache.insert(sensor.id.clone(), SensorInfo {
+                            temp_input_path: PathBuf::from(source_path),
+                            id: sensor.id.clone(),
+                            name: sensor.name.clone(),
+                            sensor_type: sensor.sensor_type.clone(),
+                            max_temp: sensor.max_temp,
+                            crit_temp: sensor.crit_temp,
+                            chip: sensor.chip.clone(),
+                            hardware_name: sensor.hardware_name.clone(),
+                            source: sensor.source.clone(),
+                        });
+                    }
+                }
+            }
+
+            // Update cached hwmon count
+            *self.cached_hwmon_count.write().await = current_hwmon_count;
+            *self.last_discovery_from_cache.write().await = false;
+
+            discovered
+        } else {
+            // Hardware unchanged - read from cache (fast path)
+            *self.last_discovery_from_cache.write().await = true;
+            self.read_sensors_from_cache().await?
+        };
 
         // Apply deduplication if enabled
         let final_sensors = if self.config.filter_duplicate_sensors {
@@ -759,6 +882,15 @@ impl HardwareMonitor for LinuxHardwareMonitor {
 
         warn!("EMERGENCY STOP: All fans set to 100%");
         Ok(())
+    }
+
+    async fn invalidate_cache(&self) {
+        self.invalidate_sensor_cache().await;
+        debug!("Hardware cache invalidated - next discovery will be full rediscovery");
+    }
+
+    async fn last_discovery_from_cache(&self) -> bool {
+        *self.last_discovery_from_cache.read().await
     }
 }
 
@@ -876,6 +1008,14 @@ impl HardwareMonitor for WindowsHardwareMonitor {
     async fn emergency_stop(&self) -> Result<()> {
         Err(anyhow::anyhow!("Windows fan control not yet implemented"))
     }
+
+    async fn invalidate_cache(&self) {
+        // No-op for Windows stub
+    }
+
+    async fn last_discovery_from_cache(&self) -> bool {
+        false // Windows stub always returns false
+    }
 }
 
 // ============================================================================
@@ -933,6 +1073,14 @@ impl HardwareMonitor for MacOSHardwareMonitor {
 
     async fn emergency_stop(&self) -> Result<()> {
         Err(anyhow::anyhow!("macOS fan control not yet implemented"))
+    }
+
+    async fn invalidate_cache(&self) {
+        // No-op for macOS stub
+    }
+
+    async fn last_discovery_from_cache(&self) -> bool {
+        false // macOS stub always returns false
     }
 }
 
@@ -1136,6 +1284,9 @@ impl WebSocketClient {
         // Exit failsafe mode - backend connection restored
         self.exit_failsafe_mode().await;
 
+        // Invalidate hardware cache on connection/reconnection to ensure fresh discovery
+        self.hardware_monitor.invalidate_cache().await;
+
         let (write, read) = ws_stream.split();
         let write = Arc::new(tokio::sync::Mutex::new(write));
 
@@ -1312,7 +1463,11 @@ impl WebSocketClient {
 
         trace!("Sending WebSocket message (timestamp: {})", timestamp);
         write.send(Message::Text(data.to_string())).await?;
-        debug!("Sent telemetry: {} sensors, {} fans", sensors.len(), fans.len());
+
+        // Log with cache status indicator
+        let from_cache = hardware_monitor.last_discovery_from_cache().await;
+        let source = if from_cache { "from cache" } else { "from hardware" };
+        debug!("Sent telemetry: {} sensors, {} fans ({})", sensors.len(), fans.len(), source);
         Ok(())
     }
 

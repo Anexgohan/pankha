@@ -61,4 +61,14 @@ public interface IHardwareMonitor : IDisposable
     /// Dump full hardware info for debugging/reporting
     /// </summary>
     Task<List<HardwareDumpItem>> DumpFullHardwareInfoAsync();
+
+    /// <summary>
+    /// Invalidate hardware cache (call on startup/reconnection to force rediscovery)
+    /// </summary>
+    void InvalidateCache();
+
+    /// <summary>
+    /// Check if full hardware rediscovery is needed (periodic or forced)
+    /// </summary>
+    bool NeedsFullRediscovery();
 }
