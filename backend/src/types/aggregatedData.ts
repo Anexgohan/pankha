@@ -49,6 +49,7 @@ export interface SystemHealth {
 export interface AggregatedSystemData {
   systemId: number;
   agentId: string;
+  agentVersion?: string;
   systemName: string;
   status: 'online' | 'offline' | 'error';
   lastUpdate: Date;

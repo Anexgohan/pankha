@@ -555,6 +555,7 @@ export class DataAggregator extends EventEmitter {
       const aggregatedData: AggregatedSystemData = {
         systemId: system.id,
         agentId: agentId,
+        agentVersion: system.agent_version || 'unknown',
         systemName: system.name,
         status: 'online',
         lastUpdate: new Date(),

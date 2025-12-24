@@ -3,6 +3,7 @@ export interface SystemData {
   id: number;
   name: string;
   agent_id: string;
+  agent_version?: string;
   ip_address?: string;
   api_endpoint: string;
   websocket_endpoint: string;

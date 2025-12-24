@@ -611,6 +611,22 @@ const SystemCard: React.FC<SystemCardProps> = ({
               <span className="value">{formatLastSeen(system.last_seen)}</span>
             </div>
           </div>
+          <div className="info-row">
+            <div className="info-item">
+              <span className="label">Agent Version:</span>
+              <span className="value">{system.agent_version ? (() => {
+                // Normalize 4-part Windows version (X.Y.Z.W) to SemVer:
+                // - 0.1.8.0 → 0.1.8 (trim trailing .0)
+                // - 0.1.7.2 → 0.1.7-2 (convert .W to -W prerelease)
+                let ver = system.agent_version;
+                const fourPart = ver.match(/^(\d+\.\d+\.\d+)\.(\d+)$/);
+                if (fourPart) {
+                  ver = fourPart[2] === '0' ? fourPart[1] : `${fourPart[1]}-${fourPart[2]}`;
+                }
+                return ver.startsWith('v') ? ver : `v${ver}`;
+              })() : 'Unknown'}</span>
+            </div>
+          </div>
           {(averageTemperature || highestTemperature || averageFanRPM || highestFanRPM) && (
             <div className="info-row">
               {averageTemperature && (
