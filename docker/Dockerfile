@@ -1,6 +1,10 @@
 # Multi-stage build for production optimization
 FROM node:20-alpine AS builder
 
+# Version injected at build time via CI/CD
+ARG VERSION=dev
+ENV VITE_APP_VERSION=$VERSION
+
 # Install Python and build dependencies for native modules
 RUN apk add --no-cache python3 make g++
 
@@ -23,6 +27,10 @@ RUN npm run build
 
 # Production stage
 FROM node:20-alpine AS production
+
+# Pass version to runtime for backend health endpoint
+ARG VERSION=dev
+ENV PANKHA_VERSION=$VERSION
 
 # Install nginx for serving static files
 RUN apk add --no-cache nginx curl

@@ -1,4 +1,5 @@
 name: Release Build and Publish
+run-name: "release-public ${{ github.event.client_payload.version || github.event.inputs.version || '' }}"
 
 # This workflow runs on the PUBLIC repo (pankha) to take advantage of FREE ARM64 runners.
 # Triggered by repository_dispatch from pankha-dev when a version tag is pushed.
@@ -56,6 +57,25 @@ jobs:
           rustup target add aarch64-unknown-linux-gnu
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
+      - name: Inject version into Cargo.toml
+        working-directory: agents/clients/linux/rust
+        run: |
+          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix
+          
+          # Convert 4-part version to SemVer prerelease format: 0.1.7.1 → 0.1.7-1
+          DOTS=$(echo "$VERSION_NUM" | grep -o '\.' | wc -l)
+          if [ "$DOTS" -ge 3 ]; then
+            CARGO_VER=$(echo "$VERSION_NUM" | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\.\([0-9]*\)/\1-\2/')
+            echo "⚠️  Converting: $VERSION_NUM → $CARGO_VER (SemVer prerelease format)"
+          else
+            CARGO_VER="$VERSION_NUM"
+            echo "📝 Using version: $CARGO_VER"
+          fi
+          
+          sed -i "s/^version = \".*\"/version = \"$CARGO_VER\"/" Cargo.toml
+          cat Cargo.toml | head -5
 
       - name: Build Rust agent (${{ matrix.arch }})
         working-directory: agents/clients/linux/rust
@@ -164,6 +184,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           push: true
           provenance: false
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
           tags: |
             anexgohan/pankha:${{ steps.version.outputs.version }}-${{ matrix.tag_suffix }}
           cache-from: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }}

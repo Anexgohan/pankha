@@ -2404,7 +2404,7 @@ fn set_log_level_runtime(level: &str) -> Result<()> {
 }
 
 async fn show_status() -> Result<()> {
-    println!("Pankha Rust Agent Status");
+    println!("Pankha Rust Agent v{}", env!("CARGO_PKG_VERSION"));
     println!("========================");
 
     if is_running() {
@@ -2520,6 +2520,7 @@ where
 
 #[derive(Parser, Debug)]
 #[command(name = "pankha-agent")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Pankha Cross-Platform Hardware Monitoring Agent", long_about = None)]
 #[command(disable_help_flag = false)]
 struct Args {
@@ -2709,7 +2710,7 @@ async fn main() -> Result<()> {
         save_pid(process::id())?;
     }
 
-    info!("Pankha Agent v1.0.0 starting ({})", std::env::consts::OS);
+    info!("Pankha Agent v{} starting ({})", env!("CARGO_PKG_VERSION"), std::env::consts::OS);
 
     // Show config if requested
     if args.config {

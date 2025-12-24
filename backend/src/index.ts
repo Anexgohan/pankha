@@ -104,7 +104,7 @@ app.get('/health', (req, res) => {
     status: isInitialized ? 'ok' : 'initializing',
     timestamp: new Date().toISOString(),
     service: 'pankha-backend',
-    version: '1.0.0',
+    version: process.env.PANKHA_VERSION || 'dev',
     services: {
       database: isInitialized ? 'connected' : 'disconnected',
       agent_manager: isInitialized ? 'active' : 'inactive',

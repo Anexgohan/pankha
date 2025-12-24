@@ -12,6 +12,7 @@ type TabType = 'systems' | 'profiles';
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
   const [overview, setOverview] = useState<any>(null);
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
   // Persistent dropdown states across re-renders
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
@@ -36,6 +37,25 @@ const Dashboard: React.FC = () => {
     };
     fetchOverview();
     const interval = setInterval(fetchOverview, 10000); // Every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch latest version from GitHub API
+  React.useEffect(() => {
+    const fetchLatestVersion = async () => {
+      try {
+        const response = await fetch('https://api.github.com/repos/Anexgohan/pankha/releases/latest');
+        if (response.ok) {
+          const data = await response.json();
+          setLatestVersion(data.tag_name);
+        }
+      } catch (err) {
+        console.error('Failed to fetch latest version:', err);
+      }
+    };
+    fetchLatestVersion();
+    // Re-fetch every 10 minutes
+    const interval = setInterval(fetchLatestVersion, 600000);
     return () => clearInterval(interval);
   }, []);
 
@@ -195,7 +215,31 @@ const Dashboard: React.FC = () => {
       </div>
 
       <footer className="dashboard-footer">
-        <p>Pankha Fan Control System v1.0.0 | {systems.length} systems monitored</p>
+        <p>
+          Pankha Fan Control | {systems.length} systems monitored |{' '}
+          <a
+            href={`https://github.com/Anexgohan/pankha/releases/tag/${__APP_VERSION__}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="version-link"
+          >
+            Current: {__APP_VERSION__}
+          </a>
+          {latestVersion && (
+            <>
+              {' | '}
+              <a
+                href={`https://github.com/Anexgohan/pankha/releases/tag/${latestVersion}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="version-link"
+              >
+                Latest: {latestVersion}
+              </a>
+            </>
+          )}
+          {' |'}
+        </p>
       </footer>
     </div>
   );

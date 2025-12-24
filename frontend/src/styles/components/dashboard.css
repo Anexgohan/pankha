@@ -129,6 +129,17 @@
   font-size: var(--font-size-base);
 }
 
+.dashboard-footer .version-link {
+  color: var(--color-info);
+  text-decoration: none;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+.dashboard-footer .version-link:hover {
+  text-decoration: underline;
+  opacity: 0.8;
+}
+
 /* Refresh Rate Selector */
 .refresh-rate-selector {
   display: flex;
