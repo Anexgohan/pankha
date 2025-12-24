@@ -340,27 +340,14 @@ jobs:
             release-assets/example.env
             release-assets/checksums.txt
           body: |
-            ## 🎉 Pankha Release ${{ steps.version.outputs.version }}
+            ## Pankha Fan Control (पंखा) Release ${{ steps.version.outputs.version }}
 
-            ### 📦 Downloads
-
-            **Windows Agent:**
-             - `pankha-agent-windows_x64.msi` - **Windows Installer** (Recommended)
-
-            **Linux Agent Binaries (Ready to Run):**
-            - `pankha-agent-linux_x86_64` - For Intel/AMD x86_64 systems
-            - `pankha-agent-linux_arm64` - For Raspberry Pi 5 / ARM64 systems
-            - `config.example.json` - Example agent configuration file (generate with `pankha-agent-linux_arm64 --setup`)
-
-            **Docker Deployment Files:**
-            - `compose.yml` - Docker Compose configuration
-            - `example.env` - Environment variables template
-
-            **Verification:**
-            - `checksums.txt` - SHA256 checksums for all files
+            ### Instructions:
+            1. Deploy the Pankha Server
+            2. Deploy the Pankha Agents to your client devices
 
             ## Quick Start (Pankha Server)
-            **Docker Compose Method:**
+            **Docker Compose Method (Recommended):**
             ```bash
             # Download Docker Compose files from release
             wget -O compose.yml https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/compose.yml
@@ -370,16 +357,16 @@ jobs:
             docker compose up -d
             ```
 
-            **Docker Image:**
+            **Docker Run Method:**
             ```bash
             # Specific version (recommended for production)
-            docker pull anexgohan/pankha:${{ steps.version.outputs.version }}
+            docker run -d --name pankha anexgohan/pankha:${{ steps.version.outputs.version }}
 
             # Latest version
-            docker pull anexgohan/pankha:latest
+            docker run -d --name pankha anexgohan/pankha:latest
             ```
 
-            ## Quick Start 
+            ## Quick Start (Pankha Agents)
             
             ### 🐧 (Linux Agents)
             ### For x86_64 systems:
@@ -405,7 +392,7 @@ jobs:
             wget -O pankha-agent-windows_x64.msi https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-windows_x64.msi
             ```
 
-            ### Verify Download Integrity
+            ### 🔐 Verify Download Integrity
             ```bash
             wget -O checksums.txt https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/checksums.txt
             sha256sum -c checksums.txt
