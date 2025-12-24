@@ -1,3 +1,4 @@
+# REPO: pankha (public) | Builds Rust agents, Windows agent, Docker images, and creates GitHub release
 name: Release Build and Publish
 run-name: "release-public ${{ github.event.client_payload.version || github.event.inputs.version || '' }}"
 
