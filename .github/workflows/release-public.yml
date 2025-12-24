@@ -343,8 +343,8 @@ jobs:
             ## Pankha Fan Control (पंखा) Release ${{ steps.version.outputs.version }}
 
             ### Instructions:
-            1. Deploy the Pankha Server
-            2. Deploy the Pankha Agents to your client devices
+              1. Deploy the Pankha Server
+              2. Deploy the Pankha Agents to your client devices
 
             ## Quick Start (Pankha Server)
             **Docker Compose Method (Recommended):**
