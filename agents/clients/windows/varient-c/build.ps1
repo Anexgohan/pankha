@@ -26,29 +26,31 @@ function Get-GitVersion {
 
 # Determine Version and InfoVersion
 if ([string]::IsNullOrWhiteSpace($Version)) {
-    $RawVersion = Get-GitVersion
-    $InfoVersion = $RawVersion
-    
-    # Extract only the numeric part for AssemblyVersion/FileVersion
-    if ($InfoVersion -match '^(\d+(\.\d+){0,3})') {
-        $Version = $Matches[1]
-    } else {
-        $Version = "0.0.0"
-    }
-    
-    Write-Host "Auto-detected Version: $Version (Info: $InfoVersion)" -ForegroundColor Gray
+    $InfoVersion = Get-GitVersion
 } else {
-    # Sanitize provided version (strip 'v' if present)
     $InfoVersion = $Version -replace '^v', ''
-    
+}
+
+# Normalize 4-part version to SemVer prerelease format for InfoVersion: 0.1.7.1 -> 0.1.7-1
+# This matches the logic in .github/workflows/release-public.yml used for Rust agents.
+# We use greedy matching for the 4th part and preserve any remaining suffix (e.g., 0.1.7.6-alpha -> 0.1.7-6-alpha)
+if ($InfoVersion -match '^(\d+\.\d+\.\d+)\.(\d+)(.*)$') {
+    # Keep original 4-part (including suffix if present) for AssemblyVersion/FileVersion
+    # Note: AssemblyVersion/FileVersion usually only support numbers, so we might need to strip suffixes for $Version
+    $VersionOnly = $Matches[1] + "." + $Matches[2]
+    # Convert to SemVer for InformationalVersion
+    $InfoVersion = "$($Matches[1])-$($Matches[2])$($Matches[3])"
+    $Version = $VersionOnly
+    Write-Host "⚠️  Converting: $($Matches[0]) -> $($InfoVersion) (SemVer format for parity)" -ForegroundColor Yellow
+} else {
     # Extract only the numeric part for AssemblyVersion/FileVersion
     if ($InfoVersion -match '^(\d+(\.\d+){0,3})') {
         $Version = $Matches[1]
     } else {
         $Version = "0.0.0"
     }
-    Write-Host "Using Version: $Version (Info: $InfoVersion)" -ForegroundColor Gray
 }
+Write-Host "Final Versions - FileVersion: $Version | InfoVersion: $InfoVersion" -ForegroundColor Gray
 
 
 # Function to check if running as administrator
@@ -312,6 +314,7 @@ $PropsContent = @"
     <FileVersion>$Version</FileVersion>
     <AssemblyVersion>$Version</AssemblyVersion>
     <InformationalVersion>$InfoVersion</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 </Project>
 "@

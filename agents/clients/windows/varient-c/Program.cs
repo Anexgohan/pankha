@@ -245,7 +245,7 @@ class Program
                 }
 
                 Log.Information("Pankha Windows Agent starting...");
-                Log.Information("Version: {Version}", typeof(Program).Assembly.GetName().Version);
+                Log.Information("Version: {Version}", Pankha.WindowsAgent.Platform.VersionHelper.GetVersion());
                 Log.Information("OS: {OS}", Environment.OSVersion);
                 Log.Information(".NET Runtime: {Runtime}", Environment.Version);
 
@@ -643,6 +643,8 @@ class Program
 
         // Service status
         ServiceManager.ShowServiceStatus();
+
+        Log.Information("Version: {Version}", Pankha.WindowsAgent.Platform.VersionHelper.GetVersion());
 
         Log.Information("");
 
