@@ -215,7 +215,7 @@ public class WebSocketClient : IDisposable
                 {
                     AgentId = _config.Agent.AgentId,
                     Name = _config.Agent.Name,
-                    AgentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
+                    AgentVersion = Pankha.WindowsAgent.Platform.VersionHelper.GetVersion(),
                     UpdateInterval = (int)(_config.Hardware.UpdateInterval * 1000), // seconds to ms
                     FilterDuplicateSensors = _config.Monitoring.FilterDuplicateSensors,
                     DuplicateSensorTolerance = _config.Monitoring.DuplicateSensorTolerance,

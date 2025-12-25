@@ -27,24 +27,27 @@ function Get-GitVersion {
 # Determine Version and InfoVersion
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $RawVersion = Get-GitVersion
+    $InfoVersion = $RawVersion
     
-    # Check if format is X.Y.Z (basic regex)
-    if ($RawVersion -match '^\d+(\.\d+)+') {
-        $Version = $RawVersion.Split('-')[0] # Remove suffixes like -dirty or -hash
+    # Extract only the numeric part for AssemblyVersion/FileVersion
+    if ($InfoVersion -match '^(\d+(\.\d+){0,3})') {
+        $Version = $Matches[1]
     } else {
-        # Fallback for pure hashes (e.g. 749b59b)
-        $Version = "0.0.0" 
+        $Version = "0.0.0"
     }
     
-    $InfoVersion = $Version
     Write-Host "Auto-detected Version: $Version (Info: $InfoVersion)" -ForegroundColor Gray
 } else {
     # Sanitize provided version (strip 'v' if present)
-    if ($Version.StartsWith("v")) {
-        $Version = $Version.Substring(1)
+    $InfoVersion = $Version -replace '^v', ''
+    
+    # Extract only the numeric part for AssemblyVersion/FileVersion
+    if ($InfoVersion -match '^(\d+(\.\d+){0,3})') {
+        $Version = $Matches[1]
+    } else {
+        $Version = "0.0.0"
     }
-    $InfoVersion = $Version
-    Write-Host "Using Version: $Version" -ForegroundColor Gray
+    Write-Host "Using Version: $Version (Info: $InfoVersion)" -ForegroundColor Gray
 }
 
 
@@ -305,7 +308,7 @@ $PropsContent = @"
 <Project>
   <PropertyGroup>
     <AssemblyName>$AgentExeName</AssemblyName>
-    <Version>$Version</Version>
+    <Version>$InfoVersion</Version>
     <FileVersion>$Version</FileVersion>
     <AssemblyVersion>$Version</AssemblyVersion>
     <InformationalVersion>$InfoVersion</InformationalVersion>

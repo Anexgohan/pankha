@@ -14,7 +14,7 @@ static class Program
         ConfigureLogging();
 
         Log.Information("=== Pankha Tray Application Starting ===");
-        Log.Information("Version: {Version}", typeof(Program).Assembly.GetName().Version);
+        Log.Information("Version: {Version}", Pankha.WindowsAgent.Platform.VersionHelper.GetVersion());
 
         // Enable visual styles for modern Windows look
         Application.EnableVisualStyles();

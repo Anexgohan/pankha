@@ -167,7 +167,7 @@ public class NamedPipeHost : IDisposable
                     var fans = await _hardware.DiscoverFansAsync();
                     
                     // Get Version dynamically
-                    var version = Assembly.GetEntryAssembly()?.GetName().Version?.ToString() ?? "0.0.0";
+                    var version = Pankha.WindowsAgent.Platform.VersionHelper.GetVersion();
 
                     response = new AgentStatus
                     {

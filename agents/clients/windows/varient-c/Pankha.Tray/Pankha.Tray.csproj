@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <Compile Include="..\Platform\PathResolver.cs" Link="Services\PathResolver.cs" />
+    <Compile Include="..\Platform\VersionHelper.cs" Link="Services\VersionHelper.cs" />
   </ItemGroup>
 
   <ItemGroup>
