@@ -321,6 +321,7 @@ export class DataAggregator extends EventEmitter {
   /**
    * Flush buffered data points to database as aggregated averages
    * Called every N minutes (configurable via DATA_AGGREGATION_INTERVAL_MINUTES)
+   * Uses a database transaction to ensure atomic writes - all data is written or none is.
    */
   private async flushAggregatedData(): Promise<void> {
     try {
@@ -328,54 +329,91 @@ export class DataAggregator extends EventEmitter {
       let totalPointsFlushed = 0;
       let totalAggregatesStored = 0;
 
+      // Collect all inserts to perform atomically
+      interface AggregatedInsert {
+        type: 'sensor' | 'fan';
+        systemId: number;
+        sensorId?: number;
+        fanId?: number;
+        temperature?: number;
+        speed?: number;
+        rpm?: number;
+        pointCount: number;
+      }
+
+      const pendingInserts: AggregatedInsert[] = [];
+      const buffersToFlush: Map<number, SystemDataBuffer> = new Map();
+
+      // Phase 1: Calculate all aggregates (outside transaction for efficiency)
       for (const [systemId, buffer] of this.dataBuffer.entries()) {
-        // Calculate and store aggregated sensor data
+        buffersToFlush.set(systemId, buffer);
+
+        // Calculate aggregated sensor data
         for (const [sensorId, dataPoints] of buffer.sensors.entries()) {
           if (dataPoints.length === 0) continue;
 
-          // Calculate average temperature
           const avgTemp = dataPoints.reduce((sum, p) => sum + (p.temperature || 0), 0) / dataPoints.length;
 
-          // Store aggregated average to database
-          await this.db.run(
-            'INSERT INTO monitoring_data (system_id, sensor_id, temperature, timestamp) VALUES ($1, $2, $3, $4)',
-            [systemId, sensorId, avgTemp, now.toISOString()]
-          );
-
-          totalPointsFlushed += dataPoints.length;
-          totalAggregatesStored++;
+          pendingInserts.push({
+            type: 'sensor',
+            systemId,
+            sensorId,
+            temperature: avgTemp,
+            pointCount: dataPoints.length
+          });
         }
 
-        // Calculate and store aggregated fan data
+        // Calculate aggregated fan data
         for (const [fanId, dataPoints] of buffer.fans.entries()) {
           if (dataPoints.length === 0) continue;
 
-          // Calculate average speed and RPM (rounded to integers for database)
           const avgSpeed = Math.round(dataPoints.reduce((sum, p) => sum + (p.speed || 0), 0) / dataPoints.length);
           const avgRpm = Math.round(dataPoints.reduce((sum, p) => sum + (p.rpm || 0), 0) / dataPoints.length);
 
-          // Store aggregated average to database
-          await this.db.run(
-            'INSERT INTO monitoring_data (system_id, fan_id, fan_speed, fan_rpm, timestamp) VALUES ($1, $2, $3, $4, $5)',
-            [systemId, fanId, avgSpeed, avgRpm, now.toISOString()]
-          );
-
-          totalPointsFlushed += dataPoints.length;
-          totalAggregatesStored++;
+          pendingInserts.push({
+            type: 'fan',
+            systemId,
+            fanId,
+            speed: avgSpeed,
+            rpm: avgRpm,
+            pointCount: dataPoints.length
+          });
         }
-
-        // Clear buffer after flushing
-        buffer.sensors.clear();
-        buffer.fans.clear();
-        buffer.lastFlush = now;
       }
 
-      if (totalAggregatesStored > 0) {
-        log.info(`[DataAggregator] Flushed ${totalPointsFlushed} raw data points -> ${totalAggregatesStored} aggregated averages to DB`, 'DataAggregator');
+      // Phase 2: Insert all data atomically in a transaction
+      if (pendingInserts.length > 0) {
+        await this.db.transaction(async (client) => {
+          for (const insert of pendingInserts) {
+            if (insert.type === 'sensor') {
+              await client.query(
+                'INSERT INTO monitoring_data (system_id, sensor_id, temperature, timestamp) VALUES ($1, $2, $3, $4)',
+                [insert.systemId, insert.sensorId, insert.temperature, now.toISOString()]
+              );
+            } else {
+              await client.query(
+                'INSERT INTO monitoring_data (system_id, fan_id, fan_speed, fan_rpm, timestamp) VALUES ($1, $2, $3, $4, $5)',
+                [insert.systemId, insert.fanId, insert.speed, insert.rpm, now.toISOString()]
+              );
+            }
+            totalPointsFlushed += insert.pointCount;
+            totalAggregatesStored++;
+          }
+        });
+
+        // Phase 3: Clear buffers only after successful transaction commit
+        for (const [systemId, buffer] of buffersToFlush.entries()) {
+          buffer.sensors.clear();
+          buffer.fans.clear();
+          buffer.lastFlush = now;
+        }
+
+        log.info(`[DataAggregator] Flushed ${totalPointsFlushed} raw data points -> ${totalAggregatesStored} aggregated averages to DB (atomic transaction)`, 'DataAggregator');
       }
 
     } catch (error) {
       log.error('Error flushing aggregated data:', 'DataAggregator', error);
+      // On error, buffers are NOT cleared - data will be retried on next flush cycle
     }
   }
 

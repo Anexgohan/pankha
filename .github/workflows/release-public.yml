@@ -365,11 +365,12 @@ jobs:
             release-assets/example.env
             release-assets/checksums.txt
           body: |
-            ## Pankha Fan Control (पंखा) ${{ steps.version.outputs.is_prerelease == 'true' && '🧪 Pre-release' || '📦 Release' }} ${{ steps.version.outputs.version }}
+            ## Pankha Fan Control (पंखा) ${{ steps.version.outputs.is_prerelease == 'true' && '- Pre-release' || '- Release' }} ${{ steps.version.outputs.version }}
 
             ### Instructions:
-              1. Deploy the Pankha Server
+              1. Deploy the Pankha Server Docker Container
               2. Deploy the Pankha Agents to your client devices
+              3. Access the Pankha Web Interface at `http://<server-ip>:<port>`
 
             ## ![Docker](https://img.shields.io/badge/-Docker-0db7ed?logo=docker&logoColor=white&style=flat-square) Quick Start (Pankha Server)
             **Docker Compose Method (Recommended):**

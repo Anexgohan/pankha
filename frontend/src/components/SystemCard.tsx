@@ -1218,6 +1218,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
 };
 
 // Memoize SystemCard to prevent unnecessary re-renders
+// NOTE: last_seen changes with every agent update, effectively triggering re-renders for data changes.
+// The explicit array checks below are for clarity and future-proofing - they ensure re-renders
+// happen when sensor/fan data changes, even if last_seen were ever removed from this comparison.
 export default React.memo(SystemCard, (prevProps, nextProps) => {
   // Only re-render if these specific properties changed
   return (
@@ -1232,6 +1235,9 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.fan_step_percent === nextProps.system.fan_step_percent &&
     prevProps.system.emergency_temp === nextProps.system.emergency_temp &&
     prevProps.system.log_level === nextProps.system.log_level &&
+    // Explicit sensor/fan array checks (reference equality works because mergeDelta creates new arrays)
+    prevProps.system.current_temperatures === nextProps.system.current_temperatures &&
+    prevProps.system.current_fan_speeds === nextProps.system.current_fan_speeds &&
     prevProps.expandedSensors === nextProps.expandedSensors &&
     prevProps.expandedFans === nextProps.expandedFans
   );
