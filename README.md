@@ -221,7 +221,7 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 <table>
 <tr>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ![Server](https://img.shields.io/badge/-Server-0db7ed?logo=docker&logoColor=white&style=flat-square)
 
@@ -229,7 +229,7 @@ The agent will connect to the backend and start sending hardware data. You can n
 [Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ![Agents](https://img.shields.io/badge/-Agents-CE422B?logo=rust&logoColor=white&style=flat-square)
 
@@ -238,15 +238,15 @@ The agent will connect to the backend and start sending hardware data. You can n
 [Settings](https://github.com/Anexgohan/pankha/wiki/Agents-Advanced-Settings)
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ![Reference](https://img.shields.io/badge/-Reference-339933?logo=swagger&logoColor=white&style=flat-square)
 
-[![API](https://img.shields.io/badge/API-50_endpoints-blue?style=flat-square&logo=openapiinitiative)](https://github.com/Anexgohan/pankha/wiki/API-Reference)<br>
+[API Reference](https://github.com/Anexgohan/pankha/wiki/API-Reference)<br>
 [Fan Profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles)
 
 </td>
-<td align="center" width="25%">
+<td align="center" valign="top" width="25%">
 
 ![Help](https://img.shields.io/badge/-Help-F7DF1E?logo=stackoverflow&logoColor=black&style=flat-square)
 
