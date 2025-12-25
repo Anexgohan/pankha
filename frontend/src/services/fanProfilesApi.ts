@@ -121,6 +121,19 @@ export interface ExportOptions {
   include_system_profiles?: boolean;
 }
 
+// Default Profiles Types
+export interface DefaultProfileInfo {
+  profile_name: string;
+  description?: string;
+  profile_type: string;
+  exists_in_db: boolean;
+}
+
+export interface LoadDefaultsRequest {
+  profile_names?: string[];
+  resolve_conflicts: 'skip' | 'rename' | 'overwrite';
+}
+
 /**
  * Get all fan profiles
  */
@@ -341,4 +354,40 @@ export const downloadFanProfilesExport = async (options?: ExportOptions): Promis
   } catch (error) {
     throw new Error(`Failed to download fan profiles export: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
+};
+
+/**
+ * Get available default fan profiles with their current status
+ */
+export const getDefaultProfiles = async (): Promise<DefaultProfileInfo[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/fan-profiles/defaults`);
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || `Failed to fetch default profiles: ${response.statusText}`);
+  }
+  
+  const result = await response.json();
+  return result.data;
+};
+
+/**
+ * Load default fan profiles (all or selected)
+ */
+export const loadDefaultProfiles = async (request: LoadDefaultsRequest): Promise<ImportResult> => {
+  const response = await fetch(`${API_BASE_URL}/api/fan-profiles/load-defaults`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || `Failed to load default profiles: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  return result.data;
 };

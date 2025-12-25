@@ -1,0 +1,202 @@
+{
+  "format": "pankha-fan-profiles",
+  "version": "1.0",
+  "exported_at": "2025-12-25T16:05:03.954Z",
+  "exported_by": "pankha-system",
+  "profiles": [
+    {
+      "profile_name": "GPU Optimal",
+      "description": "Minimise Noise and RPM below 50°C and ramp up above 70°C when performance is needed,\nGreat for GPU.",
+      "profile_type": "custom",
+      "curve_points": [
+        {
+          "temperature": "0.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "49.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "50.00",
+          "fan_speed": 35
+        },
+        {
+          "temperature": "60.00",
+          "fan_speed": 50
+        },
+        {
+          "temperature": "70.00",
+          "fan_speed": 80
+        },
+        {
+          "temperature": "75.00",
+          "fan_speed": 100
+        }
+      ]
+    },
+    {
+      "profile_name": "Lazy",
+      "description": "Stays at zero RPM till 50°C, kicks in after 50°C, stays silent till 70°C and goes full blast at 80°C.\nGood for PCH, Chipset and High RPM 8000RPM+ fans",
+      "profile_type": "custom",
+      "curve_points": [
+        {
+          "temperature": "0.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "50.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "60.00",
+          "fan_speed": 10
+        },
+        {
+          "temperature": "70.00",
+          "fan_speed": 50
+        },
+        {
+          "temperature": "75.00",
+          "fan_speed": 80
+        },
+        {
+          "temperature": "80.00",
+          "fan_speed": 100
+        }
+      ]
+    },
+    {
+      "profile_name": "Optimal",
+      "description": "Minimise Noise and RPM below 50°C and ramp up above 60°C when performance is needed,\nBest of Both worlds",
+      "profile_type": "custom",
+      "curve_points": [
+        {
+          "temperature": "0.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "40.00",
+          "fan_speed": 30
+        },
+        {
+          "temperature": "50.00",
+          "fan_speed": 40
+        },
+        {
+          "temperature": "60.00",
+          "fan_speed": 55
+        },
+        {
+          "temperature": "70.00",
+          "fan_speed": 85
+        },
+        {
+          "temperature": "80.00",
+          "fan_speed": 100
+        }
+      ]
+    },
+    {
+      "profile_name": "Performance",
+      "description": "Cooling is a priority, ramp fans to higher RPM faster",
+      "profile_type": "custom",
+      "curve_points": [
+        {
+          "temperature": "0.00",
+          "fan_speed": 40
+        },
+        {
+          "temperature": "30.00",
+          "fan_speed": 40
+        },
+        {
+          "temperature": "40.00",
+          "fan_speed": 50
+        },
+        {
+          "temperature": "50.00",
+          "fan_speed": 60
+        },
+        {
+          "temperature": "60.00",
+          "fan_speed": 75
+        },
+        {
+          "temperature": "70.00",
+          "fan_speed": 90
+        },
+        {
+          "temperature": "75.00",
+          "fan_speed": 100
+        }
+      ]
+    },
+    {
+      "profile_name": "Raspberry Pi 5",
+      "description": "Stays at zero RPM till 40°C, kicks in after 40C, stays silent till 60°C and goes full blast at 75°C. Good for SystemOnChipset (SOC) and ARM boards and High RPM 6000RPM+ fans.\nSpecially designed for Raspberry Pi 5 Models to keep Noise Low but give Performance when needed, basically mostly silent but noisy when needed. (Select the CPU sensor not ADC or Highest Temperature)",
+      "profile_type": "custom",
+      "curve_points": [
+        {
+          "temperature": "0.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "40.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "55.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "60.00",
+          "fan_speed": 25
+        },
+        {
+          "temperature": "65.00",
+          "fan_speed": 80
+        },
+        {
+          "temperature": "70.00",
+          "fan_speed": 100
+        }
+      ]
+    },
+    {
+      "profile_name": "Standard",
+      "description": "Standard curve for most systems.",
+      "profile_type": "custom",
+      "curve_points": [
+        {
+          "temperature": "0.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "30.00",
+          "fan_speed": 30
+        },
+        {
+          "temperature": "40.00",
+          "fan_speed": 40
+        },
+        {
+          "temperature": "50.00",
+          "fan_speed": 50
+        },
+        {
+          "temperature": "60.00",
+          "fan_speed": 60
+        },
+        {
+          "temperature": "70.00",
+          "fan_speed": 80
+        },
+        {
+          "temperature": "80.00",
+          "fan_speed": 100
+        }
+      ]
+    }
+  ]
+}

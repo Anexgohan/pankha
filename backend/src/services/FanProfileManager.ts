@@ -505,6 +505,114 @@ export class FanProfileManager extends EventEmitter {
   }
 
   /**
+   * Get default profiles from JSON file with their current status (exists in DB or not)
+   */
+  public async getDefaultProfiles(): Promise<Array<{
+    profile_name: string;
+    description?: string;
+    profile_type: string;
+    exists_in_db: boolean;
+  }>> {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Path to defaults file (in backend/src/config, copied to backend/config in Docker)
+      const defaultsPath = path.resolve(__dirname, '../config/fan-profiles-defaults.json');
+      
+      if (!fs.existsSync(defaultsPath)) {
+        log.warn(`Default profiles file not found at ${defaultsPath}`, 'FanProfileManager');
+        return [];
+      }
+
+      const defaultsContent = fs.readFileSync(defaultsPath, 'utf8');
+      const defaultsData = JSON.parse(defaultsContent);
+
+      if (!defaultsData.profiles || !Array.isArray(defaultsData.profiles)) {
+        return [];
+      }
+
+      // Get existing profile names from DB
+      const existingProfiles = await this.db.all('SELECT profile_name FROM fan_profiles');
+      const existingNames = new Set(existingProfiles.map((p: any) => p.profile_name));
+
+      // Map defaults with exists status
+      return defaultsData.profiles.map((profile: any) => ({
+        profile_name: profile.profile_name,
+        description: profile.description,
+        profile_type: profile.profile_type || 'custom',
+        exists_in_db: existingNames.has(profile.profile_name)
+      }));
+
+    } catch (error) {
+      log.error('Error getting default profiles', 'FanProfileManager', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load default profiles (all or selected)
+   */
+  public async loadDefaultProfiles(options: {
+    profile_names?: string[];
+    resolve_conflicts: 'skip' | 'rename' | 'overwrite';
+  }): Promise<ImportResult> {
+    try {
+      const fs = await import('fs');
+      const path = await import('path');
+      
+      // Path to defaults file (in backend/src/config, copied to backend/config in Docker)
+      const defaultsPath = path.resolve(__dirname, '../config/fan-profiles-defaults.json');
+      
+      if (!fs.existsSync(defaultsPath)) {
+        throw new Error(`Default profiles file not found at ${defaultsPath}`);
+      }
+
+      const defaultsContent = fs.readFileSync(defaultsPath, 'utf8');
+      const defaultsData = JSON.parse(defaultsContent);
+
+      if (!defaultsData.profiles || !Array.isArray(defaultsData.profiles)) {
+        throw new Error('Invalid default profiles format');
+      }
+
+      // Filter profiles if specific names requested
+      let profilesToLoad = defaultsData.profiles;
+      if (options.profile_names && options.profile_names.length > 0) {
+        const requestedNames = new Set(options.profile_names);
+        profilesToLoad = defaultsData.profiles.filter(
+          (p: any) => requestedNames.has(p.profile_name)
+        );
+      }
+
+      // Normalize curve points (handle string temperatures)
+      const normalizedProfiles = profilesToLoad.map((profile: any) => ({
+        ...profile,
+        curve_points: profile.curve_points?.map((point: any) => ({
+          temperature: typeof point.temperature === 'string' 
+            ? parseFloat(point.temperature) 
+            : point.temperature,
+          fan_speed: point.fan_speed
+        })) || []
+      }));
+
+      log.info(`📥 Loading ${normalizedProfiles.length} default fan profiles`, 'FanProfileManager');
+
+      // Use existing import logic
+      const result = await this.importFanProfiles({
+        profiles: normalizedProfiles,
+        resolve_conflicts: options.resolve_conflicts,
+        make_global: true
+      });
+
+      return result;
+
+    } catch (error) {
+      log.error('Error loading default profiles', 'FanProfileManager', error);
+      throw error;
+    }
+  }
+
+  /**
    * Export fan profiles to JSON format
    */
   public async exportFanProfiles(options: ExportOptions = {}): Promise<FanProfileExport> {

@@ -206,49 +206,9 @@ CREATE TRIGGER update_fan_profiles_timestamp
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
--- Insert default fan profiles
-INSERT INTO fan_profiles (id, profile_name, description, profile_type, is_global, created_by)
-VALUES
-(1, 'Silent', 'Prioritizes quiet operation with low fan speeds', 'silent', true, 'system'),
-(2, 'Balanced', 'Balanced cooling and noise levels', 'balanced', true, 'system'),
-(3, 'Performance', 'Maximum cooling with higher fan speeds', 'performance', true, 'system')
-ON CONFLICT (id) DO NOTHING;
-
--- Reset sequence for fan_profiles to start after pre-inserted records
-SELECT setval('fan_profiles_id_seq', (SELECT MAX(id) FROM fan_profiles));
-
--- Default curve points for Silent profile (low speeds)
-INSERT INTO fan_curve_points (profile_id, temperature, fan_speed, point_order)
-VALUES
-(1, 30.0, 20, 1),
-(1, 40.0, 25, 2),
-(1, 50.0, 35, 3),
-(1, 60.0, 45, 4),
-(1, 70.0, 60, 5),
-(1, 80.0, 80, 6)
-ON CONFLICT (profile_id, temperature) DO NOTHING;
-
--- Default curve points for Balanced profile (moderate speeds)
-INSERT INTO fan_curve_points (profile_id, temperature, fan_speed, point_order)
-VALUES
-(2, 30.0, 25, 1),
-(2, 40.0, 30, 2),
-(2, 50.0, 45, 3),
-(2, 60.0, 60, 4),
-(2, 70.0, 75, 5),
-(2, 80.0, 90, 6)
-ON CONFLICT (profile_id, temperature) DO NOTHING;
-
--- Default curve points for Performance profile (high speeds)
-INSERT INTO fan_curve_points (profile_id, temperature, fan_speed, point_order)
-VALUES
-(3, 30.0, 40, 1),
-(3, 40.0, 50, 2),
-(3, 50.0, 65, 3),
-(3, 60.0, 75, 4),
-(3, 70.0, 85, 5),
-(3, 80.0, 100, 6)
-ON CONFLICT (profile_id, temperature) DO NOTHING;
+-- NOTE: Default fan profiles (GPU Optimal, Lazy, Optimal, Performance, Raspberry Pi 5, Standard)
+-- are now loaded programmatically from backend/src/config/fan-profiles-defaults.json
+-- on first run when no profiles exist. See Database.loadDefaultProfiles()
 
 -- Backend Settings (Global Configuration)
 CREATE TABLE IF NOT EXISTS backend_settings (

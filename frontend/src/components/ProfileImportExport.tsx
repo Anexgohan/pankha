@@ -1,11 +1,14 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   downloadFanProfilesExport,
-  importFanProfiles
+  importFanProfiles,
+  getDefaultProfiles,
+  loadDefaultProfiles
 } from '../services/fanProfilesApi';
 import type {
   ImportFanProfilesRequest,
-  ImportResult
+  ImportResult,
+  DefaultProfileInfo
 } from '../services/fanProfilesApi';
 
 interface ProfileImportExportProps {
@@ -15,11 +18,36 @@ interface ProfileImportExportProps {
 
 const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportComplete }) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [isLoadingDefaults, setIsLoadingDefaults] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showDefaultsDialog, setShowDefaultsDialog] = useState(false);
   const [resolveConflicts, setResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('rename');
+  const [defaultResolveConflicts, setDefaultResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('skip');
   const [makeGlobal, setMakeGlobal] = useState(false);
+  const [defaultProfiles, setDefaultProfiles] = useState<DefaultProfileInfo[]>([]);
+  const [selectedDefaults, setSelectedDefaults] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch default profiles when dialog opens
+  useEffect(() => {
+    if (showDefaultsDialog) {
+      fetchDefaultProfiles();
+    }
+  }, [showDefaultsDialog]);
+
+  const fetchDefaultProfiles = async () => {
+    try {
+      const defaults = await getDefaultProfiles();
+      setDefaultProfiles(defaults);
+      // Pre-select profiles that don't exist yet
+      const notExisting = defaults.filter(p => !p.exists_in_db).map(p => p.profile_name);
+      setSelectedDefaults(new Set(notExisting));
+    } catch (error) {
+      console.error('Failed to fetch default profiles:', error);
+      alert('Failed to fetch default profiles: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  };
 
   const handleExportAll = async () => {
     try {
@@ -54,6 +82,61 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
     } finally {
       setIsExporting(false);
     }
+  };
+
+  const handleRestoreAllDefaults = async () => {
+    try {
+      setIsLoadingDefaults(true);
+      const result = await loadDefaultProfiles({
+        resolve_conflicts: 'skip'
+      });
+      setImportResult(result);
+      if (result.imported_count > 0) {
+        onImportComplete();
+      }
+    } catch (error) {
+      console.error('Restore defaults failed:', error);
+      alert('Restore defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoadingDefaults(false);
+    }
+  };
+
+  const handleLoadSelectedDefaults = async () => {
+    try {
+      if (selectedDefaults.size === 0) {
+        alert('Please select at least one profile to load');
+        return;
+      }
+
+      setIsLoadingDefaults(true);
+      const result = await loadDefaultProfiles({
+        profile_names: Array.from(selectedDefaults),
+        resolve_conflicts: defaultResolveConflicts
+      });
+      setImportResult(result);
+      setShowDefaultsDialog(false);
+      if (result.imported_count > 0) {
+        onImportComplete();
+      }
+    } catch (error) {
+      console.error('Load defaults failed:', error);
+      alert('Load defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    } finally {
+      setIsLoadingDefaults(false);
+    }
+  };
+
+  const toggleDefaultSelection = (profileName: string) => {
+    setSelectedDefaults(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(profileName)) {
+        newSet.delete(profileName);
+      } else {
+        newSet.add(profileName);
+      }
+      return newSet;
+    });
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,43 +215,125 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       </div>
 
       <div className="import-export-actions">
-        <div className="export-section">
-          <h4>Export Profiles</h4>
-          <div className="export-buttons">
-            <button
-              onClick={handleExportAll}
-              disabled={isExporting}
-              className="export-button all-button"
-            >
-              {isExporting ? '⏳ Exporting...' : '📤 Export All Profiles'}
-            </button>
-            <button
-              onClick={handleExportSelected}
-              disabled={isExporting}
-              className="export-button selected-button"
-            >
-              {isExporting ? '⏳ Exporting...' : '📤 Export Selected'}
-            </button>
-          </div>
-          <p className="export-hint">
-            💡 Select profiles using the checkboxes on the cards, then export selected profiles.
-          </p>
-        </div>
-
-        <div className="import-section">
-          <h4>Import Profiles</h4>
+        <div className="action-row">
+          <button
+            onClick={handleExportAll}
+            disabled={isExporting}
+            className="export-button all-button"
+          >
+            {isExporting ? '⏳ Exporting...' : '📤 Export All Profiles'}
+          </button>
+          <button
+            onClick={handleRestoreAllDefaults}
+            disabled={isLoadingDefaults}
+            className="default-button restore-all-button"
+          >
+            {isLoadingDefaults ? '⏳ Loading...' : '🔄 Restore All Defaults'}
+          </button>
           <button
             onClick={() => setShowImportDialog(true)}
             className="import-button"
           >
             📥 Import Profiles from File
           </button>
-          <p className="import-hint">
-            💡 Import fan profiles exported from another Pankha system.
-          </p>
         </div>
+        <div className="action-row">
+          <button
+            onClick={handleExportSelected}
+            disabled={isExporting}
+            className="export-button selected-button"
+          >
+            {isExporting ? '⏳ Exporting...' : '📤 Export Selected'}
+          </button>
+          <button
+            onClick={() => setShowDefaultsDialog(true)}
+            className="default-button load-defaults-button"
+          >
+            📋 Load Default Profiles
+          </button>
+        </div>
+        <p className="action-hint">
+          💡 Select profiles using checkboxes on the cards, then export selected. Use defaults buttons to restore factory profiles.
+        </p>
       </div>
 
+      {/* Load Defaults Dialog */}
+      {showDefaultsDialog && (
+        <div className="import-dialog-overlay">
+          <div className="import-dialog">
+            <div className="dialog-header">
+              <h3>Load Default Profiles</h3>
+              <button
+                onClick={() => setShowDefaultsDialog(false)}
+                className="close-button"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="dialog-content">
+              <p className="dialog-description">
+                Select which default profiles to load. Profiles already in your library are marked.
+              </p>
+              
+              <div className="defaults-list">
+                {defaultProfiles.map((profile) => (
+                  <div key={profile.profile_name} className="default-profile-item">
+                    <label className="default-profile-label">
+                      <input
+                        type="checkbox"
+                        checked={selectedDefaults.has(profile.profile_name)}
+                        onChange={() => toggleDefaultSelection(profile.profile_name)}
+                      />
+                      <span className="profile-info">
+                        <span className="profile-name">{profile.profile_name}</span>
+                        {profile.exists_in_db && (
+                          <span className="exists-badge">Already exists</span>
+                        )}
+                      </span>
+                    </label>
+                    {profile.description && (
+                      <p className="profile-description">{profile.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="import-options">
+                <div className="option-group">
+                  <label>If profile already exists:</label>
+                  <select
+                    value={defaultResolveConflicts}
+                    onChange={(e) => setDefaultResolveConflicts(e.target.value as any)}
+                  >
+                    <option value="skip">Skip (don't import)</option>
+                    <option value="rename">Rename (add suffix)</option>
+                    <option value="overwrite">Overwrite (replace existing)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div className="dialog-footer">
+              <button
+                onClick={() => setShowDefaultsDialog(false)}
+                className="cancel-button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleLoadSelectedDefaults}
+                disabled={isLoadingDefaults || selectedDefaults.size === 0}
+                className="confirm-button"
+              >
+                {isLoadingDefaults ? '⏳ Loading...' : `Load ${selectedDefaults.size} Profile${selectedDefaults.size !== 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import from File Dialog */}
       {showImportDialog && (
         <div className="import-dialog-overlay">
           <div className="import-dialog">

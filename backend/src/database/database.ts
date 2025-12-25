@@ -42,9 +42,89 @@ export class Database {
     try {
       await this.pool.query(schema);
       log.info('Database schema initialized successfully', 'Database');
+      
+      // Load default profiles on first run
+      await this.loadDefaultProfiles();
     } catch (error: any) {
       log.error('Error initializing database schema', 'Database', error);
       throw error;
+    }
+  }
+
+  /**
+   * Load default fan profiles from JSON file if no profiles exist
+   * Only runs on first installation or if all profiles have been deleted
+   */
+  private async loadDefaultProfiles(): Promise<void> {
+    try {
+      // Check if any profiles exist
+      const result = await this.pool.query('SELECT COUNT(*) as count FROM fan_profiles');
+      const profileCount = parseInt(result.rows[0].count, 10);
+      
+      if (profileCount > 0) {
+        log.debug(`${profileCount} fan profiles already exist, skipping default load`, 'Database');
+        return;
+      }
+
+      // Read default profiles from JSON file
+      // Path to defaults file (in backend/src/config, copied to backend/config in Docker)
+      const defaultsPath = path.resolve(__dirname, '../config/fan-profiles-defaults.json');
+      
+      if (!fs.existsSync(defaultsPath)) {
+        log.warn(`Default profiles file not found at ${defaultsPath}`, 'Database');
+        return;
+      }
+
+      const defaultsContent = fs.readFileSync(defaultsPath, 'utf8');
+      const defaultsData = JSON.parse(defaultsContent);
+
+      if (!defaultsData.profiles || !Array.isArray(defaultsData.profiles)) {
+        log.warn('Invalid default profiles format', 'Database');
+        return;
+      }
+
+      log.info(`Loading ${defaultsData.profiles.length} default fan profiles...`, 'Database');
+
+      for (const profile of defaultsData.profiles) {
+        // Insert profile
+        const profileResult = await this.pool.query(
+          `INSERT INTO fan_profiles (profile_name, description, profile_type, is_global, created_by)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING id`,
+          [
+            profile.profile_name,
+            profile.description || null,
+            profile.profile_type || 'custom',
+            true, // is_global
+            'system'
+          ]
+        );
+
+        const profileId = profileResult.rows[0].id;
+
+        // Insert curve points
+        if (profile.curve_points && Array.isArray(profile.curve_points)) {
+          for (let i = 0; i < profile.curve_points.length; i++) {
+            const point = profile.curve_points[i];
+            // Handle temperature as string or number
+            const temp = typeof point.temperature === 'string' 
+              ? parseFloat(point.temperature) 
+              : point.temperature;
+            
+            await this.pool.query(
+              'INSERT INTO fan_curve_points (profile_id, temperature, fan_speed, point_order) VALUES ($1, $2, $3, $4)',
+              [profileId, temp, point.fan_speed, i + 1]
+            );
+          }
+        }
+
+        log.info(`  ✓ Loaded default profile: ${profile.profile_name}`, 'Database');
+      }
+
+      log.success(`Successfully loaded ${defaultsData.profiles.length} default fan profiles`, 'Database');
+    } catch (error) {
+      log.error('Error loading default fan profiles', 'Database', error);
+      // Don't throw - this is not critical for startup
     }
   }
 

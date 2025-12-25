@@ -44,6 +44,7 @@ WORKDIR /app
 COPY --from=builder /app/backend/dist ./backend/
 COPY --from=builder /app/backend/package*.json ./backend/
 COPY --from=builder /app/backend/src/database ./backend/database/
+COPY --from=builder /app/backend/src/config ./backend/config/
 
 # Copy built frontend
 COPY --from=builder /app/frontend/dist ./frontend/

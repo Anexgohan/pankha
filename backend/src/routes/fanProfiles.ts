@@ -146,6 +146,66 @@ router.post('/import', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/fan-profiles/defaults
+ * Get available default fan profiles with their current status (exists in DB or not)
+ */
+router.get('/defaults', async (req: Request, res: Response) => {
+  try {
+    const defaults = await fanProfileManager.getDefaultProfiles();
+    
+    res.json({
+      success: true,
+      data: defaults,
+      count: defaults.length
+    });
+
+  } catch (error) {
+    log.error('Error fetching default profiles:', 'fanProfiles', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch default profiles',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
+ * POST /api/fan-profiles/load-defaults
+ * Load default fan profiles (all or selected)
+ */
+router.post('/load-defaults', async (req: Request, res: Response) => {
+  try {
+    const { profile_names, resolve_conflicts = 'skip' } = req.body;
+
+    if (!['skip', 'rename', 'overwrite'].includes(resolve_conflicts)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid resolve_conflicts value. Must be: skip, rename, or overwrite'
+      });
+    }
+
+    const result = await fanProfileManager.loadDefaultProfiles({
+      profile_names,
+      resolve_conflicts
+    });
+
+    res.json({
+      success: result.success,
+      data: result,
+      message: `Default profiles loaded: ${result.imported_count} imported, ${result.skipped_count} skipped, ${result.error_count} errors`
+    });
+
+  } catch (error) {
+    log.error('Error loading default profiles:', 'fanProfiles', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load default profiles',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * GET /api/fan-profiles/:id
  * Get a specific fan profile by ID
  */
