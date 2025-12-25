@@ -221,7 +221,7 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 <table>
 <tr>
-<td align="center" valign="top" width="25%">
+<td align="center" valign="top">
 
 ![Server](https://img.shields.io/badge/-Server-0db7ed?logo=docker&logoColor=white&style=flat-square)
 
@@ -232,7 +232,7 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 </div>
 </td>
-<td align="center" valign="top" width="25%">
+<td align="center" valign="top">
 
 ![Agents](https://img.shields.io/badge/-Agents-CE422B?logo=rust&logoColor=white&style=flat-square)
 
@@ -244,7 +244,7 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 </div>
 </td>
-<td align="center" valign="top" width="25%">
+<td align="center" valign="top">
 
 ![Reference](https://img.shields.io/badge/-Reference-339933?logo=swagger&logoColor=white&style=flat-square)
 
@@ -255,7 +255,7 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 </div>
 </td>
-<td align="center" valign="top" width="25%">
+<td align="center" valign="top">
 
 ![Help](https://img.shields.io/badge/-Help-F7DF1E?logo=stackoverflow&logoColor=black&style=flat-square)
 
@@ -269,7 +269,7 @@ The agent will connect to the backend and start sending hardware data. You can n
 </tr>
 </table>
 
-## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square)
+## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square) Architecture:
 
 ![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=nodedotjs&logoColor=white&style=flat-square) ![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black&style=flat-square) ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-336791?logo=postgresql&logoColor=white&style=flat-square) ![Rust](https://img.shields.io/badge/-Rust-CE422B?logo=rust&logoColor=white&style=flat-square) ![.NET](https://img.shields.io/badge/-.NET%208-512BD4?logo=dotnet&logoColor=white&style=flat-square) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square)
 
