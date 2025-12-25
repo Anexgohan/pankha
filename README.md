@@ -225,10 +225,10 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 ![Server](https://img.shields.io/badge/-Server-0db7ed?logo=docker&logoColor=white&style=flat-square)
 
-<div align="right">
+<div align="left">
 
-[Installation](https://github.com/Anexgohan/pankha/wiki/Server-Installation)<br>
-[Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
+- [Installation](https://github.com/Anexgohan/pankha/wiki/Server-Installation)
+- [Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
 
 </div>
 </td>
@@ -236,11 +236,11 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 ![Agents](https://img.shields.io/badge/-Agents-CE422B?logo=rust&logoColor=white&style=flat-square)
 
-<div align="right">
+<div align="left">
 
-[Linux](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)<br>
-[Windows](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)<br>
-[Settings](https://github.com/Anexgohan/pankha/wiki/Agents-Advanced-Settings)
+- [Linux](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)
+- [Windows](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)
+- [Settings](https://github.com/Anexgohan/pankha/wiki/Agents-Advanced-Settings)
 
 </div>
 </td>
@@ -248,10 +248,10 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 ![Reference](https://img.shields.io/badge/-Reference-339933?logo=swagger&logoColor=white&style=flat-square)
 
-<div align="right">
+<div align="left">
 
-[API Reference](https://github.com/Anexgohan/pankha/wiki/API-Reference)<br>
-[Fan Profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles)
+- [API Reference](https://github.com/Anexgohan/pankha/wiki/API-Reference)
+- [Fan Profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles)
 
 </div>
 </td>
@@ -259,10 +259,10 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 ![Help](https://img.shields.io/badge/-Help-F7DF1E?logo=stackoverflow&logoColor=black&style=flat-square)
 
-<div align="right">
+<div align="left">
 
-[Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)<br>
-[Build from Source](https://github.com/Anexgohan/pankha/wiki/Development-Build)
+- [Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)
+- [Build from Source](https://github.com/Anexgohan/pankha/wiki/Development-Build)
 
 </div>
 </td>
