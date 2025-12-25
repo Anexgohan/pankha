@@ -1,54 +1,135 @@
 # API Reference
 
-Pankha exposes a REST API for configuration and a WebSocket interface for real-time data. This is useful for integrating with external systems like Home Assistant, Node-RED, or custom scripts.
-
-**Base URL**: `http://<server-ip>:3000`
+Pankha exposes a REST API for configuration and a WebSocket interface for real-time data. Base URL: `http://<server-ip>:3000`
 
 ---
 
-## REST API
+## Health & Status
 
-### System Management
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Backend health check with service statistics |
+| GET | `/api/overview` | Aggregate stats across all systems |
+| GET | `/api/websocket/info` | WebSocket connection info and stats |
+| POST | `/api/emergency-stop` | Set all fans to 100% on all systems |
 
-#### List All Systems
-Get a list of all registered agents and their current status.
-*   **GET** `/api/systems`
-*   **Response**: `[{id, name, status, ...}]`
+---
 
-#### Set Fan Speed (Manual Control)
-Force a fan to a specific speed. Note: The autonomous controller may override this if "Manual Mode" is not explicitly enabled/supported by the specific agent logic version.
-*   **PUT** `/api/systems/:id/fans/:fanId`
-*   **Body**: `{ "speed": 75 }` (0-100)
+## Systems
 
-### Configuration
-Update agent behavior settings.
+### List & CRUD
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/systems` | List all registered agents |
+| POST | `/api/systems` | Add new system |
+| GET | `/api/systems/:id` | Get system details with sensors/fans |
+| PUT | `/api/systems/:id` | Update system configuration |
+| DELETE | `/api/systems/:id` | Remove system |
+| GET | `/api/systems/:id/status` | Real-time connection status |
 
-| Endpoint (PUT) | Body | Description |
-| :--- | :--- | :--- |
-| `/api/systems/:id/hysteresis` | `{ "temp": 5.0 }` | Set temperature hysteresis (0-10°C) |
-| `/api/systems/:id/fan-step` | `{ "step": 5 }` | Set smoothing step percentage (1-100%) |
-| `/api/systems/:id/agent-rate` | `{ "interval": 1000 }` | Set update interval in milliseconds |
+### Controller
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/systems/controller/status` | Fan profile controller status |
+| PUT | `/api/systems/controller/interval` | Set controller update interval |
+
+### Sensors
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/systems/:id/sensors` | Get all sensors for system |
+| PUT | `/api/systems/:id/sensors/:sensorId/label` | Set custom sensor label |
+| PUT | `/api/systems/:id/sensors/:sensorId/visibility` | Show/hide sensor |
+| GET | `/api/systems/:id/sensor-visibility` | Get visibility settings |
+| PUT | `/api/systems/:id/sensor-groups/:groupName/visibility` | Show/hide sensor group |
+
+### Fans
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/systems/:id/fans` | Get all fans for system |
+| PUT | `/api/systems/:id/fans/:fanId` | **Set fan speed** (0-100%) |
+| PUT | `/api/systems/:id/fans/:fanId/label` | Set custom fan label |
+
+### Agent Settings
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| PUT | `/api/systems/:id/update-interval` | Set agent polling interval (seconds) |
+| PUT | `/api/systems/:id/fan-step` | Set fan speed step % (smoothing) |
+| PUT | `/api/systems/:id/hysteresis` | Set temperature hysteresis (°C) |
+| PUT | `/api/systems/:id/emergency-temp` | Set emergency temperature threshold |
+| PUT | `/api/systems/:id/log-level` | Set agent log level |
+| PUT | `/api/systems/:id/sensor-deduplication` | Enable/disable duplicate filtering |
+| PUT | `/api/systems/:id/sensor-tolerance` | Set duplicate detection tolerance |
+
+### Profiles & History
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| PUT | `/api/systems/:id/profile` | Assign profile to system |
+| POST | `/api/systems/:id/profiles` | Create system-specific profile |
+| GET | `/api/systems/:id/history` | Get historical sensor/fan data |
+| GET | `/api/systems/:id/charts` | Get aggregated chart data |
+
+---
+
+## Fan Profiles
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/fan-profiles` | List all profiles |
+| GET | `/api/fan-profiles/:id` | Get profile details |
+| POST | `/api/fan-profiles` | Create new profile |
+| PUT | `/api/fan-profiles/:id` | Update profile |
+| DELETE | `/api/fan-profiles/:id` | Delete profile |
+| GET | `/api/fan-profiles/stats` | Profile statistics |
+| POST | `/api/fan-profiles/assign` | Assign profile to fan |
+| GET | `/api/fan-profiles/assignments/:systemId` | Get fan assignments |
+| POST | `/api/fan-profiles/calculate-speed` | Calculate speed for temp |
+| GET | `/api/fan-profiles/export` | Export profiles to JSON |
+| POST | `/api/fan-profiles/import` | Import profiles from JSON |
+
+---
+
+## Fan Configurations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/fan-configurations/:systemId` | Get fan configurations |
+| POST | `/api/fan-configurations/sensor` | Configure fan sensor mapping |
+
+---
+
+## Discovery
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/discovery/scan` | Scan network for agents |
+| GET | `/api/discovery/hardware` | Get discovered hardware |
+| POST | `/api/discovery/test-fan` | Test fan control |
+| GET | `/api/discovery/systems/:id/sensors/scan` | Scan for new sensors |
+| PUT | `/api/discovery/systems/:id/sensors/:sensorId` | Update discovered sensor |
+| POST | `/api/discovery/systems/:id/sensor-mapping` | Map sensors to labels |
 
 ---
 
 ## WebSocket API
 
-The WebSocket is used for high-frequency real-time data.
 **Endpoint**: `ws://<server-ip>:3000/websocket`
 
-### Events (Server -> Client)
+### Events (Server → Client)
 
-#### `fullState`
-Sent immediately upon connection. Contains the complete snapshot of all systems.
+| Event | Description |
+|-------|-------------|
+| `fullState` | Complete snapshot on connection |
+| `systemDelta` | Incremental updates (bandwidth optimized) |
+| `agentRegistered` | Agent connected |
+| `agentOffline` | Agent disconnected |
 
-#### `systemDelta`
-Sent purely when values change (bandwidth optimized).
+### Example: systemDelta
 ```json
 {
   "type": "systemDelta",
   "data": {
     "agentId": "linux-agent-1",
-    "timestamp": "2023-10-27T10:00:00Z",
+    "timestamp": "2025-01-01T12:00:00Z",
     "changes": ["sensors", "fans"],
     "sensors": [{ "id": "temp1", "temperature": 45.2 }],
     "fans": [{ "id": "fan1", "rpm": 1200, "speed": 40 }]
@@ -56,16 +137,61 @@ Sent purely when values change (bandwidth optimized).
 }
 ```
 
-#### `agentRegistered` / `agentOffline`
-Lifecycle events sent when agents connect or disconnect.
+---
+
+## Quick Examples
+
+### Set Fan Speed
+```bash
+curl -X PUT http://localhost:3000/api/systems/1/fans/fan1 \
+  -H "Content-Type: application/json" \
+  -d '{"speed": 75}'
+```
+
+### Create Fan Profile
+```bash
+curl -X POST http://localhost:3000/api/fan-profiles \
+  -H "Content-Type: application/json" \
+  -d '{
+    "profile_name": "Silent",
+    "curve_points": [
+      {"temperature": 30, "fan_speed": 30},
+      {"temperature": 50, "fan_speed": 50},
+      {"temperature": 70, "fan_speed": 100}
+    ]
+  }'
+```
+
+### Check Health
+```bash
+curl http://localhost:3000/health
+```
 
 ---
 
-## Integration Examples
+## Error Responses
 
-### Curl: Set Fan Speed
-```bash
-curl -X PUT http://localhost:3000/api/systems/1/fans/fan_input_1 \
-     -H "Content-Type: application/json" \
-     -d '{"speed": 100}'
+```json
+{
+  "success": false,
+  "error": "Error message",
+  "message": "Detailed description"
+}
 ```
+
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 201 | Created |
+| 400 | Bad request |
+| 404 | Not found |
+| 500 | Server error |
+| 503 | Service unavailable |
+
+---
+
+## Notes
+
+- **Authentication**: Not required in current version
+- **Rate Limiting**: None enforced; use WebSocket for real-time updates
+- **URL Parameters**: Replace `:id`, `:fanId`, etc. with actual values

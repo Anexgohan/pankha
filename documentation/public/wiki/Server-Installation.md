@@ -6,6 +6,8 @@ Pankha is designed to be deployed using Docker Compose. This guides you through 
 
 *   Docker Engine
 *   Docker Compose
+*   256MB RAM minimum
+*   1GB disk space for database
 
 ## 1. Quick Start (Recommended)
 
@@ -79,3 +81,9 @@ docker compose ps
 ```
 
 You should see an `Up` status for both the app and postgres containers.
+
+---
+
+## Next Steps
+
+Once your server is running, see [Server-Configuration](Server-Configuration) for environment settings and [Agents-Linux](Agents-Linux) or [Agents-Windows](Agents-Windows) to install agents on your systems.

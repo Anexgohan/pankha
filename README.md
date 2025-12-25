@@ -77,7 +77,7 @@ Fully Customizable:
 - Docker and Docker Compose for server deployment
 - System with fan control capabilities (for agents)
 
-# ![Docker](https://img.shields.io/badge/-Docker-2496ED?logo=docker&logoColor=white&style=flat-square) Server Installation Guide:
+# ![Docker](https://img.shields.io/badge/-Docker-0db7ed?logo=docker&logoColor=white&style=flat-square) Server Installation Guide:
 ## Docker Compose Deployment:
 1. Download the Docker Compose file:
    ```bash
@@ -215,17 +215,51 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 ## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square)
 
-- [Installation Guide](documentation/public/getting-started/installation.md) - Server setup and deployment
-- [Agent Setup Guide](documentation/public/getting-started/agent-setup.md) - Installing and configuring agents
-- [Backend Configuration](documentation/public/configuration/backend.md) - Server environment and settings
-- [Agent Configuration](documentation/public/configuration/agent.md) - Agent configuration options
-- [API Documentation](documentation/public/api/endpoints.md) - REST API reference
-- [Backend Troubleshooting](documentation/public/troubleshooting/backend.md) - Server issues and solutions
-- [Agent Troubleshooting](documentation/public/troubleshooting/agent.md) - Agent issues and solutions
+[![Wiki](https://img.shields.io/badge/Full_Documentation-GitHub_Wiki-0db7ed?style=for-the-badge&logo=github)](https://github.com/Anexgohan/pankha/wiki)
+
+### Quick Links
+
+<table>
+<tr>
+<td align="center" width="25%">
+
+![Server](https://img.shields.io/badge/-Server-0db7ed?logo=docker&logoColor=white&style=flat-square)
+
+[Installation](https://github.com/Anexgohan/pankha/wiki/Server-Installation)<br>
+[Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
+
+</td>
+<td align="center" width="25%">
+
+![Agents](https://img.shields.io/badge/-Agents-CE422B?logo=rust&logoColor=white&style=flat-square)
+
+[Linux](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)<br>
+[Windows](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)<br>
+[Settings](https://github.com/Anexgohan/pankha/wiki/Agents-Advanced-Settings)
+
+</td>
+<td align="center" width="25%">
+
+![Reference](https://img.shields.io/badge/-Reference-339933?logo=swagger&logoColor=white&style=flat-square)
+
+[![API](https://img.shields.io/badge/API-50_endpoints-blue?style=flat-square&logo=openapiinitiative)](https://github.com/Anexgohan/pankha/wiki/API-Reference)<br>
+[Fan Profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles)
+
+</td>
+<td align="center" width="25%">
+
+![Help](https://img.shields.io/badge/-Help-F7DF1E?logo=stackoverflow&logoColor=black&style=flat-square)
+
+[Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)<br>
+[Build from Source](https://github.com/Anexgohan/pankha/wiki/Development-Build)
+
+</td>
+</tr>
+</table>
 
 ## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square)
 
-![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=nodedotjs&logoColor=white&style=flat-square) ![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black&style=flat-square) ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-4169E1?logo=postgresql&logoColor=white&style=flat-square) ![Rust](https://img.shields.io/badge/-Rust-000?logo=rust&logoColor=white&style=flat-square) ![.NET](https://img.shields.io/badge/-.NET%208-512BD4?logo=dotnet&logoColor=white&style=flat-square) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square)
+![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=nodedotjs&logoColor=white&style=flat-square) ![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black&style=flat-square) ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-336791?logo=postgresql&logoColor=white&style=flat-square) ![Rust](https://img.shields.io/badge/-Rust-CE422B?logo=rust&logoColor=white&style=flat-square) ![.NET](https://img.shields.io/badge/-.NET%208-512BD4?logo=dotnet&logoColor=white&style=flat-square) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square)
 
 ```
 Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardware

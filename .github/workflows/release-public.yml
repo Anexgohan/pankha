@@ -346,7 +346,7 @@ jobs:
               1. Deploy the Pankha Server
               2. Deploy the Pankha Agents to your client devices
 
-            ## ![Docker](https://img.shields.io/badge/-Docker-2496ED?logo=docker&logoColor=white&style=flat-square) Quick Start (Pankha Server)
+            ## ![Docker](https://img.shields.io/badge/-Docker-0db7ed?logo=docker&logoColor=white&style=flat-square) Quick Start (Pankha Server)
             **Docker Compose Method (Recommended):**
             ```bash
             # Download Docker Compose files from release

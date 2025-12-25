@@ -13,9 +13,19 @@ Each agent has specific settings to fine-tune its behavior. You can edit these i
     *   Temp rises to 55°C (Change > 4°C) -> **Update** (Fan increases to new target)
 
 ### Emergency Temperature
-*   **Purpose**: Failsafe protection.
-*   **How it works**: If any sensor reaches this threshold (default **90°C**), the agent **ignores all profiles, hysteresis, and smoothing**.
+*   **Purpose**: Failsafe protection for hardware safety.
+*   **How it works**: If any sensor reaches this threshold (default **80°C**), the agent **ignores all profiles, hysteresis, and smoothing**.
 *   **Action**: All fans are immediately forced to **100% speed** to protect hardware.
+*   **Offline Failsafe**: When the agent loses connection to the backend, it continues monitoring temperatures locally. If any sensor hits the emergency threshold while disconnected, the agent autonomously triggers 100% fan speed—**no backend required**.
+
+### Minimum Fan Speed (Safety Floor)
+*   **Purpose**: Hardware protection—prevents fans from ever stopping completely.
+*   **How it works**: Even if the backend sends a 0% speed command (or goes offline), the agent will **never** set fans below this value.
+*   **Default**: 30%
+*   **Why it matters**:
+    *   Prevents fan stalling (can damage bearings on some fans)
+    *   Ensures airflow during backend outages
+    *   Protects against accidental full-stop commands
 
 ---
 

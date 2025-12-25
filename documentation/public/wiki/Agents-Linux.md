@@ -66,7 +66,25 @@ sudo systemctl start pankha-agent
 
 ## CLI Commands
 
-*   `--start`: Run the agent in the foreground (or as daemon).
-*   `--status`: Show current connection status and discovered hardware.
-*   `--config`: Show the current loaded configuration.
-*   `--setup`: Run the interactive configuration wizard.
+| Command | Short | Description |
+|---------|-------|-------------|
+| `--start` | `-s` | Start the agent daemon in background |
+| `--stop` | `-x` | Stop the agent daemon |
+| `--restart` | `-r` | Restart the agent daemon |
+| `--status` | `-i` | Show agent status and connection info |
+| `--config` | `-c` | Show current loaded configuration |
+| `--setup` | `-e` | Run interactive setup wizard |
+| `--log-show` | `-l` | View logs (live tail) |
+| `--log-show N` | `-l N` | View last N log lines |
+| `--log-level LEVEL` | | Set log level (TRACE/DEBUG/INFO/WARN/ERROR) |
+| `--test` | | Hardware discovery test |
+| `--help` | `-h` | Show help |
+| `--version` | `-V` | Show version |
+
+### Quick Examples
+```bash
+./pankha-agent -s        # Start daemon
+./pankha-agent -i        # Check status
+./pankha-agent -l        # View live logs
+./pankha-agent -x        # Stop daemon
+```
