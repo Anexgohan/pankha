@@ -3,11 +3,11 @@
 ![Docker Pulls](https://img.shields.io/docker/pulls/anexgohan/pankha)
 ![GitHub Discussions](https://img.shields.io/github/discussions/Anexgohan/pankha)
 ![GitHub Repo Size](https://img.shields.io/github/repo-size/Anexgohan/pankha)
+![GitHub Commit Activity](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha)
 ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 
 ![GitHub Latest Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/latest/total?label=Latest%20Downloads)
 ![GitHub Total Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/total?label=Total%20Downloads)
-![GitHub Commit Activity](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha)
 ![GitHub Last Commit](https://img.shields.io/github/last-commit/Anexgohan/pankha)
 ![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
 
@@ -19,7 +19,7 @@
 ![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Anexgohan/pankha)
 
 ![Reddit Subscribers](https://img.shields.io/reddit/subreddit-subscribers/selfhosted?style=social)
-![Discord](https://img.shields.io/discord/:serverId?label=Pankha%20Discord&logo=discord)
+![Discord](https://img.shields.io/badge/Discord-Coming%20Soon-5865F2?logo=discord&logoColor=white&style=flat-square)
 
 ---
 Is an open-source Distributed fan control system with Centralized Management system for monitoring and controlling hardware cooling across multiple machines. Production-ready with real-time hardware monitoring, WebSocket communication, and PostgreSQL database.
@@ -77,7 +77,7 @@ Fully Customizable:
 - Docker and Docker Compose for server deployment
 - System with fan control capabilities (for agents)
 
-# Server Installation Guide :
+# ![Docker](https://img.shields.io/badge/-Docker-2496ED?logo=docker&logoColor=white&style=flat-square) Server Installation Guide:
 ## Docker Compose Deployment:
 1. Download the Docker Compose file:
    ```bash
@@ -126,10 +126,9 @@ That's it! The backend is now running with:
     docker compose down
     ```
 
-# Agent Installation Guide:  
-# Agent Installation Guide:  
+# ![Agent](https://img.shields.io/badge/-Agent-4A90A4?logo=robot&logoColor=white&style=flat-square) Agent Installation Guide:  
 
-### 1. Windows Agent (New!)
+### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent
 **Requirements**: Windows 10/11, .NET 8 Runtime.
 
 1. **Download Installer**:
@@ -140,10 +139,10 @@ That's it! The backend is now running with:
    - Launch "Pankha Fan Control" from the Start Menu.
    - Right-click the Tray Icon -> **Settings** to configure the backend URL.
 
-### 2. Linux Client Agent (Rust)
+### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agent (Rust)
 **Performance**: Single binary, <10MB RAM, <1% CPU. Zero dependencies.
 
-## *For x86_64 systems (Intel/AMD):*
+## ![Intel x86_64](https://img.shields.io/badge/-Intel%20x86__64-0071C5?logo=intel&logoColor=white&style=flat-square) ![AMD x86_64](https://img.shields.io/badge/-AMD%20x86__64-ED1C24?logo=amd&logoColor=white&style=flat-square) For x86_64 systems:
   - With wget
     ```bash
     wget -O pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
@@ -177,7 +176,7 @@ That's it! The backend is now running with:
       ./pankha-agent-linux_x86_64 --help
         ```
 
-## *For ARM64 systems (Raspberry Pi 5, pimox, pxvirt, ARM sbc, etc):*
+## ![ARM64](https://img.shields.io/badge/-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square) For ARM64 systems (Raspberry Pi 5, etc):
   - With wget
     ```bash
     wget -O pankha-agent-linux_arm64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
@@ -214,7 +213,7 @@ That's it! The backend is now running with:
 
 The agent will connect to the backend and start sending hardware data. You can now manage the agent from the dashboard.
 
-## Documentation
+## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square)
 
 - [Installation Guide](documentation/public/getting-started/installation.md) - Server setup and deployment
 - [Agent Setup Guide](documentation/public/getting-started/agent-setup.md) - Installing and configuring agents
@@ -224,7 +223,9 @@ The agent will connect to the backend and start sending hardware data. You can n
 - [Backend Troubleshooting](documentation/public/troubleshooting/backend.md) - Server issues and solutions
 - [Agent Troubleshooting](documentation/public/troubleshooting/agent.md) - Agent issues and solutions
 
-## Architecture
+## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square)
+
+![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=nodedotjs&logoColor=white&style=flat-square) ![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black&style=flat-square) ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-4169E1?logo=postgresql&logoColor=white&style=flat-square) ![Rust](https://img.shields.io/badge/-Rust-000?logo=rust&logoColor=white&style=flat-square) ![.NET](https://img.shields.io/badge/-.NET%208-512BD4?logo=dotnet&logoColor=white&style=flat-square) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square)
 
 ```
 Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardware
@@ -277,7 +278,7 @@ Build from source:
   docker compose up -d
   ```
 
-## Configuration
+## ![Config](https://img.shields.io/badge/-Configuration-5C5C5C?logo=gnubash&logoColor=white&style=flat-square) Configuration
 
 ### Backend Configuration
 
@@ -338,7 +339,7 @@ Agent configuration file: `config.json` (running directory)
 
 ```
 
-## Troubleshooting
+## ![Troubleshoot](https://img.shields.io/badge/-Troubleshooting-DC3545?logo=bug&logoColor=white&style=flat-square) Troubleshooting
 
 ### Backend Issues
 
@@ -402,7 +403,7 @@ cat /sys/class/hwmon/hwmon*/pwm*
 echo 128 | sudo tee /sys/class/hwmon/hwmon0/pwm1
 ```
 
-## Contributing
+## ![Contributing](https://img.shields.io/badge/-Contributing-28A745?logo=github&logoColor=white&style=flat-square) Contributing
 
 We welcome contributions! Please see our contributing guidelines:
 

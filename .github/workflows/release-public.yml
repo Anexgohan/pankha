@@ -346,7 +346,7 @@ jobs:
               1. Deploy the Pankha Server
               2. Deploy the Pankha Agents to your client devices
 
-            ## Quick Start (Pankha Server)
+            ## ![Docker](https://img.shields.io/badge/-Docker-2496ED?logo=docker&logoColor=white&style=flat-square) Quick Start (Pankha Server)
             **Docker Compose Method (Recommended):**
             ```bash
             # Download Docker Compose files from release
@@ -368,8 +368,8 @@ jobs:
 
             ## Quick Start (Pankha Agents)
             
-            ### 🐧 (Linux Agents)
-            ### For x86_64 systems:
+            ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agents
+            #### ![Intel x86_64](https://img.shields.io/badge/-Intel%20x86__64-0071C5?logo=intel&logoColor=white&style=flat-square) ![AMD x86_64](https://img.shields.io/badge/-AMD%20x86__64-ED1C24?logo=amd&logoColor=white&style=flat-square) For x86_64 systems:
             ```bash
             wget -O pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x86_64
             chmod +x pankha-agent-linux_x86_64
@@ -377,7 +377,7 @@ jobs:
             ./pankha-agent-linux_x86_64 --start
             ```
 
-            ### For ARM64 systems (Raspberry Pi 5):
+            #### ![ARM64](https://img.shields.io/badge/-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square) For ARM64 systems (Raspberry Pi 5):
             ```bash
             wget -O pankha-agent-linux_arm64 https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_arm64
             chmod +x pankha-agent-linux_arm64
@@ -385,20 +385,20 @@ jobs:
             ./pankha-agent-linux_arm64 --start
             ```
 
-            ### 🪟 (Windows Agent)
-            ### For x64 systems:
+            ### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent
+            #### ![Intel 64](https://img.shields.io/badge/-Intel%2064-0071C5?logo=intel&logoColor=white&style=flat-square) ![AMD 64](https://img.shields.io/badge/-AMD%2064-ED1C24?logo=amd&logoColor=white&style=flat-square) For x64 systems:
             ```bash
             # Download MSI form release assets below, then run it
             wget -O pankha-agent-windows_x64.msi https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-windows_x64.msi
             ```
 
-            ### 🔐 Verify Download Integrity
+            ### ![SHA256](https://img.shields.io/badge/-SHA256-28A745?logo=gnuprivacyguard&logoColor=white&style=flat-square) Verify Download Integrity
             ```bash
             wget -O checksums.txt https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/checksums.txt
             sha256sum -c checksums.txt
             ```
 
-            ## 📚 Documentation
+            ## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square)
 
             - [Installation Guide](https://github.com/Anexgohan/pankha/wiki/Installation)
             - [Agent Setup Guide](https://github.com/Anexgohan/pankha/wiki/Agent-Setup)
