@@ -213,7 +213,7 @@ That's it! The backend is now running with:
 
 The agent will connect to the backend and start sending hardware data. You can now manage the agent from the dashboard.
 
-## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square)
+## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square) Documentation:
 
 [![Wiki](https://img.shields.io/badge/Full_Documentation-GitHub_Wiki-0db7ed?style=for-the-badge&logo=github)](https://github.com/Anexgohan/pankha/wiki)
 
@@ -225,34 +225,46 @@ The agent will connect to the backend and start sending hardware data. You can n
 
 ![Server](https://img.shields.io/badge/-Server-0db7ed?logo=docker&logoColor=white&style=flat-square)
 
+<div align="right">
+
 [Installation](https://github.com/Anexgohan/pankha/wiki/Server-Installation)<br>
 [Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
 
+</div>
 </td>
 <td align="center" valign="top" width="25%">
 
 ![Agents](https://img.shields.io/badge/-Agents-CE422B?logo=rust&logoColor=white&style=flat-square)
 
+<div align="right">
+
 [Linux](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)<br>
 [Windows](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)<br>
 [Settings](https://github.com/Anexgohan/pankha/wiki/Agents-Advanced-Settings)
 
+</div>
 </td>
 <td align="center" valign="top" width="25%">
 
 ![Reference](https://img.shields.io/badge/-Reference-339933?logo=swagger&logoColor=white&style=flat-square)
 
+<div align="right">
+
 [API Reference](https://github.com/Anexgohan/pankha/wiki/API-Reference)<br>
 [Fan Profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles)
 
+</div>
 </td>
 <td align="center" valign="top" width="25%">
 
 ![Help](https://img.shields.io/badge/-Help-F7DF1E?logo=stackoverflow&logoColor=black&style=flat-square)
 
+<div align="right">
+
 [Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)<br>
 [Build from Source](https://github.com/Anexgohan/pankha/wiki/Development-Build)
 
+</div>
 </td>
 </tr>
 </table>
