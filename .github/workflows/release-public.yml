@@ -1,5 +1,5 @@
 # REPO: pankha (public) | Builds Rust agents, Windows agent, Docker images, and creates GitHub release
-name: Release Build and Publish
+name: release-public
 run-name: "release-public ${{ github.event.client_payload.version || github.event.inputs.version || '' }}"
 
 # This workflow runs on the PUBLIC repo (pankha) to take advantage of FREE ARM64 runners.
@@ -13,6 +13,10 @@ on:
       version:
         description: 'Version tag (e.g., v1.0.0)'
         required: true
+      is_prerelease:
+        description: 'Is this a pre-release? (true/false, or auto to detect from version)'
+        required: false
+        default: 'auto'
 
 permissions:
   contents: write
@@ -207,7 +211,24 @@ jobs:
           VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
-          echo "📦 Creating release: ${VERSION}"
+          
+          # Get pre-release flag from dispatch or auto-detect from version
+          IS_PRERELEASE="${{ github.event.client_payload.is_prerelease || github.event.inputs.is_prerelease || 'auto' }}"
+          if [ "$IS_PRERELEASE" = "auto" ]; then
+            # Auto-detect from version string (alpha, beta, prerelease, pre-release, rc)
+            if echo "$VERSION" | grep -qiE '-(alpha|beta|prerelease|pre-release|rc)(\.|$)'; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          fi
+          echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "🧪 PRE-RELEASE build: ${VERSION}"
+          else
+            echo "📦 STABLE release build: ${VERSION}"
+          fi
 
       # Download all artifacts
       - name: Download x86_64 agent
@@ -267,25 +288,29 @@ jobs:
       - name: Create Docker manifest
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          IS_PRERELEASE="${{ steps.version.outputs.is_prerelease }}"
 
           echo "🐳 Creating multi-arch manifest for ${VERSION}..."
 
-          # Create versioned manifest
+          # Create versioned manifest (always)
           docker manifest create anexgohan/pankha:${VERSION} \
             anexgohan/pankha:${VERSION}-amd64 \
             anexgohan/pankha:${VERSION}-arm64
 
           docker manifest push anexgohan/pankha:${VERSION}
-
-          # Create/update latest manifest
-          docker manifest create anexgohan/pankha:latest \
-            anexgohan/pankha:${VERSION}-amd64 \
-            anexgohan/pankha:${VERSION}-arm64
-
-          docker manifest push anexgohan/pankha:latest
-
           echo "✅ Pushed: anexgohan/pankha:${VERSION}"
-          echo "✅ Pushed: anexgohan/pankha:latest"
+
+          # Update latest tag only for stable releases
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "⏭️  Skipped: anexgohan/pankha:latest (pre-release)"
+          else
+            docker manifest create anexgohan/pankha:latest \
+              anexgohan/pankha:${VERSION}-amd64 \
+              anexgohan/pankha:${VERSION}-arm64
+
+            docker manifest push anexgohan/pankha:latest
+            echo "✅ Pushed: anexgohan/pankha:latest"
+          fi
 
       # Create version tag (if not exists)
       - name: Create version tag
@@ -340,7 +365,7 @@ jobs:
             release-assets/example.env
             release-assets/checksums.txt
           body: |
-            ## Pankha Fan Control (पंखा) Release ${{ steps.version.outputs.version }}
+            ## Pankha Fan Control (पंखा) ${{ steps.version.outputs.is_prerelease == 'true' && '🧪 Pre-release' || '📦 Release' }} ${{ steps.version.outputs.version }}
 
             ### Instructions:
               1. Deploy the Pankha Server
@@ -407,20 +432,29 @@ jobs:
             - [Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)
 
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.is_prerelease == 'true' }}
 
       # Summary
       - name: Release Summary
         run: |
           VERSION="${{ steps.version.outputs.version }}"
+          IS_PRERELEASE="${{ steps.version.outputs.is_prerelease }}"
 
-          echo "## 🎉 Release ${VERSION} Complete!" >> $GITHUB_STEP_SUMMARY
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "## 🧪 Pre-release ${VERSION} Complete!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## 🎉 Release ${VERSION} Complete!" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ✅ Published Artifacts:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Docker Images (Multi-arch):**" >> $GITHUB_STEP_SUMMARY
           echo "- \`anexgohan/pankha:${VERSION}\` (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY
-          echo "- \`anexgohan/pankha:latest\` (updated)" >> $GITHUB_STEP_SUMMARY
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "- ⏭️ \`anexgohan/pankha:latest\` (skipped - pre-release)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ✅ \`anexgohan/pankha:latest\` (updated)" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Release Assets:**" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ pankha-agent-linux_x86_64" >> $GITHUB_STEP_SUMMARY
