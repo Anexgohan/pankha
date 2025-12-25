@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup>
     <AssemblyName>pankha-agent</AssemblyName>
-    <Version>0.1.8</Version>
-    <FileVersion>0.1.8</FileVersion>
-    <AssemblyVersion>0.1.8</AssemblyVersion>
-    <InformationalVersion>0.1.8</InformationalVersion>
+    <Version>0.1.8.1</Version>
+    <FileVersion>0.1.8.1</FileVersion>
+    <AssemblyVersion>0.1.8.1</AssemblyVersion>
+    <InformationalVersion>0.1.8.1</InformationalVersion>
   </PropertyGroup>
 </Project>

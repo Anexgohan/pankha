@@ -271,9 +271,10 @@ export class DeltaComputer {
 
   /**
    * Deep clone state to avoid reference issues
+   * Uses native structuredClone() for efficiency (no intermediate string serialization)
    */
   private cloneState(state: AggregatedSystemData): AggregatedSystemData {
-    return JSON.parse(JSON.stringify(state));
+    return structuredClone(state);
   }
 
   /**
