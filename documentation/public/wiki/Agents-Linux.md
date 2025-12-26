@@ -25,43 +25,40 @@ wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/downloa
 chmod +x pankha-agent
 ```
 
-### 2. Interactive Setup
+### 2. Recommended: Interactive Setup
 
-Run the setup wizard to generate your configuration file and connect to your server.
+The easiest way to get started is by running the interactive setup wizard. This "all-in-one" command handles everything from initial configuration to systemd service installation.
 
 ```bash
 ./pankha-agent --setup
 ```
 
-You will be asked for:
-1.  **Backend URL**: e.g., `ws://192.168.1.50:3000/websocket`
-2.  **Agent Name**: e.g., `media-server`
+The wizard will guide you through:
+1.  **Configuration**: Connecting to your server (e.g., `ws://192.168.1.50:3000/websocket`) and naming the agent.
+2.  **Auto-Start**: Prompting you to install the agent as a **systemd service** so it starts automatically on boot.
 
-### 3. Run as a Service (Systemd)
+---
 
-To ensure the agent runs on boot, create a systemd service file.
+### 3. Service Management (Systemd)
 
-**File**: `/etc/systemd/system/pankha-agent.service`
+If you skipped the service installation during `--setup`, or want to manage it manually, you can use these commands:
 
-```ini
-[Unit]
-Description=Pankha Fan Control Agent
-After=network.target
+**Install & Start on Boot**:
+```bash
+./pankha-agent --install-service
+```
+This automatically creates everything needed at `/etc/systemd/system/pankha-agent.service` and starts the daemon.
 
-[Service]
-ExecStart=/opt/pankha/pankha-agent --start
-WorkingDirectory=/opt/pankha
-Restart=always
-User=root
-
-[Install]
-WantedBy=multi-user.target
+**Remove Service**:
+```bash
+./pankha-agent --uninstall-service
 ```
 
-Enable and start:
+#### Manual Control
+You can always use standard systemd commands for status and logs:
 ```bash
-sudo systemctl enable pankha-agent
-sudo systemctl start pankha-agent
+systemctl status pankha-agent
+journalctl -u pankha-agent -f
 ```
 
 ## CLI Commands
