@@ -1959,8 +1959,9 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     };
 
     println!("\n╔══════════════════════════════════════╗");
-    println!("║   Pankha Rust Agent Setup Wizard   ║");
-    println!("╚══════════════════════════════════════╝\n");
+    println!("║    Pankha Rust Agent Setup Wizard    ║");
+    println!("╚══════════════════════════════════════╝");
+    println!("Build: \x1b[32mpankha-agent v{} ({})\x1b[0m\n", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
 
     // Load existing config if present
     let existing_config = if config_file.exists() {
@@ -1970,7 +1971,35 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
         let mut response = String::new();
         io::stdin().read_line(&mut response)?;
         if !response.trim().eq_ignore_ascii_case("y") {
-            println!("Setup cancelled.");
+            // User declined to overwrite config - check if autostart is needed
+            #[cfg(target_os = "linux")]
+            {
+                let needs_autostart = has_systemd() && !Path::new(SYSTEMD_SERVICE_PATH).exists();
+                if needs_autostart {
+                    println!("\nAuto-start service not installed");
+                    print!("   Install systemd service to start agent on boot? [Y/n]: ");
+                    io::stdout().flush()?;
+                    let mut autostart_input = String::new();
+                    io::stdin().read_line(&mut autostart_input)?;
+                    
+                    if !autostart_input.trim().eq_ignore_ascii_case("n") {
+                        if unsafe { libc::geteuid() } == 0 {
+                            match install_systemd_service() {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    println!("   ⚠ Could not install service: {}", e);
+                                    println!("   You can retry later with: sudo ./pankha-agent --install-service");
+                                }
+                            }
+                        } else {
+                            println!("   ⚠ Root privileges required to install service.");
+                            println!("   Run later with: sudo ./pankha-agent --install-service");
+                        }
+                    }
+                    println!();
+                }
+            }
+            println!("Config unchanged.");
             return Ok(());
         }
         // Load existing config to use as defaults
@@ -2168,7 +2197,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     // Autostart prompt (show if systemd available and service not installed)
     #[cfg(target_os = "linux")]
     if has_systemd() && !Path::new(SYSTEMD_SERVICE_PATH).exists() {
-        println!("\n🔄 Auto-start on boot");
+        println!("\nAuto-start service not installed");
         print!("   Install systemd service to start agent on boot? [Y/n]: ");
         io::stdout().flush()?;
         let mut autostart_input = String::new();
@@ -2825,6 +2854,7 @@ where
 #[command(name = "pankha-agent")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "Pankha Cross-Platform Hardware Monitoring Agent", long_about = None)]
+#[command(after_help = "")]
 #[command(disable_help_flag = false)]
 struct Args {
     // === Setup & Service ===
@@ -2892,7 +2922,9 @@ async fn main() -> Result<()> {
         Err(err) => {
             // Check if this is a help request
             if err.kind() == clap::error::ErrorKind::DisplayHelp {
+                println!();  // Blank line at top
                 print!("{}", err);
+                println!();  // Blank line at bottom
                 process::exit(0);
             }
             // Custom version output with architecture (green)
@@ -3047,8 +3079,6 @@ async fn main() -> Result<()> {
         save_pid(process::id())?;
     }
 
-    info!("Pankha Agent v{} starting ({})", env!("CARGO_PKG_VERSION"), std::env::consts::OS);
-
     // Show config if requested
     if args.config {
         let config = load_config(None).await?;
@@ -3061,6 +3091,9 @@ async fn main() -> Result<()> {
         run_setup_wizard(None).await?;
         return Ok(());
     }
+
+    // Log startup message (only for normal operation, not setup/config commands)
+    info!("Pankha Agent v{} starting ({})", env!("CARGO_PKG_VERSION"), std::env::consts::OS);
 
     // Check if config file exists (required for normal operation)
     let config_file_path = std::env::current_exe()?
