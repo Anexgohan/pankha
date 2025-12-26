@@ -4,7 +4,7 @@ The Pankha Windows Agent is a native .NET 8 application that runs as a Backgroun
 
 ## Installation
 
-1.  **Download**: Get the latest `PankhaAgentSetup.msi` from the [Releases Page](https://github.com/Anexgohan/pankha/releases).
+1.  **Download**: Get the latest `pankha-agent-windows_x64.msi` from the [Releases Page](https://github.com/Anexgohan/pankha/releases).
 2.  **Install**: Run the installer. Accept the UAC prompt to allow the service to be registered.
 3.  **Verify**:
     *   A "Fan" icon should appear in your System Tray.

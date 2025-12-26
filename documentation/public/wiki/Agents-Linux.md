@@ -15,14 +15,14 @@ Download the binary for your architecture from the [Releases Page](https://githu
 
 **x86_64 (Intel/AMD)**:
 ```bash
-wget -O pankha-agent-linux_x86_64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
-chmod +x pankha-agent-linux_x86_64
+wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+chmod +x pankha-agent
 ```
 
 **ARM64 (Raspberry Pi/SBC)**:
 ```bash
-wget -O pankha-agent-linux_arm64 https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
-chmod +x pankha-agent-linux_arm64
+wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+chmod +x pankha-agent
 ```
 
 ### 2. Interactive Setup
@@ -30,7 +30,7 @@ chmod +x pankha-agent-linux_arm64
 Run the setup wizard to generate your configuration file and connect to your server.
 
 ```bash
-./pankha-agent-linux_x86_64 --setup
+./pankha-agent --setup
 ```
 
 You will be asked for:
@@ -49,7 +49,7 @@ Description=Pankha Fan Control Agent
 After=network.target
 
 [Service]
-ExecStart=/opt/pankha/pankha-agent-linux_x86_64 --start
+ExecStart=/opt/pankha/pankha-agent --start
 WorkingDirectory=/opt/pankha
 Restart=always
 User=root
@@ -66,20 +66,22 @@ sudo systemctl start pankha-agent
 
 ## CLI Commands
 
-| Command | Short | Description |
-|---------|-------|-------------|
-| `--start` | `-s` | Start the agent daemon in background |
-| `--stop` | `-x` | Stop the agent daemon |
-| `--restart` | `-r` | Restart the agent daemon |
-| `--status` | `-i` | Show agent status and connection info |
-| `--config` | `-c` | Show current loaded configuration |
-| `--setup` | `-e` | Run interactive setup wizard |
-| `--log-show` | `-l` | View logs (live tail) |
-| `--log-show N` | `-l N` | View last N log lines |
-| `--log-level LEVEL` | | Set log level (TRACE/DEBUG/INFO/WARN/ERROR) |
-| `--test` | | Hardware discovery test |
-| `--help` | `-h` | Show help |
-| `--version` | `-V` | Show version |
+| Command                   | Short | Description                                                                 |
+| ------------------------- | ----- | --------------------------------------------------------------------------- |
+| `--start`                 | `-s`  | Start the agent daemon in background                                        |
+| `--stop`                  | `-x`  | Stop the agent daemon                                                       |
+| `--restart`               | `-r`  | Restart the agent daemon                                                    |
+| `--status`                | `-i`  | Show agent status                                                           |
+| `--config`                | `-c`  | Show current configuration                                                  |
+| `--setup`                 | `-e`  | Run interactive setup wizard                                                |
+| `--install-service`       | `-I`  | Install systemd service for auto-start on boot                              |
+| `--uninstall-service`     | `-U`  | Uninstall systemd service                                                   |
+| `--log-show [<LOG_SHOW>]` | `-l`  | Show agent logs (tail -f by default, or tail -n <lines> if provided)        |
+| `--log-level <LOG_LEVEL>` |       | Set log level (TRACE, DEBUG, INFO, WARN, ERROR). Use with --start/--restart |
+| `--check`                 |       | Run health check (verify config, service, directories)                      |
+| `--test`                  |       | Test mode (hardware discovery only)                                         |
+| `--help`                  | `-h`  | Print help                                                                  |
+| `--version`               | `-V`  | Print version                                                               |
 
 ### Quick Examples
 ```bash

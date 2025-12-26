@@ -119,14 +119,25 @@
 
 ### Linux Agent
 ```bash
-./pankha-agent -s        # Start daemon
-./pankha-agent -x        # Stop daemon
-./pankha-agent -r        # Restart daemon
-./pankha-agent -i        # Show status
-./pankha-agent -c        # Show config
-./pankha-agent -l        # View logs (live)
-./pankha-agent -l 50     # View last 50 log lines
-./pankha-agent -e        # Setup wizard
+# Setup & Service
+./pankha-agent -e                # Run interactive setup wizard
+./pankha-agent -I                # Install systemd service
+./pankha-agent -U                # Uninstall systemd service
+
+# Daemon Control
+./pankha-agent -s                # Start daemon
+./pankha-agent -x                # Stop daemon
+./pankha-agent -r                # Restart daemon
+
+# Status & Logs
+./pankha-agent -i                # Show status
+./pankha-agent -l                # View logs (live)
+./pankha-agent --log-level INFO  # Set log level
+
+# Config & Debug
+./pankha-agent -c                # Show config
+./pankha-agent --check           # Run health check
+./pankha-agent --test            # Test mode (hardware discovery)
 ```
 
 ### Windows Agent (run as Administrator)

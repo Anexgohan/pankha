@@ -153,28 +153,31 @@ That's it! The backend is now running with:
     curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
     chmod +x pankha-agent
     ```
-  ***Configure and manage the x86_64 agent using the following commands:***
+  ***Configure and manage the agent using the following commands:***
 
   1. Configure agent (Required for first time)
       ```bash
       ./pankha-agent --setup
       ```
-  2. Start agent (Make sure --setup is done first)
+  2. Manage Service (Auto-start on boot)
       ```bash
-      ./pankha-agent --start
+      ./pankha-agent --install-service
+      ./pankha-agent --uninstall-service
       ```
-  3. Check status
+  3. Check status & Health
       ```bash
       ./pankha-agent --status
+      ./pankha-agent --check
       ```
-  4. Stop agent
+  4. Start/Stop daemon
       ```bash
+      ./pankha-agent --start
       ./pankha-agent --stop
       ```
   5. Help, or list all commands and options
       ```bash
       ./pankha-agent --help
-        ```
+      ```
 
 ## ![ARM64](https://img.shields.io/badge/-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square) For ARM64 systems (Raspberry Pi 5, etc):
   - With wget
@@ -188,28 +191,12 @@ That's it! The backend is now running with:
     chmod +x pankha-agent
     ```
 
-  ***Configure and manage the arm64 agent using the following commands:***
+  ***Configure and manage the agent using the same commands as above:***
 
-  1. Configure agent (Required for first time)
-      ```bash
-      ./pankha-agent --setup
-      ```
-  2. Start agent (Make sure --setup is done first)
-      ```bash
-      ./pankha-agent --start
-      ```
-  3. Check status
-      ```bash
-      ./pankha-agent --status
-      ```
-  4. Stop agent
-      ```bash
-      ./pankha-agent --stop
-      ```
-  5. Help, or list all commands and options
-      ```bash
-      ./pankha-agent --help
-      ```
+  1. **Interactive Setup**: `./pankha-agent --setup`
+  2. **Manage Service**: `./pankha-agent --install-service`
+  3. **Check Status**: `./pankha-agent --status`
+  4. **View Logs**: `./pankha-agent --log-show`
 
 The agent will connect to the backend and start sending hardware data. You can now manage the agent from the dashboard.
 
