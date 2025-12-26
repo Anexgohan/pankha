@@ -2850,6 +2850,31 @@ where
     }
 }
 
+const HELP_TEXT: &str = "
+Pankha Cross-Platform Hardware Monitoring Agent
+Usage: pankha-agent-linux_x86_64 [OPTIONS]
+
+Options:
+  -h, --help                    Print help
+  -V, --version                 Print version
+Setup & Service:
+  -e, --setup                   Run interactive setup wizard
+  -I, --install-service         Install systemd service for auto-start on boot
+  -U, --uninstall-service       Uninstall systemd service
+Daemon Control:
+  -s, --start                   Start the agent daemon in background
+  -x, --stop                    Stop the agent daemon
+  -r, --restart                 Restart the agent daemon
+Status & Logs:
+  -i, --status                  Show agent status
+  -l, --log-show [<LOG_SHOW>]   Show agent logs (tail -f by default, or tail -n <lines> if provided)
+      --log-level <LOG_LEVEL>   Set log level (TRACE, DEBUG, INFO, WARN, ERROR). Use with --start/--restart
+Config & Debug:
+  -c, --config                  Show current configuration
+      --check                   Run health check (verify config, service, directories)
+      --test                    Test mode (hardware discovery only)
+";
+
 #[derive(Parser, Debug)]
 #[command(name = "pankha-agent")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
@@ -2922,9 +2947,7 @@ async fn main() -> Result<()> {
         Err(err) => {
             // Check if this is a help request
             if err.kind() == clap::error::ErrorKind::DisplayHelp {
-                println!();  // Blank line at top
-                print!("{}", err);
-                println!();  // Blank line at bottom
+                print!("{}", HELP_TEXT);
                 process::exit(0);
             }
             // Custom version output with architecture (green)
@@ -2938,7 +2961,7 @@ async fn main() -> Result<()> {
             eprintln!();
 
             // Then print full help for clarity
-            Args::command().print_help().unwrap();
+            print!("{}", HELP_TEXT);
             eprintln!();
             eprintln!("\nFor more information, try '--help'.");
 
