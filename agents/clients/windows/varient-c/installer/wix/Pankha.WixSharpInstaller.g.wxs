@@ -6,7 +6,7 @@
 </auto-generated>
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="4782276f-925e-49e0-b7e8-52d2caafcbac" Name="Pankha Windows Agent" Language="1033" Codepage="Windows-1252" Version="0.1.8" UpgradeCode="a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d" Manufacturer="Pankha Fan Control">
+  <Product Id="5aaa84bb-d51e-40b8-a357-db8e5f3916b7" Name="Pankha Windows Agent" Language="1033" Codepage="Windows-1252" Version="0.1.8" UpgradeCode="a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d" Manufacturer="Pankha Fan Control">
     <Package InstallerVersion="200" Compressed="yes" Platform="x64" SummaryCodepage="Windows-1252" InstallScope="perMachine" Languages="1033" />
     <Media Id="1" Cabinet="Pankha20Windows20Agent.cab" EmbedCab="yes" />
 
@@ -14,7 +14,7 @@
       <Directory Id="ProgramFiles64Folder" Name="ProgramFiles64Folder">
         <Directory Id="INSTALLDIR" Name="Pankha Fan Control">
 
-          <Component Id="Component.pankha2dagent.exe_2959411416" Guid="4782276f-925e-49e0-b7e8-52d2ebfcb2fb" Win64="yes">
+          <Component Id="Component.pankha2dagent.exe_2959411416" Guid="5aaa84bb-d51e-40b8-a357-db8e8086fd06" Win64="yes">
             <File Id="pankha2dagent.exe_2959411416" Source="..\publish\win-x64\agent\pankha-agent.exe" />
 
             <ServiceInstall Id="PankhaAgent" Name="PankhaAgent" DisplayName="Pankha Windows Agent" Description="Monitors hardware sensors and controls fan speeds for the Pankha system" Type="ownProcess" Start="auto" ErrorControl="normal" Account="LocalSystem" Interactive="no" />
@@ -24,11 +24,11 @@
             <ServiceControl Id="RemovePankhaAgent" Name="PankhaAgent" Remove="uninstall" Wait="yes" />
           </Component>
 
-          <Component Id="Component.pankha2dtray.exe_1108545044" Guid="4782276f-925e-49e0-b7e8-52d2a6f3bc7d" Win64="yes">
+          <Component Id="Component.pankha2dtray.exe_1108545044" Guid="5aaa84bb-d51e-40b8-a357-db8e3b7d0788" Win64="yes">
             <File Id="pankha2dtray.exe_1108545044" Source="..\publish\win-x64\agent\pankha-tray.exe" />
           </Component>
 
-          <Component Id="Component.Configure20Pankha20Agent" Guid="4782276f-925e-49e0-b7e8-52d20b4dbebc" Win64="yes">
+          <Component Id="Component.Configure20Pankha20Agent" Guid="5aaa84bb-d51e-40b8-a357-db8ea0d709c7" Win64="yes">
             <Shortcut Id="INSTALLDIR.Configure20Pankha20Agent" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--setup" Name="Configure Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -39,7 +39,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.View20Pankha20Agent20Logs" Guid="4782276f-925e-49e0-b7e8-52d2f48a6952" Win64="yes">
+          <Component Id="Component.View20Pankha20Agent20Logs" Guid="5aaa84bb-d51e-40b8-a357-db8e8914b45d" Win64="yes">
             <Shortcut Id="INSTALLDIR.View20Pankha20Agent20Logs" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--logs follow" Name="View Pankha Agent Logs.lnk" />
 
             <CreateFolder />
@@ -49,7 +49,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Pankha20Agent20Status" Guid="4782276f-925e-49e0-b7e8-52d23952f707" Win64="yes">
+          <Component Id="Component.Pankha20Agent20Status" Guid="5aaa84bb-d51e-40b8-a357-db8ecedc4212" Win64="yes">
             <Shortcut Id="INSTALLDIR.Pankha20Agent20Status" WorkingDirectory="INSTALLDIR" Target="[System64Folder]cmd.exe" Arguments="/K &quot;cd /d &quot;[INSTALLDIR]&quot; &amp;&amp; pankha-agent.exe --status &amp;&amp; pause&quot;" Name="Pankha Agent Status.lnk" />
 
             <CreateFolder />
@@ -59,7 +59,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Uninstall20Pankha20Agent" Guid="4782276f-925e-49e0-b7e8-52d22fb85efb" Win64="yes">
+          <Component Id="Component.Uninstall20Pankha20Agent" Guid="5aaa84bb-d51e-40b8-a357-db8ec442a906" Win64="yes">
             <Shortcut Id="INSTALLDIR.Uninstall20Pankha20Agent" WorkingDirectory="INSTALLDIR" Target="[SystemFolder]msiexec.exe" Arguments="/i [ProductCode] /l*v &quot;[CommonAppDataFolder]Pankha Fan Control\logs\uninstall_full.log&quot;" Name="Uninstall Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -71,7 +71,7 @@
 
           <Directory Id="logs" Name="logs">
 
-            <Component Id="Component.logs.EmptyDirectory" Guid="4782276f-925e-49e0-b7e8-52d2dcdea14a" KeyPath="yes" Win64="yes">
+            <Component Id="Component.logs.EmptyDirectory" Guid="5aaa84bb-d51e-40b8-a357-db8e7168ec55" KeyPath="yes" Win64="yes">
               <CreateFolder />
               <RemoveFolder Id="logs" On="uninstall" />
             </Component>
@@ -83,7 +83,7 @@
       <Directory Id="ProgramMenuFolder" Name="ProgramMenuFolder">
         <Directory Id="Pankha20Windows20Agent_" Name="Pankha Windows Agent">
 
-          <Component Id="Component.Pankha20Tray" Guid="4782276f-925e-49e0-b7e8-52d255d01524" Win64="yes">
+          <Component Id="Component.Pankha20Tray" Guid="5aaa84bb-d51e-40b8-a357-db8eea5a602f" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Pankha20Tray" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-tray.exe" Name="Pankha Tray.lnk" />
 
             <CreateFolder />
@@ -94,7 +94,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Configure20Pankha20Agent.1" Guid="4782276f-925e-49e0-b7e8-52d2dde5ad64" Win64="yes">
+          <Component Id="Component.Configure20Pankha20Agent.1" Guid="5aaa84bb-d51e-40b8-a357-db8e726ff86f" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Configure20Pankha20Agent.1" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--setup" Name="Configure Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -104,7 +104,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.View20Pankha20Agent20Logs.1" Guid="4782276f-925e-49e0-b7e8-52d2bf97cded" Win64="yes">
+          <Component Id="Component.View20Pankha20Agent20Logs.1" Guid="5aaa84bb-d51e-40b8-a357-db8e542118f8" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.View20Pankha20Agent20Logs.1" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--logs follow" Name="View Pankha Agent Logs.lnk" />
 
             <CreateFolder />
@@ -114,7 +114,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Pankha20Agent20Status.1" Guid="4782276f-925e-49e0-b7e8-52d2af33af0a" Win64="yes">
+          <Component Id="Component.Pankha20Agent20Status.1" Guid="5aaa84bb-d51e-40b8-a357-db8e44bdfa15" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Pankha20Agent20Status.1" WorkingDirectory="System64Folder" Target="[System64Folder]cmd.exe" Arguments="/K &quot;cd /d &quot;[INSTALLDIR]&quot; &amp;&amp; pankha-agent.exe --status &amp;&amp; pause&quot;" Name="Pankha Agent Status.lnk" />
 
             <CreateFolder />
@@ -124,7 +124,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Uninstall20Pankha20Agent.1" Guid="4782276f-925e-49e0-b7e8-52d286232455" Win64="yes">
+          <Component Id="Component.Uninstall20Pankha20Agent.1" Guid="5aaa84bb-d51e-40b8-a357-db8e1bad6f60" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Uninstall20Pankha20Agent.1" WorkingDirectory="SystemFolder" Target="[SystemFolder]msiexec.exe" Arguments="/i [ProductCode] /l*v &quot;[CommonAppDataFolder]Pankha Fan Control\logs\uninstall_full.log&quot;" Name="Uninstall Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -139,7 +139,7 @@
 
       <Directory Id="StartupFolder" Name="StartupFolder">
 
-        <Component Id="Component.Pankha20Tray.1" Guid="4782276f-925e-49e0-b7e8-52d2f6749ed5" Win64="yes">
+        <Component Id="Component.Pankha20Tray.1" Guid="5aaa84bb-d51e-40b8-a357-db8e8bfee9e0" Win64="yes">
           <Shortcut Id="StartupFolder.Pankha20Tray.1" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-tray.exe" Name="Pankha Tray.lnk" />
 
           <CreateFolder />
@@ -151,7 +151,7 @@
 
       </Directory>
 
-      <Component Id="TARGETDIR" Guid="4782276f-925e-49e0-b7e8-52d23d6fab1f" KeyPath="yes" Win64="yes">
+      <Component Id="TARGETDIR" Guid="5aaa84bb-d51e-40b8-a357-db8ed2f9f62a" KeyPath="yes" Win64="yes">
         <RemoveFolder Id="TARGETDIR" On="uninstall" />
       </Component>
 

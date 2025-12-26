@@ -2165,10 +2165,62 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
         }
     }
 
-    println!("\n✨ Setup complete! Run the agent with:");
-    println!("   ./pankha-agent");
-    println!("\n   Or run in background:");
-    println!("   nohup ./pankha-agent > pankha-agent.log 2>&1 &\n");
+    // Autostart prompt (show if systemd available and service not installed)
+    #[cfg(target_os = "linux")]
+    if has_systemd() && !Path::new(SYSTEMD_SERVICE_PATH).exists() {
+        println!("\n🔄 Auto-start on boot");
+        print!("   Install systemd service to start agent on boot? [Y/n]: ");
+        io::stdout().flush()?;
+        let mut autostart_input = String::new();
+        io::stdin().read_line(&mut autostart_input)?;
+        
+        if !autostart_input.trim().eq_ignore_ascii_case("n") {
+            // Check if running as root
+            if unsafe { libc::geteuid() } == 0 {
+                match install_systemd_service() {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("   ⚠ Could not install service: {}", e);
+                        println!("   You can retry later with: sudo ./pankha-agent --install-service");
+                    }
+                }
+            } else {
+                println!("   ⚠ Root privileges required to install service.");
+                println!("   Run later with: sudo ./pankha-agent --install-service");
+            }
+        }
+    }
+
+    println!("\n✨ Setup complete!");
+
+    // Ask if user wants to start the agent now
+    if !is_running() {
+        print!("\n   Start the agent now? [Y/n]: ");
+        io::stdout().flush()?;
+        let mut start_input = String::new();
+        io::stdin().read_line(&mut start_input)?;
+        
+        if !start_input.trim().eq_ignore_ascii_case("n") {
+            match start_daemon_with_log_level(None) {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("   ⚠ Could not start agent: {}", e);
+                }
+            }
+        } else {
+            #[cfg(target_os = "linux")]
+            if has_systemd() && Path::new(SYSTEMD_SERVICE_PATH).exists() {
+                println!("\n   Start later with: sudo systemctl start pankha-agent");
+            } else {
+                println!("\n   Start later with: ./pankha-agent --start");
+            }
+            
+            #[cfg(not(target_os = "linux"))]
+            println!("\n   Start later with: ./pankha-agent --start");
+        }
+    } else {
+        println!("   Agent is already running.");
+    }
 
     Ok(())
 }
@@ -2184,6 +2236,164 @@ use std::process;
 
 const PID_FILE: &str = "/run/pankha-agent/pankha-agent.pid";
 const LOG_DIR: &str = "/var/log/pankha-agent";
+const SYSTEMD_SERVICE_PATH: &str = "/etc/systemd/system/pankha-agent.service";
+
+const SYSTEMD_SERVICE_TEMPLATE: &str = r#"[Unit]
+Description=Pankha Hardware Monitoring Agent
+After=network.target
+
+[Service]
+Type=forking
+ExecStart={{EXEC_PATH}} --start
+ExecStop={{EXEC_PATH}} --stop
+ExecReload={{EXEC_PATH}} --restart
+PIDFile=/run/pankha-agent/pankha-agent.pid
+Restart=on-failure
+RestartSec=10
+User=root
+WorkingDirectory={{WORK_DIR}}
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+"#;
+
+/// Check if systemd is available on this system
+fn has_systemd() -> bool {
+    Path::new("/run/systemd/system").exists()
+}
+
+/// Install or repair systemd service for auto-start on boot (idempotent)
+fn install_systemd_service() -> Result<()> {
+    // Check if running as root (using libc for Linux)
+    #[cfg(target_os = "linux")]
+    if unsafe { libc::geteuid() } != 0 {
+        return Err(anyhow::anyhow!(
+            "Root privileges required. Run with: sudo ./pankha-agent --install-service"
+        ));
+    }
+
+    // Check if systemd is available
+    if !has_systemd() {
+        println!("❌ systemd not detected on this system.");
+        println!("   The agent can still run manually with: ./pankha-agent --start");
+        println!();
+        println!("   For auto-start, consult your init system documentation:");
+        println!("   - OpenRC: Add to /etc/init.d/");
+        println!("   - SysVinit: Add to /etc/rc.local");
+        println!("   - runit: Create service directory in /etc/sv/");
+        return Ok(());
+    }
+
+    // Get executable path and working directory
+    let exe_path = std::env::current_exe()?;
+    let work_dir = exe_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?;
+
+    // Generate service file content
+    let service_content = SYSTEMD_SERVICE_TEMPLATE
+        .replace("{{EXEC_PATH}}", exe_path.to_str().unwrap_or("/opt/pankha-agent/pankha-agent"))
+        .replace("{{WORK_DIR}}", work_dir.to_str().unwrap_or("/opt/pankha-agent"));
+
+    // Check if service file already exists and is identical
+    let service_path = Path::new(SYSTEMD_SERVICE_PATH);
+    if service_path.exists() {
+        if let Ok(existing_content) = fs::read_to_string(service_path) {
+            if existing_content == service_content {
+                println!("✓ Service is already installed and up-to-date");
+                return Ok(());
+            }
+        }
+        println!("! Existing service file found - updating...");
+    }
+
+    // Write service file
+    fs::write(service_path, &service_content)
+        .context("Failed to write service file")?;
+    println!("✓ Service file created: {}", SYSTEMD_SERVICE_PATH);
+
+    // Reload systemd daemon
+    let reload_status = process::Command::new("systemctl")
+        .args(["daemon-reload"])
+        .status();
+    match reload_status {
+        Ok(status) if status.success() => {
+            println!("✓ Systemd daemon reloaded");
+        }
+        _ => {
+            println!("⚠ Failed to reload systemd daemon (run: systemctl daemon-reload)");
+        }
+    }
+
+    // Enable the service
+    let enable_status = process::Command::new("systemctl")
+        .args(["enable", "pankha-agent.service"])
+        .status();
+    match enable_status {
+        Ok(status) if status.success() => {
+            println!("✓ Service enabled (will start on boot)");
+        }
+        _ => {
+            println!("⚠ Failed to enable service (run: systemctl enable pankha-agent.service)");
+        }
+    }
+
+    println!();
+    println!("Start now with: sudo systemctl start pankha-agent");
+    println!("Or use:         ./pankha-agent --start");
+
+    Ok(())
+}
+
+/// Uninstall systemd service
+fn uninstall_systemd_service() -> Result<()> {
+    // Check if running as root (using libc for Linux)
+    #[cfg(target_os = "linux")]
+    if unsafe { libc::geteuid() } != 0 {
+        return Err(anyhow::anyhow!(
+            "Root privileges required. Run with: sudo ./pankha-agent --uninstall-service"
+        ));
+    }
+
+    // Check if systemd is available
+    if !has_systemd() {
+        println!("❌ systemd not detected on this system.");
+        return Ok(());
+    }
+
+    let service_path = Path::new(SYSTEMD_SERVICE_PATH);
+    if !service_path.exists() {
+        println!("✓ Service is not installed");
+        return Ok(());
+    }
+
+    // Stop the service if running
+    let _ = process::Command::new("systemctl")
+        .args(["stop", "pankha-agent"])
+        .status();
+    println!("✓ Service stopped");
+
+    // Disable the service
+    let _ = process::Command::new("systemctl")
+        .args(["disable", "pankha-agent"])
+        .status();
+    println!("✓ Service disabled");
+
+    // Remove the service file
+    fs::remove_file(service_path)?;
+    println!("✓ Service file removed");
+
+    // Reload systemd daemon
+    let _ = process::Command::new("systemctl")
+        .args(["daemon-reload"])
+        .status();
+    println!("✓ Systemd daemon reloaded");
+
+    Ok(())
+}
+
 
 fn ensure_directories() -> Result<()> {
     fs::create_dir_all("/run/pankha-agent")?;
@@ -2204,7 +2414,16 @@ fn get_pid() -> Result<Option<u32>> {
 fn is_running() -> bool {
     if let Ok(Some(pid)) = get_pid() {
         // Check if process is still alive by sending signal 0
-        unsafe { libc::kill(pid as i32, 0) == 0 }
+        let alive = unsafe { libc::kill(pid as i32, 0) == 0 };
+        
+        if !alive {
+            // Process is dead but PID file exists - cleanup stale PID
+            if let Err(e) = remove_pid_file() {
+                eprintln!("Warning: Could not remove stale PID file: {}", e);
+            }
+            return false;
+        }
+        true
     } else {
         false
     }
@@ -2245,7 +2464,7 @@ fn start_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
         process::exit(1);
     }
 
-    println!("Starting Pankha Rust Agent daemon...");
+    println!("\x1b[32mStarting pankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
 
     // Prepare log file
     ensure_directories()?;
@@ -2316,7 +2535,7 @@ fn stop_daemon() -> Result<()> {
 }
 
 fn restart_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
-    println!("Restarting Pankha Rust Agent...");
+    println!("\x1b[32mRestarting pankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
 
     // Stop the agent if it's running
     if is_running() {
@@ -2404,8 +2623,8 @@ fn set_log_level_runtime(level: &str) -> Result<()> {
 }
 
 async fn show_status() -> Result<()> {
-    println!("Pankha Rust Agent v{}", env!("CARGO_PKG_VERSION"));
-    println!("========================");
+    println!("\x1b[32mpankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+    println!("================================");
 
     if is_running() {
         if let Some(pid) = get_pid()? {
@@ -2437,6 +2656,90 @@ async fn show_status() -> Result<()> {
         println!("   Error: Could not load configuration");
     }
 
+    Ok(())
+}
+
+/// Run health check to verify agent installation
+fn run_health_check() -> Result<()> {
+    println!("\x1b[32mpankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+    println!("Health Check");
+    println!("============\n");
+    
+    let mut all_ok = true;
+    
+    // Check config file
+    let exe_path = std::env::current_exe()?;
+    let config_path = exe_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+        .join("config.json");
+    
+    if config_path.exists() {
+        println!("✓ Config file: {}", config_path.display());
+    } else {
+        println!("✗ Config file: NOT FOUND");
+        println!("  Run: ./pankha-agent --setup");
+        all_ok = false;
+    }
+    
+    // Check directories
+    if Path::new("/run/pankha-agent").exists() {
+        println!("✓ Runtime dir: /run/pankha-agent");
+    } else {
+        println!("⚠ Runtime dir: Not created (will be created on start)");
+    }
+    
+    if Path::new(LOG_DIR).exists() {
+        println!("✓ Log dir: {}", LOG_DIR);
+    } else {
+        println!("⚠ Log dir: Not created (will be created on start)");
+    }
+    
+    // Check systemd service (Linux only)
+    #[cfg(target_os = "linux")]
+    {
+        if has_systemd() {
+            if Path::new(SYSTEMD_SERVICE_PATH).exists() {
+                // Check if enabled
+                let enabled = process::Command::new("systemctl")
+                    .args(["is-enabled", "pankha-agent"])
+                    .output()
+                    .map(|o| o.status.success())
+                    .unwrap_or(false);
+                
+                if enabled {
+                    println!("✓ Systemd service: Installed and enabled");
+                } else {
+                    println!("⚠ Systemd service: Installed but NOT enabled");
+                    println!("  Run: sudo systemctl enable pankha-agent");
+                }
+            } else {
+                println!("✗ Systemd service: NOT INSTALLED");
+                println!("  Run: sudo ./pankha-agent --install-service");
+                all_ok = false;
+            }
+        } else {
+            println!("- Systemd: Not available on this system");
+        }
+    }
+    
+    // Check agent status
+    if is_running() {
+        if let Ok(Some(pid)) = get_pid() {
+            println!("✓ Agent status: Running (PID: {})", pid);
+        }
+    } else {
+        println!("⚠ Agent status: Not running");
+        all_ok = false;
+    }
+    
+    println!();
+    if all_ok {
+        println!("\x1b[32m✓ All checks passed!\x1b[0m");
+    } else {
+        println!("\x1b[33m⚠ Some issues found - see above\x1b[0m");
+    }
+    
     Ok(())
 }
 
@@ -2524,43 +2827,57 @@ where
 #[command(about = "Pankha Cross-Platform Hardware Monitoring Agent", long_about = None)]
 #[command(disable_help_flag = false)]
 struct Args {
-    /// Set log level dynamically (TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL).
-    /// When used alone, changes the log level of a running agent without restart.
-    /// Can also be used with --start/--restart to set level on startup.
-    #[arg(long = "log-level")]
-    log_level: Option<String>,
-
-    /// Test mode (hardware discovery only)
-    #[arg(long)]
-    test: bool,
-
+    // === Setup & Service ===
     /// Run interactive setup wizard
-    #[arg(short = 'e', long)]
+    #[arg(short = 'e', long, help_heading = "Setup & Service")]
     setup: bool,
 
-    /// Show current configuration
-    #[arg(short = 'c', long)]
-    config: bool,
+    /// Install systemd service for auto-start on boot
+    #[arg(short = 'I', long = "install-service", help_heading = "Setup & Service")]
+    install_service: bool,
 
+    /// Uninstall systemd service
+    #[arg(short = 'U', long = "uninstall-service", help_heading = "Setup & Service")]
+    uninstall_service: bool,
+
+    // === Daemon Control ===
     /// Start the agent daemon in background
-    #[arg(short = 's', long)]
+    #[arg(short = 's', long, help_heading = "Daemon Control")]
     start: bool,
 
     /// Stop the agent daemon
-    #[arg(short = 'x', long)]
+    #[arg(short = 'x', long, help_heading = "Daemon Control")]
     stop: bool,
 
     /// Restart the agent daemon
-    #[arg(short = 'r', long)]
+    #[arg(short = 'r', long, help_heading = "Daemon Control")]
     restart: bool,
 
+    // === Status & Logs ===
     /// Show agent status
-    #[arg(short = 'i', long = "status")]
+    #[arg(short = 'i', long = "status", help_heading = "Status & Logs")]
     status: bool,
 
-    /// Show agent logs (tail -f by default, or tail -n <lines> if number provided)
-    #[arg(short = 'l', long = "log-show")]
+    /// Show agent logs (tail -f by default, or tail -n <lines> if provided)
+    #[arg(short = 'l', long = "log-show", help_heading = "Status & Logs")]
     log_show: Option<Option<usize>>,
+
+    /// Set log level (TRACE, DEBUG, INFO, WARN, ERROR). Use with --start/--restart
+    #[arg(long = "log-level", help_heading = "Status & Logs")]
+    log_level: Option<String>,
+
+    // === Config & Debug ===
+    /// Show current configuration
+    #[arg(short = 'c', long, help_heading = "Config & Debug")]
+    config: bool,
+
+    /// Run health check (verify config, service, directories)
+    #[arg(long, help_heading = "Config & Debug")]
+    check: bool,
+
+    /// Test mode (hardware discovery only)
+    #[arg(long, help_heading = "Config & Debug")]
+    test: bool,
 
     /// Internal flag for daemon child process (do not use directly)
     #[arg(long, hide = true)]
@@ -2573,11 +2890,14 @@ async fn main() -> Result<()> {
     let args = match Args::try_parse() {
         Ok(args) => args,
         Err(err) => {
-            // Check if this is a help or version request (already formatted by clap)
-            if err.kind() == clap::error::ErrorKind::DisplayHelp
-                || err.kind() == clap::error::ErrorKind::DisplayVersion {
-                // Just print the error (which contains the help/version)
+            // Check if this is a help request
+            if err.kind() == clap::error::ErrorKind::DisplayHelp {
                 print!("{}", err);
+                process::exit(0);
+            }
+            // Custom version output with architecture (green)
+            if err.kind() == clap::error::ErrorKind::DisplayVersion {
+                println!("\x1b[32mpankha-agent {} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
                 process::exit(0);
             }
 
@@ -2611,6 +2931,21 @@ async fn main() -> Result<()> {
         return show_status().await;
     }
 
+    if args.check {
+        return run_health_check();
+    }
+
+    // Systemd service management (Linux only)
+    #[cfg(target_os = "linux")]
+    if args.install_service {
+        return install_systemd_service();
+    }
+
+    #[cfg(target_os = "linux")]
+    if args.uninstall_service {
+        return uninstall_systemd_service();
+    }
+
     if let Some(lines) = args.log_show {
         // Show agent logs
         let log_path = format!("{}/agent.log", LOG_DIR);
@@ -2620,12 +2955,14 @@ async fn main() -> Result<()> {
         match lines {
             Some(n) => {
                 // Show last N lines: tail -n <lines>
-                println!("Showing last {} log entries...\n", n);
+                println!("Showing last {} log entries...", n);
+                println!("\x1b[32mpankha-agent v{} ({})\x1b[0m\n", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
                 cmd.arg("-n").arg(n.to_string());
             }
             None => {
                 // Follow logs: tail -f
-                println!("Showing live agent logs (Ctrl+C to exit)...\n");
+                println!("Showing live agent logs (Ctrl+C to exit)...");
+                println!("\x1b[32mpankha-agent v{} ({})\x1b[0m\n", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
                 cmd.arg("-f");
             }
         }
