@@ -128,11 +128,11 @@ That's it! The backend is now running with:
 
 # ![Agent](https://img.shields.io/badge/-Agent-4A90A4?logo=robot&logoColor=white&style=flat-square) Agent Installation Guide:  
 
-### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent
+### [![Windows](https://img.shields.io/badge/CPU-x64-0078D4?logo=windows&logoColor=white&style=flat-square&labelColor=333&logoSize=auto)](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi) Windows Agent
 **Requirements**: Windows 10/11, .NET 8 Runtime.
 
 1. **Download Installer**:
-   - Download `PankhaAgentSetup.msi` from [Latest Releases](https://github.com/Anexgohan/pankha/releases/latest).
+   - Download `pankha-agent-windows_x64.msi` from [Latest Releases](https://github.com/Anexgohan/pankha/releases/latest).
 2. **Install**:
    - Run the installer. It will install the Background Service and Tray Application.
 3. **Configure**:
@@ -142,7 +142,7 @@ That's it! The backend is now running with:
 ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agent (Rust)
 **Performance**: Single binary, <10MB RAM, <1% CPU. Zero dependencies.
 
-## ![Intel x86_64](https://img.shields.io/badge/-Intel%20x86__64-0071C5?logo=intel&logoColor=white&style=flat-square) ![AMD x86_64](https://img.shields.io/badge/-AMD%20x86__64-ED1C24?logo=amd&logoColor=white&style=flat-square) For x86_64 systems:
+## ![Intel x86_64](https://img.shields.io/badge/CPU-x86__64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x86_64](https://img.shields.io/badge/CPU-x86__64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x86_64 systems:
   - With wget
     ```bash
     wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
