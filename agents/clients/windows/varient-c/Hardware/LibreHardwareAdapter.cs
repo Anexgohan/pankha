@@ -804,14 +804,15 @@ public class LibreHardwareAdapter : IHardwareMonitor
         return result;
     }
 
-    private HardwareDumpItem MapToDumpItem(IHardware hardware)
+    private HardwareDumpItem MapToDumpItem(IHardware hardware, string? parentId = null)
     {
-        var item = new HardwareDumpItem
+        // Build sensor list with control info
+        var sensors = new List<HardwareDumpSensor>();
+        
+        // First pass: collect all sensors
+        foreach (var s in hardware.Sensors)
         {
-            Name = hardware.Name,
-            Identifier = hardware.Identifier.ToString(),
-            Type = hardware.HardwareType.ToString(),
-            Sensors = hardware.Sensors.Select(s => new HardwareDumpSensor
+            var dumpSensor = new HardwareDumpSensor
             {
                 Name = s.Name,
                 Identifier = s.Identifier.ToString(),
@@ -822,16 +823,96 @@ public class LibreHardwareAdapter : IHardwareMonitor
                 IsMonitored = s.SensorType == SensorType.Temperature || 
                               s.SensorType == SensorType.Fan || 
                               s.SensorType == SensorType.Control
-            }).ToList()
+            };
+            
+            // Extract control info for Fan and Control type sensors
+            if (s.SensorType == SensorType.Control || s.SensorType == SensorType.Fan)
+            {
+                dumpSensor.Control = BuildControlInfo(s, hardware);
+            }
+            
+            sensors.Add(dumpSensor);
+        }
+        
+        // Second pass: link Fan and Control sensors
+        LinkFanControlSensors(sensors);
+        
+        var item = new HardwareDumpItem
+        {
+            Name = hardware.Name,
+            Identifier = hardware.Identifier.ToString(),
+            Type = hardware.HardwareType.ToString(),
+            Parent = parentId,
+            Sensors = sensors
         };
 
         foreach (var sub in hardware.SubHardware)
         {
-            item.SubHardware.Add(MapToDumpItem(sub));
+            item.SubHardware.Add(MapToDumpItem(sub, hardware.Identifier.ToString()));
         }
 
         return item;
     }
+    
+    private ControlInfo BuildControlInfo(ISensor sensor, IHardware hardware)
+    {
+        var controlInfo = new ControlInfo
+        {
+            CurrentPercent = sensor.SensorType == SensorType.Control ? sensor.Value : null,
+            CanWrite = sensor.Control != null,
+            Range = [0, 100]
+        };
+        
+        // Detect control method based on hardware type
+        controlInfo.Method = hardware.HardwareType switch
+        {
+            HardwareType.GpuNvidia => "NvAPI",
+            HardwareType.GpuAmd => "ADL",
+            HardwareType.GpuIntel => "IntelGPU",
+            HardwareType.SuperIO => "SuperIO",
+            HardwareType.EmbeddedController => "EC",
+            _ => "Unknown"
+        };
+        
+        // NVIDIA GPUs can restore to auto (driver control)
+        // SuperIO and other fans typically cannot
+        controlInfo.CanRestoreDefault = hardware.HardwareType == HardwareType.GpuNvidia ||
+                                        hardware.HardwareType == HardwareType.GpuAmd;
+        
+        return controlInfo;
+    }
+    
+    private void LinkFanControlSensors(List<HardwareDumpSensor> sensors)
+    {
+        // Link Fan sensors to corresponding Control sensors by matching identifier patterns
+        // Pattern: /gpu-nvidia/0/fan/1 <-> /gpu-nvidia/0/control/1
+        //          /lpc/.../fan/0 <-> /lpc/.../control/0
+        
+        var fanSensors = sensors.Where(s => s.Type == "Fan" && s.Control != null).ToList();
+        var controlSensors = sensors.Where(s => s.Type == "Control" && s.Control != null).ToList();
+        
+        foreach (var fan in fanSensors)
+        {
+            // Extract base path and index: "/gpu-nvidia/0/fan/1" -> "/gpu-nvidia/0/" and "1"
+            var fanId = fan.Identifier;
+            var lastSlash = fanId.LastIndexOf('/');
+            if (lastSlash <= 0) continue;
+            
+            var fanIndex = fanId.Substring(lastSlash + 1);
+            var basePath = fanId.Substring(0, fanId.LastIndexOf("/fan/"));
+            
+            // Look for matching control: same base + "/control/" + same index
+            var matchingControl = controlSensors.FirstOrDefault(c => 
+                c.Identifier == $"{basePath}/control/{fanIndex}");
+            
+            if (matchingControl != null)
+            {
+                fan.Control!.LinkedSensorId = matchingControl.Identifier;
+                matchingControl.Control!.LinkedSensorId = fan.Identifier;
+            }
+        }
+    }
+
 
     public void Dispose()
     {

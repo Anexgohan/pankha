@@ -168,6 +168,27 @@ public class NamedPipeHost : IDisposable
                     
                     // Get Version dynamically
                     var version = Pankha.WindowsAgent.Platform.VersionHelper.GetVersion();
+                    
+                    // Get top sensors for tooltip (take first 4, sorted by temp descending)
+                    var topSensors = sensors
+                        .OrderByDescending(s => s.Temperature)
+                        .Take(4)
+                        .Select(s => new SensorReading 
+                        { 
+                            Name = s.Name?.Replace("Temperature", "").Trim() ?? "Sensor",
+                            Temperature = (float)s.Temperature 
+                        })
+                        .ToList();
+                    
+                    // Get all fans for tooltip (include all, even at 0 RPM)
+                    var topFans = fans
+                        .Take(6)
+                        .Select(f => new FanReading 
+                        { 
+                            Name = f.Name ?? "Fan",
+                            Rpm = f.Rpm 
+                        })
+                        .ToList();
 
                     response = new AgentStatus
                     {
@@ -178,7 +199,9 @@ public class NamedPipeHost : IDisposable
                         SensorsDiscovered = sensors.Count,
                         FansDiscovered = fans.Count,
                         Uptime = DateTime.UtcNow - System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime(),
-                        IsService = !Environment.UserInteractive // Approximate check
+                        IsService = !Environment.UserInteractive, // Approximate check
+                        TopSensors = topSensors,
+                        TopFans = topFans
                     };
                     break;
 

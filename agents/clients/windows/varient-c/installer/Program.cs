@@ -463,6 +463,28 @@ namespace Pankha.WixSharpInstaller
                      {
                          LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
                      }
+
+                     // Configure Service Failure Recovery (SCM)
+                     // Restart on failure: 5s → 10s → 15s, reset after 1 day
+                     try
+                     {
+                         LogToDebugFile(logBaseDir, logType, "Configuring service failure recovery...");
+                         var scProcess = Process.Start(new ProcessStartInfo
+                         {
+                             FileName = "sc.exe",
+                             // reset= 86400 (1 day in seconds)
+                             // actions= restart/5000/restart/10000/restart/15000 (ms)
+                             Arguments = "failure PankhaAgent reset= 86400 actions= restart/5000/restart/10000/restart/15000",
+                             UseShellExecute = false,
+                             CreateNoWindow = true
+                         });
+                         scProcess?.WaitForExit(5000);
+                         LogToDebugFile(logBaseDir, logType, $"Service recovery configured. Exit code: {scProcess?.ExitCode}");
+                     }
+                     catch (Exception ex)
+                     {
+                         LogToDebugFile(logBaseDir, logType, $"Failed to configure service recovery: {ex.Message}");
+                     }
                 }
 
                 // ... (Cleanup Logic: Reset Config & Uninstall) ...

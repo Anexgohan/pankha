@@ -22,6 +22,28 @@ public class AgentStatus
     public int FansDiscovered { get; set; }
     public TimeSpan Uptime { get; set; }
     public bool IsService { get; set; }
+    
+    // Sensor data for tooltip display
+    public List<SensorReading> TopSensors { get; set; } = new();
+    public List<FanReading> TopFans { get; set; } = new();
+}
+
+/// <summary>
+/// Temperature sensor reading for tooltip
+/// </summary>
+public class SensorReading
+{
+    public string Name { get; set; } = "";
+    public float Temperature { get; set; }
+}
+
+/// <summary>
+/// Fan speed reading for tooltip
+/// </summary>
+public class FanReading
+{
+    public string Name { get; set; } = "";
+    public float Rpm { get; set; }
 }
 
 public static class IpcCommands

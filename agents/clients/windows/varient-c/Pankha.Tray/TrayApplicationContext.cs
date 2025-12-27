@@ -11,7 +11,7 @@ namespace Pankha.Tray;
 /// </summary>
 public class TrayApplicationContext : ApplicationContext
 {
-    private readonly NotifyIcon _notifyIcon;
+    private readonly NativeNotifyIcon _nativeIcon;
     private readonly IpcClient _ipcClient;
     private readonly System.Windows.Forms.Timer _pollTimer;
     private readonly ContextMenuStrip _contextMenu;
@@ -19,10 +19,15 @@ public class TrayApplicationContext : ApplicationContext
     // Forms (created on demand)
     private StatusForm? _statusForm;
     private ConfigForm? _configForm;
+    private ToolTipForm? _customTooltip;
 
     // State
     private bool _isConnected = false;
+    private bool _hasPromptedToStartService = false;
     private AgentStatus? _lastStatus;
+    private Icon _connectedIcon = null!;
+    private Icon _disconnectedIcon = null!;
+    private System.Windows.Forms.Timer? _tooltipShowTimer;
 
     // Menu items that need state updates
     private ToolStripMenuItem _statusHeaderItem = null!;
@@ -30,22 +35,23 @@ public class TrayApplicationContext : ApplicationContext
     public TrayApplicationContext()
     {
         _ipcClient = new IpcClient();
+        
+        // Cache icons
+        _disconnectedIcon = GetDisconnectedIcon();
+        _connectedIcon = GetConnectedIcon();
 
         // Build context menu
         _contextMenu = BuildContextMenu();
 
-        // Create notify icon
-        _notifyIcon = new NotifyIcon
-        {
-            Icon = GetDisconnectedIcon(),
-            Text = "Pankha Agent: Initializing...",
-            ContextMenuStrip = _contextMenu,
-            Visible = true
-        };
-
-        // Wire up click events
-        _notifyIcon.MouseClick += OnNotifyIconClick;
-        _notifyIcon.DoubleClick += (s, e) => ShowConfigForm();
+        // Create native notify icon with Shell API NOTIFYICON_VERSION_4
+        _nativeIcon = new NativeNotifyIcon(_disconnectedIcon, "Pankha Agent: Initializing...");
+        
+        // Wire up events
+        _nativeIcon.LeftClick += () => { _customTooltip?.Hide(); ShowStatusForm(); };
+        _nativeIcon.DoubleClick += () => ShowConfigForm();
+        _nativeIcon.RightClick += (pos) => _contextMenu.Show(pos);
+        _nativeIcon.PopupOpen += OnTrayPopupOpen;
+        _nativeIcon.PopupClose += OnTrayPopupClose;
 
         // Start polling timer (every 2 seconds)
         _pollTimer = new System.Windows.Forms.Timer { Interval = 2000 };
@@ -131,25 +137,39 @@ public class TrayApplicationContext : ApplicationContext
                 if (!_isConnected)
                 {
                     _isConnected = true;
-                    _notifyIcon.Icon = GetConnectedIcon();
+                    _nativeIcon.UpdateIcon(_connectedIcon);
                     Log.Information("Connected to agent service");
                 }
 
-                _notifyIcon.Text = $"Pankha: Connected\nSensors: {status.SensorsDiscovered} | Fans: {status.FansDiscovered}";
+                // Clear default tooltip (we use custom ToolTipForm)
+                _nativeIcon.UpdateTooltip("");
                 _statusHeaderItem.Text = $"Pankha Agent: Connected";
+                
+                // Update custom tooltip
+                _customTooltip?.UpdateStatus(status);
             }
             else
             {
                 if (_isConnected)
                 {
                     _isConnected = false;
-                    _notifyIcon.Icon = GetDisconnectedIcon();
+                    _nativeIcon.UpdateIcon(_disconnectedIcon);
                     Log.Warning("Lost connection to agent service");
                 }
 
-                _notifyIcon.Text = "Pankha: Disconnected (Service not running?)";
+                _nativeIcon.UpdateTooltip("Pankha: Disconnected");
                 _statusHeaderItem.Text = "Pankha Agent: Disconnected";
                 _lastStatus = null;
+                
+                // Update custom tooltip
+                _customTooltip?.UpdateStatus(null);
+                
+                // Prompt to start service on first failure
+                if (!_hasPromptedToStartService)
+                {
+                    _hasPromptedToStartService = true;
+                    PromptToStartService();
+                }
             }
         }
         catch (Exception ex)
@@ -158,11 +178,49 @@ public class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private void OnNotifyIconClick(object? sender, MouseEventArgs e)
+    private void OnTrayPopupOpen()
     {
-        if (e.Button == MouseButtons.Left)
+        // Start timer for delayed tooltip show (prevents flash on quick mouse pass)
+        if (_tooltipShowTimer == null)
         {
-            ShowStatusForm();
+            _tooltipShowTimer = new System.Windows.Forms.Timer { Interval = 150 };
+            _tooltipShowTimer.Tick += OnTooltipShowTimerTick;
+        }
+        
+        // Reset and start the timer
+        _tooltipShowTimer.Stop();
+        _tooltipShowTimer.Start();
+    }
+    
+    private void OnTooltipShowTimerTick(object? sender, EventArgs e)
+    {
+        // Timer fired - show tooltip now (we're on UI thread)
+        _tooltipShowTimer?.Stop();
+        
+        if (_customTooltip == null)
+        {
+            _customTooltip = new ToolTipForm();
+        }
+        
+        _customTooltip.UpdateStatus(_lastStatus);
+        if (!_customTooltip.Visible)
+        {
+            _customTooltip.ShowAt(Cursor.Position);
+        }
+    }
+    
+    private void OnTrayPopupClose()
+    {
+        // Cancel pending tooltip show
+        _tooltipShowTimer?.Stop();
+        
+        // Check if mouse moved onto tooltip itself - if so, don't hide
+        if (_customTooltip != null && _customTooltip.Visible)
+        {
+            if (!_customTooltip.Bounds.Contains(Cursor.Position))
+            {
+                _customTooltip.Hide();
+            }
         }
     }
 
@@ -232,6 +290,33 @@ public class TrayApplicationContext : ApplicationContext
         }
     }
 
+    private void PromptToStartService()
+    {
+        // Show on UI thread
+        if (InvokeRequired())
+        {
+            System.Windows.Forms.Application.OpenForms[0]?.BeginInvoke(new Action(PromptToStartService));
+            return;
+        }
+        
+        var result = MessageBox.Show(
+            "Pankha Agent service is not running.\n\nWould you like to start it now?",
+            "Pankha Fan Control",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+            
+        if (result == DialogResult.Yes)
+        {
+            RunServiceCommand("--start");
+        }
+    }
+    
+    private bool InvokeRequired()
+    {
+        return System.Windows.Forms.Application.OpenForms.Count > 0 && 
+               System.Windows.Forms.Application.OpenForms[0]?.InvokeRequired == true;
+    }
+
     private void RunServiceCommand(string command)
     {
         try
@@ -284,7 +369,7 @@ public class TrayApplicationContext : ApplicationContext
     {
         Log.Information("Exit requested by user");
         _pollTimer.Stop();
-        _notifyIcon.Visible = false;
+        _nativeIcon.Dispose(); // Remove tray icon
         Application.Exit();
     }
 
@@ -314,10 +399,11 @@ public class TrayApplicationContext : ApplicationContext
         if (disposing)
         {
             _pollTimer?.Dispose();
-            _notifyIcon?.Dispose();
+            _nativeIcon?.Dispose();
             _statusForm?.Dispose();
             _configForm?.Dispose();
             _contextMenu?.Dispose();
+            _customTooltip?.Dispose();
         }
         base.Dispose(disposing);
     }
