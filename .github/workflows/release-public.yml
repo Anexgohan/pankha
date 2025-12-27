@@ -344,8 +344,17 @@ jobs:
 
           if ! git diff --cached --quiet; then
             git commit -m "Update agent binaries for ${{ steps.version.outputs.version }}"
-            git push origin main
-            echo "✅ Agent binaries updated in repository"
+            
+            # Retry up to 3 times in case of concurrent pushes
+            for i in 1 2 3; do
+              git pull --rebase origin main
+              if git push origin main; then
+                echo "✅ Agent binaries updated in repository"
+                break
+              fi
+              echo "⚠️ Push failed, retrying ($i/3)..."
+              sleep 2
+            done
           else
             echo "✅ Agent binaries already up to date"
           fi
