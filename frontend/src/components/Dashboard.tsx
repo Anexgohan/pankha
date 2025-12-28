@@ -5,9 +5,10 @@ import OverviewStats from './OverviewStats';
 import ThemeToggle from './ThemeToggle';
 import ControllerIntervalSelector from './ControllerIntervalSelector';
 import FanProfileManager from './FanProfileManager';
+import Settings from './Settings';
 import { useWebSocketData } from '../hooks/useWebSocketData';
 
-type TabType = 'systems' | 'profiles';
+type TabType = 'systems' | 'profiles' | 'settings';
 
 const Dashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
@@ -175,6 +176,12 @@ const Dashboard: React.FC = () => {
           >
             📊 Fan Profiles
           </button>
+          <button 
+            className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('settings')}
+          >
+            ⚙️ Settings
+          </button>
         </div>
       </nav>
 
@@ -211,6 +218,10 @@ const Dashboard: React.FC = () => {
           <div className="fan-profiles-section">
             <FanProfileManager />
           </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <Settings />
         )}
       </div>
 

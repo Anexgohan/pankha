@@ -233,3 +233,32 @@ ON CONFLICT (setting_key) DO NOTHING;
 
 -- Create index for faster setting lookups
 CREATE INDEX IF NOT EXISTS idx_backend_settings_key ON backend_settings(setting_key);
+
+-- ============================================
+-- License Management Tables
+-- ============================================
+
+-- License cache table (for offline resilience when license API is unreachable)
+CREATE TABLE IF NOT EXISTS licenses (
+  id SERIAL PRIMARY KEY,
+  license_key VARCHAR(255) UNIQUE NOT NULL,
+  tier VARCHAR(50) NOT NULL DEFAULT 'free',
+  agent_limit INTEGER NOT NULL DEFAULT 3,
+  retention_days INTEGER NOT NULL DEFAULT 1,
+  alert_limit INTEGER NOT NULL DEFAULT 2,
+  api_access VARCHAR(20) NOT NULL DEFAULT 'none',
+  expires_at TIMESTAMP,
+  validated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Current active license configuration (single row table)
+CREATE TABLE IF NOT EXISTS license_config (
+  id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  license_key VARCHAR(255),
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for license tables
+CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key);
+CREATE INDEX IF NOT EXISTS idx_licenses_tier ON licenses(tier);

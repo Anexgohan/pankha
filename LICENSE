@@ -1,16 +1,35 @@
-GNU AFFERO GENERAL PUBLIC LICENSE
-Version 3, 19 November 2007
+# Pankha License
 
-Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
-Everyone is permitted to copy and distribute verbatim copies
-of this license document, but changing it is not allowed.
+Copyright (c) 2024 Pankha Contributors
 
-Preamble
+## Dual License
 
-The GNU Affero General Public License is a free, copyleft license for
-software and other kinds of works, specifically designed to ensure
-cooperation with the community in the case of network server software.
+This project is available under **one** of the following licenses:
 
-[License continues - this is the standard AGPL-3.0 text]
+### 1. GNU Affero General Public License v3.0 (AGPL-3.0)
 
-For the complete license text, see: https://www.gnu.org/licenses/agpl-3.0.html
+For open source use. You may use, modify, and distribute this software under
+the terms of the AGPL-3.0, provided you comply with all its requirements,
+including making your modifications available under the same license.
+
+See: https://www.gnu.org/licenses/agpl-3.0.html
+
+### 2. Commercial License
+
+For commercial use without AGPL-3.0 obligations.
+Purchase a commercial license to:
+- Use Pankha without AGPL compliance requirements
+- Remove source code disclosure obligations
+- Remove "Powered by Pankha" branding
+
+See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) for details.
+Purchase at: https://pankha.dev/pricing
+
+---
+
+## Contributor License Agreement
+
+By contributing to this project, you agree that your contributions may be
+licensed under both the AGPL-3.0 and commercial licenses, granting the
+project maintainers the right to include your contributions in commercially
+licensed versions.

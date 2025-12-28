@@ -17,6 +17,7 @@ import systemsRouter from './routes/systems';
 import discoveryRouter from './routes/discovery';
 import fanProfilesRouter from './routes/fanProfiles';
 import fanConfigurationsRouter from './routes/fanConfigurations';
+import { licenseRouter, licenseManager } from './license';
 import { log } from './utils/logger';
 
 const app = express();
@@ -52,6 +53,9 @@ async function initializeServices() {
 
     // Load existing agents from database
     await agentManager.loadAgentsFromDatabase();
+
+    // Initialize license manager
+    await licenseManager.initialize();
 
     // Initialize WebSocket server (agents will connect TO us)
     webSocketHub.initialize(parseInt(WS_PORT.toString()));
@@ -124,6 +128,7 @@ app.use('/api/systems', systemsRouter);
 app.use('/api/discovery', discoveryRouter);
 app.use('/api/fan-profiles', fanProfilesRouter);
 app.use('/api/fan-configurations', fanConfigurationsRouter);
+app.use('/api/license', licenseRouter);
 
 // System overview endpoint
 app.get('/api/overview', (req, res) => {

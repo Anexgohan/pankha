@@ -166,4 +166,15 @@ export const getFanAssignments = async (systemId: number) => {
   return response.data.data; // Extract the data array from the response
 };
 
+// License Management
+export const getLicense = async () => {
+  const response = await api.get('/api/license');
+  return response.data;
+};
+
+export const setLicense = async (licenseKey: string) => {
+  const response = await api.post('/api/license', { licenseKey });
+  return response.data;
+};
+
 export default api;
