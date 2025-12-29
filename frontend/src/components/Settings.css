@@ -1,61 +1,64 @@
-/* Settings Page Styles */
+/* Settings Page - Minimal overrides, reuses app design system */
 
+/* Settings uses the same layout as dashboard */
 .settings-container {
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
+  padding: var(--spacing-xl);
+  width: 100%;
 }
 
+/* Reuse nav-tabs style from dashboard for internal tabs */
 .settings-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--border-color, #333);
-  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: var(--spacing-xl);
 }
 
 .settings-tab {
-  padding: 10px 20px;
+  background: transparent;
   border: none;
-  background: var(--card-bg, #1a1a2e);
-  color: var(--text-secondary, #888);
-  border-radius: 8px 8px 0 0;
+  padding: var(--spacing-lg) var(--spacing-2xl);
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s ease;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
 }
 
 .settings-tab:hover {
-  background: var(--card-bg-hover, #252540);
-  color: var(--text-primary, #fff);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .settings-tab.active {
-  background: var(--accent-color, #4f6d7a);
-  color: #fff;
+  color: var(--color-info);
+  border-bottom-color: var(--color-info);
+  background: var(--bg-hover);
 }
 
+/* Content area reuses system-card style */
 .settings-content {
-  background: var(--card-bg, #1a1a2e);
-  border-radius: 12px;
-  padding: 24px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: var(--spacing-xl);
 }
 
 .settings-section h2 {
-  margin: 0 0 20px 0;
-  color: var(--text-primary, #fff);
-  font-size: 1.5rem;
+  margin: 0 0 var(--spacing-lg) 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
 }
 
 .settings-section h3 {
-  margin: 24px 0 12px 0;
-  color: var(--text-primary, #fff);
-  font-size: 1.1rem;
+  margin: var(--spacing-xl) 0 var(--spacing-md) 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
 }
 
 .settings-info {
-  color: var(--text-secondary, #888);
-  margin-bottom: 16px;
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
 }
 
 .settings-list {
@@ -65,121 +68,133 @@
 }
 
 .settings-list li {
-  padding: 8px 0;
-  color: var(--text-secondary, #888);
+  padding: var(--spacing-sm) 0;
+  color: var(--text-secondary);
 }
 
-/* License Info */
+/* License section - reuses stat-card and profile-card patterns */
 .license-info {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  background: var(--card-bg-alt, #0d0d1a);
-  border-radius: 8px;
-  margin-bottom: 24px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
 }
 
 .tier-badge {
   display: inline-block;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-weight: bold;
-  font-size: 1.2rem;
-  text-align: center;
-  width: fit-content;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
 }
 
 .tier-badge.tier-free {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background: var(--color-info);
+  color: white;
 }
 
 .tier-badge.tier-pro {
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
-  color: #fff;
+  background: var(--color-success);
+  color: white;
 }
 
 .tier-badge.tier-enterprise {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  color: #fff;
+  background: var(--color-warning);
+  color: black;
 }
 
-.tier-badge.tier-unlimited {
-  background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
-  color: #000;
-}
-
+/* Reuses overview-stats grid pattern */
 .license-limits {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-  gap: 16px;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
 }
 
+/* Reuses stat-card pattern */
 .limit-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 12px;
-  background: var(--card-bg, #1a1a2e);
-  border-radius: 8px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  text-align: center;
+  border-left: 3px solid var(--color-info);
+}
+
+/* Remaining time urgency colors */
+.limit-item.remaining-caution {
+  border-left-color: var(--color-warning);
+}
+
+.limit-item.remaining-caution .limit-value {
+  color: var(--color-warning);
+}
+
+.limit-item.remaining-critical {
+  border-left-color: var(--color-error);
+}
+
+.limit-item.remaining-critical .limit-value {
+  color: var(--color-error);
 }
 
 .limit-label {
-  color: var(--text-secondary, #888);
-  font-size: 12px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
   text-transform: uppercase;
+  display: block;
+  margin-bottom: var(--spacing-xs);
 }
 
 .limit-value {
-  color: var(--text-primary, #fff);
-  font-size: 1.5rem;
-  font-weight: bold;
+  color: var(--text-primary);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
 }
 
-/* License Form */
+/* License form - reuses form patterns */
 .license-form {
-  margin-top: 24px;
+  margin-top: var(--spacing-xl);
 }
 
 .license-input-group {
   display: flex;
-  gap: 12px;
+  gap: var(--spacing-md);
 }
 
 .license-input {
   flex: 1;
-  padding: 12px 16px;
-  border: 1px solid var(--border-color, #333);
-  border-radius: 8px;
-  background: var(--input-bg, #0d0d1a);
-  color: var(--text-primary, #fff);
-  font-size: 14px;
+  padding: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
   font-family: monospace;
 }
 
 .license-input::placeholder {
-  color: var(--text-muted, #555);
+  color: var(--text-tertiary);
 }
 
 .license-input:focus {
   outline: none;
-  border-color: var(--accent-color, #4f6d7a);
+  border-color: var(--color-info);
 }
 
+/* Reuses control-button pattern */
 .license-submit {
-  padding: 12px 24px;
-  background: var(--accent-color, #4f6d7a);
-  color: #fff;
+  background-color: var(--color-info);
+  color: white;
   border: none;
-  border-radius: 8px;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
-  font-weight: bold;
-  transition: background 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .license-submit:hover:not(:disabled) {
-  background: var(--accent-hover, #5a7f8c);
+  background-color: var(--color-info-hover);
 }
 
 .license-submit:disabled {
@@ -188,72 +203,271 @@
 }
 
 .license-status {
-  margin-top: 12px;
-  padding: 12px;
-  border-radius: 8px;
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
 }
 
 .license-status.success {
-  background: rgba(56, 239, 125, 0.1);
-  color: #38ef7d;
+  background: rgba(76, 175, 80, 0.15);
+  color: var(--color-success);
+  border-left: 3px solid var(--color-success);
 }
 
 .license-status.error {
-  background: rgba(245, 87, 108, 0.1);
-  color: #f5576c;
+  background: rgba(244, 67, 54, 0.15);
+  color: var(--color-error);
+  border-left: 3px solid var(--color-error);
 }
 
-/* Upgrade Link */
+/* Upgrade link - reuses button patterns */
 .license-upgrade {
-  margin-top: 24px;
+  margin-top: var(--spacing-xl);
   text-align: center;
 }
 
 .upgrade-link {
   display: inline-block;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
+  background-color: var(--color-info);
+  color: white;
   text-decoration: none;
-  border-radius: 8px;
-  font-weight: bold;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  transition: background-color 0.2s ease, transform 0.2s ease;
 }
 
 .upgrade-link:hover {
+  background-color: var(--color-info-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
-/* About Section */
+/* About section */
 .about-info {
-  margin-bottom: 24px;
+  margin-bottom: var(--spacing-xl);
 }
 
 .about-info p {
-  margin: 8px 0;
-  color: var(--text-secondary, #888);
+  margin: var(--spacing-sm) 0;
+  color: var(--text-secondary);
 }
 
 .about-info strong {
-  color: var(--text-primary, #fff);
+  color: var(--text-primary);
 }
 
+/* About links - reuses card list pattern */
 .about-links {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--spacing-sm);
 }
 
 .about-links a {
-  padding: 12px 16px;
-  background: var(--card-bg-alt, #0d0d1a);
-  color: var(--text-primary, #fff);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
   text-decoration: none;
-  border-radius: 8px;
-  transition: background 0.2s ease;
+  border-radius: var(--radius-md);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+  border-left: 3px solid transparent;
 }
 
 .about-links a:hover {
-  background: var(--card-bg-hover, #252540);
+  background: var(--bg-hover);
+  border-left-color: var(--color-info);
+}
+
+/* Pricing Section */
+.pricing-section {
+  margin-top: var(--spacing-xl);
+}
+
+.pricing-section h3 {
+  margin-bottom: var(--spacing-lg);
+  color: var(--text-primary);
+}
+
+.pricing-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.pricing-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pricing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-info);
+}
+
+.pricing-card.featured {
+  /* Use subtle background instead of border for "Popular" highlight */
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(76, 175, 80, 0.05) 100%);
+  position: relative;
+}
+
+.pricing-card.featured::before {
+  content: 'Popular';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-success);
+  color: white;
+  padding: 2px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+}
+
+.pricing-card.current {
+  border-color: var(--color-info);
+}
+
+.pricing-header {
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pricing-header h4 {
+  margin: 0 0 var(--spacing-sm) 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.pricing-price {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.pricing-period {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--spacing-lg) 0;
+  flex: 1;
+}
+
+.pricing-features li {
+  padding: var(--spacing-xs) 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  position: relative;
+  padding-left: var(--spacing-lg);
+}
+
+.pricing-features li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--color-success);
+}
+
+.pricing-options {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  justify-content: center;
+}
+
+.pricing-option {
+  background: var(--bg-tertiary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.pricing-buy-btn {
+  display: block;
+  text-align: center;
+  background: var(--color-info);
+  color: white;
+  text-decoration: none;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+  transition: background-color 0.2s ease;
+}
+
+.pricing-buy-btn:hover {
+  background: var(--color-info-hover);
+}
+
+.current-plan-badge {
+  text-align: center;
+  background: var(--color-info);
+  color: white;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Current tier button - clickable but visually indicates current */
+.pricing-buy-btn.current-tier-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.pricing-buy-btn.current-tier-btn:hover {
+  background: var(--color-info);
+  color: white;
+  border-color: var(--color-info);
+}
+
+/* Billing Period Toggle */
+.pricing-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: 2px;
+  margin-bottom: var(--spacing-md);
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+.toggle-btn.active {
+  background: var(--color-info);
+  color: white;
+}
+
+/* Savings Badge */
+.savings {
+  color: var(--color-success);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
 }

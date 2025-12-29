@@ -3,11 +3,13 @@
  * 
  * Endpoints for license management:
  * - GET /api/license - Get current license info
+ * - GET /api/license/pricing - Get all tier pricing info
  * - POST /api/license - Set/update license key
  */
 
 import { Router, Request, Response } from 'express';
 import { licenseManager } from './LicenseManager';
+import { TIERS } from './tiers';
 
 const router = Router();
 
@@ -22,6 +24,52 @@ router.get('/', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[License API] Error getting license info:', error);
     res.status(500).json({ error: 'Failed to get license info' });
+  }
+});
+
+/**
+ * GET /api/license/pricing
+ * Get all tier pricing and feature info
+ */
+router.get('/pricing', async (req: Request, res: Response) => {
+  try {
+    // Transform TIERS for frontend consumption
+    const pricing = {
+      free: {
+        name: TIERS.free.name,
+        agents: TIERS.free.agentLimit,
+        retentionDays: TIERS.free.retentionDays,
+        alerts: TIERS.free.alertLimit,
+        alertChannels: TIERS.free.alertChannels,
+        apiAccess: TIERS.free.apiAccess,
+        showBranding: TIERS.free.showBranding,
+        pricing: TIERS.free.pricing,
+      },
+      pro: {
+        name: TIERS.pro.name,
+        agents: TIERS.pro.agentLimit,
+        retentionDays: TIERS.pro.retentionDays,
+        alerts: TIERS.pro.alertLimit === Infinity ? -1 : TIERS.pro.alertLimit,
+        alertChannels: TIERS.pro.alertChannels,
+        apiAccess: TIERS.pro.apiAccess,
+        showBranding: TIERS.pro.showBranding,
+        pricing: TIERS.pro.pricing,
+      },
+      enterprise: {
+        name: TIERS.enterprise.name,
+        agents: TIERS.enterprise.agentLimit === Infinity ? -1 : TIERS.enterprise.agentLimit,
+        retentionDays: TIERS.enterprise.retentionDays,
+        alerts: TIERS.enterprise.alertLimit === Infinity ? -1 : TIERS.enterprise.alertLimit,
+        alertChannels: TIERS.enterprise.alertChannels,
+        apiAccess: TIERS.enterprise.apiAccess,
+        showBranding: TIERS.enterprise.showBranding,
+        pricing: TIERS.enterprise.pricing,
+      },
+    };
+    res.json(pricing);
+  } catch (error) {
+    console.error('[License API] Error getting pricing:', error);
+    res.status(500).json({ error: 'Failed to get pricing info' });
   }
 });
 

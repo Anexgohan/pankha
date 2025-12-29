@@ -7,12 +7,16 @@ import { getLicense } from '../services/api';
 
 export interface LicenseInfo {
   tier: string;
+  billing: string | null;
+  customerName: string | null;
   agentLimit: number;
   retentionDays: number;
   alertLimit: number;
   alertChannels: string[];
   apiAccess: string;
   showBranding: boolean;
+  expiresAt: string | null;
+  activatedAt: string | null;
 }
 
 interface LicenseContextType {
@@ -45,12 +49,16 @@ export const LicenseProvider: React.FC<LicenseProviderProps> = ({ children }) =>
       // Set default free tier on error
       setLicense({
         tier: 'Free',
+        billing: null,
+        customerName: null,
         agentLimit: 3,
-        retentionDays: 1,
+        retentionDays: 7,
         alertLimit: 2,
-        alertChannels: ['dashboard'],
+        alertChannels: ['dashboard', 'email'],
         apiAccess: 'none',
         showBranding: true,
+        expiresAt: null,
+        activatedAt: null,
       });
     } finally {
       setIsLoading(false);

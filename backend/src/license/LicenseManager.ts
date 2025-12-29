@@ -16,6 +16,10 @@ export class LicenseManager {
   private validator: LicenseValidator;
   private cachedTier: TierConfig;
   private cacheExpiry: Date;
+  private licenseExpiresAt: Date | null = null;  // License expiration date
+  private licenseActivatedAt: Date | null = null;  // When license was issued
+  private licenseBilling: 'monthly' | 'yearly' | 'lifetime' | null = null;
+  private customerName: string | null = null;
   private readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
   constructor() {
@@ -154,22 +158,30 @@ export class LicenseManager {
    */
   async getLicenseInfo(): Promise<{
     tier: string;
+    billing: string | null;
+    customerName: string | null;
     agentLimit: number;
     retentionDays: number;
     alertLimit: number;
     alertChannels: string[];
     apiAccess: string;
     showBranding: boolean;
+    expiresAt: string | null;
+    activatedAt: string | null;
   }> {
     const tier = await this.getCurrentTier();
     return {
       tier: tier.name,
+      billing: this.licenseBilling,
+      customerName: this.customerName,
       agentLimit: tier.agentLimit === Infinity ? -1 : tier.agentLimit,
       retentionDays: tier.retentionDays,
       alertLimit: tier.alertLimit === Infinity ? -1 : tier.alertLimit,
       alertChannels: tier.alertChannels,
       apiAccess: tier.apiAccess,
       showBranding: tier.showBranding,
+      expiresAt: this.licenseExpiresAt ? this.licenseExpiresAt.toISOString() : null,
+      activatedAt: this.licenseActivatedAt ? this.licenseActivatedAt.toISOString() : null,
     };
   }
 
@@ -194,6 +206,10 @@ export class LicenseManager {
     const tier = result.valid ? result.tier : 'free';
     this.cachedTier = getTier(tier);
     this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION_MS);
+    this.licenseExpiresAt = result.expiresAt;  // Store license expiry date
+    this.licenseActivatedAt = result.activatedAt;  // Store license issued date
+    this.licenseBilling = result.billing || null;  // Store billing period
+    this.customerName = result.customerName || null;  // Store customer name
 
     // Persist to database for offline resilience
     try {

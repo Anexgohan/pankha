@@ -177,4 +177,9 @@ export const setLicense = async (licenseKey: string) => {
   return response.data;
 };
 
+export const getPricing = async () => {
+  const response = await api.get('/api/license/pricing');
+  return response.data;
+};
+
 export default api;

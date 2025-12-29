@@ -241,7 +241,7 @@ CREATE INDEX IF NOT EXISTS idx_backend_settings_key ON backend_settings(setting_
 -- License cache table (for offline resilience when license API is unreachable)
 CREATE TABLE IF NOT EXISTS licenses (
   id SERIAL PRIMARY KEY,
-  license_key VARCHAR(255) UNIQUE NOT NULL,
+  license_key TEXT UNIQUE NOT NULL,  -- JWT token can be 500+ chars
   tier VARCHAR(50) NOT NULL DEFAULT 'free',
   agent_limit INTEGER NOT NULL DEFAULT 3,
   retention_days INTEGER NOT NULL DEFAULT 1,
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS licenses (
 -- Current active license configuration (single row table)
 CREATE TABLE IF NOT EXISTS license_config (
   id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
-  license_key VARCHAR(255),
+  license_key TEXT,  -- JWT token can be 500+ chars
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

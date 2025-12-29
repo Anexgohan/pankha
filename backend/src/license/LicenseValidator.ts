@@ -5,7 +5,7 @@
  * The public key is embedded here - only Pankha can create valid tokens.
  * 
  * How it works:
- * 1. User purchases license from pankha.dev (via Dodo Payments)
+ * 1. User purchases license from pankha.dev (via e.g. Dodo Payments)
  * 2. User receives a signed JWT license token
  * 3. User enters the token in Settings → Subscription
  * 4. This validator verifies the signature using the embedded public key
@@ -20,36 +20,50 @@ import * as crypto from 'crypto';
 export interface ValidationResult {
   valid: boolean;
   tier: string;
+  billing?: 'monthly' | 'yearly' | 'lifetime';
+  licenseId?: string;
   expiresAt: Date | null;
+  activatedAt: Date | null;  // When license was issued
+  customerName?: string;
+  customerEmail?: string;
   error?: string;
 }
 
 interface LicensePayload {
+  // V2 token fields
+  v?: number;      // Token version
+  lid?: string;    // License ID
+  billing?: 'monthly' | 'yearly' | 'lifetime';
+  name?: string;   // Customer name
+  oid?: string;    // Order ID
+  
+  // Core fields (both v1 and v2)
   tier: 'pro' | 'enterprise';
   email: string;
-  exp: number;  // Unix timestamp (seconds)
-  iat: number;  // Issued at (seconds)
-  sub: string;  // Subject (license ID)
+  exp: number;     // Unix timestamp (seconds)
+  iat: number;     // Issued at (seconds)
+  sub?: string;    // Subject (v1 license ID)
 }
 
 /**
  * Public key for verifying license tokens (RS256/RSA)
  * 
- * TODO: Replace this with your actual public key
- * Generate keypair: openssl genrsa -out private.pem 2048
- * Extract public: openssl rsa -in private.pem -pubout -out public.pem
+ * Generated with: openssl genrsa -out private.pem 2048
+ * Extracted with: openssl rsa -in private.pem -pubout -out public.pem
  * 
- * The PRIVATE key stays on your license server (pankha.dev/api/license/generate)
- * The PUBLIC key is embedded here for verification
+ * The PRIVATE key stays on pankha.dev license server.
+ * This PUBLIC key is embedded here for signature verification.
+ * 
+ * Keys location: custom-files/.secrets/keys/license-validator/
  */
 const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA0000000000000000000
-0000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000000000000000000000
-000000000000000000000000000000000000PLACEHOLDER0000000000000000
-AQAB
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu7hErRKFEt2saGxHhZ3b
+TE+Mwgw+AMIpLBzJBL8raOQbdSP5f1HYtLaOwBfhkbsd+bb4m95+S6vZE+ht8RBr
+Y7N3IV7CMj6/pBHuI3acktSlekAH2KSoQfX/JdDrwAp78U2U6EoT0YhbtR+SeOm0
+Y7LjFS8kyO4sTRIxcaG4XUtFsM06vgrVrOd9nbYEPoYMUsCpotYiGA2pUdfHFZ9x
+W39ZQ/tyu43/+W1NjwDqMKlrFj2gBByfoAbavxUNRfvnJEwtXZmFxI+iqTJ3ATvc
+hQP6rIoOpUQfffNyC6ZPj9PD7rqhlTb/PzJALCXOdWkkr6mXkNovuQufjU84Ulxf
+WQIDAQAB
 -----END PUBLIC KEY-----`;
 
 // ================================================================
@@ -129,6 +143,7 @@ export class LicenseValidator {
           valid: false,
           tier: 'free',
           expiresAt: null,
+          activatedAt: null,
           error: 'License system not configured. Contact support@pankha.dev',
         };
       }
@@ -140,6 +155,7 @@ export class LicenseValidator {
           valid: false,
           tier: 'free',
           expiresAt: null,
+          activatedAt: null,
           error: 'Invalid license format',
         };
       }
@@ -165,6 +181,7 @@ export class LicenseValidator {
           valid: false,
           tier: 'free',
           expiresAt: null,
+          activatedAt: null,
           error: 'Invalid license signature',
         };
       }
@@ -173,24 +190,48 @@ export class LicenseValidator {
       const payloadJson = Buffer.from(this.base64UrlDecode(payloadB64), 'base64').toString('utf8');
       const payload: LicensePayload = JSON.parse(payloadJson);
 
-      // Check expiration
+      // Check expiration (exp=0 means lifetime, never expires)
       const now = Math.floor(Date.now() / 1000);
-      if (payload.exp && payload.exp < now) {
+      const isLifetime = payload.exp === 0;
+      
+      if (!isLifetime && payload.exp && payload.exp < now) {
         return {
           valid: false,
           tier: 'free',
           expiresAt: new Date(payload.exp * 1000),
+          activatedAt: payload.iat ? new Date(payload.iat * 1000) : null,
           error: 'License expired',
         };
       }
 
+      // Determine billing period (for v1 tokens, derive from expiration)
+      let billing = payload.billing;
+      if (!billing) {
+        // V1 token - derive billing from expiration
+        if (isLifetime) {
+          billing = 'lifetime';
+        } else {
+          // Rough check: if expiration is ~1 year away, it's yearly
+          const daysRemaining = (payload.exp - now) / (24 * 60 * 60);
+          billing = daysRemaining > 180 ? 'yearly' : 'monthly';
+        }
+      }
+
       // Valid license!
-      console.log(`[LicenseValidator] License valid: ${payload.tier} tier, expires ${new Date(payload.exp * 1000).toISOString()}`);
+      const expiresAt = isLifetime ? null : (payload.exp ? new Date(payload.exp * 1000) : null);
+      const licenseId = payload.lid || payload.sub;
+      
+      console.log(`[LicenseValidator] License valid: ${payload.tier} tier (${billing}), expires ${isLifetime ? 'LIFETIME' : expiresAt?.toISOString()}`);
       
       return {
         valid: true,
         tier: payload.tier,
-        expiresAt: payload.exp ? new Date(payload.exp * 1000) : null,
+        billing,
+        licenseId,
+        expiresAt,
+        activatedAt: payload.iat ? new Date(payload.iat * 1000) : null,
+        customerName: payload.name,
+        customerEmail: payload.email,
       };
     } catch (error) {
       console.error('[LicenseValidator] Validation error:', error);
@@ -198,6 +239,7 @@ export class LicenseValidator {
         valid: false,
         tier: 'free',
         expiresAt: null,
+        activatedAt: null,
         error: 'License validation failed',
       };
     }
