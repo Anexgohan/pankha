@@ -182,4 +182,9 @@ export const getPricing = async () => {
   return response.data;
 };
 
+export const deleteLicense = async () => {
+  const response = await api.delete('/api/license');
+  return response.data;
+};
+
 export default api;

@@ -119,12 +119,20 @@ router.post('/', async (req: Request, res: Response) => {
  */
 router.delete('/', async (req: Request, res: Response) => {
   try {
-    // TODO: Implement license removal
-    res.json({
-      success: true,
-      tier: 'free',
-      message: 'License removed, reverted to free tier',
-    });
+    const result = await licenseManager.removeLicense();
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        tier: 'free',
+        message: 'License removed, reverted to free tier',
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: result.error || 'Failed to remove license',
+      });
+    }
   } catch (error) {
     console.error('[License API] Error removing license:', error);
     res.status(500).json({ 

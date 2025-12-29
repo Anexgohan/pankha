@@ -85,6 +85,30 @@ export class LicenseManager {
   }
 
   /**
+   * Remove license key and revert to free tier
+   */
+  async removeLicense(): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Delete from database
+      await this.getPool().query('DELETE FROM license_config WHERE id = 1');
+
+      // Reset to free tier
+      this.cachedTier = TIERS.free;
+      this.licenseActivatedAt = null;
+      this.licenseExpiresAt = null;
+      this.licenseBilling = null;
+      this.customerName = null;
+      this.cacheExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      console.log('[LicenseManager] License removed, reverted to free tier');
+      return { success: true };
+    } catch (error) {
+      console.error('[LicenseManager] Failed to remove license:', error);
+      return { success: false, error: 'Failed to remove license' };
+    }
+  }
+
+  /**
    * Get current tier configuration (from cache or re-validate)
    */
   async getCurrentTier(): Promise<TierConfig> {

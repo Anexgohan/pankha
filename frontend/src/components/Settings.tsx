@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLicense } from '../license';
-import { setLicense, getPricing } from '../services/api';
+import { setLicense, getPricing, deleteLicense } from '../services/api';
 import './Settings.css';
 
 type SettingsTab = 'general' | 'license' | 'about';
@@ -70,6 +70,23 @@ const Settings: React.FC = () => {
       }
     } catch (error) {
       setLicenseStatus({ success: false, message: 'Failed to validate license' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveLicense = async () => {
+    if (!confirm('Are you sure you want to remove your license? You will revert to the Free tier.')) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await deleteLicense();
+      await refreshLicense();
+      setLicenseStatus({ success: true, message: 'License removed. Reverted to Free tier.' });
+    } catch (error) {
+      setLicenseStatus({ success: false, message: 'Failed to remove license' });
     } finally {
       setIsSubmitting(false);
     }
@@ -190,7 +207,7 @@ const Settings: React.FC = () => {
                     </div>
 
                     {/* Pro Plan */}
-                    <div className={`pricing-card featured ${license.tier === 'Pro' ? 'current' : ''}`}>
+                    <div className="pricing-card featured">
                       <div className="pricing-header">
                         <h4>Pro</h4>
                         <div className="pricing-toggle">
@@ -252,7 +269,7 @@ const Settings: React.FC = () => {
                     </div>
 
                     {/* Enterprise Plan */}
-                    <div className={`pricing-card ${license.tier === 'Enterprise' ? 'current' : ''}`}>
+                    <div className="pricing-card">
                       <div className="pricing-header">
                         <h4>Enterprise</h4>
                         <div className="pricing-toggle">
@@ -287,9 +304,6 @@ const Settings: React.FC = () => {
                         <li>Full API Access</li>
                         <li>No Branding</li>
                       </ul>
-                      <div className="pricing-options">
-                        <div className="pricing-option">${pricing?.enterprise.pricing.lifetime || 499} lifetime</div>
-                      </div>
                       {license.tier === 'Enterprise' && license.billing === enterpriseBilling ? (
                         <div className="current-plan-badge">Current Plan</div>
                       ) : license.tier === 'Enterprise' ? (
@@ -322,8 +336,15 @@ const Settings: React.FC = () => {
                 {/* Current Subscription - Second */}
                 <h3>Your Subscription</h3>
                 <div className="license-info">
-                  <div className={`tier-badge tier-${license.tier.toLowerCase()}`}>
-                    {license.tier}
+                  <div className="tier-badges">
+                    <div className={`tier-badge tier-${license.tier.toLowerCase()}`}>
+                      {license.tier}
+                    </div>
+                    {license.billing && (
+                      <div className="billing-badge">
+                        {license.billing.charAt(0).toUpperCase() + license.billing.slice(1)}
+                      </div>
+                    )}
                   </div>
                   <div className="license-limits">
                     <div className="limit-item">
@@ -384,6 +405,16 @@ const Settings: React.FC = () => {
                     >
                       {isSubmitting ? 'Validating...' : 'Activate'}
                     </button>
+                    {license.tier !== 'Free' && (
+                      <button 
+                        type="button"
+                        className="remove-license-btn"
+                        onClick={handleRemoveLicense}
+                        disabled={isSubmitting}
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
                   {licenseStatus && (
                     <p className={`license-status ${licenseStatus.success ? 'success' : 'error'}`}>

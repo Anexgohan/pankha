@@ -103,6 +103,21 @@
   color: black;
 }
 
+.tier-badges {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.billing-badge {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-weight: var(--font-weight-bold);
+  background: var(--color-info);
+  color: white;
+  font-size: var(--font-size-lg);
+}
+
 /* Reuses overview-stats grid pattern */
 .license-limits {
   display: grid;
@@ -149,6 +164,31 @@
   color: var(--text-primary);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
+}
+
+/* Remove license button */
+.remove-license-btn {
+  padding: var(--spacing-md) var(--spacing-xl);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.remove-license-btn:hover {
+  background: var(--color-error);
+  color: white;
+  border-color: var(--color-error);
+}
+
+.remove-license-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* License form - reuses form patterns */
@@ -356,7 +396,7 @@
 
 .pricing-period {
   color: var(--text-secondary);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
 }
 
 .pricing-features {
@@ -405,33 +445,33 @@
   padding: var(--spacing-md);
   border-radius: var(--radius-md);
   font-weight: var(--font-weight-medium);
-  transition: background-color 0.2s ease;
+  transition: filter 0.2s ease;
 }
 
 .pricing-buy-btn:hover {
-  background: var(--color-info-hover);
+  filter: brightness(1.1);
+  color: white;
 }
 
 .current-plan-badge {
   text-align: center;
-  background: var(--color-info);
-  color: white;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   padding: var(--spacing-md);
   border-radius: var(--radius-md);
   font-weight: var(--font-weight-medium);
-}
-
-/* Current tier button - clickable but visually indicates current */
-.pricing-buy-btn.current-tier-btn {
-  background: var(--bg-tertiary);
-  color: var(--text-secondary);
   border: 1px solid var(--border-color);
 }
 
-.pricing-buy-btn.current-tier-btn:hover {
+/* Current tier button - same as regular */
+.pricing-buy-btn.current-tier-btn {
   background: var(--color-info);
   color: white;
-  border-color: var(--color-info);
+}
+
+.pricing-buy-btn.current-tier-btn:hover {
+  filter: brightness(1.1);
+  color: white;
 }
 
 /* Billing Period Toggle */
