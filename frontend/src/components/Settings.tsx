@@ -36,6 +36,7 @@ const Settings: React.FC = () => {
   // Billing period toggles for pricing cards
   const [proBilling, setProBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [enterpriseBilling, setEnterpriseBilling] = useState<'monthly' | 'yearly'>('monthly');
+  const [lifetimeTier, setLifetimeTier] = useState<'pro' | 'enterprise'>('pro');
   
   // Dynamic pricing from API
   const [pricing, setPricing] = useState<PricingData | null>(null);
@@ -327,6 +328,57 @@ const Settings: React.FC = () => {
                           Get Enterprise (${enterpriseBilling === 'monthly' 
                             ? `${pricing?.enterprise.pricing.monthly || 25}/mo` 
                             : `${pricing?.enterprise.pricing.yearly || 249}/yr`})
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Lifetime Plan */}
+                    <div className="pricing-card lifetime">
+                      <div className="pricing-badge best-value">BEST VALUE</div>
+                      <div className="pricing-header">
+                        <h4>Lifetime</h4>
+                        <div className="pricing-toggle">
+                          <button 
+                            className={`toggle-btn ${lifetimeTier === 'pro' ? 'active' : ''}`}
+                            onClick={() => setLifetimeTier('pro')}
+                          >
+                            Pro
+                          </button>
+                          <button 
+                            className={`toggle-btn ${lifetimeTier === 'enterprise' ? 'active' : ''}`}
+                            onClick={() => setLifetimeTier('enterprise')}
+                          >
+                            Enterprise
+                          </button>
+                        </div>
+                        <div className="pricing-price">
+                          ${lifetimeTier === 'pro' 
+                            ? pricing?.pro.pricing.lifetime || 149 
+                            : pricing?.enterprise.pricing.lifetime || 499}
+                        </div>
+                        <div className="pricing-period">one-time payment</div>
+                      </div>
+                      <ul className="pricing-features">
+                        <li>Pay once, own forever</li>
+                        <li>{lifetimeTier === 'pro' ? '10' : 'Unlimited'} Agents</li>
+                        <li>{lifetimeTier === 'pro' ? '30' : '365'} Days History</li>
+                        <li>Unlimited Alerts</li>
+                        <li>All Notification Channels</li>
+                        {lifetimeTier === 'enterprise' && <li>No Branding</li>}
+                      </ul>
+                      {license.tier === (lifetimeTier === 'pro' ? 'Pro' : 'Enterprise') && license.billing === 'lifetime' ? (
+                        <div className="current-plan-badge">Current Plan</div>
+                      ) : (
+                        <a 
+                          href={`https://buy.pankha.dev/${lifetimeTier}/lifetime`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="pricing-buy-btn lifetime-btn"
+                        >
+                          Get {lifetimeTier === 'pro' ? 'Pro' : 'Enterprise'} Lifetime ($
+                          {lifetimeTier === 'pro' 
+                            ? pricing?.pro.pricing.lifetime || 149 
+                            : pricing?.enterprise.pricing.lifetime || 499})
                         </a>
                       )}
                     </div>

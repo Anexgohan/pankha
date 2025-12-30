@@ -4,6 +4,7 @@ import { AgentManager } from '../services/AgentManager';
 import { CommandDispatcher } from '../services/CommandDispatcher';
 import { DataAggregator } from '../services/DataAggregator';
 import { FanProfileController } from '../services/FanProfileController';
+import { licenseManager } from '../license/LicenseManager';
 import { log } from '../utils/logger';
 
 const router = Router();
@@ -12,6 +13,21 @@ const agentManager = AgentManager.getInstance();
 const commandDispatcher = CommandDispatcher.getInstance();
 const dataAggregator = DataAggregator.getInstance();
 const fanProfileController = FanProfileController.getInstance();
+
+/**
+ * Check if a system can be controlled based on license tier agent limit.
+ * Returns true if system is within limit, false if over_limit (view-only).
+ */
+async function canControlSystem(systemId: number): Promise<boolean> {
+  const tier = await licenseManager.getCurrentTier();
+  if (tier.agentLimit === Infinity) return true;
+
+  // Get systems ordered by creation (id) and check if this one is within limit
+  const systems = await db.all('SELECT id FROM systems ORDER BY id');
+  const systemIndex = systems.findIndex(s => s.id === systemId);
+  
+  return systemIndex >= 0 && systemIndex < tier.agentLimit;
+}
 
 // GET /api/systems - List all managed systems
 router.get('/', async (req: Request, res: Response) => {
@@ -28,15 +44,23 @@ router.get('/', async (req: Request, res: Response) => {
       ORDER BY s.name
     `);
 
+    // Get license tier agent limit
+    const tier = await licenseManager.getCurrentTier();
+    const agentLimit = tier.agentLimit === Infinity ? systems.length : tier.agentLimit;
+
     // Add real-time status from AgentManager
-    const enhancedSystems = systems.map(system => {
+    const enhancedSystems = systems.map((system, index) => {
       const agentStatus = agentManager.getAgentStatus(system.agent_id);
       const systemData = dataAggregator.getSystemData(system.agent_id);
+      
+      // First N systems (by creation order) are active, rest are over_limit
+      const accessStatus = index < agentLimit ? 'active' : 'over_limit';
       
       return {
         ...system,
         capabilities: system.capabilities || null,
         config_data: system.config_data || null,
+        access_status: accessStatus,
         real_time_status: agentStatus?.status || 'unknown',
         last_data_received: agentStatus?.lastDataReceived || null,
         current_temperatures: systemData?.sensors || [],
@@ -408,6 +432,14 @@ router.put('/:id/fans/:fanId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Speed must be a number between 0 and 100' });
     }
 
+    // Check license limit
+    if (!await canControlSystem(systemId)) {
+      return res.status(403).json({ 
+        error: 'System exceeds agent limit. Upgrade your plan to control this system.',
+        upgrade_required: true
+      });
+    }
+
     const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
     if (!system) {
       return res.status(404).json({ error: 'System not found' });
@@ -438,6 +470,14 @@ router.put('/:id/update-interval', async (req: Request, res: Response) => {
 
     if (typeof interval !== 'number' || interval < 0.5 || interval > 30) {
       return res.status(400).json({ error: 'Interval must be a number between 0.5 and 30 seconds' });
+    }
+
+    // Check license limit
+    if (!await canControlSystem(systemId)) {
+      return res.status(403).json({ 
+        error: 'System exceeds agent limit. Upgrade your plan to control this system.',
+        upgrade_required: true
+      });
     }
 
     const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
@@ -533,6 +573,14 @@ router.put('/:id/profile', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'profile_name is required' });
     }
 
+    // Check license limit
+    if (!await canControlSystem(systemId)) {
+      return res.status(403).json({ 
+        error: 'System exceeds agent limit. Upgrade your plan to control this system.',
+        upgrade_required: true
+      });
+    }
+
     const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
     if (!system) {
       return res.status(404).json({ error: 'System not found' });
@@ -614,8 +662,17 @@ router.get('/:id/history', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'System not found' });
     }
 
-    const startTime = start_time ? new Date(start_time as string) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Get tier retention limit
+    const tier = await licenseManager.getCurrentTier();
+    const retentionCutoff = new Date(Date.now() - tier.retentionDays * 24 * 60 * 60 * 1000);
+
+    let startTime = start_time ? new Date(start_time as string) : new Date(Date.now() - 24 * 60 * 60 * 1000);
     const endTime = end_time ? new Date(end_time as string) : new Date();
+
+    // Clamp start_time to the tier's retention limit (don't show data older than allowed)
+    if (startTime < retentionCutoff) {
+      startTime = retentionCutoff;
+    }
 
     const sensorIdArray = sensor_ids ? (sensor_ids as string).split(',').map(id => parseInt(id)) : undefined;
     const fanIdArray = fan_ids ? (fan_ids as string).split(',').map(id => parseInt(id)) : undefined;
@@ -650,18 +707,27 @@ router.get('/:id/history', async (req: Request, res: Response) => {
 router.get('/:id/charts', async (req: Request, res: Response) => {
   try {
     const systemId = parseInt(req.params.id);
-    const { hours = 24 } = req.query;
+    let { hours = 24 } = req.query;
 
     const system = await db.get('SELECT id FROM systems WHERE id = $1', [systemId]);
     if (!system) {
       return res.status(404).json({ error: 'System not found' });
     }
 
-    const stats = await dataAggregator.getSystemStatistics(systemId, parseInt(hours as string));
+    // Clamp hours to tier retention limit
+    const tier = await licenseManager.getCurrentTier();
+    const maxHours = tier.retentionDays * 24;
+    let requestedHours = parseInt(hours as string);
+    if (requestedHours > maxHours) {
+      requestedHours = maxHours;
+    }
+
+    const stats = await dataAggregator.getSystemStatistics(systemId, requestedHours);
 
     res.json({
       system_id: systemId,
-      time_range_hours: parseInt(hours as string),
+      time_range_hours: requestedHours,
+      max_hours_allowed: maxHours,
       statistics: stats
     });
 

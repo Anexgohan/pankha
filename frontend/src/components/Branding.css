@@ -1,0 +1,28 @@
+.branding {
+  position: fixed;
+  bottom: var(--spacing-md);
+  right: var(--spacing-md);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  z-index: 100;
+}
+
+.branding:hover {
+  opacity: 1;
+}
+
+.branding a {
+  color: var(--color-info);
+  text-decoration: none;
+  font-weight: var(--font-weight-medium);
+}
+
+.branding a:hover {
+  text-decoration: underline;
+}

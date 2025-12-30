@@ -371,6 +371,40 @@
   text-transform: uppercase;
 }
 
+/* Lifetime card styling */
+.pricing-card.lifetime {
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, rgba(255, 193, 7, 0.08) 100%);
+  position: relative;
+}
+
+.pricing-card.lifetime:hover {
+  border-color: #FFC107;
+}
+
+.pricing-badge.best-value {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%);
+  color: #1a1a1a;
+  padding: 2px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pricing-buy-btn.lifetime-btn {
+  background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%);
+  color: #1a1a1a;
+}
+
+.pricing-buy-btn.lifetime-btn:hover {
+  background: linear-gradient(135deg, #FFD54F 0%, #FFB300 100%);
+}
+
 .pricing-card.current {
   border-color: var(--color-info);
 }
