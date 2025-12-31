@@ -27,16 +27,21 @@ interface PricingData {
 }
 
 // Dodo Payments checkout URLs - direct product links
+// TEST MODE: https://test.checkout.dodopayments.com/buy/{product_id}
+// LIVE MODE: https://checkout.dodopayments.com/buy/{product_id}
+const CHECKOUT_BASE = 'https://test.checkout.dodopayments.com/buy'; // Test mode
+// const CHECKOUT_BASE = 'https://checkout.dodopayments.com/buy'; // Live mode - uncomment for production
+
 const CHECKOUT_URLS = {
   pro: {
-    monthly: 'https://checkout.dodopayments.com/buy/pdt_0NV3sqzBkKRDNGHgkyOT4',
-    yearly: 'https://checkout.dodopayments.com/buy/pdt_0NV8gT4no4UJnP34pVgnl',
-    lifetime: 'https://checkout.dodopayments.com/buy/pdt_0NV8jwCkXAYkXJYyFrPQb',
+    monthly: `${CHECKOUT_BASE}/pdt_0NV3sqzBkKRDNGHgkyOT4`,
+    yearly: `${CHECKOUT_BASE}/pdt_0NV8gT4no4UJnP34pVgnl`,
+    lifetime: `${CHECKOUT_BASE}/pdt_0NV8jwCkXAYkXJYyFrPQb`,
   },
   enterprise: {
-    monthly: 'https://checkout.dodopayments.com/buy/pdt_0NV3tEaaHxETmRVdeJ0Ei',
-    yearly: 'https://checkout.dodopayments.com/buy/pdt_0NV8l5b1st3Cwv9PBbTLL',
-    lifetime: 'https://checkout.dodopayments.com/buy/pdt_0NV8gqfMxnRCmhzbWUzyR',
+    monthly: `${CHECKOUT_BASE}/pdt_0NV3tEaaHxETmRVdeJ0Ei`,
+    yearly: `${CHECKOUT_BASE}/pdt_0NV8l5b1st3Cwv9PBbTLL`,
+    lifetime: `${CHECKOUT_BASE}/pdt_0NV8gqfMxnRCmhzbWUzyR`,
   },
 } as const;
 
@@ -303,7 +308,7 @@ const Settings: React.FC = () => {
                         </div>
                         <div className="pricing-price">
                           ${enterpriseBilling === 'monthly' 
-                            ? pricing?.enterprise.pricing.monthly || 25 
+                            ? pricing?.enterprise.pricing.monthly || 35 
                             : pricing?.enterprise.pricing.yearly || 249}
                         </div>
                         <div className="pricing-period">
@@ -329,7 +334,7 @@ const Settings: React.FC = () => {
                           className="pricing-buy-btn current-tier-btn"
                         >
                           Switch to {enterpriseBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${enterpriseBilling === 'monthly' 
-                            ? `${pricing?.enterprise.pricing.monthly || 25}/mo` 
+                            ? `${pricing?.enterprise.pricing.monthly || 35}/mo` 
                             : `${pricing?.enterprise.pricing.yearly || 249}/yr`})
                         </a>
                       ) : (
@@ -340,7 +345,7 @@ const Settings: React.FC = () => {
                           className="pricing-buy-btn"
                         >
                           Get Enterprise (${enterpriseBilling === 'monthly' 
-                            ? `${pricing?.enterprise.pricing.monthly || 25}/mo` 
+                            ? `${pricing?.enterprise.pricing.monthly || 35}/mo` 
                             : `${pricing?.enterprise.pricing.yearly || 249}/yr`})
                         </a>
                       )}
@@ -374,10 +379,15 @@ const Settings: React.FC = () => {
                       </div>
                       <ul className="pricing-features">
                         <li>Pay once, own forever</li>
-                        <li>{lifetimeTier === 'pro' ? '10' : 'Unlimited'} Agents</li>
-                        <li>{lifetimeTier === 'pro' ? '30' : '365'} Days History</li>
+                        <li>{lifetimeTier === 'pro' 
+                          ? (pricing?.pro.agents || 10)
+                          : (pricing?.enterprise.agents === -1 ? 'Unlimited' : pricing?.enterprise.agents || 'Unlimited')} Agents</li>
+                        <li>{lifetimeTier === 'pro' 
+                          ? (pricing?.pro.retentionDays || 30)
+                          : (pricing?.enterprise.retentionDays || 365)} Days History</li>
                         <li>Unlimited Alerts</li>
                         <li>All Notification Channels</li>
+                        <li>Full API Access</li>
                         {lifetimeTier === 'enterprise' && <li>No Branding</li>}
                       </ul>
                       {license.tier === (lifetimeTier === 'pro' ? 'Pro' : 'Enterprise') && license.billing === 'lifetime' ? (
@@ -460,7 +470,7 @@ const Settings: React.FC = () => {
                       type="text"
                       value={licenseKey}
                       onChange={(e) => setLicenseKey(e.target.value)}
-                      placeholder="Paste your license token (eyJ...)"
+                      placeholder="Paste your license token (eyJhbGciOiJSUzI1NiIs...)"
                       className="license-input"
                       disabled={isSubmitting}
                     />

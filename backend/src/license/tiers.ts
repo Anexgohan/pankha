@@ -7,6 +7,9 @@
  * - Free: $0 (no payment required)
  * - Pro: $5/month, $49/year, $149 lifetime
  * - Enterprise: $25/month, $249/year, $499 lifetime
+ * 
+ * NOTE: Dodo Payments checkout URLs are defined in:
+ *       frontend/src/components/Settings.tsx → CHECKOUT_URLS constant
  */
 
 export interface TierPricing {
@@ -55,7 +58,7 @@ export const TIERS: Record<string, TierConfig> = {
     alertChannels: ['dashboard', 'email', 'webhook'],
     apiAccess: 'full',
     showBranding: false,
-    pricing: { monthly: 25, yearly: 249, lifetime: 499 },
+    pricing: { monthly: 35, yearly: 249, lifetime: 499 },
   },
 };
 
