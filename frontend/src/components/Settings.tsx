@@ -26,6 +26,20 @@ interface PricingData {
   enterprise: TierPricing;
 }
 
+// Dodo Payments checkout URLs - direct product links
+const CHECKOUT_URLS = {
+  pro: {
+    monthly: 'https://checkout.dodopayments.com/buy/pdt_0NV3sqzBkKRDNGHgkyOT4',
+    yearly: 'https://checkout.dodopayments.com/buy/pdt_0NV8gT4no4UJnP34pVgnl',
+    lifetime: 'https://checkout.dodopayments.com/buy/pdt_0NV8jwCkXAYkXJYyFrPQb',
+  },
+  enterprise: {
+    monthly: 'https://checkout.dodopayments.com/buy/pdt_0NV3tEaaHxETmRVdeJ0Ei',
+    yearly: 'https://checkout.dodopayments.com/buy/pdt_0NV8l5b1st3Cwv9PBbTLL',
+    lifetime: 'https://checkout.dodopayments.com/buy/pdt_0NV8gqfMxnRCmhzbWUzyR',
+  },
+} as const;
+
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const { license, isLoading, refreshLicense } = useLicense();
@@ -246,7 +260,7 @@ const Settings: React.FC = () => {
                         <div className="current-plan-badge">Current Plan</div>
                       ) : license.tier === 'Pro' ? (
                         <a 
-                          href={`https://buy.pankha.dev/pro/${proBilling}`} 
+                          href={CHECKOUT_URLS.pro[proBilling]} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="pricing-buy-btn current-tier-btn"
@@ -257,7 +271,7 @@ const Settings: React.FC = () => {
                         </a>
                       ) : (
                         <a 
-                          href={`https://buy.pankha.dev/pro/${proBilling}`} 
+                          href={CHECKOUT_URLS.pro[proBilling]} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="pricing-buy-btn"
@@ -309,7 +323,7 @@ const Settings: React.FC = () => {
                         <div className="current-plan-badge">Current Plan</div>
                       ) : license.tier === 'Enterprise' ? (
                         <a 
-                          href={`https://buy.pankha.dev/enterprise/${enterpriseBilling}`} 
+                          href={CHECKOUT_URLS.enterprise[enterpriseBilling]} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="pricing-buy-btn current-tier-btn"
@@ -320,7 +334,7 @@ const Settings: React.FC = () => {
                         </a>
                       ) : (
                         <a 
-                          href={`https://buy.pankha.dev/enterprise/${enterpriseBilling}`} 
+                          href={CHECKOUT_URLS.enterprise[enterpriseBilling]} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="pricing-buy-btn"
@@ -370,7 +384,7 @@ const Settings: React.FC = () => {
                         <div className="current-plan-badge">Current Plan</div>
                       ) : (
                         <a 
-                          href={`https://buy.pankha.dev/${lifetimeTier}/lifetime`} 
+                          href={CHECKOUT_URLS[lifetimeTier].lifetime} 
                           target="_blank" 
                           rel="noopener noreferrer" 
                           className="pricing-buy-btn lifetime-btn"

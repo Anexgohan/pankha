@@ -84,3 +84,28 @@
   background: #f3e5f5;
   color: #7b1fa2;
 }
+
+/* Read-Only Badge (License Limit) */
+.read-only-badge {
+  margin-left: var(--spacing-sm);
+  font-size: var(--font-size-base);
+  cursor: help;
+  opacity: 0.9;
+  animation: pulse-lock 2s ease-in-out infinite;
+}
+
+@keyframes pulse-lock {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Read-only card styling */
+.system-card.read-only {
+  border-left: 3px solid #FFA000;
+}
+
+.system-card.read-only select:disabled,
+.system-card.read-only input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

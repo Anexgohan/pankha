@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import Database from '../database/database';
 import { AgentConfig, AgentStatus, AgentDataPacket, FanControlCommand } from '../types/agent';
 import { log } from '../utils/logger';
+import { licenseManager } from '../license';
 
 export class AgentManager extends EventEmitter {
   private static instance: AgentManager;
@@ -16,6 +17,10 @@ export class AgentManager extends EventEmitter {
   private agentLogLevel: Map<string, string> = new Map(); // Track log level
   private db: Database;
   private healthCheckInterval: NodeJS.Timeout | null = null;
+  
+  // Cache for agent registration order (to avoid repeated DB queries)
+  private cachedAgentOrder: string[] = []; // agent_ids in registration order
+  private agentOrderCacheValid: boolean = false;
 
   private constructor() {
     super();
@@ -110,6 +115,10 @@ export class AgentManager extends EventEmitter {
       log.info(` Agent ${agentConfig.agentId} registered with update interval: ${intervalSeconds}s`, 'AgentManager');
 
       log.info(` Agent registered: ${agentConfig.name} (${agentConfig.agentId})`, 'AgentManager');
+      
+      // Invalidate agent order cache since a new agent was registered
+      this.invalidateAgentOrderCache();
+      
       this.emit('agentRegistered', agentConfig);
       
     } catch (error) {
@@ -136,6 +145,10 @@ export class AgentManager extends EventEmitter {
       this.agentUpdateIntervals.delete(agentId);
 
       log.info(` Agent unregistered: ${agentId}`, 'AgentManager');
+      
+      // Invalidate agent order cache since an agent was unregistered
+      this.invalidateAgentOrderCache();
+      
       this.emit('agentUnregistered', { agentId, agent });
       
     } catch (error) {
@@ -389,6 +402,125 @@ export class AgentManager extends EventEmitter {
     }
     
     return counts;
+  }
+
+  /**
+   * Get agents sorted by registration time (oldest first)
+   * Uses cached order when available, refreshes from DB when cache is invalid
+   */
+  public async getAgentsByRegistrationOrder(): Promise<AgentConfig[]> {
+    try {
+      // Refresh cache if invalid
+      if (!this.agentOrderCacheValid) {
+        const systems = await this.db.all(
+          'SELECT agent_id FROM systems ORDER BY created_at ASC'
+        );
+        this.cachedAgentOrder = systems.map((s: { agent_id: string }) => s.agent_id);
+        this.agentOrderCacheValid = true;
+        log.debug('Agent order cache refreshed', 'AgentManager');
+      }
+      
+      // Return agents in cached order, only those currently in memory
+      const orderedAgents: AgentConfig[] = [];
+      for (const agentId of this.cachedAgentOrder) {
+        const agent = this.agents.get(agentId);
+        if (agent) {
+          orderedAgents.push(agent);
+        }
+      }
+      
+      return orderedAgents;
+    } catch (error) {
+      log.error('Error getting agents by registration order:', 'AgentManager', error);
+      // Fallback: return agents in arbitrary order
+      return Array.from(this.agents.values());
+    }
+  }
+
+  /**
+   * Invalidate the agent order cache (call after register/unregister)
+   */
+  private invalidateAgentOrderCache(): void {
+    this.agentOrderCacheValid = false;
+  }
+
+  /**
+   * Check if agent is over the license limit (read-only mode)
+   * Oldest registered agents have priority for full access
+   */
+  public async isAgentReadOnly(agentId: string): Promise<boolean> {
+    try {
+      const limit = await licenseManager.getAgentLimit();
+      
+      // Infinity means unlimited - never read-only
+      if (limit === Infinity || limit === -1) {
+        return false;
+      }
+      
+      const sortedAgents = await this.getAgentsByRegistrationOrder();
+      const index = sortedAgents.findIndex(a => a.agentId === agentId);
+      
+      // Agent not found means it's not registered yet
+      if (index === -1) {
+        return false;
+      }
+      
+      // Agents beyond the limit are read-only
+      return index >= limit;
+    } catch (error) {
+      log.error('Error checking agent read-only status:', 'AgentManager', error);
+      // On error, default to allowing control (fail open)
+      return false;
+    }
+  }
+
+  /**
+   * Batch check which agents are read-only (optimized for listing)
+   * Returns a Map of agentId -> isReadOnly
+   */
+  public async getAgentsReadOnlyStatus(): Promise<Map<string, boolean>> {
+    const result = new Map<string, boolean>();
+    
+    try {
+      const limit = await licenseManager.getAgentLimit();
+      
+      // Unlimited tier - all agents have full access
+      if (limit === Infinity || limit === -1) {
+        for (const agentId of this.agents.keys()) {
+          result.set(agentId, false);
+        }
+        return result;
+      }
+      
+      const sortedAgents = await this.getAgentsByRegistrationOrder();
+      
+      sortedAgents.forEach((agent, index) => {
+        result.set(agent.agentId, index >= limit);
+      });
+      
+      return result;
+    } catch (error) {
+      log.error('Error getting batch read-only status:', 'AgentManager', error);
+      // On error, default to allowing control (fail open)
+      for (const agentId of this.agents.keys()) {
+        result.set(agentId, false);
+      }
+      return result;
+    }
+  }
+
+  /**
+   * Get agent limit info for UI display
+   */
+  public async getAgentLimitInfo(): Promise<{ current: number; limit: number; overLimit: boolean }> {
+    const limit = await licenseManager.getAgentLimit();
+    const current = this.agents.size;
+    
+    return {
+      current,
+      limit: limit === Infinity ? -1 : limit,
+      overLimit: limit !== Infinity && current > limit
+    };
   }
 
   /**

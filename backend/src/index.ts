@@ -131,7 +131,7 @@ app.use('/api/fan-configurations', fanConfigurationsRouter);
 app.use('/api/license', licenseRouter);
 
 // System overview endpoint
-app.get('/api/overview', (req, res) => {
+app.get('/api/overview', async (req, res) => {
   if (!services) {
     return res.status(503).json({ error: 'Services not initialized' });
   }
@@ -140,8 +140,16 @@ app.get('/api/overview', (req, res) => {
   const wsStats = services.webSocketHub.getStats();
   const queueStatus = services.commandDispatcher.getQueueStatus();
 
+  // Add license limit info
+  const tier = await licenseManager.getCurrentTier();
+  const agentLimit = tier.agentLimit;
+  const isUnlimited = agentLimit === Infinity;
+
   res.json({
     ...overview,
+    agentLimit: isUnlimited ? 'unlimited' : agentLimit,
+    overLimit: !isUnlimited && overview.totalSystems > agentLimit,
+    tierName: tier.name,
     websocket_stats: wsStats,
     command_queue_status: queueStatus,
     timestamp: new Date().toISOString()

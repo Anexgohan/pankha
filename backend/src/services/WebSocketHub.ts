@@ -6,6 +6,7 @@ import { AgentManager } from './AgentManager';
 import { CommandDispatcher } from './CommandDispatcher';
 import { AgentCommunication } from './AgentCommunication';
 import { DeltaComputer } from './DeltaComputer';
+import { licenseManager } from '../license';
 import { log } from '../utils/logger';
 
 interface ClientConnection {
@@ -544,9 +545,22 @@ export class WebSocketHub extends EventEmitter {
   /**
    * Handle get overview request
    */
-  private handleGetOverview(clientId: string): void {
+  private async handleGetOverview(clientId: string): Promise<void> {
     const overview = this.dataAggregator.getSystemOverview();
-    this.sendToClient(clientId, 'overview', overview);
+    
+    // Add license limit info
+    const tier = await licenseManager.getCurrentTier();
+    const agentLimit = tier.agentLimit;
+    const isUnlimited = agentLimit === Infinity;
+    
+    const enrichedOverview = {
+      ...overview,
+      agentLimit: isUnlimited ? 'unlimited' : agentLimit,
+      overLimit: !isUnlimited && overview.totalSystems > agentLimit,
+      tierName: tier.name
+    };
+    
+    this.sendToClient(clientId, 'overview', enrichedOverview);
   }
 
   /**

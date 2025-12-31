@@ -22,6 +22,9 @@ export interface SystemData {
   hysteresis_temp?: number;
   emergency_temp?: number;
   log_level?: string;
+  // License limit fields
+  read_only?: boolean; // Agent is over license limit (can view but not control)
+  access_status?: 'active' | 'over_limit';
   system_health?: {
     cpuUsage: number;
     memoryUsage: number;
@@ -63,6 +66,10 @@ export interface SystemOverview {
   totalFans: number;
   avgTemperature: number;
   highestTemperature: number;
+  // License limit info
+  agentLimit?: number | 'unlimited';
+  overLimit?: boolean;
+  tierName?: string;
 }
 
 export interface WebSocketMessage {

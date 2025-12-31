@@ -17,16 +17,11 @@ const fanProfileController = FanProfileController.getInstance();
 /**
  * Check if a system can be controlled based on license tier agent limit.
  * Returns true if system is within limit, false if over_limit (view-only).
+ * Uses AgentManager.isAgentReadOnly() for consistent ordering by created_at.
  */
-async function canControlSystem(systemId: number): Promise<boolean> {
-  const tier = await licenseManager.getCurrentTier();
-  if (tier.agentLimit === Infinity) return true;
-
-  // Get systems ordered by creation (id) and check if this one is within limit
-  const systems = await db.all('SELECT id FROM systems ORDER BY id');
-  const systemIndex = systems.findIndex(s => s.id === systemId);
-  
-  return systemIndex >= 0 && systemIndex < tier.agentLimit;
+async function canControlSystem(agentId: string): Promise<boolean> {
+  const isReadOnly = await agentManager.isAgentReadOnly(agentId);
+  return !isReadOnly;
 }
 
 // GET /api/systems - List all managed systems
@@ -48,19 +43,24 @@ router.get('/', async (req: Request, res: Response) => {
     const tier = await licenseManager.getCurrentTier();
     const agentLimit = tier.agentLimit === Infinity ? systems.length : tier.agentLimit;
 
+    // Get read-only status for all agents in a single call (optimized)
+    const readOnlyStatus = await agentManager.getAgentsReadOnlyStatus();
+    
     // Add real-time status from AgentManager
-    const enhancedSystems = systems.map((system, index) => {
+    const enhancedSystems = systems.map((system) => {
       const agentStatus = agentManager.getAgentStatus(system.agent_id);
       const systemData = dataAggregator.getSystemData(system.agent_id);
       
-      // First N systems (by creation order) are active, rest are over_limit
-      const accessStatus = index < agentLimit ? 'active' : 'over_limit';
+      // Check if this agent is read-only (over limit)
+      const isReadOnly = readOnlyStatus.get(system.agent_id) ?? false;
+      const accessStatus = isReadOnly ? 'over_limit' : 'active';
       
       return {
         ...system,
         capabilities: system.capabilities || null,
         config_data: system.config_data || null,
         access_status: accessStatus,
+        read_only: isReadOnly,
         real_time_status: agentStatus?.status || 'unknown',
         last_data_received: agentStatus?.lastDataReceived || null,
         current_temperatures: systemData?.sensors || [],
@@ -158,6 +158,25 @@ router.post('/', async (req: Request, res: Response) => {
   } catch (error) {
     log.error('Error creating system:', 'systems', error);
     res.status(500).json({ error: 'Failed to create system' });
+  }
+});
+
+// GET /api/systems/limit - Get agent limit info for UI display
+router.get('/limit', async (_req: Request, res: Response) => {
+  try {
+    const limitInfo = await agentManager.getAgentLimitInfo();
+    const tier = await licenseManager.getCurrentTier();
+    
+    res.json({
+      current_agents: limitInfo.current,
+      agent_limit: limitInfo.limit === -1 ? 'unlimited' : limitInfo.limit,
+      over_limit: limitInfo.overLimit,
+      tier_name: tier.name,
+      upgrade_url: 'https://pankha.dev/pricing'
+    });
+  } catch (error) {
+    log.error('Error fetching agent limit info:', 'systems', error);
+    res.status(500).json({ error: 'Failed to fetch agent limit info' });
   }
 });
 
@@ -432,17 +451,17 @@ router.put('/:id/fans/:fanId', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Speed must be a number between 0 and 100' });
     }
 
+    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
     // Check license limit
-    if (!await canControlSystem(systemId)) {
+    if (!await canControlSystem(system.agent_id)) {
       return res.status(403).json({ 
         error: 'System exceeds agent limit. Upgrade your plan to control this system.',
         upgrade_required: true
       });
-    }
-
-    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
-    if (!system) {
-      return res.status(404).json({ error: 'System not found' });
     }
 
     const result = await commandDispatcher.setFanSpeed(system.agent_id, fanId, speed, priority);
@@ -472,17 +491,17 @@ router.put('/:id/update-interval', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Interval must be a number between 0.5 and 30 seconds' });
     }
 
+    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
     // Check license limit
-    if (!await canControlSystem(systemId)) {
+    if (!await canControlSystem(system.agent_id)) {
       return res.status(403).json({ 
         error: 'System exceeds agent limit. Upgrade your plan to control this system.',
         upgrade_required: true
       });
-    }
-
-    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
-    if (!system) {
-      return res.status(404).json({ error: 'System not found' });
     }
 
     const result = await commandDispatcher.setUpdateInterval(system.agent_id, interval, priority);
@@ -573,17 +592,17 @@ router.put('/:id/profile', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'profile_name is required' });
     }
 
+    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: 'System not found' });
+    }
+
     // Check license limit
-    if (!await canControlSystem(systemId)) {
+    if (!await canControlSystem(system.agent_id)) {
       return res.status(403).json({ 
         error: 'System exceeds agent limit. Upgrade your plan to control this system.',
         upgrade_required: true
       });
-    }
-
-    const system = await db.get('SELECT agent_id FROM systems WHERE id = $1', [systemId]);
-    if (!system) {
-      return res.status(404).json({ error: 'System not found' });
     }
 
     const result = await commandDispatcher.applyFanProfile(system.agent_id, profile_name);

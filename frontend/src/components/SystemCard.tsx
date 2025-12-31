@@ -577,8 +577,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
     return isGroupHidden(chipName);
   };
 
+  // Helper to check if agent is read-only (over license limit)
+  const isReadOnly = system.read_only === true;
+  const readOnlyTooltip = 'This system exceeds your license limit. Upgrade to control this agent. You can still view data.';
+
   return (
-    <div className="system-card">
+    <div className={`system-card${isReadOnly ? ' read-only' : ''}`}>
       <div className="system-header">
         <div className="system-title">
           <div className="title-left">
@@ -589,6 +593,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
             >
               {system.status}
             </span>
+            {isReadOnly && (
+              <span 
+                className="read-only-badge"
+                title={readOnlyTooltip}
+              >
+                🔒
+              </span>
+            )}
           </div>
           <button 
             className="delete-button"
@@ -674,8 +686,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     className="agent-interval-select"
                     value={agentInterval}
                     onChange={(e) => handleAgentIntervalChange(parseFloat(e.target.value))}
-                    disabled={loading === 'agent-interval'}
-                    title="Agent data collection interval"
+                    disabled={loading === 'agent-interval' || isReadOnly}
+                    title={isReadOnly ? readOnlyTooltip : "Agent data collection interval"}
                   >
                     <option value={0.5}>0.5s</option>
                     <option value={1}>1s</option>
@@ -694,8 +706,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     type="checkbox"
                     checked={filterDuplicates}
                     onChange={(e) => handleFilterDuplicatesChange(e.target.checked)}
-                    disabled={loading === 'filter-duplicates'}
-                    title="Filter duplicate temperature sensors"
+                    disabled={loading === 'filter-duplicates' || isReadOnly}
+                    title={isReadOnly ? readOnlyTooltip : "Filter duplicate temperature sensors"}
                   />
                   {loading === 'filter-duplicates' && <span className="loading-spinner">⏳</span>}
                 </div>
@@ -705,8 +717,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     className="agent-interval-select"
                     value={sensorTolerance}
                     onChange={(e) => handleSensorToleranceChange(parseFloat(e.target.value))}
-                    disabled={loading === 'sensor-tolerance'}
-                    title="Temperature tolerance for sensor deduplication (°C)"
+                    disabled={loading === 'sensor-tolerance' || isReadOnly}
+                    title={isReadOnly ? readOnlyTooltip : "Temperature tolerance for sensor deduplication (°C)"}
                   >
                     <option value={0.25}>0.25°C</option>
                     <option value={0.5}>0.5°C</option>
@@ -730,8 +742,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     className="agent-interval-select"
                     value={fanStep}
                     onChange={(e) => handleFanStepChange(parseInt(e.target.value))}
-                    disabled={loading === 'fan-step'}
-                    title={`Determines the incremental percentage change in fan speed when adjusting towards the target temperature. Instead of making abrupt changes, the fan speed will increase or decrease in defined steps, providing smoother transitions and reducing wear on the fan. Changes are applied every ${agentInterval}s (Agent Rate).`}
+                    disabled={loading === 'fan-step' || isReadOnly}
+                    title={isReadOnly ? readOnlyTooltip : `Determines the incremental percentage change in fan speed when adjusting towards the target temperature. Instead of making abrupt changes, the fan speed will increase or decrease in defined steps, providing smoother transitions and reducing wear on the fan. Changes are applied every ${agentInterval}s (Agent Rate).`}
                   >
                     <option value={3}>3%</option>
                     <option value={5}>5%</option>
@@ -749,8 +761,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     className="agent-interval-select"
                     value={hysteresis}
                     onChange={(e) => handleHysteresisChange(parseFloat(e.target.value))}
-                    disabled={loading === 'hysteresis'}
-                    title="Temperature tolerance before adjusting fan speed. The fan will only change speed when temperature moves more than this amount from the target, preventing constant micro-adjustments. Higher values = more stability, lower values = more responsive cooling."
+                    disabled={loading === 'hysteresis' || isReadOnly}
+                    title={isReadOnly ? readOnlyTooltip : "Temperature tolerance before adjusting fan speed. The fan will only change speed when temperature moves more than this amount from the target, preventing constant micro-adjustments. Higher values = more stability, lower values = more responsive cooling."}
                   >
                     <option value={0.0}>Disable (instant)</option>
                     <option value={0.5}>0.5°C</option>
@@ -769,8 +781,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     className="agent-interval-select"
                     value={emergencyTemp}
                     onChange={(e) => handleEmergencyTempChange(parseFloat(e.target.value))}
-                    disabled={loading === 'emergency-temp'}
-                    title="Temperature threshold that overrides all controls and sets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety."
+                    disabled={loading === 'emergency-temp' || isReadOnly}
+                    title={isReadOnly ? readOnlyTooltip : "Temperature threshold that overrides all controls and sets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety."}
                   >
                     <option value={70}>70°C</option>
                     <option value={75}>75°C</option>
@@ -788,8 +800,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     className="agent-interval-select"
                     value={logLevel}
                     onChange={(e) => handleLogLevelChange(e.target.value)}
-                    disabled={loading === 'log-level'}
-                    title="Agent logging verbosity. TRACE: very detailed debug info, DEBUG: detailed diagnostics, INFO: normal operation logs, WARN: warnings, ERROR: errors only."
+                    disabled={loading === 'log-level' || isReadOnly}
+                    title={isReadOnly ? readOnlyTooltip : "Agent logging verbosity. TRACE: very detailed debug info, DEBUG: detailed diagnostics, INFO: normal operation logs, WARN: warnings, ERROR: errors only."}
                   >
                     <option value="TRACE">TRACE</option>
                     <option value="DEBUG">DEBUG</option>
@@ -1063,7 +1075,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             }
                           }
                         }}
-                        disabled={system.status !== 'online'}
+                        disabled={system.status !== 'online' || isReadOnly}
                       >
                         <option value="">Select Sensor...</option>
 
@@ -1155,7 +1167,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             });
                           }
                         }}
-                        disabled={loading === `fan-profile-${fan.id}` || system.status !== 'online'}
+                        disabled={loading === `fan-profile-${fan.id}` || system.status !== 'online' || isReadOnly}
                       >
                         <option value="">No Profile (Manual)</option>
                         {fanProfiles.map((profile: FanProfile) => (
@@ -1225,6 +1237,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.fan_step_percent === nextProps.system.fan_step_percent &&
     prevProps.system.emergency_temp === nextProps.system.emergency_temp &&
     prevProps.system.log_level === nextProps.system.log_level &&
+    prevProps.system.read_only === nextProps.system.read_only && // License limit status
     // Explicit sensor/fan array checks (reference equality works because mergeDelta creates new arrays)
     prevProps.system.current_temperatures === nextProps.system.current_temperatures &&
     prevProps.system.current_fan_speeds === nextProps.system.current_fan_speeds &&

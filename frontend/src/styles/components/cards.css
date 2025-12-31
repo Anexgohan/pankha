@@ -45,6 +45,16 @@
   border-left-color: var(--color-warning);
 }
 
+/* License limit indicators */
+.stat-card.at-limit {
+  border-left-color: #FFA000; /* Amber */
+}
+
+.stat-card.over-limit {
+  border-left-color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 5%, var(--bg-secondary));
+}
+
 .stat-value {
   font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-bold);
