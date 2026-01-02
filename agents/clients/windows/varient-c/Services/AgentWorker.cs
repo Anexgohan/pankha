@@ -27,9 +27,9 @@ public class AgentWorker : BackgroundService
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Pankha Agent Service starting...");
-        _logger.LogInformation("Agent ID: {AgentId}", _config.Agent.AgentId);
+        _logger.LogInformation("Agent ID: {AgentId}", _config.Agent.Id);
         _logger.LogInformation("Agent Name: {Name}", _config.Agent.Name);
-        _logger.LogInformation("Backend URL: {Url}", _config.Backend.Url);
+        _logger.LogInformation("Backend URL: {Url}", _config.Backend.ServerUrl);
 
         await base.StartAsync(cancellationToken);
     }
@@ -43,7 +43,6 @@ public class AgentWorker : BackgroundService
             // Initialize hardware monitor
             _hardwareMonitor = new LibreHardwareAdapter(
                 _config.Hardware,
-                _config.Monitoring,
                 Serilog.Log.Logger);
 
             // Initialize connection watchdog with config for emergency_temp monitoring

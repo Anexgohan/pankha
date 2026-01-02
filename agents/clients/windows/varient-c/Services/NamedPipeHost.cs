@@ -192,7 +192,7 @@ public class NamedPipeHost : IDisposable
 
                     response = new AgentStatus
                     {
-                        AgentId = _config.Agent.AgentId,
+                        AgentId = _config.Agent.Id,
                         AgentName = _config.Agent.Name,
                         Version = version, 
                         ConnectionState = _wsClient.State.ToString(),
@@ -219,10 +219,10 @@ public class NamedPipeHost : IDisposable
                             {
                                 newConfig.Agent.Validate();
 
-                                // Check if log level changed
+                                // Check if log level changed (now in Agent section)
                                 bool logLevelChanged = !string.Equals(
-                                    _config.Logging.LogLevel,
-                                    newConfig.Logging.LogLevel,
+                                    _config.Agent.LogLevel,
+                                    newConfig.Agent.LogLevel,
                                     StringComparison.OrdinalIgnoreCase);
 
                                 // Fix: Explicitly save to disk
@@ -232,15 +232,15 @@ public class NamedPipeHost : IDisposable
                                 _config.Agent = newConfig.Agent;
                                 _config.Backend = newConfig.Backend;
                                 _config.Hardware = newConfig.Hardware;
-                                _config.Monitoring = newConfig.Monitoring;
+                                // Monitoring section removed (merged into Hardware)
                                 _config.Logging = newConfig.Logging;
 
                                 Log.Information("IPC: Configuration saved to {Path}", PathResolver.ConfigPath);
 
                                 // Apply log level change immediately (same logic as CommandHandler)
-                                if (logLevelChanged && !string.IsNullOrEmpty(newConfig.Logging.LogLevel))
+                                if (logLevelChanged && !string.IsNullOrEmpty(newConfig.Agent.LogLevel))
                                 {
-                                    var upperLevel = newConfig.Logging.LogLevel.ToUpperInvariant();
+                                    var upperLevel = newConfig.Agent.LogLevel.ToUpperInvariant();
                                     var serilogLevel = upperLevel switch
                                     {
                                         "TRACE" => Serilog.Events.LogEventLevel.Verbose,
@@ -254,7 +254,7 @@ public class NamedPipeHost : IDisposable
 
                                     // Update the global LoggingLevelSwitch (same as CommandHandler does)
                                     Program.LogLevelSwitch.MinimumLevel = serilogLevel;
-                                    Log.Information("IPC: Log level changed to {Level}", newConfig.Logging.LogLevel);
+                                    Log.Information("IPC: Log level changed to {Level}", newConfig.Agent.LogLevel);
                                 }
 
                                 // FORCE FRONTEND UPDATE:

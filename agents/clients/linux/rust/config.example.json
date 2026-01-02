@@ -1,22 +1,20 @@
 {
   "agent": {
-    "id": "OS-mysystem-randomhash",
+    "id": "linux-hostname-randomhash",
     "name": "hostname-or-custom-name",
     "update_interval": 3.0,
     "log_level": "INFO"
   },
   "backend": {
     "server_url": "ws://192.168.1.100:3000/websocket",
-    "reconnect_interval": 30.0,
+    "reconnect_interval": 5.0,
     "max_reconnect_attempts": -1,
     "connection_timeout": 10.0
   },
   "hardware": {
     "enable_fan_control": true,
     "enable_sensor_monitoring": true,
-    "fan_safety_minimum": 30,
-    "filter_duplicate_sensors": false,
-    "duplicate_sensor_tolerance": 2.0,
+    "failsafe_speed": 70,
     "fan_step_percent": 5,
     "hysteresis_temp": 3.0,
     "emergency_temp": 80.0

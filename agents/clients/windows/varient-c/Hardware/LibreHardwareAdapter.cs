@@ -12,7 +12,6 @@ namespace Pankha.WindowsAgent.Hardware;
 public class LibreHardwareAdapter : IHardwareMonitor
 {
     private readonly HardwareSettings _settings;
-    private readonly MonitoringSettings _monitoringSettings;
     private readonly Computer _computer;
     private readonly DateTime _startTime;
     private readonly ILogger _logger;
@@ -38,10 +37,9 @@ public class LibreHardwareAdapter : IHardwareMonitor
     private const double FULL_DISCOVERY_INTERVAL_MINUTES = 5.0;
     private bool _forceRediscovery = true; // Force rediscovery on startup/reconnection
 
-    public LibreHardwareAdapter(HardwareSettings settings, MonitoringSettings monitoringSettings, ILogger logger)
+    public LibreHardwareAdapter(HardwareSettings settings, ILogger logger)
     {
         _settings = settings;
-        _monitoringSettings = monitoringSettings;
         _logger = logger;
         _startTime = DateTime.UtcNow;
 
@@ -141,20 +139,8 @@ public class LibreHardwareAdapter : IHardwareMonitor
             }
         }
 
-        // Apply sensor deduplication if enabled
-        if (_monitoringSettings.FilterDuplicateSensors && sensors.Count > 1)
-        {
-            _logger.Debug("Applying sensor deduplication with {Tolerance}°C tolerance",
-                _monitoringSettings.DuplicateSensorTolerance);
-            sensors = SensorDeduplicator.Deduplicate(
-                sensors,
-                _monitoringSettings.DuplicateSensorTolerance,
-                _logger);
-        }
-        else
-        {
-            _logger.Debug("Discovered {Count} sensors (deduplication disabled)", sensors.Count);
-        }
+        // Sensor deduplication removed (deprecated feature)
+        _logger.Debug("Discovered {Count} sensors", sensors.Count);
 
         return sensors;
     }
@@ -681,15 +667,13 @@ public class LibreHardwareAdapter : IHardwareMonitor
         await Task.WhenAll(tasks);
     }
 
-    // TODO: Make FAILSAFE_SPEED configurable via config.json
-    private const int FAILSAFE_SPEED = 70;
-
     /// <summary>
-    /// Enter failsafe mode: GPU fans → auto, other fans → 70%
+    /// Enter failsafe mode: GPU fans → auto, other fans → configured failsafe speed
     /// </summary>
     public async Task EnterFailsafeModeAsync()
     {
-        _logger.Information("Entering failsafe mode: GPU→auto, others→{Speed}%", FAILSAFE_SPEED);
+        var failsafeSpeed = _settings.FailsafeSpeed;
+        _logger.Information("Entering failsafe mode: GPU→auto, others→{Speed}%", failsafeSpeed);
 
         var tasks = new List<Task>();
 
@@ -707,9 +691,9 @@ public class LibreHardwareAdapter : IHardwareMonitor
                         return;
                     }
 
-                    // All other fans: Set to failsafe speed (70%)
-                    await SetFanSpeedAsync(fan.Id, FAILSAFE_SPEED);
-                    _logger.Information("Fan {FanId} set to {Speed}% (failsafe)", fan.Id, FAILSAFE_SPEED);
+                    // All other fans: Set to configurable failsafe speed
+                    await SetFanSpeedAsync(fan.Id, failsafeSpeed);
+                    _logger.Information("Fan {FanId} set to {Speed}% (failsafe)", fan.Id, failsafeSpeed);
                 }
                 catch (Exception ex)
                 {
@@ -719,7 +703,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
         }
 
         await Task.WhenAll(tasks);
-        _logger.Warning("FAILSAFE MODE ACTIVE: GPU fans on auto, others at {Speed}%", FAILSAFE_SPEED);
+        _logger.Warning("FAILSAFE MODE ACTIVE: GPU fans on auto, others at {Speed}%", failsafeSpeed);
     }
 
     /// <summary>
@@ -738,18 +722,18 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
     /// <summary>
     /// Get the maximum temperature across all sensors
+    /// Used by ConnectionWatchdog for emergency temperature detection during failsafe mode
     /// </summary>
     public async Task<double> GetMaxTemperatureAsync()
     {
-        await UpdateAsync();
-
-        var maxTemp = _sensorCache.Values
-            .Where(s => s.Type == "temperature")
-            .Select(s => s.Temperature)
-            .DefaultIfEmpty(0.0)
-            .Max();
-
-        return maxTemp;
+        // FIX: Use DiscoverSensorsAsync() to get actual sensor data
+        // Previous bug: _sensorCache was never populated, so this always returned 0.0
+        var sensors = await DiscoverSensorsAsync();
+        
+        if (!sensors.Any())
+            return 0.0;
+        
+        return sensors.Max(s => s.Temperature);
     }
 
     /// <summary>

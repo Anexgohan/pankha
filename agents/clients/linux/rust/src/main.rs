@@ -100,13 +100,14 @@ pub struct BackendSettings {
 pub struct HardwareSettings {
     pub enable_fan_control: bool,
     pub enable_sensor_monitoring: bool,
-    pub fan_safety_minimum: u8,
-    pub filter_duplicate_sensors: bool,
-    pub duplicate_sensor_tolerance: f64,
     pub fan_step_percent: u8,        // 3, 5, 10, 15, 25, 50, 100 (disable)
     pub hysteresis_temp: f64,        // 0.5-10.0°C (0.0 = disable)
     pub emergency_temp: f64,         // 70-100°C - used for local failsafe mode
+    #[serde(default = "default_failsafe_speed")]
+    pub failsafe_speed: u8,          // 0-100% - fan speed during failsafe mode
 }
+
+fn default_failsafe_speed() -> u8 { 70 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingSettings {
@@ -145,12 +146,10 @@ impl Default for AgentConfig {
             hardware: HardwareSettings {
                 enable_fan_control: true,
                 enable_sensor_monitoring: true,
-                fan_safety_minimum: 30,
-                filter_duplicate_sensors: false,
-                duplicate_sensor_tolerance: 1.0,
                 fan_step_percent: 5,
                 hysteresis_temp: 3.0,
                 emergency_temp: 85.0,
+                failsafe_speed: 70,
             },
             logging: LoggingSettings {
                 enable_file_logging: true,
@@ -769,14 +768,7 @@ impl HardwareMonitor for LinuxHardwareMonitor {
             self.read_sensors_from_cache().await?
         };
 
-        // Apply deduplication if enabled
-        let final_sensors = if self.config.filter_duplicate_sensors {
-            Self::deduplicate_sensors(sensors, self.config.duplicate_sensor_tolerance)
-        } else {
-            sensors
-        };
-
-        Ok(final_sensors)
+        Ok(sensors)
     }
 
     async fn discover_fans(&self) -> Result<Vec<Fan>> {
@@ -896,54 +888,6 @@ impl HardwareMonitor for LinuxHardwareMonitor {
 
 #[cfg(target_os = "linux")]
 impl LinuxHardwareMonitor {
-    fn deduplicate_sensors(sensors: Vec<Sensor>, _tolerance: f64) -> Vec<Sensor> {
-        // Group sensors by temperature (within tolerance)
-        let mut temp_groups: HashMap<String, Vec<Sensor>> = HashMap::new();
-
-        for sensor in sensors {
-            let temp_key = format!("{:.1}", sensor.temperature);
-            temp_groups.entry(temp_key).or_insert_with(Vec::new).push(sensor);
-        }
-
-        let mut deduplicated = Vec::new();
-
-        for (_temp, group) in temp_groups {
-            if group.len() == 1 {
-                deduplicated.push(group[0].clone());
-            } else {
-                // Select best sensor based on chip priority
-                let best = Self::select_best_sensor(&group);
-                deduplicated.push(best);
-            }
-        }
-
-        deduplicated
-    }
-
-    fn select_best_sensor(sensors: &[Sensor]) -> Sensor {
-        let chip_priority = |chip: &str| -> i32 {
-            let chip_lower = chip.to_lowercase();
-            if chip_lower.contains("k10temp") || chip_lower.contains("coretemp") {
-                100
-            } else if chip_lower.contains("it8") || chip_lower.contains("nct") {
-                90
-            } else if chip_lower.contains("nvme") {
-                80
-            } else if chip_lower.contains("wmi") {
-                50
-            } else if chip_lower.contains("acpi") {
-                40
-            } else {
-                30
-            }
-        };
-
-        sensors.iter()
-            .max_by_key(|s| chip_priority(s.chip.as_deref().unwrap_or("")))
-            .cloned()
-            .unwrap()
-    }
-
     // Method to force hardware rediscovery (no longer needed without caching, but kept for API compatibility)
     pub async fn rediscover_hardware(&self) -> Result<()> {
         info!("Hardware rediscovery requested (no caching, always fresh)");
@@ -1109,9 +1053,6 @@ impl WebSocketClient {
         }
     }
 
-    // TODO: Make failsafe_speed configurable via config.json
-    const FAILSAFE_SPEED: u8 = 70;
-
     /// Enter failsafe mode - set all fans to failsafe speed and enable local temp monitoring
     async fn enter_failsafe_mode(&self) -> Result<()> {
         let mut failsafe = self.failsafe_active.write().await;
@@ -1121,11 +1062,16 @@ impl WebSocketClient {
         *failsafe = true;
         drop(failsafe);
 
+        // Read configurable failsafe speed
+        let config = self.config.read().await;
+        let failsafe_speed = config.hardware.failsafe_speed;
+        drop(config);
+
         warn!("⚠️ ENTERING FAILSAFE MODE - Backend disconnected");
-        warn!("Setting all fans to {}% (failsafe speed)", Self::FAILSAFE_SPEED);
+        warn!("Setting all fans to {}% (failsafe speed)", failsafe_speed);
 
         // Set all fans to failsafe speed
-        if let Err(e) = self.set_all_fans_to_speed(Self::FAILSAFE_SPEED).await {
+        if let Err(e) = self.set_all_fans_to_speed(failsafe_speed).await {
             error!("Failed to set failsafe fan speed: {}", e);
         }
 
@@ -1412,11 +1358,10 @@ impl WebSocketClient {
                 "name": config.agent.name,
                 "agent_version": env!("CARGO_PKG_VERSION"),
                 "update_interval": config.agent.update_interval as u64, // Send in seconds to match frontend/backend format
-                "filter_duplicate_sensors": config.hardware.filter_duplicate_sensors,
-                "duplicate_sensor_tolerance": config.hardware.duplicate_sensor_tolerance,
                 "fan_step_percent": config.hardware.fan_step_percent,
                 "hysteresis_temp": config.hardware.hysteresis_temp,
                 "emergency_temp": config.hardware.emergency_temp,
+                "failsafe_speed": config.hardware.failsafe_speed,
                 "log_level": config.agent.log_level.clone(),
                 "capabilities": {
                     "sensors": sensors,
@@ -1506,24 +1451,6 @@ impl WebSocketClient {
                                 error!("Failed to apply update_interval: {}", e);
                             } else {
                                 info!("Applied update_interval: {}s", interval);
-                            }
-                        }
-
-                        // Apply filter_duplicate_sensors
-                        if let Some(enabled) = config.get("filter_duplicate_sensors").and_then(|v| v.as_bool()) {
-                            if let Err(e) = self.set_sensor_deduplication(enabled).await {
-                                error!("Failed to apply filter_duplicate_sensors: {}", e);
-                            } else {
-                                info!("Applied filter_duplicate_sensors: {}", enabled);
-                            }
-                        }
-
-                        // Apply duplicate_sensor_tolerance
-                        if let Some(tolerance) = config.get("duplicate_sensor_tolerance").and_then(|v| v.as_f64()) {
-                            if let Err(e) = self.set_sensor_tolerance(tolerance).await {
-                                error!("Failed to apply duplicate_sensor_tolerance: {}", e);
-                            } else {
-                                info!("Applied duplicate_sensor_tolerance: {}", tolerance);
                             }
                         }
 
@@ -1625,26 +1552,6 @@ impl WebSocketClient {
                     (false, Some("Missing or invalid interval".to_string()), serde_json::json!({}))
                 }
             }
-            "setSensorDeduplication" => {
-                if let Some(enabled) = payload.get("enabled").and_then(|v| v.as_bool()) {
-                    match self.set_sensor_deduplication(enabled).await {
-                        Ok(_) => (true, None, serde_json::json!({"enabled": enabled})),
-                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
-                    }
-                } else {
-                    (false, Some("Missing or invalid enabled flag".to_string()), serde_json::json!({}))
-                }
-            }
-            "setSensorTolerance" => {
-                if let Some(tolerance) = payload.get("tolerance").and_then(|v| v.as_f64()) {
-                    match self.set_sensor_tolerance(tolerance).await {
-                        Ok(_) => (true, None, serde_json::json!({"tolerance": tolerance})),
-                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
-                    }
-                } else {
-                    (false, Some("Missing or invalid tolerance".to_string()), serde_json::json!({}))
-                }
-            }
             "setFanStep" => {
                 if let Some(step) = payload.get("step").and_then(|v| v.as_u64()) {
                     match self.set_fan_step(step as u8).await {
@@ -1738,49 +1645,6 @@ impl WebSocketClient {
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
         info!("Update interval changed: {}s → {}s (saved to config)", old_interval, interval);
-        Ok(())
-    }
-
-    async fn set_sensor_deduplication(&self, enabled: bool) -> Result<()> {
-        // Update config quickly with minimal lock time
-        {
-            let mut config = self.config.write().await;
-            config.hardware.filter_duplicate_sensors = enabled;
-        } // Lock released here
-
-        // Perform I/O outside of lock
-        let config_path = std::env::current_exe()?
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
-            .join("config.json");
-
-        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
-
-        info!("Sensor deduplication changed to: {} (saved to config)", enabled);
-        Ok(())
-    }
-
-    async fn set_sensor_tolerance(&self, tolerance: f64) -> Result<()> {
-        // Validate tolerance range (0.25-5.0°C)
-        if tolerance < 0.25 || tolerance > 5.0 {
-            return Err(anyhow::anyhow!("Invalid tolerance: {}. Must be between 0.25 and 5.0°C", tolerance));
-        }
-
-        // Update config quickly with minimal lock time
-        {
-            let mut config = self.config.write().await;
-            config.hardware.duplicate_sensor_tolerance = tolerance;
-        } // Lock released here
-
-        // Perform I/O outside of lock
-        let config_path = std::env::current_exe()?
-            .parent()
-            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
-            .join("config.json");
-
-        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
-
-        info!("Sensor tolerance changed to: {}°C (saved to config)", tolerance);
         Ok(())
     }
 
@@ -1916,6 +1780,48 @@ impl WebSocketClient {
 // CONFIGURATION MANAGEMENT
 // ============================================================================
 
+/// Migrate config to current version (removes deprecated, adds new fields)
+/// Phase 3: Config Migration - handles old configs automatically
+fn migrate_config(config_path: &Path) -> Result<bool> {
+    if !config_path.exists() {
+        return Ok(false);
+    }
+    
+    let content = std::fs::read_to_string(config_path)?;
+    let mut json: serde_json::Value = serde_json::from_str(&content)?;
+    let mut migrated = false;
+    
+    // === REMOVALS ===
+    if let Some(hardware) = json.get_mut("hardware").and_then(|h| h.as_object_mut()) {
+        if hardware.remove("filter_duplicate_sensors").is_some() {
+            info!("Migrated: removed 'filter_duplicate_sensors'");
+            migrated = true;
+        }
+        if hardware.remove("duplicate_sensor_tolerance").is_some() {
+            info!("Migrated: removed 'duplicate_sensor_tolerance'");
+            migrated = true;
+        }
+        if hardware.remove("fan_safety_minimum").is_some() {
+            info!("Migrated: removed 'fan_safety_minimum' (replaced by failsafe_speed)");
+            migrated = true;
+        }
+        
+        // === ADDITIONS ===
+        if !hardware.contains_key("failsafe_speed") {
+            hardware.insert("failsafe_speed".to_string(), serde_json::json!(70));
+            info!("Migrated: added 'failsafe_speed' with default 70");
+            migrated = true;
+        }
+    }
+    
+    if migrated {
+        std::fs::write(config_path, serde_json::to_string_pretty(&json)?)?;
+        info!("Config migrated to latest version: {:?}", config_path);
+    }
+    
+    Ok(migrated)
+}
+
 pub async fn load_config(path: Option<&str>) -> Result<AgentConfig> {
     let config_path = if let Some(p) = path {
         PathBuf::from(p)
@@ -1927,6 +1833,11 @@ pub async fn load_config(path: Option<&str>) -> Result<AgentConfig> {
             .to_path_buf();
         exe_dir.join("config.json")
     };
+
+    // Migrate config first (handles old configs automatically)
+    if let Err(e) = migrate_config(&config_path) {
+        warn!("Config migration check failed: {}", e);
+    }
 
     if config_path.exists() {
         let content = tokio::fs::read_to_string(&config_path).await?;
@@ -2077,43 +1988,20 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     io::stdin().read_line(&mut fan_control_str)?;
     let enable_fan_control = !fan_control_str.trim().eq_ignore_ascii_case("n");
 
-    // Fan Safety Minimum - default 30
-    let default_fan_min = if let Some(ref existing) = existing_config {
-        existing.hardware.fan_safety_minimum
+    // Failsafe Speed - default 70%
+    let default_failsafe = if let Some(ref existing) = existing_config {
+        existing.hardware.failsafe_speed
     } else {
-        30
+        70
     };
-    print!("Fan safety minimum percentage (0-100%, default {}, 0=allow stop): ", default_fan_min);
+    print!("Failsafe speed when backend disconnected (0-100%, default {}): ", default_failsafe);
     io::stdout().flush()?;
-    let mut fan_min_str = String::new();
-    io::stdin().read_line(&mut fan_min_str)?;
-    let fan_safety_minimum = if fan_min_str.trim().is_empty() {
-        default_fan_min
+    let mut failsafe_str = String::new();
+    io::stdin().read_line(&mut failsafe_str)?;
+    let failsafe_speed = if failsafe_str.trim().is_empty() {
+        default_failsafe
     } else {
-        fan_min_str.trim().parse::<u8>().unwrap_or(default_fan_min).min(100)
-    };
-
-    // Filter Duplicates - default n (false)
-    print!("Filter Duplicate Sensors? (y/N): ");
-    io::stdout().flush()?;
-    let mut filter_str = String::new();
-    io::stdin().read_line(&mut filter_str)?;
-    let filter_duplicates = filter_str.trim().eq_ignore_ascii_case("y");
-
-    // Tolerance - default 1.0
-    let default_tolerance = if let Some(ref existing) = existing_config {
-        existing.hardware.duplicate_sensor_tolerance
-    } else {
-        1.0
-    };
-    print!("Sensor Tolerance (°C) [{}]: ", default_tolerance);
-    io::stdout().flush()?;
-    let mut tolerance_str = String::new();
-    io::stdin().read_line(&mut tolerance_str)?;
-    let tolerance = if tolerance_str.trim().is_empty() {
-        default_tolerance
-    } else {
-        tolerance_str.trim().parse::<f64>().unwrap_or(default_tolerance)
+        failsafe_str.trim().parse::<u8>().unwrap_or(default_failsafe).min(100)
     };
 
     // Create config
@@ -2133,12 +2021,10 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
         hardware: HardwareSettings {
             enable_fan_control,
             enable_sensor_monitoring: true,
-            fan_safety_minimum,
-            filter_duplicate_sensors: filter_duplicates,
-            duplicate_sensor_tolerance: tolerance,
             fan_step_percent: 5,
             hysteresis_temp: 3.0,
             emergency_temp: 85.0,
+            failsafe_speed,
         },
         logging: LoggingSettings {
             enable_file_logging: true,
@@ -2291,6 +2177,21 @@ WantedBy=multi-user.target
 /// Check if systemd is available on this system
 fn has_systemd() -> bool {
     Path::new("/run/systemd/system").exists()
+}
+
+/// Check if the pankha-agent systemd service is actively managing the process
+/// Returns true if systemd service exists and is active/activating
+fn is_systemd_service_active() -> bool {
+    if !has_systemd() || !Path::new(SYSTEMD_SERVICE_PATH).exists() {
+        return false;
+    }
+    
+    // Check if service is active (running) or activating (starting)
+    process::Command::new("systemctl")
+        .args(["is-active", "--quiet", "pankha-agent"])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
 }
 
 /// Install or repair systemd service for auto-start on boot (idempotent)
@@ -2531,6 +2432,29 @@ fn start_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
 }
 
 fn stop_daemon() -> Result<()> {
+    // Check if systemd service is actively managing the process
+    // If so, delegate to systemctl to prevent auto-restart from Restart=on-failure
+    if is_systemd_service_active() {
+        println!("Agent is managed by systemd. Using systemctl stop...");
+        let status = process::Command::new("systemctl")
+            .args(["stop", "pankha-agent"])
+            .status();
+        
+        match status {
+            Ok(s) if s.success() => {
+                println!("Agent stopped via systemd");
+                return Ok(());
+            }
+            Ok(_) => {
+                eprintln!("WARNING: systemctl stop failed, falling back to manual stop");
+            }
+            Err(e) => {
+                eprintln!("WARNING: Could not run systemctl: {}, falling back to manual stop", e);
+            }
+        }
+    }
+
+    // Manual stop (for non-systemd systems or systemctl fallback)
     if !is_running() {
         eprintln!("WARNING: Agent is not running");
         process::exit(1);
@@ -2566,6 +2490,29 @@ fn stop_daemon() -> Result<()> {
 fn restart_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
     println!("\x1b[32mRestarting pankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
 
+    // Check if systemd service is actively managing the process
+    // If so, delegate to systemctl to prevent auto-restart conflicts
+    if is_systemd_service_active() {
+        println!("Agent is managed by systemd. Using systemctl restart...");
+        let status = process::Command::new("systemctl")
+            .args(["restart", "pankha-agent"])
+            .status();
+        
+        match status {
+            Ok(s) if s.success() => {
+                println!("Agent restarted via systemd");
+                return Ok(());
+            }
+            Ok(_) => {
+                eprintln!("WARNING: systemctl restart failed, falling back to manual restart");
+            }
+            Err(e) => {
+                eprintln!("WARNING: Could not run systemctl: {}, falling back to manual restart", e);
+            }
+        }
+    }
+
+    // Manual restart (for non-systemd systems or systemctl fallback)
     // Stop the agent if it's running
     if is_running() {
         if let Some(pid) = get_pid()? {

@@ -134,7 +134,7 @@
     },
     {
       "profile_name": "Raspberry Pi 5",
-      "description": "Stays at zero RPM till 40°C, kicks in after 40C, stays silent till 60°C and goes full blast at 75°C. Good for SystemOnChipset (SOC) and ARM boards and High RPM 6000RPM+ fans.\nSpecially designed for Raspberry Pi 5 Models to keep Noise Low but give Performance when needed, basically mostly silent but noisy when needed. (Select the CPU sensor not ADC or Highest Temperature)",
+      "description": "Stays at zero RPM till 45°C, kicks in after 45°C, stays silent till 60°C and goes full blast at 75°C. Good for SystemOnChipset (SOC) and ARM boards and High RPM 6000RPM+ fans.\nSpecially designed for Raspberry Pi 5 Models to keep Noise Low but give Performance when needed, basically mostly silent but noisy when needed. (Select the CPU sensor not ADC or Highest Temperature)",
       "profile_type": "custom",
       "curve_points": [
         {
@@ -165,7 +165,7 @@
     },
     {
       "profile_name": "Standard",
-      "description": "Standard curve for most systems.",
+      "description": "Standard curve for most systems. Noisier than Optimal but quieter than Performance.",
       "profile_type": "custom",
       "curve_points": [
         {

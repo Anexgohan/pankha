@@ -12,15 +12,6 @@
       "min": 0.5,
       "max": 30
     },
-    "sensorTolerance": {
-      "label": "Sensor Tolerance",
-      "description": "Temperature tolerance for sensor deduplication",
-      "unit": "°C",
-      "values": [0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
-      "default": 0.5,
-      "min": 0.25,
-      "max": 5.0
-    },
     "fanStep": {
       "label": "Fan Step",
       "description": "Incremental percentage change in fan speed when adjusting towards target temperature",
@@ -63,6 +54,27 @@
       "values": [70, 75, 80, 85, 90, 95, 100],
       "default": 85,
       "min": 70,
+      "max": 100
+    },
+    "failsafeSpeed": {
+      "label": "Failsafe Speed",
+      "description": "Fan speed when backend connection is lost. NVIDIA GPUs reset to auto control.",
+      "unit": "%",
+      "values": [
+        { "value": 0, "label": "0% (allow stop)" },
+        { "value": 10, "label": "10%" },
+        { "value": 20, "label": "20%" },
+        { "value": 30, "label": "30%" },
+        { "value": 40, "label": "40%" },
+        { "value": 50, "label": "50%" },
+        { "value": 60, "label": "60%" },
+        { "value": 70, "label": "70% (default)" },
+        { "value": 80, "label": "80%" },
+        { "value": 90, "label": "90%" },
+        { "value": 100, "label": "100% (max)" }
+      ],
+      "default": 70,
+      "min": 0,
       "max": 100
     },
     "logLevel": {

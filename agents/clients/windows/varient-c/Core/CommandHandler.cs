@@ -8,6 +8,7 @@ namespace Pankha.WindowsAgent.Core;
 
 /// <summary>
 /// Handles commands received from backend
+/// Unified schema - sensor deduplication commands removed
 /// </summary>
 public class CommandHandler
 {
@@ -43,11 +44,7 @@ public class CommandHandler
                 case "setUpdateInterval":
                     return await HandleSetUpdateIntervalAsync(commandId, payload);
 
-                case "setSensorDeduplication":
-                    return await HandleSetSensorDeduplicationAsync(commandId, payload);
-
-                case "setSensorTolerance":
-                    return await HandleSetSensorToleranceAsync(commandId, payload);
+                // Sensor deduplication commands removed (deprecated feature)
 
                 case "setFanStep":
                     return await HandleSetFanStepAsync(commandId, payload);
@@ -105,44 +102,13 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, "Update interval must be between 0.5 and 30 seconds"));
         }
 
-        var oldInterval = _config.Hardware.UpdateInterval;
-        _config.Hardware.UpdateInterval = interval;
+        var oldInterval = _config.Agent.UpdateInterval;
+        _config.Agent.UpdateInterval = interval;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Update interval changed: {Old}s -> {New}s", oldInterval, interval);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { interval }));
-    }
-
-    private Task<CommandResponse> HandleSetSensorDeduplicationAsync(string commandId, Dictionary<string, object> payload)
-    {
-        var enabled = GetPayloadValue<bool>(payload, "enabled");
-
-        var oldEnabled = _config.Monitoring.FilterDuplicateSensors;
-        _config.Monitoring.FilterDuplicateSensors = enabled;
-        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
-
-        _logger.Information("Sensor deduplication changed: {Old} -> {New}", oldEnabled, enabled);
-
-        return Task.FromResult(CreateSuccessResponse(commandId, new { enabled }));
-    }
-
-    private Task<CommandResponse> HandleSetSensorToleranceAsync(string commandId, Dictionary<string, object> payload)
-    {
-        var tolerance = GetPayloadValue<double>(payload, "tolerance");
-
-        if (tolerance < 0.25 || tolerance > 5.0)
-        {
-            return Task.FromResult(CreateErrorResponse(commandId, "Tolerance must be between 0.25°C and 5.0°C"));
-        }
-
-        var oldTolerance = _config.Monitoring.DuplicateSensorTolerance;
-        _config.Monitoring.DuplicateSensorTolerance = tolerance;
-        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
-
-        _logger.Information("Sensor tolerance changed: {Old}C -> {New}C", oldTolerance, tolerance);
-
-        return Task.FromResult(CreateSuccessResponse(commandId, new { tolerance }));
     }
 
     private Task<CommandResponse> HandleSetFanStepAsync(string commandId, Dictionary<string, object> payload)
@@ -155,8 +121,8 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, $"Step must be one of: {string.Join(", ", validSteps)}"));
         }
 
-        var oldStep = _config.Monitoring.FanStepPercent;
-        _config.Monitoring.FanStepPercent = step;
+        var oldStep = _config.Hardware.FanStepPercent;
+        _config.Hardware.FanStepPercent = step;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Fan step changed: {Old}% -> {New}%", oldStep, step);
@@ -173,8 +139,8 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, "Hysteresis must be between 0.0°C and 10.0°C"));
         }
 
-        var oldHysteresis = _config.Monitoring.HysteresisTemp;
-        _config.Monitoring.HysteresisTemp = hysteresis;
+        var oldHysteresis = _config.Hardware.HysteresisTemp;
+        _config.Hardware.HysteresisTemp = hysteresis;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Hysteresis changed: {Old}C -> {New}C", oldHysteresis, hysteresis);
@@ -191,8 +157,8 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, "Emergency temperature must be between 70°C and 100°C"));
         }
 
-        var oldTemp = _config.Hardware.EmergencyTemperature;
-        _config.Hardware.EmergencyTemperature = temp;
+        var oldTemp = _config.Hardware.EmergencyTemp;
+        _config.Hardware.EmergencyTemp = temp;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         _logger.Information("Emergency temperature changed: {Old}C -> {New}C", oldTemp, temp);
@@ -212,8 +178,9 @@ public class CommandHandler
             return Task.FromResult(CreateErrorResponse(commandId, $"Log level must be one of: {string.Join(", ", validLevels)}"));
         }
 
-        // Save to config file
-        _config.Logging.LogLevel = upperLevel;
+        // Save to config file (now in Agent section)
+        var oldLevel = _config.Agent.LogLevel;
+        _config.Agent.LogLevel = upperLevel;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
         // Map to Serilog level
@@ -229,8 +196,6 @@ public class CommandHandler
         };
 
         // Update the global LoggingLevelSwitch - this dynamically changes ALL loggers
-        // This is the Serilog equivalent of Rust agent's tracing_reload_handle.reload()
-        var oldLevel = _config.Logging.LogLevel;
         Pankha.WindowsAgent.Program.LogLevelSwitch.MinimumLevel = serilogLevel;
 
         _logger.Information("Log level changed: {Old} -> {New}", oldLevel, upperLevel);

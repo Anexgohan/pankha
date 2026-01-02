@@ -267,11 +267,11 @@ class Program
                 config.Agent.Validate();
                 config.Backend.Validate();
                 config.Hardware.Validate();
-                config.Monitoring.Validate();
+                // config.Monitoring removed (merged into Hardware)
                 config.Logging.Validate();
 
-                Log.Information("Agent ID: {AgentId}", config.Agent.AgentId);
-                Log.Information("Backend: {Url}", config.Backend.Url);
+                Log.Information("Agent ID: {AgentId}", config.Agent.Id);
+                Log.Information("Backend: {Url}", config.Backend.ServerUrl);
 
                 // Config show command
                 if (configShow)
@@ -416,7 +416,6 @@ class Program
 
         using var hardware = new LibreHardwareAdapter(
             config.Hardware,
-            config.Monitoring,
             Log.Logger);
 
         using var watchdog = new ConnectionWatchdog(
@@ -467,7 +466,6 @@ class Program
 
         using var hardware = new LibreHardwareAdapter(
             config.Hardware,
-            config.Monitoring,
             Log.Logger);
 
         // Test sensor discovery
@@ -535,19 +533,19 @@ class Program
         }
 
         // Backend URL
-        Console.Write($"Backend URL [{config.Backend.Url}]: ");
+        Console.Write($"Backend URL [{config.Backend.ServerUrl}]: ");
         var url = Console.ReadLine();
         if (!string.IsNullOrWhiteSpace(url))
         {
-            config.Backend.Url = url;
+            config.Backend.ServerUrl = url;
         }
 
-        // Update interval
-        Console.Write($"Update interval in seconds [{config.Hardware.UpdateInterval}]: ");
+        // Update interval (now in Agent section)
+        Console.Write($"Update interval in seconds [{config.Agent.UpdateInterval}]: ");
         var intervalStr = Console.ReadLine();
         if (double.TryParse(intervalStr, out var interval))
         {
-            config.Hardware.UpdateInterval = interval;
+            config.Agent.UpdateInterval = interval;
         }
 
         // Fan control
@@ -601,36 +599,31 @@ class Program
         Log.Information("");
 
         Log.Information("📋 Agent Settings:");
-        Log.Information("  Agent ID: {AgentId}", config.Agent.AgentId);
+        Log.Information("  Agent ID: {AgentId}", config.Agent.Id);
         Log.Information("  Name: {Name}", config.Agent.Name);
-        Log.Information("  Hostname: {Hostname}", config.Agent.Hostname);
+        Log.Information("  Update Interval: {Interval}s", config.Agent.UpdateInterval);
+        Log.Information("  Log Level: {Level}", config.Agent.LogLevel);
         Log.Information("");
 
         Log.Information("🌐 Backend Settings:");
-        Log.Information("  URL: {Url}", config.Backend.Url);
-        Log.Information("  Reconnect Interval: {Interval}ms", config.Backend.ReconnectInterval);
+        Log.Information("  URL: {Url}", config.Backend.ServerUrl);
+        Log.Information("  Reconnect Interval: {Interval}s", config.Backend.ReconnectInterval);
         Log.Information("  Max Reconnect Attempts: {Max}", config.Backend.MaxReconnectAttempts == -1 ? "Infinite" : config.Backend.MaxReconnectAttempts.ToString());
         Log.Information("");
 
         Log.Information("🔧 Hardware Settings:");
-        Log.Information("  Update Interval: {Interval}s", config.Hardware.UpdateInterval);
         Log.Information("  Fan Control: {Enabled}", config.Hardware.EnableFanControl ? "Enabled" : "Disabled");
-        Log.Information("  Min Fan Speed: {Min}%", config.Hardware.MinFanSpeed);
-        Log.Information("  Emergency Temperature: {Temp}°C", config.Hardware.EmergencyTemperature);
-        Log.Information("");
-
-        Log.Information("📊 Monitoring Settings:");
-        Log.Information("  Filter Duplicate Sensors: {Enabled}", config.Monitoring.FilterDuplicateSensors ? "Enabled" : "Disabled");
-        Log.Information("  Sensor Tolerance: {Tolerance}°C", config.Monitoring.DuplicateSensorTolerance);
-        Log.Information("  Fan Step: {Step}%", config.Monitoring.FanStepPercent);
-        Log.Information("  Hysteresis: {Hysteresis}°C", config.Monitoring.HysteresisTemp);
+        Log.Information("  Failsafe Speed: {Speed}%", config.Hardware.FailsafeSpeed);
+        Log.Information("  Fan Step: {Step}%", config.Hardware.FanStepPercent);
+        Log.Information("  Hysteresis: {Hysteresis}°C", config.Hardware.HysteresisTemp);
+        Log.Information("  Emergency Temperature: {Temp}°C", config.Hardware.EmergencyTemp);
         Log.Information("");
 
         Log.Information("📝 Logging Settings:");
-        Log.Information("  Log Level: {Level}", config.Logging.LogLevel);
-        Log.Information("  Log Directory: {Dir}", config.Logging.LogDirectory);
-        Log.Information("  Max Log Files: {Max}", config.Logging.MaxLogFiles);
-        Log.Information("  Max Log Size: {Size} MB", config.Logging.MaxLogFileSizeMB);
+        Log.Information("  File Logging: {Enabled}", config.Logging.EnableFileLogging ? "Enabled" : "Disabled");
+        Log.Information("  Log File: {File}", config.Logging.LogFile);
+        Log.Information("  Max Log Size: {Size} MB", config.Logging.MaxLogSizeMb);
+        Log.Information("  Log Retention: {Days} days", config.Logging.LogRetentionDays);
         Log.Information("");
 
         Log.Information("Configuration file: {Path}", CONFIG_PATH);
@@ -651,7 +644,6 @@ class Program
         // Hardware test
         using var hardware = new LibreHardwareAdapter(
             config.Hardware,
-            config.Monitoring,
             Log.Logger);
 
         var sensors = await hardware.DiscoverSensorsAsync();

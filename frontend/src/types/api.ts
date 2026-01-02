@@ -7,7 +7,7 @@ export interface SystemData {
   ip_address?: string;
   api_endpoint: string;
   websocket_endpoint: string;
-  status: 'online' | 'offline' | 'error' | 'installing';
+  status: "online" | "offline" | "error" | "installing";
   last_seen?: string;
   last_data_received?: string;
   sensor_count: number;
@@ -16,15 +16,14 @@ export interface SystemData {
   current_temperatures?: SensorReading[];
   current_fan_speeds?: FanReading[];
   current_update_interval?: number;
-  filter_duplicate_sensors?: boolean;
-  duplicate_sensor_tolerance?: number;
   fan_step_percent?: number;
   hysteresis_temp?: number;
   emergency_temp?: number;
   log_level?: string;
+  failsafe_speed?: number;
   // License limit fields
   read_only?: boolean; // Agent is over license limit (can view but not control)
-  access_status?: 'active' | 'over_limit';
+  access_status?: "active" | "over_limit";
   system_health?: {
     cpuUsage: number;
     memoryUsage: number;
@@ -38,7 +37,7 @@ export interface SensorReading {
   label: string;
   type: string;
   temperature: number;
-  status: 'ok' | 'warning' | 'critical';
+  status: "ok" | "warning" | "critical";
   maxTemp?: number;
   critTemp?: number;
   hardwareName?: string; // Full hardware name (e.g., "AMD Ryzen 9 3900X", "NVIDIA GeForce RTX 2070 SUPER")
@@ -53,7 +52,7 @@ export interface FanReading {
   speed: number;
   rpm: number;
   targetSpeed: number;
-  status: 'ok' | 'error' | 'stopped';
+  status: "ok" | "error" | "stopped";
   dbId?: number; // Database record ID for fan_profile_assignments
 }
 
@@ -67,7 +66,7 @@ export interface SystemOverview {
   avgTemperature: number;
   highestTemperature: number;
   // License limit info
-  agentLimit?: number | 'unlimited';
+  agentLimit?: number | "unlimited";
   overLimit?: boolean;
   tierName?: string;
 }

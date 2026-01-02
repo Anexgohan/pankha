@@ -1,9 +1,9 @@
-import { EventEmitter } from 'events';
-import Database from '../database/database';
-import { AgentDataPacket, SensorInfo, FanInfo } from '../types/agent';
-import { AggregatedSystemData } from '../types/aggregatedData';
-import { AgentManager } from './AgentManager';
-import { log } from '../utils/logger';
+import { EventEmitter } from "events";
+import Database from "../database/database";
+import { AgentDataPacket, SensorInfo, FanInfo } from "../types/agent";
+import { AggregatedSystemData } from "../types/aggregatedData";
+import { AgentManager } from "./AgentManager";
+import { log } from "../utils/logger";
 // Removed AgentCommunication import to prevent circular dependency
 
 // Data buffer for aggregation
@@ -15,8 +15,8 @@ interface DataPoint {
 }
 
 interface SystemDataBuffer {
-  sensors: Map<number, DataPoint[]>;  // sensor_id -> data points
-  fans: Map<number, DataPoint[]>;     // fan_id -> data points
+  sensors: Map<number, DataPoint[]>; // sensor_id -> data points
+  fans: Map<number, DataPoint[]>; // fan_id -> data points
   lastFlush: Date;
 }
 
@@ -29,7 +29,7 @@ export class DataAggregator extends EventEmitter {
   private dataRetentionDays: number; // Configurable via DATA_RETENTION_DAYS env var
 
   // Data aggregation system - raw data to dashboard, aggregated averages to DB
-  private dataBuffer: Map<number, SystemDataBuffer> = new Map();  // system_id -> buffer
+  private dataBuffer: Map<number, SystemDataBuffer> = new Map(); // system_id -> buffer
   private aggregationInterval: NodeJS.Timeout | null = null;
   private aggregationIntervalMinutes: number; // Configurable via DATA_AGGREGATION_INTERVAL_MINUTES env var
 
@@ -39,14 +39,23 @@ export class DataAggregator extends EventEmitter {
     this.agentManager = AgentManager.getInstance();
 
     // Read configuration from environment variables with defaults
-    this.dataRetentionDays = parseInt(process.env.DATA_RETENTION_DAYS || '30', 10);
-    this.aggregationIntervalMinutes = parseInt(process.env.DATA_AGGREGATION_INTERVAL_MINUTES || '5', 10);
+    this.dataRetentionDays = parseInt(
+      process.env.DATA_RETENTION_DAYS || "30",
+      10
+    );
+    this.aggregationIntervalMinutes = parseInt(
+      process.env.DATA_AGGREGATION_INTERVAL_MINUTES || "5",
+      10
+    );
 
-    log.info(`[DataAggregator] Configuration:
+    log.info(
+      `[DataAggregator] Configuration:
   - Retention: ${this.dataRetentionDays} days
   - Aggregation interval: ${this.aggregationIntervalMinutes} minutes
   - Raw data: Sent to dashboard in real-time
-  - Stored data: ${this.aggregationIntervalMinutes}-minute averages only`, 'DataAggregator');
+  - Stored data: ${this.aggregationIntervalMinutes}-minute averages only`,
+      "DataAggregator"
+    );
 
     this.setupEventListeners();
     this.startDataRetentionCleanup();
@@ -67,24 +76,30 @@ export class DataAggregator extends EventEmitter {
     // AgentCommunication import removed to prevent circular dependency
     // Data is now received via direct method call: updateSystemData()
     // this.agentCommunication.on('agentData', this.handleAgentData.bind(this));
-    this.agentManager.on('agentOffline', this.handleAgentOffline.bind(this));
+    this.agentManager.on("agentOffline", this.handleAgentOffline.bind(this));
   }
 
   /**
    * Handle incoming agent data
    */
-  private async handleAgentData(event: { agentId: string; data: AgentDataPacket }): Promise<void> {
+  private async handleAgentData(event: {
+    agentId: string;
+    data: AgentDataPacket;
+  }): Promise<void> {
     const { agentId, data } = event;
-    
+
     try {
       // Get system info from database
       const system = await this.db.get(
-        'SELECT id, name, status FROM systems WHERE agent_id = $1',
+        "SELECT id, name, status FROM systems WHERE agent_id = $1",
         [agentId]
       );
 
       if (!system) {
-        log.warn(`Received data from unknown agent: ${agentId}`, 'DataAggregator');
+        log.warn(
+          `Received data from unknown agent: ${agentId}`,
+          "DataAggregator"
+        );
         return;
       }
 
@@ -102,29 +117,30 @@ export class DataAggregator extends EventEmitter {
         systemId: system.id,
         agentId: agentId,
         systemName: system.name,
-        status: 'online',
+        status: "online",
         lastUpdate: new Date(data.timestamp),
-        sensors: data.sensors.map(sensor => ({
+        sensors: data.sensors.map((sensor) => ({
           id: sensor.id,
           name: sensor.id, // We'll get the proper name from DB if needed
           label: sensor.id,
-          type: 'unknown', // We'll get the proper type from DB if needed
+          type: "unknown", // We'll get the proper type from DB if needed
           temperature: sensor.temperature,
-          status: sensor.status || 'ok',
+          status: sensor.status || "ok",
           maxTemp: sensor.max_temp,
           critTemp: sensor.crit_temp,
-          hardwareName: (sensor as any).hardwareName || (sensor as any).hardware_name // From agent data
+          hardwareName:
+            (sensor as any).hardwareName || (sensor as any).hardware_name, // From agent data
         })),
-        fans: data.fans.map(fan => ({
+        fans: data.fans.map((fan) => ({
           id: fan.id,
           name: fan.id,
           label: fan.id,
           speed: fan.speed,
           rpm: fan.rpm,
           targetSpeed: fan.targetSpeed,
-          status: fan.status
+          status: fan.status,
         })),
-        systemHealth: data.systemHealth
+        systemHealth: data.systemHealth,
       };
 
       // Enrich with database information
@@ -134,12 +150,17 @@ export class DataAggregator extends EventEmitter {
       this.aggregatedData.set(agentId, aggregatedData);
 
       // Emit aggregated data event
-      this.emit('dataAggregated', aggregatedData);
+      this.emit("dataAggregated", aggregatedData);
 
-      log.debug(`Data aggregated for system`, 'DataAggregator', { systemName: system.name, agentId });
-
+      log.debug(`Data aggregated for system`, "DataAggregator", {
+        systemName: system.name,
+        agentId,
+      });
     } catch (error) {
-      log.error(`Failed to aggregate data for agent`, 'DataAggregator', { agentId, error });
+      log.error(`Failed to aggregate data for agent`, "DataAggregator", {
+        agentId,
+        error,
+      });
     }
   }
 
@@ -149,49 +170,55 @@ export class DataAggregator extends EventEmitter {
   private handleAgentOffline(event: { agentId: string }): void {
     const { agentId } = event;
     const data = this.aggregatedData.get(agentId);
-    
+
     if (data) {
-      data.status = 'offline';
+      data.status = "offline";
       data.lastUpdate = new Date();
-      
+
       // Clear temperature data when agent goes offline
-      data.sensors = data.sensors.map(sensor => ({
+      data.sensors = data.sensors.map((sensor) => ({
         ...sensor,
         temperature: 0,
-        status: 'ok' as const
+        status: "ok" as const,
       }));
-      
+
       // Clear fan data when agent goes offline
-      data.fans = data.fans.map(fan => ({
+      data.fans = data.fans.map((fan) => ({
         ...fan,
         speed: 0,
         rpm: 0,
         targetSpeed: 0,
-        status: 'ok' as const
+        status: "ok" as const,
       }));
-      
+
       // Reset system health data
       data.systemHealth = {
         cpuUsage: 0,
         memoryUsage: 0,
-        agentUptime: 0
+        agentUptime: 0,
       };
-      
+
       this.aggregatedData.set(agentId, data);
-      this.emit('systemOffline', data);
-      log.info(`[DataAggregator] Cleared sensor and fan data for offline agent: ${agentId}`, 'DataAggregator');
+      this.emit("systemOffline", data);
+      log.info(
+        `[DataAggregator] Cleared sensor and fan data for offline agent: ${agentId}`,
+        "DataAggregator"
+      );
     }
   }
 
   /**
    * Ensure sensors exist in database (create if missing)
    */
-  private async ensureSensorsExist(systemId: number, sensors: AgentDataPacket['sensors']): Promise<void> {
+  private async ensureSensorsExist(
+    systemId: number,
+    sensors: AgentDataPacket["sensors"]
+  ): Promise<void> {
     if (!sensors || sensors.length === 0) return;
 
     for (const sensor of sensors) {
       const existing = await this.db.get(
-        'SELECT id FROM sensors WHERE system_id = $1 AND sensor_name = $2',
+        "SELECT id FROM sensors WHERE system_id = $1 AND sensor_name = $2",
         [systemId, sensor.id]
       );
 
@@ -206,13 +233,15 @@ export class DataAggregator extends EventEmitter {
             systemId,
             sensor.id,
             sensor.id,
-            sensor.type || 'unknown',
-            'unknown',
+            sensor.type || "unknown",
+            "unknown",
             sensor.max_temp || null,
-            sensor.crit_temp || null
+            sensor.crit_temp || null,
           ]
         );
-        log.debug(`Created sensor record`, 'DataAggregator', { sensorId: sensor.id });
+        log.debug(`Created sensor record`, "DataAggregator", {
+          sensorId: sensor.id,
+        });
       }
     }
   }
@@ -220,12 +249,15 @@ export class DataAggregator extends EventEmitter {
   /**
    * Ensure fans exist in database (create if missing)
    */
-  private async ensureFansExist(systemId: number, fans: AgentDataPacket['fans']): Promise<void> {
+  private async ensureFansExist(
+    systemId: number,
+    fans: AgentDataPacket["fans"]
+  ): Promise<void> {
     if (!fans || fans.length === 0) return;
 
     for (const fan of fans) {
       const existing = await this.db.get(
-        'SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2',
+        "SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2",
         [systemId, fan.id]
       );
 
@@ -235,13 +267,9 @@ export class DataAggregator extends EventEmitter {
           `INSERT INTO fans (
             system_id, fan_name, fan_label, is_controllable
           ) VALUES ($1, $2, $3, true)`,
-          [
-            systemId,
-            fan.id,
-            fan.id
-          ]
+          [systemId, fan.id, fan.id]
         );
-        log.debug(`Created fan record`, 'DataAggregator', { fanId: fan.id });
+        log.debug(`Created fan record`, "DataAggregator", { fanId: fan.id });
       }
     }
   }
@@ -250,7 +278,10 @@ export class DataAggregator extends EventEmitter {
    * Buffer data points for later aggregation (instead of immediate storage)
    * Dashboard gets raw data in real-time, only aggregated averages are stored to DB
    */
-  private async bufferDataPoints(systemId: number, data: AgentDataPacket): Promise<void> {
+  private async bufferDataPoints(
+    systemId: number,
+    data: AgentDataPacket
+  ): Promise<void> {
     const timestamp = new Date(data.timestamp);
 
     // Initialize buffer for system if it doesn't exist
@@ -258,7 +289,7 @@ export class DataAggregator extends EventEmitter {
       this.dataBuffer.set(systemId, {
         sensors: new Map(),
         fans: new Map(),
-        lastFlush: new Date()
+        lastFlush: new Date(),
       });
     }
 
@@ -267,7 +298,7 @@ export class DataAggregator extends EventEmitter {
     // Buffer sensor data points
     for (const sensor of data.sensors) {
       const sensorRecord = await this.db.get(
-        'SELECT id FROM sensors WHERE system_id = $1 AND sensor_name = $2',
+        "SELECT id FROM sensors WHERE system_id = $1 AND sensor_name = $2",
         [systemId, sensor.id]
       );
 
@@ -278,7 +309,7 @@ export class DataAggregator extends EventEmitter {
 
         buffer.sensors.get(sensorRecord.id)!.push({
           temperature: sensor.temperature,
-          timestamp: timestamp
+          timestamp: timestamp,
         });
       }
     }
@@ -286,7 +317,7 @@ export class DataAggregator extends EventEmitter {
     // Buffer fan data points
     for (const fan of data.fans) {
       const fanRecord = await this.db.get(
-        'SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2',
+        "SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2",
         [systemId, fan.id]
       );
 
@@ -298,7 +329,7 @@ export class DataAggregator extends EventEmitter {
         buffer.fans.get(fanRecord.id)!.push({
           speed: fan.speed,
           rpm: fan.rpm,
-          timestamp: timestamp
+          timestamp: timestamp,
         });
       }
     }
@@ -315,7 +346,10 @@ export class DataAggregator extends EventEmitter {
       this.flushAggregatedData();
     }, intervalMs);
 
-    log.info(`[DataAggregator] Started periodic aggregation: ${this.aggregationIntervalMinutes}-minute intervals`, 'DataAggregator');
+    log.info(
+      `[DataAggregator] Started periodic aggregation: ${this.aggregationIntervalMinutes}-minute intervals`,
+      "DataAggregator"
+    );
   }
 
   /**
@@ -331,7 +365,7 @@ export class DataAggregator extends EventEmitter {
 
       // Collect all inserts to perform atomically
       interface AggregatedInsert {
-        type: 'sensor' | 'fan';
+        type: "sensor" | "fan";
         systemId: number;
         sensorId?: number;
         fanId?: number;
@@ -352,14 +386,16 @@ export class DataAggregator extends EventEmitter {
         for (const [sensorId, dataPoints] of buffer.sensors.entries()) {
           if (dataPoints.length === 0) continue;
 
-          const avgTemp = dataPoints.reduce((sum, p) => sum + (p.temperature || 0), 0) / dataPoints.length;
+          const avgTemp =
+            dataPoints.reduce((sum, p) => sum + (p.temperature || 0), 0) /
+            dataPoints.length;
 
           pendingInserts.push({
-            type: 'sensor',
+            type: "sensor",
             systemId,
             sensorId,
             temperature: avgTemp,
-            pointCount: dataPoints.length
+            pointCount: dataPoints.length,
           });
         }
 
@@ -367,16 +403,22 @@ export class DataAggregator extends EventEmitter {
         for (const [fanId, dataPoints] of buffer.fans.entries()) {
           if (dataPoints.length === 0) continue;
 
-          const avgSpeed = Math.round(dataPoints.reduce((sum, p) => sum + (p.speed || 0), 0) / dataPoints.length);
-          const avgRpm = Math.round(dataPoints.reduce((sum, p) => sum + (p.rpm || 0), 0) / dataPoints.length);
+          const avgSpeed = Math.round(
+            dataPoints.reduce((sum, p) => sum + (p.speed || 0), 0) /
+              dataPoints.length
+          );
+          const avgRpm = Math.round(
+            dataPoints.reduce((sum, p) => sum + (p.rpm || 0), 0) /
+              dataPoints.length
+          );
 
           pendingInserts.push({
-            type: 'fan',
+            type: "fan",
             systemId,
             fanId,
             speed: avgSpeed,
             rpm: avgRpm,
-            pointCount: dataPoints.length
+            pointCount: dataPoints.length,
           });
         }
       }
@@ -385,15 +427,26 @@ export class DataAggregator extends EventEmitter {
       if (pendingInserts.length > 0) {
         await this.db.transaction(async (client) => {
           for (const insert of pendingInserts) {
-            if (insert.type === 'sensor') {
+            if (insert.type === "sensor") {
               await client.query(
-                'INSERT INTO monitoring_data (system_id, sensor_id, temperature, timestamp) VALUES ($1, $2, $3, $4)',
-                [insert.systemId, insert.sensorId, insert.temperature, now.toISOString()]
+                "INSERT INTO monitoring_data (system_id, sensor_id, temperature, timestamp) VALUES ($1, $2, $3, $4)",
+                [
+                  insert.systemId,
+                  insert.sensorId,
+                  insert.temperature,
+                  now.toISOString(),
+                ]
               );
             } else {
               await client.query(
-                'INSERT INTO monitoring_data (system_id, fan_id, fan_speed, fan_rpm, timestamp) VALUES ($1, $2, $3, $4, $5)',
-                [insert.systemId, insert.fanId, insert.speed, insert.rpm, now.toISOString()]
+                "INSERT INTO monitoring_data (system_id, fan_id, fan_speed, fan_rpm, timestamp) VALUES ($1, $2, $3, $4, $5)",
+                [
+                  insert.systemId,
+                  insert.fanId,
+                  insert.speed,
+                  insert.rpm,
+                  now.toISOString(),
+                ]
               );
             }
             totalPointsFlushed += insert.pointCount;
@@ -408,11 +461,13 @@ export class DataAggregator extends EventEmitter {
           buffer.lastFlush = now;
         }
 
-        log.info(`[DataAggregator] Flushed ${totalPointsFlushed} raw data points -> ${totalAggregatesStored} aggregated averages to DB (atomic transaction)`, 'DataAggregator');
+        log.info(
+          `[DataAggregator] Flushed ${totalPointsFlushed} raw data points -> ${totalAggregatesStored} aggregated averages to DB (atomic transaction)`,
+          "DataAggregator"
+        );
       }
-
     } catch (error) {
-      log.error('Error flushing aggregated data:', 'DataAggregator', error);
+      log.error("Error flushing aggregated data:", "DataAggregator", error);
       // On error, buffers are NOT cleared - data will be retried on next flush cycle
     }
   }
@@ -420,10 +475,13 @@ export class DataAggregator extends EventEmitter {
   /**
    * Update sensor readings in database
    */
-  private async updateSensorReadings(systemId: number, sensors: AgentDataPacket['sensors']): Promise<void> {
+  private async updateSensorReadings(
+    systemId: number,
+    sensors: AgentDataPacket["sensors"]
+  ): Promise<void> {
     for (const sensor of sensors) {
       await this.db.run(
-        'UPDATE sensors SET current_temp = $1, last_reading = CURRENT_TIMESTAMP WHERE system_id = $2 AND sensor_name = $3',
+        "UPDATE sensors SET current_temp = $1, last_reading = CURRENT_TIMESTAMP WHERE system_id = $2 AND sensor_name = $3",
         [sensor.temperature, systemId, sensor.id]
       );
     }
@@ -432,10 +490,13 @@ export class DataAggregator extends EventEmitter {
   /**
    * Update fan readings in database
    */
-  private async updateFanReadings(systemId: number, fans: AgentDataPacket['fans']): Promise<void> {
+  private async updateFanReadings(
+    systemId: number,
+    fans: AgentDataPacket["fans"]
+  ): Promise<void> {
     for (const fan of fans) {
       await this.db.run(
-        'UPDATE fans SET current_speed = $1, current_rpm = $2, last_command = CURRENT_TIMESTAMP WHERE system_id = $3 AND fan_name = $4',
+        "UPDATE fans SET current_speed = $1, current_rpm = $2, last_command = CURRENT_TIMESTAMP WHERE system_id = $3 AND fan_name = $4",
         [fan.speed, fan.rpm, systemId, fan.id]
       );
     }
@@ -444,18 +505,20 @@ export class DataAggregator extends EventEmitter {
   /**
    * Enrich aggregated data with database information
    */
-  private async enrichAggregatedData(data: AggregatedSystemData): Promise<void> {
+  private async enrichAggregatedData(
+    data: AggregatedSystemData
+  ): Promise<void> {
     // Get hidden sensor groups for this system
     const hiddenGroups = await this.db.all(
-      'SELECT group_name FROM sensor_group_visibility WHERE system_id = $1 AND is_hidden = true',
+      "SELECT group_name FROM sensor_group_visibility WHERE system_id = $1 AND is_hidden = true",
       [data.systemId]
     );
-    const hiddenGroupNames = new Set(hiddenGroups.map(g => g.group_name));
+    const hiddenGroupNames = new Set(hiddenGroups.map((g) => g.group_name));
 
     // Enrich sensor data
     for (const sensor of data.sensors) {
       const sensorInfo = await this.db.get(
-        'SELECT id, sensor_label, sensor_type, temp_max, temp_crit, is_hidden FROM sensors WHERE system_id = $1 AND sensor_name = $2',
+        "SELECT id, sensor_label, sensor_type, temp_max, temp_crit, is_hidden FROM sensors WHERE system_id = $1 AND sensor_name = $2",
         [data.systemId, sensor.id]
       );
 
@@ -463,7 +526,7 @@ export class DataAggregator extends EventEmitter {
         sensor.dbId = sensorInfo.id; // Database record ID for fan_profile_assignments
         sensor.name = sensorInfo.sensor_label || sensor.id;
         sensor.label = sensorInfo.sensor_label || sensor.id;
-        sensor.type = sensorInfo.sensor_type || 'unknown';
+        sensor.type = sensorInfo.sensor_type || "unknown";
         sensor.maxTemp = sensorInfo.temp_max;
         sensor.critTemp = sensorInfo.temp_crit;
 
@@ -473,7 +536,7 @@ export class DataAggregator extends EventEmitter {
         if (!isHidden) {
           // Check if part of hidden group
           const chipMatch = sensor.id.match(/^([a-z0-9_]+?)_\d+$/i);
-          const chipName = chipMatch ? chipMatch[1] : sensor.id.split('_')[0];
+          const chipName = chipMatch ? chipMatch[1] : sensor.id.split("_")[0];
           isHidden = hiddenGroupNames.has(chipName);
         }
 
@@ -484,20 +547,26 @@ export class DataAggregator extends EventEmitter {
     // Enrich fan data
     for (const fan of data.fans) {
       const fanInfo = await this.db.get(
-        'SELECT id, fan_label, target_speed FROM fans WHERE system_id = $1 AND fan_name = $2',
+        "SELECT id, fan_label, target_speed FROM fans WHERE system_id = $1 AND fan_name = $2",
         [data.systemId, fan.id]
       );
 
       if (fanInfo) {
         fan.dbId = fanInfo.id; // Database record ID for fan_profile_assignments
-        log.trace(`Enriched fan with database ID`, 'DataAggregator', { fanId: fan.id, dbId: fanInfo.id });
+        log.trace(`Enriched fan with database ID`, "DataAggregator", {
+          fanId: fan.id,
+          dbId: fanInfo.id,
+        });
         fan.name = fanInfo.fan_label || fan.id;
         fan.label = fanInfo.fan_label || fan.id;
         if (fanInfo.target_speed !== null) {
           fan.targetSpeed = fanInfo.target_speed;
         }
       } else {
-        log.warn(`[DataAggregator] No fan info found for fan ${fan.id} in system ${data.systemId}`, 'DataAggregator');
+        log.warn(
+          `[DataAggregator] No fan info found for fan ${fan.id} in system ${data.systemId}`,
+          "DataAggregator"
+        );
       }
     }
   }
@@ -537,90 +606,109 @@ export class DataAggregator extends EventEmitter {
   /**
    * Update system data from agent data packet
    */
-  public async updateSystemData(agentId: string, dataPacket: AgentDataPacket): Promise<void> {
+  public async updateSystemData(
+    agentId: string,
+    dataPacket: AgentDataPacket
+  ): Promise<void> {
     try {
-      log.trace(`Updating system data`, 'DataAggregator', { agentId });
+      log.trace(`Updating system data`, "DataAggregator", { agentId });
 
       // Get system info from database
-      const system = await this.db.get('SELECT * FROM systems WHERE agent_id = $1', [agentId]);
+      const system = await this.db.get(
+        "SELECT * FROM systems WHERE agent_id = $1",
+        [agentId]
+      );
       if (!system) {
-        log.warn(`System not found for agent ${agentId}`, 'DataAggregator');
+        log.warn(`System not found for agent ${agentId}`, "DataAggregator");
         return;
       }
 
       // Process sensor data
-      const sensors = dataPacket.sensors?.map(sensor => {
-        const temp = sensor.temperature;
-        const critTemp = sensor.crit_temp || 95;
-        
-        // Calculate status on server from raw temperature data
-        let status: 'ok' | 'caution' | 'warning' | 'critical';
-        if (temp >= critTemp) {
-          status = 'critical';
-        } else if (temp >= 70) {
-          status = 'warning';
-        } else if (temp >= 60) {
-          status = 'caution';
-        } else {
-          status = 'ok';
-        }
-        
-        return {
-          id: sensor.id,
-          name: sensor.id,
-          label: sensor.id,
-          type: sensor.type || 'unknown',
-          temperature: temp,
-          status: status,
-          maxTemp: sensor.max_temp,
-          critTemp: sensor.crit_temp,
-          hardwareName: (sensor as any).hardwareName || (sensor as any).hardware_name
-        };
-      }) || [];
+      const sensors =
+        dataPacket.sensors?.map((sensor) => {
+          const temp = sensor.temperature;
+          const critTemp = sensor.crit_temp || 95;
+
+          // Calculate status on server from raw temperature data
+          let status: "ok" | "caution" | "warning" | "critical";
+          if (temp >= critTemp) {
+            status = "critical";
+          } else if (temp >= 70) {
+            status = "warning";
+          } else if (temp >= 60) {
+            status = "caution";
+          } else {
+            status = "ok";
+          }
+
+          return {
+            id: sensor.id,
+            name: sensor.id,
+            label: sensor.id,
+            type: sensor.type || "unknown",
+            temperature: temp,
+            status: status,
+            maxTemp: sensor.max_temp,
+            critTemp: sensor.crit_temp,
+            hardwareName:
+              (sensor as any).hardwareName || (sensor as any).hardware_name,
+          };
+        }) || [];
 
       // Process fan data
-      const fans = dataPacket.fans?.map(fan => ({
-        id: fan.id,
-        name: fan.id,
-        label: fan.id,
-        speed: fan.speed,
-        rpm: fan.rpm,
-        targetSpeed: fan.targetSpeed,
-        status: fan.status === 'error' ? 'error' as const : (fan.status === 'stopped' ? 'stopped' as const : 'ok' as const)
-      })) || [];
+      const fans =
+        dataPacket.fans?.map((fan) => ({
+          id: fan.id,
+          name: fan.id,
+          label: fan.id,
+          speed: fan.speed,
+          rpm: fan.rpm,
+          targetSpeed: fan.targetSpeed,
+          status:
+            fan.status === "error"
+              ? ("error" as const)
+              : fan.status === "stopped"
+              ? ("stopped" as const)
+              : ("ok" as const),
+        })) || [];
 
       // Update aggregated data
       const aggregatedData: AggregatedSystemData = {
         systemId: system.id,
         agentId: agentId,
-        agentVersion: system.agent_version || 'unknown',
+        agentVersion: system.agent_version || "unknown",
         systemName: system.name,
-        status: 'online',
+        status: "online",
         lastUpdate: new Date(),
         sensors: sensors,
         fans: fans,
         systemHealth: {
           cpuUsage: dataPacket.systemHealth?.cpuUsage || 0,
           memoryUsage: dataPacket.systemHealth?.memoryUsage || 0,
-          agentUptime: dataPacket.systemHealth?.agentUptime || 0
+          agentUptime: dataPacket.systemHealth?.agentUptime || 0,
         },
         // Agent configuration from AgentManager
         // NOTE: These values are included so DeltaComputer can detect config changes
         // and send delta updates when user modifies settings via GUI
-        current_update_interval: this.agentManager.getAgentUpdateInterval(agentId),
-        filter_duplicate_sensors: this.agentManager.getAgentSensorDeduplication(agentId),
-        duplicate_sensor_tolerance: this.agentManager.getAgentSensorTolerance(agentId),
+        current_update_interval:
+          this.agentManager.getAgentUpdateInterval(agentId),
+        // filter_duplicate_sensors removed (deprecated)
+        // duplicate_sensor_tolerance removed (deprecated)
         fan_step_percent: this.agentManager.getAgentFanStep(agentId),
         hysteresis_temp: this.agentManager.getAgentHysteresis(agentId),
         emergency_temp: this.agentManager.getAgentEmergencyTemp(agentId),
-        log_level: this.agentManager.getAgentLogLevel(agentId)
+        log_level: this.agentManager.getAgentLogLevel(agentId),
       };
 
       // Enrich with database information (adds dbId, isHidden flag to sensors)
       await this.enrichAggregatedData(aggregatedData);
 
       this.aggregatedData.set(agentId, aggregatedData);
-      log.debug(`Updated aggregated data`, 'DataAggregator', { agentId, sensorCount: sensors.length, fanCount: fans.length });
+      log.debug(`Updated aggregated data`, "DataAggregator", {
+        agentId,
+        sensorCount: sensors.length,
+        fanCount: fans.length,
+      });
 
       // Persist data to PostgreSQL
       try {
@@ -637,16 +725,23 @@ export class DataAggregator extends EventEmitter {
         // Update current fan readings
         await this.updateFanReadings(system.id, dataPacket.fans);
 
-        log.debug(`Persisted data to PostgreSQL`, 'DataAggregator', { agentId });
+        log.debug(`Persisted data to PostgreSQL`, "DataAggregator", {
+          agentId,
+        });
       } catch (dbError) {
-        log.error(`Failed to persist data to PostgreSQL`, 'DataAggregator', { agentId, error: dbError });
+        log.error(`Failed to persist data to PostgreSQL`, "DataAggregator", {
+          agentId,
+          error: dbError,
+        });
       }
 
       // Emit event for real-time updates
-      this.emit('dataAggregated', aggregatedData);
-
+      this.emit("dataAggregated", aggregatedData);
     } catch (error) {
-      log.error(`Failed to update system data`, 'DataAggregator', { agentId, error });
+      log.error(`Failed to update system data`, "DataAggregator", {
+        agentId,
+        error,
+      });
     }
   }
 
@@ -655,15 +750,18 @@ export class DataAggregator extends EventEmitter {
    */
   public removeSystemData(agentId: string): void {
     this.aggregatedData.delete(agentId);
-    log.info(`[DataAggregator] Removed system data from cache: ${agentId}`, 'DataAggregator');
+    log.info(
+      `[DataAggregator] Removed system data from cache: ${agentId}`,
+      "DataAggregator"
+    );
   }
 
   /**
    * Get historical data for a system
    */
   public async getHistoricalData(
-    systemId: number, 
-    startTime: Date, 
+    systemId: number,
+    startTime: Date,
     endTime: Date,
     sensorIds?: number[],
     fanIds?: number[]
@@ -686,22 +784,26 @@ export class DataAggregator extends EventEmitter {
         AND md.timestamp BETWEEN $2 AND $3
     `;
 
-    const params: any[] = [systemId, startTime.toISOString(), endTime.toISOString()];
+    const params: any[] = [
+      systemId,
+      startTime.toISOString(),
+      endTime.toISOString(),
+    ];
     let paramIndex = 4;
 
     if (sensorIds && sensorIds.length > 0) {
-      const placeholders = sensorIds.map(() => `$${paramIndex++}`).join(',');
+      const placeholders = sensorIds.map(() => `$${paramIndex++}`).join(",");
       sql += ` AND (md.sensor_id IN (${placeholders}) OR md.sensor_id IS NULL)`;
       params.push(...sensorIds);
     }
 
     if (fanIds && fanIds.length > 0) {
-      const placeholders = fanIds.map(() => `$${paramIndex++}`).join(',');
+      const placeholders = fanIds.map(() => `$${paramIndex++}`).join(",");
       sql += ` AND (md.fan_id IN (${placeholders}) OR md.fan_id IS NULL)`;
       params.push(...fanIds);
     }
 
-    sql += ' ORDER BY md.timestamp ASC';
+    sql += " ORDER BY md.timestamp ASC";
 
     return await this.db.all(sql, params);
   }
@@ -709,10 +811,14 @@ export class DataAggregator extends EventEmitter {
   /**
    * Get system statistics
    */
-  public async getSystemStatistics(systemId: number, hours: number = 24): Promise<any> {
+  public async getSystemStatistics(
+    systemId: number,
+    hours: number = 24
+  ): Promise<any> {
     const startTime = new Date(Date.now() - hours * 60 * 60 * 1000);
-    
-    const stats = await this.db.get(`
+
+    const stats = await this.db.get(
+      `
       SELECT 
         COUNT(*) as total_readings,
         AVG(temperature) as avg_temp,
@@ -722,7 +828,9 @@ export class DataAggregator extends EventEmitter {
         AVG(fan_rpm) as avg_fan_rpm
       FROM monitoring_data
       WHERE system_id = $1 AND timestamp >= $2
-    `, [systemId, startTime.toISOString()]);
+    `,
+      [systemId, startTime.toISOString()]
+    );
 
     return stats;
   }
@@ -736,7 +844,10 @@ export class DataAggregator extends EventEmitter {
       this.cleanupOldData();
     }, 24 * 60 * 60 * 1000); // 24 hours
 
-    log.info('[DataAggregator] Data retention cleanup started', 'DataAggregator');
+    log.info(
+      "[DataAggregator] Data retention cleanup started",
+      "DataAggregator"
+    );
   }
 
   /**
@@ -744,18 +855,23 @@ export class DataAggregator extends EventEmitter {
    */
   private async cleanupOldData(): Promise<void> {
     try {
-      const cutoffDate = new Date(Date.now() - this.dataRetentionDays * 24 * 60 * 60 * 1000);
-      
+      const cutoffDate = new Date(
+        Date.now() - this.dataRetentionDays * 24 * 60 * 60 * 1000
+      );
+
       const result = await this.db.run(
-        'DELETE FROM monitoring_data WHERE timestamp < $1',
+        "DELETE FROM monitoring_data WHERE timestamp < $1",
         [cutoffDate.toISOString()]
       );
 
       if (result.rowCount && result.rowCount > 0) {
-        log.info(`[DataAggregator] Cleaned up ${result.rowCount} old monitoring records`, 'DataAggregator');
+        log.info(
+          `[DataAggregator] Cleaned up ${result.rowCount} old monitoring records`,
+          "DataAggregator"
+        );
       }
     } catch (error) {
-      log.error('Error cleaning up old data:', 'DataAggregator', error);
+      log.error("Error cleaning up old data:", "DataAggregator", error);
     }
   }
 
@@ -773,7 +889,7 @@ export class DataAggregator extends EventEmitter {
     highestTemperature: number;
   } {
     const systems = this.getAllSystemsData();
-    
+
     let totalSensors = 0;
     let totalFans = 0;
     let tempSum = 0;
@@ -783,7 +899,7 @@ export class DataAggregator extends EventEmitter {
     for (const system of systems) {
       totalSensors += system.sensors.length;
       totalFans += system.fans.length;
-      
+
       for (const sensor of system.sensors) {
         tempSum += sensor.temperature;
         tempCount++;
@@ -795,13 +911,13 @@ export class DataAggregator extends EventEmitter {
 
     return {
       totalSystems: systems.length,
-      onlineSystems: systems.filter(s => s.status === 'online').length,
-      offlineSystems: systems.filter(s => s.status === 'offline').length,
-      systemsWithErrors: systems.filter(s => s.status === 'error').length,
+      onlineSystems: systems.filter((s) => s.status === "online").length,
+      offlineSystems: systems.filter((s) => s.status === "offline").length,
+      systemsWithErrors: systems.filter((s) => s.status === "error").length,
       totalSensors,
       totalFans,
       avgTemperature: tempCount > 0 ? tempSum / tempCount : 0,
-      highestTemperature: highestTemp
+      highestTemperature: highestTemp,
     };
   }
 

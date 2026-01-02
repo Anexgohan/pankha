@@ -1,7 +1,7 @@
-import axios from 'axios';
-import type { SystemData, SystemOverview, SystemHealth } from '../types/api';
+import axios from "axios";
+import type { SystemData, SystemOverview, SystemHealth } from "../types/api";
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -10,18 +10,18 @@ const api = axios.create({
 
 // Health and Overview
 export const getHealth = async () => {
-  const response = await api.get('/health');
+  const response = await api.get("/health");
   return response.data;
 };
 
 export const getOverview = async (): Promise<SystemOverview> => {
-  const response = await api.get('/api/overview');
+  const response = await api.get("/api/overview");
   return response.data;
 };
 
 // Systems
 export const getSystems = async (): Promise<SystemData[]> => {
-  const response = await api.get('/api/systems');
+  const response = await api.get("/api/systems");
   return response.data;
 };
 
@@ -50,113 +50,153 @@ export const getFans = async (id: number) => {
 };
 
 // Sensor and Fan Labels
-export const updateSensorLabel = async (systemId: number, sensorId: number, label: string): Promise<void> => {
-  const response = await api.put(`/api/systems/${systemId}/sensors/${sensorId}/label`, {
-    label
-  });
+export const updateSensorLabel = async (
+  systemId: number,
+  sensorId: number,
+  label: string
+): Promise<void> => {
+  const response = await api.put(
+    `/api/systems/${systemId}/sensors/${sensorId}/label`,
+    {
+      label,
+    }
+  );
   return response.data;
 };
 
-export const updateFanLabel = async (systemId: number, fanId: number, label: string): Promise<void> => {
-  const response = await api.put(`/api/systems/${systemId}/fans/${fanId}/label`, {
-    label
-  });
+export const updateFanLabel = async (
+  systemId: number,
+  fanId: number,
+  label: string
+): Promise<void> => {
+  const response = await api.put(
+    `/api/systems/${systemId}/fans/${fanId}/label`,
+    {
+      label,
+    }
+  );
   return response.data;
 };
 
 // Fan Control
-export const setFanSpeed = async (systemId: number, fanId: string, speed: number, priority: string = 'normal') => {
+export const setFanSpeed = async (
+  systemId: number,
+  fanId: string,
+  speed: number,
+  priority: string = "normal"
+) => {
   const response = await api.put(`/api/systems/${systemId}/fans/${fanId}`, {
     speed,
-    priority
+    priority,
   });
   return response.data;
 };
 
-export const applyFanProfile = async (systemId: number, profileName: string) => {
+export const applyFanProfile = async (
+  systemId: number,
+  profileName: string
+) => {
   const response = await api.put(`/api/systems/${systemId}/profile`, {
-    profile_name: profileName
+    profile_name: profileName,
   });
   return response.data;
 };
 
 // Agent Configuration
-export const setAgentUpdateInterval = async (systemId: number, interval: number, priority: string = 'normal') => {
+export const setAgentUpdateInterval = async (
+  systemId: number,
+  interval: number,
+  priority: string = "normal"
+) => {
   const response = await api.put(`/api/systems/${systemId}/update-interval`, {
     interval,
-    priority
+    priority,
   });
   return response.data;
 };
 
-export const setSensorDeduplication = async (systemId: number, enabled: boolean, priority: string = 'normal') => {
-  const response = await api.put(`/api/systems/${systemId}/sensor-deduplication`, {
-    enabled,
-    priority
-  });
-  return response.data;
-};
-
-export const setSensorTolerance = async (systemId: number, tolerance: number, priority: string = 'normal') => {
-  const response = await api.put(`/api/systems/${systemId}/sensor-tolerance`, {
-    tolerance,
-    priority
-  });
-  return response.data;
-};
-
-export const setFanStep = async (systemId: number, step: number, priority: string = 'normal') => {
+export const setFanStep = async (
+  systemId: number,
+  step: number,
+  priority: string = "normal"
+) => {
   const response = await api.put(`/api/systems/${systemId}/fan-step`, {
     step,
-    priority
+    priority,
   });
   return response.data;
 };
 
-export const setHysteresis = async (systemId: number, hysteresis: number, priority: string = 'normal') => {
+export const setHysteresis = async (
+  systemId: number,
+  hysteresis: number,
+  priority: string = "normal"
+) => {
   const response = await api.put(`/api/systems/${systemId}/hysteresis`, {
     hysteresis,
-    priority
+    priority,
   });
   return response.data;
 };
 
-export const setEmergencyTemp = async (systemId: number, temp: number, priority: string = 'normal') => {
+export const setEmergencyTemp = async (
+  systemId: number,
+  temp: number,
+  priority: string = "normal"
+) => {
   const response = await api.put(`/api/systems/${systemId}/emergency-temp`, {
     temp,
-    priority
+    priority,
   });
   return response.data;
 };
 
-export const setLogLevel = async (systemId: number, level: string, priority: string = 'normal') => {
+export const setLogLevel = async (
+  systemId: number,
+  level: string,
+  priority: string = "normal"
+) => {
   const response = await api.put(`/api/systems/${systemId}/log-level`, {
     level,
-    priority
+    priority,
+  });
+  return response.data;
+};
+
+export const setFailsafeSpeed = async (
+  systemId: number,
+  speed: number,
+  priority: string = "normal"
+) => {
+  const response = await api.put(`/api/systems/${systemId}/failsafe-speed`, {
+    speed,
+    priority,
   });
   return response.data;
 };
 
 // Emergency
 export const emergencyStop = async () => {
-  const response = await api.post('/api/emergency-stop');
+  const response = await api.post("/api/emergency-stop");
   return response.data;
 };
 
 // Backend Controller
 export const getControllerStatus = async () => {
-  const response = await api.get('/api/systems/controller/status');
+  const response = await api.get("/api/systems/controller/status");
   return response.data;
 };
 
 export const setControllerInterval = async (interval: number) => {
-  const response = await api.put('/api/systems/controller/interval', { interval });
+  const response = await api.put("/api/systems/controller/interval", {
+    interval,
+  });
   return response.data;
 };
 
 // WebSocket info
 export const getWebSocketInfo = async () => {
-  const response = await api.get('/api/websocket/info');
+  const response = await api.get("/api/websocket/info");
   return response.data;
 };
 
@@ -168,22 +208,22 @@ export const getFanAssignments = async (systemId: number) => {
 
 // License Management
 export const getLicense = async () => {
-  const response = await api.get('/api/license');
+  const response = await api.get("/api/license");
   return response.data;
 };
 
 export const setLicense = async (licenseKey: string) => {
-  const response = await api.post('/api/license', { licenseKey });
+  const response = await api.post("/api/license", { licenseKey });
   return response.data;
 };
 
 export const getPricing = async () => {
-  const response = await api.get('/api/license/pricing');
+  const response = await api.get("/api/license/pricing");
   return response.data;
 };
 
 export const deleteLicense = async () => {
-  const response = await api.delete('/api/license');
+  const response = await api.delete("/api/license");
   return response.data;
 };
 

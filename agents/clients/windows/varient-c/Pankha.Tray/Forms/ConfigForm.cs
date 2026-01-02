@@ -25,11 +25,9 @@ public class ConfigForm : Form
     private ComboBox _updateIntervalComboBox = null!;  // Changed from NumericUpDown
     private CheckBox _enableFanControlCheckBox = null!;
     private ComboBox _emergencyTempComboBox = null!;   // Changed from NumericUpDown
-    private NumericUpDown _minFanSpeedNumeric = null!;
+    private NumericUpDown _failsafeSpeedNumeric = null!;
 
     // Monitoring Settings
-    private CheckBox _filterDuplicatesCheckBox = null!;
-    private ComboBox _toleranceComboBox = null!;       // Changed from NumericUpDown
     private ComboBox _fanStepComboBox = null!;         // Changed from NumericUpDown
     private ComboBox _hysteresisComboBox = null!;      // Changed from NumericUpDown
 
@@ -92,7 +90,7 @@ public class ConfigForm : Form
 
         var backendY = 22;
         AddTextBoxRow(backendGroup, "URL:", ref _backendUrlTextBox, ref backendY, 80);
-        AddNumericRow(backendGroup, "Reconnect (ms):", ref _reconnectIntervalNumeric, ref backendY, 80, 1000, 60000, 0, 1000);
+        AddNumericRow(backendGroup, "Reconnect (s):", ref _reconnectIntervalNumeric, ref backendY, 80, 1, 60, 0, 1);
 
         y += backendGroup.Height + 10;
 
@@ -118,7 +116,7 @@ public class ConfigForm : Form
         var emergencyItems = emergencyTemps.Select(v => $"{v}°C").ToArray();
         AddComboBoxRow(hardwareGroup, "Emergency Temp:", ref _emergencyTempComboBox, ref hwY, 100, emergencyItems);
 
-        AddNumericRow(hardwareGroup, "Min Fan (%):", ref _minFanSpeedNumeric, ref hwY, 100, 0, 100, 0);
+        AddNumericRow(hardwareGroup, "Failsafe (%):", ref _failsafeSpeedNumeric, ref hwY, 100, 0, 100, 0);
 
         y += hardwareGroup.Height + 10;
 
@@ -132,12 +130,6 @@ public class ConfigForm : Form
         Controls.Add(monitorGroup);
 
         var monY = 22;
-        AddCheckBoxRow(monitorGroup, "Filter Duplicate Sensors", ref _filterDuplicatesCheckBox, ref monY, 150);
-
-        // Populate Sensor Tolerance from UIOptions
-        var tolerances = UIOptions.Instance.GetSensorTolerances();
-        var toleranceItems = tolerances.Select(v => $"{v:F2}°C").ToArray();
-        AddComboBoxRow(monitorGroup, "Tolerance:", ref _toleranceComboBox, ref monY, 100, toleranceItems);
 
         // Populate Fan Step from UIOptions
         var fanSteps = UIOptions.Instance.GetFanSteps();
@@ -295,46 +287,39 @@ public class ConfigForm : Form
             {
                 // Populate form
                 _agentNameTextBox.Text = _currentConfig.Agent.Name;
-                _agentIdTextBox.Text = _currentConfig.Agent.AgentId;
+                _agentIdTextBox.Text = _currentConfig.Agent.Id;
 
-                _backendUrlTextBox.Text = _currentConfig.Backend.Url;
+                _backendUrlTextBox.Text = _currentConfig.Backend.ServerUrl;
                 SetupUrlPlaceholder(); // Apply placeholder logic
-                _reconnectIntervalNumeric.Value = _currentConfig.Backend.ReconnectInterval;
+                _reconnectIntervalNumeric.Value = (decimal)_currentConfig.Backend.ReconnectInterval;
 
-                // Set Update Interval ComboBox
+                // Set Update Interval ComboBox (now in Agent section)
                 var updateIntervals = UIOptions.Instance.GetUpdateIntervals();
-                var updateIdx = Array.IndexOf(updateIntervals, _currentConfig.Hardware.UpdateInterval);
+                var updateIdx = Array.IndexOf(updateIntervals, _currentConfig.Agent.UpdateInterval);
                 if (updateIdx >= 0) _updateIntervalComboBox.SelectedIndex = updateIdx;
 
                 _enableFanControlCheckBox.Checked = _currentConfig.Hardware.EnableFanControl;
 
                 // Set Emergency Temp ComboBox
                 var emergencyTemps = UIOptions.Instance.GetEmergencyTemps();
-                var emergencyIdx = Array.IndexOf(emergencyTemps, (int)_currentConfig.Hardware.EmergencyTemperature);
+                var emergencyIdx = Array.IndexOf(emergencyTemps, (int)_currentConfig.Hardware.EmergencyTemp);
                 if (emergencyIdx >= 0) _emergencyTempComboBox.SelectedIndex = emergencyIdx;
 
-                _minFanSpeedNumeric.Value = _currentConfig.Hardware.MinFanSpeed;
+                _failsafeSpeedNumeric.Value = _currentConfig.Hardware.FailsafeSpeed;
 
-                _filterDuplicatesCheckBox.Checked = _currentConfig.Monitoring.FilterDuplicateSensors;
-
-                // Set Sensor Tolerance ComboBox
-                var tolerances = UIOptions.Instance.GetSensorTolerances();
-                var toleranceIdx = Array.FindIndex(tolerances, t => Math.Abs(t - _currentConfig.Monitoring.DuplicateSensorTolerance) < 0.01);
-                if (toleranceIdx >= 0) _toleranceComboBox.SelectedIndex = toleranceIdx;
-
-                // Set Fan Step ComboBox
+                // Set Fan Step ComboBox (now in Hardware, formerly Monitoring)
                 var fanSteps = UIOptions.Instance.GetFanSteps();
-                var fanStepIdx = Array.FindIndex(fanSteps, f => f.Value == _currentConfig.Monitoring.FanStepPercent);
+                var fanStepIdx = Array.FindIndex(fanSteps, f => f.Value == _currentConfig.Hardware.FanStepPercent);
                 if (fanStepIdx >= 0) _fanStepComboBox.SelectedIndex = fanStepIdx;
 
-                // Set Hysteresis ComboBox
+                // Set Hysteresis ComboBox (now in Hardware, formerly Monitoring)
                 var hysteresis = UIOptions.Instance.GetHysteresisOptions();
-                var hysteresisIdx = Array.FindIndex(hysteresis, h => Math.Abs(h.Value - _currentConfig.Monitoring.HysteresisTemp) < 0.01);
+                var hysteresisIdx = Array.FindIndex(hysteresis, h => Math.Abs(h.Value - _currentConfig.Hardware.HysteresisTemp) < 0.01);
                 if (hysteresisIdx >= 0) _hysteresisComboBox.SelectedIndex = hysteresisIdx;
 
-                // Set Log Level ComboBox
+                // Set Log Level ComboBox (now in Agent section)
                 var logLevels = UIOptions.Instance.GetLogLevels();
-                var level = _currentConfig.Logging.LogLevel ?? "Information";
+                var level = _currentConfig.Agent.LogLevel ?? "INFO";
                 var logLevelIdx = Array.FindIndex(logLevels, l => l.Value.Equals(level, StringComparison.OrdinalIgnoreCase));
                 if (logLevelIdx >= 0)
                     _logLevelComboBox.SelectedIndex = logLevelIdx;
@@ -438,7 +423,7 @@ public class ConfigForm : Form
                     url += "/websocket";
                 }
             }
-            _currentConfig.Backend.Url = url;
+            _currentConfig.Backend.ServerUrl = url;
             // Update the textbox to show the formatted URL (optional, but good UX)
             if (url != "") 
             {
@@ -448,41 +433,34 @@ public class ConfigForm : Form
 
             _currentConfig.Backend.ReconnectInterval = (int)_reconnectIntervalNumeric.Value;
 
-            // Read Update Interval from ComboBox
+            // Read Update Interval from ComboBox (now in Agent section)
             var updateIntervals = UIOptions.Instance.GetUpdateIntervals();
             if (_updateIntervalComboBox.SelectedIndex >= 0 && _updateIntervalComboBox.SelectedIndex < updateIntervals.Length)
-                _currentConfig.Hardware.UpdateInterval = updateIntervals[_updateIntervalComboBox.SelectedIndex];
+                _currentConfig.Agent.UpdateInterval = updateIntervals[_updateIntervalComboBox.SelectedIndex];
 
             _currentConfig.Hardware.EnableFanControl = _enableFanControlCheckBox.Checked;
 
             // Read Emergency Temp from ComboBox
             var emergencyTemps = UIOptions.Instance.GetEmergencyTemps();
             if (_emergencyTempComboBox.SelectedIndex >= 0 && _emergencyTempComboBox.SelectedIndex < emergencyTemps.Length)
-                _currentConfig.Hardware.EmergencyTemperature = emergencyTemps[_emergencyTempComboBox.SelectedIndex];
+                _currentConfig.Hardware.EmergencyTemp = emergencyTemps[_emergencyTempComboBox.SelectedIndex];
 
-            _currentConfig.Hardware.MinFanSpeed = (int)_minFanSpeedNumeric.Value;
+            _currentConfig.Hardware.FailsafeSpeed = (int)_failsafeSpeedNumeric.Value;
 
-            _currentConfig.Monitoring.FilterDuplicateSensors = _filterDuplicatesCheckBox.Checked;
-
-            // Read Sensor Tolerance from ComboBox
-            var tolerances = UIOptions.Instance.GetSensorTolerances();
-            if (_toleranceComboBox.SelectedIndex >= 0 && _toleranceComboBox.SelectedIndex < tolerances.Length)
-                _currentConfig.Monitoring.DuplicateSensorTolerance = tolerances[_toleranceComboBox.SelectedIndex];
-
-            // Read Fan Step from ComboBox
+            // Read Fan Step from ComboBox (now in Hardware, formerly Monitoring)
             var fanSteps = UIOptions.Instance.GetFanSteps();
             if (_fanStepComboBox.SelectedIndex >= 0 && _fanStepComboBox.SelectedIndex < fanSteps.Length)
-                _currentConfig.Monitoring.FanStepPercent = fanSteps[_fanStepComboBox.SelectedIndex].Value;
+                _currentConfig.Hardware.FanStepPercent = fanSteps[_fanStepComboBox.SelectedIndex].Value;
 
-            // Read Hysteresis from ComboBox
+            // Read Hysteresis from ComboBox (now in Hardware, formerly Monitoring)
             var hysteresis = UIOptions.Instance.GetHysteresisOptions();
             if (_hysteresisComboBox.SelectedIndex >= 0 && _hysteresisComboBox.SelectedIndex < hysteresis.Length)
-                _currentConfig.Monitoring.HysteresisTemp = hysteresis[_hysteresisComboBox.SelectedIndex].Value;
+                _currentConfig.Hardware.HysteresisTemp = hysteresis[_hysteresisComboBox.SelectedIndex].Value;
 
-            // Read Log Level from ComboBox
+            // Read Log Level from ComboBox (now in Agent section)
             var logLevels = UIOptions.Instance.GetLogLevels();
             if (_logLevelComboBox.SelectedIndex >= 0 && _logLevelComboBox.SelectedIndex < logLevels.Length)
-                _currentConfig.Logging.LogLevel = logLevels[_logLevelComboBox.SelectedIndex].Value;
+                _currentConfig.Agent.LogLevel = logLevels[_logLevelComboBox.SelectedIndex].Value;
 
             var success = await _ipcClient.SetConfigAsync(_currentConfig);
 

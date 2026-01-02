@@ -58,7 +58,7 @@ public class ConnectionWatchdog : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Connection watchdog started (failsafe threshold: {Seconds}s, emergency temp: {Temp}°C)",
-            MAX_DISCONNECT_SECONDS, _config.Hardware.EmergencyTemperature);
+            MAX_DISCONNECT_SECONDS, _config.Hardware.EmergencyTemp);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -124,7 +124,7 @@ public class ConnectionWatchdog : BackgroundService
         try
         {
             var maxTemp = await _hardware.GetMaxTemperatureAsync();
-            var emergencyTemp = _config.Hardware.EmergencyTemperature;
+            var emergencyTemp = _config.Hardware.EmergencyTemp;
 
             if (maxTemp >= emergencyTemp)
             {

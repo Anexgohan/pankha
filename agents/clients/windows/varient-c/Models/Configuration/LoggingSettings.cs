@@ -4,38 +4,32 @@ namespace Pankha.WindowsAgent.Models.Configuration;
 
 /// <summary>
 /// Logging configuration settings
+/// Unified snake_case schema matching Linux agent
 /// </summary>
 public class LoggingSettings
 {
-    [JsonProperty("logLevel")]
-    public string LogLevel { get; set; } = "INFO";
+    [JsonProperty("enable_file_logging")]
+    public bool EnableFileLogging { get; set; } = true;
 
-    [JsonProperty("logDirectory")]
-    public string LogDirectory { get; set; } = "logs";
+    [JsonProperty("log_file")]
+    public string LogFile { get; set; } = "logs/agent.log";
 
-    [JsonProperty("maxLogFiles")]
-    public int MaxLogFiles { get; set; } = 7;
+    [JsonProperty("max_log_size_mb")]
+    public int MaxLogSizeMb { get; set; } = 50;
 
-    [JsonProperty("maxLogFileSizeMB")]
-    public int MaxLogFileSizeMB { get; set; } = 50;
+    [JsonProperty("log_retention_days")]
+    public int LogRetentionDays { get; set; } = 7;
 
     public void Validate()
     {
-        // Must match Rust agent: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL
-        var validLevels = new[] { "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL" };
-        if (!validLevels.Contains(LogLevel.ToUpperInvariant()))
+        if (MaxLogSizeMb < 1 || MaxLogSizeMb > 500)
         {
-            throw new InvalidOperationException($"Log level must be one of: {string.Join(", ", validLevels)}");
+            throw new InvalidOperationException("Max log size must be between 1MB and 500MB");
         }
 
-        if (MaxLogFiles < 1 || MaxLogFiles > 30)
+        if (LogRetentionDays < 1 || LogRetentionDays > 365)
         {
-            throw new InvalidOperationException("Max log files must be between 1 and 30");
-        }
-
-        if (MaxLogFileSizeMB < 1 || MaxLogFileSizeMB > 500)
-        {
-            throw new InvalidOperationException("Max log file size must be between 1MB and 500MB");
+            throw new InvalidOperationException("Log retention days must be between 1 and 365");
         }
     }
 }

@@ -112,13 +112,13 @@ public class WebSocketClient : IDisposable
         try
         {
             _connectionState = ConnectionState.Connecting;
-            _logger.Information("Connecting to {Url}", _config.Backend.Url);
+            _logger.Information("Connecting to {Url}", _config.Backend.ServerUrl);
 
             _webSocket?.Dispose();
             _webSocket = new ClientWebSocket();
             _webSocket.Options.KeepAliveInterval = TimeSpan.FromSeconds(30);
 
-            var uri = new Uri(_config.Backend.Url);
+            var uri = new Uri(_config.Backend.ServerUrl);
             await _webSocket.ConnectAsync(uri, cancellationToken);
 
             _connectionState = ConnectionState.Connected;
@@ -171,16 +171,14 @@ public class WebSocketClient : IDisposable
                 type = "updateConfig",
                 data = new
                 {
-                    agentId = _config.Agent.AgentId,
+                    agentId = _config.Agent.Id,
                     config = new
                     {
-                        update_interval = (int)_config.Hardware.UpdateInterval, // send as seconds
-                        filter_duplicate_sensors = _config.Monitoring.FilterDuplicateSensors,
-                        duplicate_sensor_tolerance = _config.Monitoring.DuplicateSensorTolerance,
-                        fan_step_percent = _config.Monitoring.FanStepPercent,
-                        hysteresis_temp = _config.Monitoring.HysteresisTemp,
-                        emergency_temp = _config.Hardware.EmergencyTemperature,
-                        log_level = _config.Logging.LogLevel.ToUpperInvariant(),
+                        update_interval = (int)_config.Agent.UpdateInterval, // seconds
+                        fan_step_percent = _config.Hardware.FanStepPercent,
+                        hysteresis_temp = _config.Hardware.HysteresisTemp,
+                        emergency_temp = _config.Hardware.EmergencyTemp,
+                        log_level = _config.Agent.LogLevel.ToUpperInvariant(),
                         name = _config.Agent.Name
                     }
                 }
@@ -213,16 +211,14 @@ public class WebSocketClient : IDisposable
             {
                 Data = new RegisterData
                 {
-                    AgentId = _config.Agent.AgentId,
+                    AgentId = _config.Agent.Id,
                     Name = _config.Agent.Name,
                     AgentVersion = Pankha.WindowsAgent.Platform.VersionHelper.GetVersion(),
-                    UpdateInterval = (int)(_config.Hardware.UpdateInterval * 1000), // seconds to ms
-                    FilterDuplicateSensors = _config.Monitoring.FilterDuplicateSensors,
-                    DuplicateSensorTolerance = _config.Monitoring.DuplicateSensorTolerance,
-                    FanStepPercent = _config.Monitoring.FanStepPercent,
-                    HysteresisTemp = _config.Monitoring.HysteresisTemp,
-                    EmergencyTemp = _config.Hardware.EmergencyTemperature,
-                    LogLevel = _config.Logging.LogLevel.ToUpperInvariant(),
+                    UpdateInterval = (int)(_config.Agent.UpdateInterval * 1000), // seconds to ms
+                    FanStepPercent = _config.Hardware.FanStepPercent,
+                    HysteresisTemp = _config.Hardware.HysteresisTemp,
+                    EmergencyTemp = _config.Hardware.EmergencyTemp,
+                    LogLevel = _config.Agent.LogLevel.ToUpperInvariant(),
                     Capabilities = new Capabilities
                     {
                         Sensors = sensors,
@@ -233,7 +229,7 @@ public class WebSocketClient : IDisposable
             };
 
             await SendMessageAsync(registerMessage, cancellationToken);
-            _logger.Information("Agent registered: {AgentId}", _config.Agent.AgentId);
+            _logger.Information("Agent registered: {AgentId}", _config.Agent.Id);
         }
         catch (Exception ex)
         {
@@ -269,7 +265,7 @@ public class WebSocketClient : IDisposable
             {
                 Data = new DataPayload
                 {
-                    AgentId = _config.Agent.AgentId,
+                    AgentId = _config.Agent.Id,
                     Timestamp = timestamp,
                     Sensors = sensors,
                     Fans = fans,
@@ -401,7 +397,7 @@ public class WebSocketClient : IDisposable
 
                 // IMPORTANT: Read interval from config on EACH iteration
                 // This allows dynamic updates via setUpdateInterval command without restart
-                var interval = TimeSpan.FromSeconds(_config.Hardware.UpdateInterval);
+                var interval = TimeSpan.FromSeconds(_config.Agent.UpdateInterval);
                 await Task.Delay(interval, cancellationToken);
             }
 
@@ -511,7 +507,7 @@ public class WebSocketClient : IDisposable
     {
         // Hardware-safe exponential backoff from Linux agent:
         // Attempt 0: 5s, Attempt 1: 7s, Attempt 2: 10s, Attempt 3+: 15s (capped)
-        var baseDelay = _config.Backend.ReconnectInterval;
+        var baseDelay = (int)(_config.Backend.ReconnectInterval * 1000); // seconds to ms
 
         var delay = _reconnectAttempts switch
         {

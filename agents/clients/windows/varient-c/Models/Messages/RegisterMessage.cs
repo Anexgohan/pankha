@@ -15,7 +15,7 @@ public class RegisterMessage
 }
 
 /// <summary>
-/// Registration data payload
+/// Registration data payload - unified schema
 /// </summary>
 public class RegisterData
 {
@@ -30,12 +30,6 @@ public class RegisterData
 
     [JsonProperty("update_interval")]
     public int UpdateInterval { get; set; } // milliseconds
-
-    [JsonProperty("filter_duplicate_sensors")]
-    public bool FilterDuplicateSensors { get; set; }
-
-    [JsonProperty("duplicate_sensor_tolerance")]
-    public double DuplicateSensorTolerance { get; set; }
 
     [JsonProperty("fan_step_percent")]
     public int FanStepPercent { get; set; }
