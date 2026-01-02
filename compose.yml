@@ -4,6 +4,7 @@
 
 services:
   pankha-app:
+    container_name: pankha_app
     image: anexgohan/pankha:latest
     logging:
       options:
@@ -11,8 +12,8 @@ services:
         max-file: "2"
         compress: "true"
     ports:
-      - "${PANKHA_PORT:-3000}:3000"  # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
-      - "${WS_PORT:-3002}:3002"  # WebSocket server for frontend (host:container) (change left side only, set to your desired port, or set WS_PORT environment variable)
+      - "${PANKHA_PORT:-3000}:3000" # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
+      - "${WS_PORT:-3002}:3002" # WebSocket server for frontend (host:container) (change left side only, set to your desired port, or set WS_PORT environment variable)
     environment:
       - TZ=${TIMEZONE:-UTC}
       - DATABASE_URL=${DATABASE_URL}
@@ -31,6 +32,7 @@ services:
     restart: unless-stopped
 
   pankha-postgres:
+    container_name: pankha_postgres
     image: postgres:17-alpine
     logging:
       options:
@@ -59,8 +61,8 @@ services:
     env_file:
       - .env
     volumes:
-      - ./backend/database/postgres_data:/var/lib/postgresql/data
-      - ./backend/src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./docker-data/database/postgres_data:/var/lib/postgresql/data
+      # - ./backend/src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     restart: unless-stopped
