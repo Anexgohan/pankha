@@ -58,6 +58,12 @@ public class CommandHandler
                 case "setLogLevel":
                     return await HandleSetLogLevelAsync(commandId, payload);
 
+                case "setFailsafeSpeed":
+                    return await HandleSetFailsafeSpeedAsync(commandId, payload);
+
+                case "setEnableFanControl":
+                    return await HandleSetEnableFanControlAsync(commandId, payload);
+
                 case "ping":
                     return CreateSuccessResponse(commandId, new { pong = true });
 
@@ -74,6 +80,13 @@ public class CommandHandler
 
     private async Task<CommandResponse> HandleSetFanSpeedAsync(string commandId, Dictionary<string, object> payload)
     {
+        // Check if fan control is enabled (matching Rust agent behavior)
+        if (!_config.Hardware.EnableFanControl)
+        {
+            _logger.Debug("Ignoring setFanSpeed command (fan control disabled)");
+            return CreateSuccessResponse(commandId, new { message = "Fan control is disabled" });
+        }
+
         var fanId = GetPayloadValue<string>(payload, "fanId");
         var speed = GetPayloadValue<int>(payload, "speed");
 
@@ -201,6 +214,39 @@ public class CommandHandler
         _logger.Information("Log level changed: {Old} -> {New}", oldLevel, upperLevel);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { level = upperLevel }));
+    }
+
+    private Task<CommandResponse> HandleSetFailsafeSpeedAsync(string commandId, Dictionary<string, object> payload)
+    {
+        var speed = GetPayloadValue<int>(payload, "speed");
+
+        if (speed < 0 || speed > 100)
+        {
+            return Task.FromResult(CreateErrorResponse(commandId, "Failsafe speed must be between 0 and 100%"));
+        }
+
+        var oldSpeed = _config.Hardware.FailsafeSpeed;
+        _config.Hardware.FailsafeSpeed = speed;
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
+
+        _logger.Information("✏️ Failsafe Speed changed: {Old}% → {New}%", oldSpeed, speed);
+
+        return Task.FromResult(CreateSuccessResponse(commandId, new { speed }));
+    }
+
+    private Task<CommandResponse> HandleSetEnableFanControlAsync(string commandId, Dictionary<string, object> payload)
+    {
+        var enabled = GetPayloadValue<bool>(payload, "enabled");
+
+        var oldEnabled = _config.Hardware.EnableFanControl;
+        _config.Hardware.EnableFanControl = enabled;
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
+
+        var status = enabled ? "enabled" : "disabled";
+        var oldStatus = oldEnabled ? "enabled" : "disabled";
+        _logger.Information("✏️ Fan Control changed: {Old} → {New}", oldStatus, status);
+
+        return Task.FromResult(CreateSuccessResponse(commandId, new { enabled }));
     }
 
     private T GetPayloadValue<T>(Dictionary<string, object> payload, string key)

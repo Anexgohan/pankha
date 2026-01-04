@@ -175,6 +175,21 @@ export const setFailsafeSpeed = async (
   return response.data;
 };
 
+export const setEnableFanControl = async (
+  systemId: number,
+  enabled: boolean,
+  priority: string = "normal"
+) => {
+  const response = await api.put(
+    `/api/systems/${systemId}/enable-fan-control`,
+    {
+      enabled,
+      priority,
+    }
+  );
+  return response.data;
+};
+
 // Emergency
 export const emergencyStop = async () => {
   const response = await api.post("/api/emergency-stop");

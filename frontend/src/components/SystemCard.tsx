@@ -8,6 +8,7 @@ import {
   setEmergencyTemp,
   setLogLevel,
   setFailsafeSpeed,
+  setEnableFanControl,
   getFanAssignments,
   updateSensorLabel,
   updateFanLabel,
@@ -62,6 +63,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
   );
   const [failsafeSpeed, setFailsafeSpeedLocal] = useState<number>(
     system.failsafe_speed || 70
+  );
+  const [enableFanControl, setEnableFanControlLocal] = useState<boolean>(
+    system.enable_fan_control ?? true
   );
   const [showHiddenSensors, setShowHiddenSensors] = useState(false);
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);
@@ -188,6 +192,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
     if (system.failsafe_speed !== undefined) {
       setFailsafeSpeedLocal(system.failsafe_speed);
     }
+    if (system.enable_fan_control !== undefined) {
+      setEnableFanControlLocal(system.enable_fan_control);
+    }
   }, [
     system.current_update_interval,
     // filter_duplicate_sensors removed (deprecated)
@@ -197,6 +204,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
     system.emergency_temp,
     system.log_level,
     system.failsafe_speed,
+    system.enable_fan_control,
   ]);
 
   // Wrapper to toggle sensor visibility (updates both localStorage and backend)
@@ -490,6 +498,22 @@ const SystemCard: React.FC<SystemCardProps> = ({
     } catch (error) {
       alert(
         "Failed to set failsafe speed: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleEnableFanControlChange = async (enabled: boolean) => {
+    try {
+      setLoading("enable-fan-control");
+      await setEnableFanControl(system.id, enabled);
+      setEnableFanControlLocal(enabled);
+      // No need to call onUpdate() since this doesn't affect displayed data
+    } catch (error) {
+      alert(
+        "Failed to set enable fan control: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
     } finally {
@@ -1002,6 +1026,32 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   {loading === "log-level" && (
                     <span className="loading-spinner">⏳</span>
                   )}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label">Fan Control:</span>
+                  <label
+                    className="checkbox-container"
+                    title={
+                      isReadOnly
+                        ? readOnlyTooltip
+                        : "Enable or disable fan speed control. When disabled, the agent will ignore all fan speed commands."
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={enableFanControl}
+                      onChange={(e) =>
+                        handleEnableFanControlChange(e.target.checked)
+                      }
+                      disabled={loading === "enable-fan-control" || isReadOnly}
+                    />
+                    <span className="checkbox-label">
+                      {enableFanControl ? "Enabled" : "Disabled"}
+                    </span>
+                    {loading === "enable-fan-control" && (
+                      <span className="loading-spinner">⏳</span>
+                    )}
+                  </label>
                 </div>
               </div>
             </>

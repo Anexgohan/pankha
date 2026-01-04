@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS sensors (
   last_reading TIMESTAMP,                   -- Last successful reading
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE
+  FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
+  UNIQUE(system_id, sensor_name)
 );
 
 -- Sensor Group Visibility (tracks which sensor groups are hidden per system)
@@ -82,7 +83,8 @@ CREATE TABLE IF NOT EXISTS fans (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
   FOREIGN KEY (primary_sensor_id) REFERENCES sensors(id) ON DELETE SET NULL,
-  FOREIGN KEY (secondary_sensor_id) REFERENCES sensors(id) ON DELETE SET NULL
+  FOREIGN KEY (secondary_sensor_id) REFERENCES sensors(id) ON DELETE SET NULL,
+  UNIQUE(system_id, fan_name)
 );
 
 -- Fan Profiles (Enhanced for Advanced Curve Management)

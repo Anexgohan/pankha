@@ -19,6 +19,7 @@ export class AgentManager extends EventEmitter {
   private agentEmergencyTemp: Map<string, number> = new Map(); // Track emergency temperature
   private agentLogLevel: Map<string, string> = new Map(); // Track log level
   private agentFailsafeSpeed: Map<string, number> = new Map(); // Track failsafe speed
+  private agentEnableFanControl: Map<string, boolean> = new Map(); // Track enable fan control
   private db: Database;
   private healthCheckInterval: NodeJS.Timeout | null = null;
 
@@ -816,6 +817,48 @@ export class AgentManager extends EventEmitter {
     this.emit("agentConfigUpdated", {
       agentId,
       config: { failsafe_speed: speed },
+    });
+  }
+
+  /**
+   * Get agent enable fan control
+   */
+  public getAgentEnableFanControl(agentId: string): boolean {
+    return this.agentEnableFanControl.get(agentId) ?? true; // Default true (enabled)
+  }
+
+  /**
+   * Set agent enable fan control
+   */
+  public async setAgentEnableFanControl(
+    agentId: string,
+    enabled: boolean,
+    persist: boolean = false
+  ): Promise<void> {
+    this.agentEnableFanControl.set(agentId, enabled);
+
+    if (persist) {
+      try {
+        await this.db.run(
+          "UPDATE systems SET config_data = jsonb_set(COALESCE(config_data, '{}'), '{enable_fan_control}', $1::jsonb) WHERE agent_id = $2",
+          [enabled, agentId]
+        );
+      } catch (error) {
+        log.error(
+          `Failed to persist enable_fan_control for ${agentId}`,
+          "AgentManager",
+          error
+        );
+      }
+    }
+
+    log.info(
+      ` Agent ${agentId} enable fan control set to ${enabled} (persisted: ${persist})`,
+      "AgentManager"
+    );
+    this.emit("agentConfigUpdated", {
+      agentId,
+      config: { enable_fan_control: enabled },
     });
   }
 

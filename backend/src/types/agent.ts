@@ -90,7 +90,8 @@ export interface FanControlCommand {
     | "setHysteresis"
     | "setEmergencyTemp"
     | "setLogLevel"
-    | "setFailsafeSpeed";
+    | "setFailsafeSpeed"
+    | "setEnableFanControl";
   payload: {
     fanId?: string;
     speed?: number;
@@ -107,6 +108,7 @@ export interface FanControlCommand {
     temp?: number; // For setEmergencyTemp command
     level?: string; // For setLogLevel command
     failsafeSpeed?: number; // For setFailsafeSpeed command (0-100%)
+    enabled?: boolean; // For setEnableFanControl command
   };
   timestamp: number;
   priority: "low" | "normal" | "high" | "emergency";

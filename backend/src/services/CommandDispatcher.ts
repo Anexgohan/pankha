@@ -291,6 +291,27 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
+   * Set enable fan control - toggle fan control on/off
+   */
+  public async setEnableFanControl(
+    agentId: string,
+    enabled: boolean,
+    priority: "low" | "normal" | "high" | "emergency" = "normal"
+  ): Promise<any> {
+    log.info(
+      ` Setting enable fan control for agent ${agentId}: ${enabled}`,
+      "CommandDispatcher"
+    );
+
+    return this.sendCommand(
+      agentId,
+      "setEnableFanControl",
+      { enabled },
+      priority
+    );
+  }
+
+  /**
    * Apply a fan profile to a system
    */
   public async applyFanProfile(
@@ -600,6 +621,19 @@ export class CommandDispatcher extends EventEmitter {
         // Persist to database
         await this.saveAgentConfig(pendingCommand.command.agentId, {
           failsafe_speed: response.data.speed,
+        });
+      }
+      if (
+        pendingCommand.command.type === "setEnableFanControl" &&
+        response.data?.enabled !== undefined
+      ) {
+        this.agentManager.setAgentEnableFanControl(
+          pendingCommand.command.agentId,
+          response.data.enabled
+        );
+        // Persist to database
+        await this.saveAgentConfig(pendingCommand.command.agentId, {
+          enable_fan_control: response.data.enabled,
         });
       }
       pendingCommand.resolve(response.data);

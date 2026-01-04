@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import './InlineEdit.css';
+import React, { useState, useEffect, useRef } from "react";
+import "./InlineEdit.css";
 
 interface InlineEditProps {
   value: string;
@@ -13,14 +13,15 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
   value,
   hardwareId,
   onSave,
-  placeholder = 'Click to edit',
-  className = ''
+  placeholder = "Click to edit",
+  className = "",
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const saveInProgressRef = useRef(false);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -39,8 +40,8 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
   };
 
   const handleSave = async () => {
-    if (editValue.trim() === '') {
-      setError('Label cannot be empty');
+    if (editValue.trim() === "") {
+      setError("Label cannot be empty");
       return;
     }
 
@@ -49,15 +50,23 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
       return;
     }
 
+    // Prevent duplicate saves from blur handler
+    if (saveInProgressRef.current) return;
+    saveInProgressRef.current = true;
+
+    // Set isEditing to false BEFORE async save to prevent blur handler from re-triggering
+    setIsEditing(false);
     setIsSaving(true);
     setError(null);
 
     try {
       await onSave(editValue.trim());
-      setIsEditing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save');
+      setError(err instanceof Error ? err.message : "Failed to save");
+      // Re-enable editing on error so user can try again
+      setIsEditing(true);
     } finally {
+      saveInProgressRef.current = false;
       setIsSaving(false);
     }
   };
@@ -69,9 +78,9 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSave();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       handleCancel();
     }
   };

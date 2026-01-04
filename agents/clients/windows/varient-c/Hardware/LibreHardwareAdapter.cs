@@ -547,7 +547,8 @@ public class LibreHardwareAdapter : IHardwareMonitor
     {
         if (!_settings.EnableFanControl)
         {
-            throw new InvalidOperationException("Fan control is disabled in configuration");
+            _logger.Debug("Ignoring SetFanSpeed for fan {FanId} (fan control disabled)", fanId);
+            return; // Return silently - user has disabled fan control
         }
 
         // Validate speed (0-100%, no minimum for testing NVIDIA GPU control)

@@ -21,6 +21,7 @@ export interface SystemData {
   emergency_temp?: number;
   log_level?: string;
   failsafe_speed?: number;
+  enable_fan_control?: boolean;
   // License limit fields
   read_only?: boolean; // Agent is over license limit (can view but not control)
   access_status?: "active" | "over_limit";

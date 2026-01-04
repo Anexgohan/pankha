@@ -205,7 +205,6 @@ pub struct LinuxHardwareMonitor {
     discovered_sensors: Arc<RwLock<HashMap<String, SensorInfo>>>,
     cached_hwmon_count: Arc<RwLock<usize>>,
     last_discovery_from_cache: Arc<RwLock<bool>>,
-    config: HardwareSettings,
     system_info: Arc<RwLock<sysinfo::System>>,
     system_info_cache: Arc<RwLock<Option<(SystemHealth, std::time::Instant)>>>,
     cpu_brand: String,
@@ -240,7 +239,7 @@ struct SensorInfo {
 
 #[cfg(target_os = "linux")]
 impl LinuxHardwareMonitor {
-    pub fn new(config: HardwareSettings) -> Self {
+    pub fn new(_config: HardwareSettings) -> Self {
         // Initialize sysinfo synchronously
         let mut sys = sysinfo::System::new_all();
         // We need to refresh CPU to ensure brand is available
@@ -276,7 +275,6 @@ impl LinuxHardwareMonitor {
             discovered_sensors: Arc::new(RwLock::new(HashMap::new())),
             cached_hwmon_count: Arc::new(RwLock::new(0)),
             last_discovery_from_cache: Arc::new(RwLock::new(false)),
-            config,
             system_info: Arc::new(RwLock::new(sys)),
             system_info_cache: Arc::new(RwLock::new(None)),
             cpu_brand,
@@ -1517,7 +1515,17 @@ impl WebSocketClient {
 
         let (success, error_msg, result_data) = match command_type {
             "setFanSpeed" => {
-                if let (Some(fan_id), Some(speed)) = (
+                // Check if fan control is enabled
+                let fan_control_enabled = {
+                    let config = self.config.read().await;
+                    config.hardware.enable_fan_control
+                };
+                
+                if !fan_control_enabled {
+                    debug!("Ignoring setFanSpeed command (fan control disabled)");
+                    // Return success silently to avoid error spam
+                    (true, None, serde_json::json!({"message": "Fan control is disabled"}))
+                } else if let (Some(fan_id), Some(speed)) = (
                     payload.get("fanId").and_then(|v| v.as_str()),
                     payload.get("speed").and_then(|v| v.as_u64())
                 ) {
@@ -1590,6 +1598,26 @@ impl WebSocketClient {
                     }
                 } else {
                     (false, Some("Missing or invalid log level".to_string()), serde_json::json!({}))
+                }
+            }
+            "setFailsafeSpeed" => {
+                if let Some(speed) = payload.get("speed").and_then(|v| v.as_u64()) {
+                    match self.set_failsafe_speed(speed as u8).await {
+                        Ok(_) => (true, None, serde_json::json!({"speed": speed})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid speed".to_string()), serde_json::json!({}))
+                }
+            }
+            "setEnableFanControl" => {
+                if let Some(enabled) = payload.get("enabled").and_then(|v| v.as_bool()) {
+                    match self.set_enable_fan_control(enabled).await {
+                        Ok(_) => (true, None, serde_json::json!({"enabled": enabled})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid enabled".to_string()), serde_json::json!({}))
                 }
             }
             "ping" => (true, None, serde_json::json!({"pong": true})),
@@ -1768,6 +1796,55 @@ impl WebSocketClient {
             warn!("✏️  Log Level changed: {} → {} (filter reload unavailable)", old_level, level.to_uppercase());
         }
 
+        Ok(())
+    }
+
+    async fn set_failsafe_speed(&self, speed: u8) -> Result<()> {
+        // Validate: 0-100%
+        if speed > 100 {
+            return Err(anyhow::anyhow!("Invalid failsafe speed: {}. Must be 0-100%", speed));
+        }
+
+        // Update config quickly with minimal lock time
+        let old_speed;
+        {
+            let mut config = self.config.write().await;
+            old_speed = config.hardware.failsafe_speed;
+            config.hardware.failsafe_speed = speed;
+        } // Lock released here
+
+        // Perform I/O outside of lock
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
+
+        info!("✏️  Failsafe Speed changed: {}% → {}%", old_speed, speed);
+        Ok(())
+    }
+
+    async fn set_enable_fan_control(&self, enabled: bool) -> Result<()> {
+        // Update config quickly with minimal lock time
+        let old_enabled;
+        {
+            let mut config = self.config.write().await;
+            old_enabled = config.hardware.enable_fan_control;
+            config.hardware.enable_fan_control = enabled;
+        } // Lock released here
+
+        // Perform I/O outside of lock
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
+
+        let status = if enabled { "enabled" } else { "disabled" };
+        let old_status = if old_enabled { "enabled" } else { "disabled" };
+        info!("✏️  Fan Control changed: {} → {}", old_status, status);
         Ok(())
     }
 

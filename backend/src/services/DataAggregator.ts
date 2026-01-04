@@ -209,6 +209,7 @@ export class DataAggregator extends EventEmitter {
 
   /**
    * Ensure sensors exist in database (create if missing)
+   * Uses INSERT ... ON CONFLICT to avoid race condition duplicates
    */
   private async ensureSensorsExist(
     systemId: number,
@@ -217,37 +218,29 @@ export class DataAggregator extends EventEmitter {
     if (!sensors || sensors.length === 0) return;
 
     for (const sensor of sensors) {
-      const existing = await this.db.get(
-        "SELECT id FROM sensors WHERE system_id = $1 AND sensor_name = $2",
-        [systemId, sensor.id]
+      // Use ON CONFLICT to handle race conditions - if sensor already exists, do nothing
+      await this.db.run(
+        `INSERT INTO sensors (
+          system_id, sensor_name, sensor_label, sensor_type, sensor_chip,
+          temp_max, temp_crit, is_available
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+        ON CONFLICT (system_id, sensor_name) DO NOTHING`,
+        [
+          systemId,
+          sensor.id,
+          sensor.id,
+          sensor.type || "unknown",
+          "unknown",
+          sensor.max_temp || null,
+          sensor.crit_temp || null,
+        ]
       );
-
-      if (!existing) {
-        // Create new sensor record
-        await this.db.run(
-          `INSERT INTO sensors (
-            system_id, sensor_name, sensor_label, sensor_type, sensor_chip,
-            temp_max, temp_crit, is_available
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
-          [
-            systemId,
-            sensor.id,
-            sensor.id,
-            sensor.type || "unknown",
-            "unknown",
-            sensor.max_temp || null,
-            sensor.crit_temp || null,
-          ]
-        );
-        log.debug(`Created sensor record`, "DataAggregator", {
-          sensorId: sensor.id,
-        });
-      }
     }
   }
 
   /**
    * Ensure fans exist in database (create if missing)
+   * Uses INSERT ... ON CONFLICT to avoid race condition duplicates
    */
   private async ensureFansExist(
     systemId: number,
@@ -256,21 +249,13 @@ export class DataAggregator extends EventEmitter {
     if (!fans || fans.length === 0) return;
 
     for (const fan of fans) {
-      const existing = await this.db.get(
-        "SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2",
-        [systemId, fan.id]
+      // Use ON CONFLICT to handle race conditions - if fan already exists, do nothing
+      await this.db.run(
+        `INSERT INTO fans (system_id, fan_name, fan_label, is_controllable)
+         VALUES ($1, $2, $3, true)
+         ON CONFLICT (system_id, fan_name) DO NOTHING`,
+        [systemId, fan.id, fan.id]
       );
-
-      if (!existing) {
-        // Create new fan record
-        await this.db.run(
-          `INSERT INTO fans (
-            system_id, fan_name, fan_label, is_controllable
-          ) VALUES ($1, $2, $3, true)`,
-          [systemId, fan.id, fan.id]
-        );
-        log.debug(`Created fan record`, "DataAggregator", { fanId: fan.id });
-      }
     }
   }
 

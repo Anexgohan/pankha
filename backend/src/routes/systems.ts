@@ -1009,6 +1009,47 @@ router.put("/:id/failsafe-speed", async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/systems/:id/enable-fan-control - Set enable fan control
+router.put("/:id/enable-fan-control", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const { enabled, priority = "normal" } = req.body;
+
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ error: "enabled must be a boolean" });
+    }
+
+    const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [
+      systemId,
+    ]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+
+    const result = await commandDispatcher.setEnableFanControl(
+      system.agent_id,
+      enabled,
+      priority
+    );
+
+    res.json({
+      message: "Enable fan control command sent",
+      agent_id: system.agent_id,
+      requested_enabled: enabled,
+      priority,
+      result,
+    });
+  } catch (error) {
+    log.error("Error setting enable fan control:", "systems", error);
+    res.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to set enable fan control",
+    });
+  }
+});
+
 // PUT /api/systems/:id/sensors/:sensorId/label - Update sensor label
 router.put(
   "/:id/sensors/:sensorId/label",
