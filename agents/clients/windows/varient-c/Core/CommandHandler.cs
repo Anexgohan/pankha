@@ -90,7 +90,7 @@ public class CommandHandler
         var fanId = GetPayloadValue<string>(payload, "fanId");
         var speed = GetPayloadValue<int>(payload, "speed");
 
-        _logger.Information("Setting fan {FanId} to {Speed}%", fanId, speed);
+        _logger.Debug("Set fan {FanId} to {Speed}%", fanId, speed);
 
         await _hardwareMonitor.SetFanSpeedAsync(fanId, speed);
 
@@ -119,7 +119,7 @@ public class CommandHandler
         _config.Agent.UpdateInterval = interval;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("Update interval changed: {Old}s -> {New}s", oldInterval, interval);
+        _logger.Information("✏️ Update Interval changed: {Old}s → {New}s", oldInterval, interval);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { interval }));
     }
@@ -138,7 +138,7 @@ public class CommandHandler
         _config.Hardware.FanStepPercent = step;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("Fan step changed: {Old}% -> {New}%", oldStep, step);
+        _logger.Information("✏️ Fan Step changed: {Old}% → {New}%", oldStep, step);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { step }));
     }
@@ -156,7 +156,7 @@ public class CommandHandler
         _config.Hardware.HysteresisTemp = hysteresis;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("Hysteresis changed: {Old}C -> {New}C", oldHysteresis, hysteresis);
+        _logger.Information("✏️ Hysteresis changed: {Old}°C → {New}°C", oldHysteresis, hysteresis);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { hysteresis }));
     }
@@ -174,7 +174,7 @@ public class CommandHandler
         _config.Hardware.EmergencyTemp = temp;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("Emergency temperature changed: {Old}C -> {New}C", oldTemp, temp);
+        _logger.Information("✏️ Emergency Temp changed: {Old}°C → {New}°C", oldTemp, temp);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { temperature = temp }));
     }
@@ -211,7 +211,7 @@ public class CommandHandler
         // Update the global LoggingLevelSwitch - this dynamically changes ALL loggers
         Pankha.WindowsAgent.Program.LogLevelSwitch.MinimumLevel = serilogLevel;
 
-        _logger.Information("Log level changed: {Old} -> {New}", oldLevel, upperLevel);
+        _logger.Information("✏️ Log Level changed: {Old} → {New}", oldLevel, upperLevel);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { level = upperLevel }));
     }

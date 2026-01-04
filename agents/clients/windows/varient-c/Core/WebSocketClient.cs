@@ -96,7 +96,7 @@ public class WebSocketClient : IDisposable
             if (!_cts.Token.IsCancellationRequested)
             {
                 var delay = CalculateReconnectDelay();
-                _logger.Information("Reconnecting in {Delay}ms (attempt {Attempt})", delay, _reconnectAttempts + 1);
+                _logger.Information("Reconnecting in {Delay:F1}s (attempt {Attempt})", delay / 1000.0, _reconnectAttempts + 1);
                 await Task.Delay(delay, _cts.Token);
             }
         }
@@ -124,7 +124,7 @@ public class WebSocketClient : IDisposable
             _connectionState = ConnectionState.Connected;
             _reconnectAttempts = 0;
             _lastMessageReceived = DateTime.UtcNow;
-            _logger.Information("WebSocket connected");
+            _logger.Information("✅ WebSocket connected");
 
             // Notify watchdog of successful connection
             _watchdog?.ReportSuccessfulConnection();
@@ -229,7 +229,7 @@ public class WebSocketClient : IDisposable
             };
 
             await SendMessageAsync(registerMessage, cancellationToken);
-            _logger.Information("Agent registered: {AgentId}", _config.Agent.Id);
+            _logger.Information("✅ Agent registered: {AgentId}", _config.Agent.Id);
         }
         catch (Exception ex)
         {
@@ -470,7 +470,7 @@ public class WebSocketClient : IDisposable
     {
         try
         {
-            _logger.Information("Executing command: {Type} (ID: {CommandId})",
+            _logger.Debug("Processing command: {Type} (ID: {CommandId})",
                 commandMessage.Data.Type, commandMessage.Data.CommandId);
 
             var response = await _commandHandler.HandleCommandAsync(
@@ -480,7 +480,7 @@ public class WebSocketClient : IDisposable
 
             await SendMessageAsync(response, cancellationToken);
 
-            _logger.Information("Command {CommandId} completed: {Success}",
+            _logger.Debug("Sent command response: {CommandId}, success: {Success}",
                 response.CommandId, response.Success);
         }
         catch (Exception ex)

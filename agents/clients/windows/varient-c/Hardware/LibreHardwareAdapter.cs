@@ -674,7 +674,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
     public async Task EnterFailsafeModeAsync()
     {
         var failsafeSpeed = _settings.FailsafeSpeed;
-        _logger.Information("Entering failsafe mode: GPU→auto, others→{Speed}%", failsafeSpeed);
+        _logger.Warning("⚠️ ENTERING FAILSAFE MODE - Backend disconnected");
 
         var tasks = new List<Task>();
 

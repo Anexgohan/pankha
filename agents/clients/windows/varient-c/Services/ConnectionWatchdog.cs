@@ -39,7 +39,7 @@ public class ConnectionWatchdog : BackgroundService
 
         if (_failsafeModeActive)
         {
-            _logger.LogInformation("✅ Connection restored, exiting failsafe mode");
+            _logger.LogInformation("✅ EXITING FAILSAFE MODE - Backend connection restored");
             _logger.LogInformation("Backend will resume fan control");
             _failsafeModeActive = false;
         }

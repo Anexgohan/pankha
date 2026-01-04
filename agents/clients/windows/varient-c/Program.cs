@@ -362,6 +362,9 @@ class Program
         // Set initial level on the switch
         LogLevelSwitch.MinimumLevel = level;
 
+        // Ensure UTF-8 encoding for proper emoji support in console and file
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+
         // Create logger using the switch for dynamic level changes
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.ControlledBy(LogLevelSwitch)  // Use switch instead of .Is()
@@ -370,6 +373,7 @@ class Program
                 theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code)
             .WriteTo.File(
                 path: logPath,
+                encoding: System.Text.Encoding.UTF8,     // Explicit UTF-8 for emoji support
                 rollingInterval: RollingInterval.Infinite,  // No time-based rolling
                 fileSizeLimitBytes: null,                    // No size limit (single file grows indefinitely)
                 rollOnFileSizeLimit: false,                  // Disable size-based rolling (no .1, .2, etc.)
