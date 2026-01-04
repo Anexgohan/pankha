@@ -116,7 +116,9 @@ class Program
             Directory.SetCurrentDirectory(PathResolver.InstallPath);
 
             // Initialize logging
-            InitializeLogging(logLevel);
+            // Disable console output when running as a Windows Service (no interactive mode flags)
+            bool isInteractiveMode = foreground || test || setup || logs != null || configShow || status || start || stop || restart;
+            InitializeLogging(logLevel, enableConsole: isInteractiveMode);
 
             // DIAGNOSTICS: Log Environment Details
             try
@@ -326,7 +328,7 @@ class Program
         return await rootCommand.InvokeAsync(args);
     }
 
-    static void InitializeLogging(string logLevel)
+    static void InitializeLogging(string logLevel, bool enableConsole = true)
     {
         // Ensure directories exist first
         Directory.CreateDirectory(Path.GetDirectoryName(LOG_PATH)!);
@@ -362,23 +364,42 @@ class Program
         // Set initial level on the switch
         LogLevelSwitch.MinimumLevel = level;
 
-        // Ensure UTF-8 encoding for proper emoji support in console and file
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
+        // Only configure console when running interactively (not as a Windows Service)
+        // Setting Console.OutputEncoding when no console is attached can cause hangs
+        if (enableConsole)
+        {
+            try
+            {
+                Console.OutputEncoding = System.Text.Encoding.UTF8;
+            }
+            catch
+            {
+                // No console available - ignore
+            }
+        }
 
         // Create logger using the switch for dynamic level changes
-        Log.Logger = new LoggerConfiguration()
-            .MinimumLevel.ControlledBy(LogLevelSwitch)  // Use switch instead of .Is()
-            .WriteTo.Console(
+        var logConfig = new LoggerConfiguration()
+            .MinimumLevel.ControlledBy(LogLevelSwitch);
+
+        // Only add console sink when running interactively
+        if (enableConsole)
+        {
+            logConfig = logConfig.WriteTo.Console(
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u}] {Message:lj}{NewLine}{Exception}",
-                theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code)
-            .WriteTo.File(
-                path: logPath,
-                encoding: System.Text.Encoding.UTF8,     // Explicit UTF-8 for emoji support
-                rollingInterval: RollingInterval.Infinite,  // No time-based rolling
-                fileSizeLimitBytes: null,                    // No size limit (single file grows indefinitely)
-                rollOnFileSizeLimit: false,                  // Disable size-based rolling (no .1, .2, etc.)
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u}] {Message:lj}{NewLine}{Exception}")
-            .CreateLogger();
+                theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code);
+        }
+
+        // Always write to file
+        logConfig = logConfig.WriteTo.File(
+            path: logPath,
+            encoding: System.Text.Encoding.UTF8,     // Explicit UTF-8 for emoji support
+            rollingInterval: RollingInterval.Infinite,  // No time-based rolling
+            fileSizeLimitBytes: null,                    // No size limit (single file grows indefinitely)
+            rollOnFileSizeLimit: false,                  // Disable size-based rolling (no .1, .2, etc.)
+            outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u}] {Message:lj}{NewLine}{Exception}");
+
+        Log.Logger = logConfig.CreateLogger();
 
         // Log the file we are using
         Log.Information("Logging to file: {Path}", logPath);

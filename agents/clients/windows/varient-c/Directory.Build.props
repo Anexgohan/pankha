@@ -1,10 +1,10 @@
 <Project>
   <PropertyGroup>
     <AssemblyName>pankha-agent</AssemblyName>
-    <Version>0.2.11-dev</Version>
-    <FileVersion>0.2.11</FileVersion>
-    <AssemblyVersion>0.2.11</AssemblyVersion>
-    <InformationalVersion>0.2.11-dev</InformationalVersion>
+    <Version>0.2.5</Version>
+    <FileVersion>0.2.5</FileVersion>
+    <AssemblyVersion>0.2.5</AssemblyVersion>
+    <InformationalVersion>0.2.5</InformationalVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 </Project>
