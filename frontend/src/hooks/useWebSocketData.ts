@@ -306,8 +306,6 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     // Subscribe to all systems
     if (wsRef.current) {
       wsRef.current.subscribe(["systems:all"]);
-
-      // Request full sync after connection
       wsRef.current.send("requestFullSync");
     }
   }, []);
@@ -425,6 +423,13 @@ export function useWebSocketData(): UseWebSocketDataReturn {
    * Initial connection
    */
   useEffect(() => {
+    // IMPORTANT: Reset mounted flag on each mount.
+    // React StrictMode (dev) double-mounts components: effect runs → cleanup → effect runs again.
+    // Without this reset, mountedRef stays false after cleanup, causing handleConnect to skip
+    // subscribing/syncing, leaving the UI stuck on "Connecting to server..."
+    // See: commit b453a64 accidentally removed this line, breaking npm run dev.
+    mountedRef.current = true;
+
     connect();
 
     return () => {

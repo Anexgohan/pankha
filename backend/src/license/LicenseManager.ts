@@ -237,12 +237,15 @@ export class LicenseManager {
 
     // Persist to database for offline resilience
     try {
+      // Convert Infinity to -1 for PostgreSQL (INTEGER column can't store Infinity)
+      const agentLimit = this.cachedTier.agentLimit === Infinity ? -1 : this.cachedTier.agentLimit;
+      
       await this.getPool().query(`
         INSERT INTO licenses (license_key, tier, agent_limit, retention_days, validated_at)
         VALUES ($1, $2, $3, $4, NOW())
         ON CONFLICT (license_key) DO UPDATE SET
           tier = $2, agent_limit = $3, retention_days = $4, validated_at = NOW()
-      `, [key, tier, this.cachedTier.agentLimit, this.cachedTier.retentionDays]);
+      `, [key, tier, agentLimit, this.cachedTier.retentionDays]);
     } catch (error) {
       console.error('[LicenseManager] Failed to cache result:', error);
     }

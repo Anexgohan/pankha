@@ -116,7 +116,7 @@ public class NvidiaGpuController : IDisposable
 
                 if (success)
                 {
-                    _logger.Information("Set NVIDIA GPU fan to {Speed}% for {GPU}", speedPercent, gpu.FullName);
+                    _logger.Debug("Set NVIDIA GPU fan to {Speed}% for {GPU}", speedPercent, gpu.FullName);
                     return true;
                 }
 
@@ -171,7 +171,7 @@ public class NvidiaGpuController : IDisposable
 
                 if (success)
                 {
-                    _logger.Information("Reset NVIDIA GPU fan to auto for {GPU}", gpu.FullName);
+                    _logger.Debug("Reset NVIDIA GPU fan to auto for {GPU}", gpu.FullName);
                     return true;
                 }
 
