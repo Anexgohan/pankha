@@ -111,8 +111,8 @@ class Program
             // Windows Service starts in System32 by default.
             // LibreHardwareMonitor needs its kernel driver (*.sys) in the same folder as the exe.
             // The driver filename is derived from the process name (e.g., pankha-agent.exe -> pankha-agent.sys).
-            // Our build.ps1 pre-extracts this driver from LibreHardwareMonitorLib NuGet package.
-            // If CWD is System32 and driver is missing, storage sensors (NVMe/SATA) won't be detected.
+            // LibreHardwareMonitor extracts the driver at RUNTIME from embedded resources on first run.
+            // If CWD is System32 and driver extraction fails, storage sensors (NVMe/SATA) won't be detected.
             Directory.SetCurrentDirectory(PathResolver.InstallPath);
 
             // Initialize logging
