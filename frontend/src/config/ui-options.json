@@ -1,64 +1,74 @@
 {
   "$schema": "./ui-options.schema.json",
-  "description": "Shared UI configuration options for Pankha frontend and agent tray applications. This file is the single source of truth for all dropdown values and configuration options.",
+  "$comment": [
+    "=== SINGLE SOURCE OF TRUTH (SST) ===",
+    "This file controls ALL dropdown options, labels, tooltips, defaults, and validation for:",
+    "  - Frontend (React): SystemCard.tsx reads via utils/uiOptions.ts",
+    "  - Backend (Node.js): systems.ts validates + AgentManager uses defaults via config/uiOptions.ts",
+    "  - Windows Tray: build.ps1 generates C# at build-time",
+    "",
+    "HOW IT WORKS:",
+    "  - Frontend: Changes appear immediately (Vite hot reload)",
+    "  - Backend: JSON inlined at compile time, rebuild Docker to apply",
+    "  - Windows: Run build.ps1 to regenerate ui-options_auto-generated.cs",
+    "  - Linux: Should be used the same way for linux agents when they are implemented",
+    "",
+    "WHAT YOU CAN CHANGE:",
+    "  - labels: UI text for each setting",
+    "  - tooltips: Hover text (supports placeholders like {fanStep})",
+    "  - values: Add/remove/reorder dropdown options (UI + backend validation uses this array)",
+    "  - default: Default value for new agent initializations + UI pre-selection",
+    "",
+    "PLACEHOLDERS in tooltips:",
+    "  {logLevel}, {emergencyTemp}, {failsafeSpeed}, {agentInterval}, {fanStep}, {hysteresis}",
+    "",
+    "NOTE: Adding NEW settings requires code changes. Editing existing values = JSON only.",
+    "REQUIRES: PowerShell 7+ for build.ps1 (supports // comments), but avoid using // comments"
+  ],
+  "description": "Shared UI configuration options for Pankha frontend and agent tray applications.",
   "version": "1.0.0",
   "options": {
-    "updateInterval": {
-      "label": "Agent Rate",
-      "description": "Agent data collection interval",
-      "unit": "s",
-      "values": [0.5, 1, 2, 3, 5, 10, 15, 30],
-      "default": 3,
-      "min": 0.5,
-      "max": 30
+    "fanControl": {
+      "label": "Fan Control",
+      "description": "Enable or disable Fan Speed Control.",
+      "tooltip": "Enable or disable Fan Speed Control.\nWhen disabled, the agent will ignore all fan speed commands (client system takes control).",
+      "default": true
     },
-    "fanStep": {
-      "label": "Fan Step",
-      "description": "Incremental percentage change in fan speed when adjusting towards target temperature",
-      "unit": "%",
+    "logLevel": {
+      "label": "Log Level",
+      "description": "Agent logging verbosity.",
+      "tooltip": "\"Log Level\" is the Agent logging verbosity. Currently set to {logLevel}.\nTRACE  : very detailed debug info \nDEBUG : detailed diagnostics \nINFO    : normal operation logs (default) \nWARN  : warnings and errors \nERROR : errors only.",
       "values": [
-        { "value": 3, "label": "3%" },
-        { "value": 5, "label": "5%" },
-        { "value": 10, "label": "10%" },
-        { "value": 15, "label": "15%" },
-        { "value": 25, "label": "25%" },
-        { "value": 50, "label": "50%" },
-        { "value": 100, "label": "Disable (instant)" }
+        { "value": "TRACE", "label": "TRACE" },
+        { "value": "DEBUG", "label": "DEBUG" },
+        { "value": "INFO", "label": "INFO (default)" },
+        { "value": "WARN", "label": "WARN" },
+        { "value": "ERROR", "label": "ERROR" }
       ],
-      "default": 5,
-      "min": 3,
-      "max": 100
-    },
-    "hysteresis": {
-      "label": "Hysteresis",
-      "description": "Temperature tolerance before adjusting fan speed. Higher values = more stability, lower values = more responsive cooling",
-      "unit": "°C",
-      "values": [
-        { "value": 0.0, "label": "Disable (instant)" },
-        { "value": 0.5, "label": "0.5°C" },
-        { "value": 1.0, "label": "1.0°C" },
-        { "value": 2.0, "label": "2.0°C" },
-        { "value": 3.0, "label": "3.0°C" },
-        { "value": 5.0, "label": "5.0°C" },
-        { "value": 7.5, "label": "7.5°C" },
-        { "value": 10.0, "label": "10.0°C" }
-      ],
-      "default": 3.0,
-      "min": 0.0,
-      "max": 10.0
+      "default": "INFO"
     },
     "emergencyTemp": {
-      "label": "Emergency Temp",
-      "description": "Temperature threshold that overrides all controls and sets fans to 100% immediately",
+      "label": "Emergency °C",
+      "description": "Temperature threshold that overrides all controls.",
+      "tooltip": "\"Emergency Temperature\" {emergencyTemp}°C is the temperature threshold that overrides all controls.\nSets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety.\nFan Control must be enabled for this to take effect.",
       "unit": "°C",
-      "values": [70, 75, 80, 85, 90, 95, 100],
-      "default": 85,
-      "min": 70,
-      "max": 100
+      "values": [
+        { "value": 60, "label": "60°C" },
+        { "value": 65, "label": "65°C" },
+        { "value": 70, "label": "70°C" },
+        { "value": 75, "label": "75°C" },
+        { "value": 80, "label": "80°C" },
+        { "value": 85, "label": "85°C (default)" },
+        { "value": 90, "label": "90°C" },
+        { "value": 95, "label": "95°C" },
+        { "value": 100, "label": "100°C" }
+      ],
+      "default": 85
     },
     "failsafeSpeed": {
       "label": "Failsafe Speed",
-      "description": "Fan speed when backend connection is lost. NVIDIA GPUs reset to auto control.",
+      "description": "Fan speed when backend connection is lost.",
+      "tooltip": "\"Failsafe Speed\" is the Fan speed {failsafeSpeed}% set when backend connection is lost (Agent goes into failsafe mode).\nWarning: 0% allows fans to stop only overridden by \"Emergency Temperature\" Threshold.",
       "unit": "%",
       "values": [
         { "value": 0, "label": "0% (allow stop)" },
@@ -71,23 +81,65 @@
         { "value": 70, "label": "70% (default)" },
         { "value": 80, "label": "80%" },
         { "value": 90, "label": "90%" },
-        { "value": 100, "label": "100% (max)" }
+        { "value": 100, "label": "100% (full speed)" }
       ],
-      "default": 70,
-      "min": 0,
-      "max": 100
+      "default": 70
     },
-    "logLevel": {
-      "label": "Log Level",
-      "description": "Agent logging verbosity",
+    "updateInterval": {
+      "label": "Agent rate",
+      "description": "Agent data collection interval.",
+      "tooltip": "Agent rate is the Agent data collection interval ({agentInterval}s).\nHow often the agent collects sensor data.\nLower = more responsive, higher = less agent CPU usage.",
+      "unit": "s",
       "values": [
-        { "value": "TRACE", "label": "TRACE" },
-        { "value": "DEBUG", "label": "DEBUG" },
-        { "value": "INFO", "label": "INFO" },
-        { "value": "WARN", "label": "WARN" },
-        { "value": "ERROR", "label": "ERROR" }
+        { "value": 0.5, "label": "0.5s (CPU Intensive)" },
+        { "value": 1, "label": "1s" },
+        { "value": 2, "label": "2s" },
+        { "value": 3, "label": "3s (Default)" },
+        { "value": 5, "label": "5s" },
+        { "value": 7, "label": "7s" },
+        { "value": 10, "label": "10s" },
+        { "value": 15, "label": "15s" },
+        { "value": 30, "label": "30s (Risks Overheating)" }
       ],
-      "default": "INFO"
+      "default": 3
+    },
+    "fanStep": {
+      "label": "Fan Step",
+      "description": "Max fan speed % change per update cycle.",
+      "tooltip": "\"Fan Step\" is the Max fan speed {fanStep}% change every update cycle of (Agent Rate) {agentInterval}s.\nSmooth transitions reduce fan wear.\nLower % = slower, smoother. Disable = instant (jerky).",
+      "unit": "%",
+      "values": [
+        { "value": 2, "label": "2%" },
+        { "value": 3, "label": "3%" },
+        { "value": 5, "label": "5% (default)" },
+        { "value": 7, "label": "7%" },
+        { "value": 10, "label": "10%" },
+        { "value": 15, "label": "15%" },
+        { "value": 25, "label": "25%" },
+        { "value": 50, "label": "50%" },
+        { "value": 100, "label": "Disable (instant)" }
+      ],
+      "default": 5
+    },
+    "hysteresis": {
+      "label": "Hysteresis",
+      "description": "Temperature tolerance before adjusting fan speed.",
+      "tooltip": "\"Hysteresis\" is the Temperature tolerance ({hysteresis}°C) before adjusting fan speed.\nPrevents constant small adjustments.\nHigher values = more stability, lower values = more responsive cooling.",
+      "unit": "°C",
+      "values": [
+        { "value": 0.0, "label": "Disable (instant)" },
+        { "value": 0.5, "label": "0.5°C" },
+        { "value": 1.0, "label": "1.0°C" },
+        { "value": 1.5, "label": "1.5°C" },
+        { "value": 2.0, "label": "2.0°C (default)" },
+        { "value": 2.5, "label": "2.5°C" },
+        { "value": 3.0, "label": "3.0°C" },
+        { "value": 4.0, "label": "4.0°C" },
+        { "value": 5.0, "label": "5.0°C" },
+        { "value": 7.5, "label": "7.5°C" },
+        { "value": 10.0, "label": "10.0°C" }
+      ],
+      "default": 2.0
     }
   }
 }

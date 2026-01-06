@@ -1651,9 +1651,10 @@ impl WebSocketClient {
     }
 
     async fn set_update_interval(&self, interval: f64) -> Result<()> {
-        // Validate interval range (0.5-30 seconds)
-        if interval < 0.5 || interval > 30.0 {
-            return Err(anyhow::anyhow!("Invalid interval: {}. Must be between 0.5 and 30 seconds", interval));
+        // Validate interval range (0.5-30 seconds, matching SST ui-options.json)
+        let valid_intervals = [0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 30.0];
+        if !valid_intervals.contains(&interval) {
+            return Err(anyhow::anyhow!("Invalid interval: {}. Must be one of: {:?}", interval, valid_intervals));
         }
 
         // Get write lock, update quickly, release lock
@@ -1677,10 +1678,10 @@ impl WebSocketClient {
     }
 
     async fn set_fan_step(&self, step: u8) -> Result<()> {
-        // Validate: 3, 5, 10, 15, 25, 50, 100
-        let valid = [3, 5, 10, 15, 25, 50, 100];
+        // Validate: 2, 3, 5, 7, 10, 15, 25, 50, 100 (matching SST ui-options.json)
+        let valid = [2, 3, 5, 7, 10, 15, 25, 50, 100];
         if !valid.contains(&step) {
-            return Err(anyhow::anyhow!("Invalid fan step: {}. Must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)", step));
+            return Err(anyhow::anyhow!("Invalid fan step: {}. Must be one of: {:?}", step, valid));
         }
 
         // Update config quickly with minimal lock time
@@ -1702,9 +1703,10 @@ impl WebSocketClient {
     }
 
     async fn set_hysteresis(&self, hysteresis: f64) -> Result<()> {
-        // Validate: 0.0 (disable), 0.5-10.0°C
-        if hysteresis < 0.0 || hysteresis > 10.0 {
-            return Err(anyhow::anyhow!("Invalid hysteresis: {}. Must be between 0.0 (disable) and 10.0°C", hysteresis));
+        // Validate hysteresis (matching SST ui-options.json values)
+        let valid_hysteresis = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.5, 10.0];
+        if !valid_hysteresis.contains(&hysteresis) {
+            return Err(anyhow::anyhow!("Invalid hysteresis: {}. Must be one of: {:?}", hysteresis, valid_hysteresis));
         }
 
         // Update config quickly with minimal lock time
@@ -1726,9 +1728,10 @@ impl WebSocketClient {
     }
 
     async fn set_emergency_temp(&self, temp: f64) -> Result<()> {
-        // Validate: 70-100°C
-        if temp < 70.0 || temp > 100.0 {
-            return Err(anyhow::anyhow!("Invalid emergency temp: {}. Must be between 70.0 and 100.0°C", temp));
+        // Validate emergency temp (matching SST ui-options.json: 60-100°C)
+        let valid_temps = [60.0, 65.0, 70.0, 75.0, 80.0, 85.0, 90.0, 95.0, 100.0];
+        if !valid_temps.contains(&temp) {
+            return Err(anyhow::anyhow!("Invalid emergency temp: {}. Must be one of: {:?}", temp, valid_temps));
         }
 
         // Update config quickly with minimal lock time
@@ -1800,9 +1803,10 @@ impl WebSocketClient {
     }
 
     async fn set_failsafe_speed(&self, speed: u8) -> Result<()> {
-        // Validate: 0-100%
-        if speed > 100 {
-            return Err(anyhow::anyhow!("Invalid failsafe speed: {}. Must be 0-100%", speed));
+        // Validate failsafe speed (matching SST ui-options.json: multiples of 10)
+        let valid_speeds = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+        if !valid_speeds.contains(&speed) {
+            return Err(anyhow::anyhow!("Invalid failsafe speed: {}. Must be one of: {:?}", speed, valid_speeds));
         }
 
         // Update config quickly with minimal lock time

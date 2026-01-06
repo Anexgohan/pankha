@@ -8,6 +8,14 @@ import {
 } from "../types/agent";
 import { log } from "../utils/logger";
 import { licenseManager } from "../license";
+import {
+  defaultFanStep,
+  defaultHysteresis,
+  defaultEmergencyTemp,
+  defaultUpdateInterval,
+  defaultFailsafeSpeed,
+  defaultLogLevel,
+} from "../config/uiOptions";
 
 export class AgentManager extends EventEmitter {
   private static instance: AgentManager;
@@ -98,19 +106,19 @@ export class AgentManager extends EventEmitter {
       // Initialize with agent's reported update interval (convert from milliseconds to seconds)
       const intervalSeconds = agentConfig.updateInterval
         ? Math.round(agentConfig.updateInterval / 1000)
-        : 3;
+        : defaultUpdateInterval;
       this.agentUpdateIntervals.set(agentConfig.agentId, intervalSeconds);
 
-      // Initialize ALL configuration Maps with default values to prevent reset bug
+      // Initialize ALL configuration Maps with default values from SST (ui-options.json)
       // This ensures all getters return actual values instead of fallback defaults
       if (!this.agentFanStep.has(agentConfig.agentId)) {
-        this.agentFanStep.set(agentConfig.agentId, 5); // Default 5%
+        this.agentFanStep.set(agentConfig.agentId, defaultFanStep);
       }
       if (!this.agentHysteresis.has(agentConfig.agentId)) {
-        this.agentHysteresis.set(agentConfig.agentId, 3.0); // Default 3.0°C
+        this.agentHysteresis.set(agentConfig.agentId, defaultHysteresis);
       }
       if (!this.agentEmergencyTemp.has(agentConfig.agentId)) {
-        this.agentEmergencyTemp.set(agentConfig.agentId, 85.0); // Default 85.0°C
+        this.agentEmergencyTemp.set(agentConfig.agentId, defaultEmergencyTemp);
       }
 
       log.info(
@@ -295,19 +303,19 @@ export class AgentManager extends EventEmitter {
 
         this.agentStatuses.set(agentConfig.agentId, status);
 
-        // Initialize with default update interval (3 seconds)
-        this.agentUpdateIntervals.set(agentConfig.agentId, 3);
+        // Initialize with default update interval from SST
+        this.agentUpdateIntervals.set(agentConfig.agentId, defaultUpdateInterval);
 
-        // Initialize ALL configuration Maps with default values to prevent reset bug
+        // Initialize ALL configuration Maps with default values from SST (ui-options.json)
         // This ensures all getters return actual values instead of fallback defaults
         if (!this.agentFanStep.has(agentConfig.agentId)) {
-          this.agentFanStep.set(agentConfig.agentId, 5); // Default 5%
+          this.agentFanStep.set(agentConfig.agentId, defaultFanStep);
         }
         if (!this.agentHysteresis.has(agentConfig.agentId)) {
-          this.agentHysteresis.set(agentConfig.agentId, 3.0); // Default 3.0°C
+          this.agentHysteresis.set(agentConfig.agentId, defaultHysteresis);
         }
         if (!this.agentEmergencyTemp.has(agentConfig.agentId)) {
-          this.agentEmergencyTemp.set(agentConfig.agentId, 85.0); // Default 85.0°C
+          this.agentEmergencyTemp.set(agentConfig.agentId, defaultEmergencyTemp);
         }
       }
 
@@ -575,7 +583,7 @@ export class AgentManager extends EventEmitter {
    * Get agent current update interval
    */
   public getAgentUpdateInterval(agentId: string): number {
-    return this.agentUpdateIntervals.get(agentId) ?? 3; // Default 3 seconds
+    return this.agentUpdateIntervals.get(agentId) ?? defaultUpdateInterval;
   }
 
   /**
@@ -617,7 +625,7 @@ export class AgentManager extends EventEmitter {
    * Get agent fan step percentage
    */
   public getAgentFanStep(agentId: string): number {
-    return this.agentFanStep.get(agentId) ?? 5; // Default 5%
+    return this.agentFanStep.get(agentId) ?? defaultFanStep;
   }
 
   /**
@@ -659,7 +667,7 @@ export class AgentManager extends EventEmitter {
    * Get agent hysteresis temperature
    */
   public getAgentHysteresis(agentId: string): number {
-    return this.agentHysteresis.get(agentId) ?? 3.0; // Default 3°C
+    return this.agentHysteresis.get(agentId) ?? defaultHysteresis;
   }
 
   /**
@@ -701,7 +709,7 @@ export class AgentManager extends EventEmitter {
    * Get agent emergency temperature
    */
   public getAgentEmergencyTemp(agentId: string): number {
-    return this.agentEmergencyTemp.get(agentId) ?? 85.0; // Default 85°C
+    return this.agentEmergencyTemp.get(agentId) ?? defaultEmergencyTemp;
   }
 
   /**
@@ -743,7 +751,7 @@ export class AgentManager extends EventEmitter {
    * Get agent log level
    */
   public getAgentLogLevel(agentId: string): string {
-    return this.agentLogLevel.get(agentId) || "INFO"; // Default INFO
+    return this.agentLogLevel.get(agentId) || defaultLogLevel;
   }
 
   /**
@@ -782,7 +790,7 @@ export class AgentManager extends EventEmitter {
    * Get agent failsafe speed
    */
   public getAgentFailsafeSpeed(agentId: string): number {
-    return this.agentFailsafeSpeed.get(agentId) ?? 70; // Default 70%
+    return this.agentFailsafeSpeed.get(agentId) ?? defaultFailsafeSpeed;
   }
 
   /**

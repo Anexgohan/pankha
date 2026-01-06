@@ -132,7 +132,9 @@
 
 .info-item-vertical {
   flex: 1;
-  flex-direction: column;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
   gap: var(--spacing-xs);
   padding: 0 var(--spacing-xs);
   border-right: 1px solid var(--border-light);
@@ -144,11 +146,18 @@
 .info-item-vertical .label {
   line-height: 0.975;
   margin-bottom: 0px;
+  white-space: nowrap;
 }
 
 .info-item-vertical .value {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.unit-small {
+  font-size: var(--font-size-xs);
+  opacity: 0.8;
 }
 
 .info-item-vertical:last-child,

@@ -45,6 +45,11 @@ COPY --from=builder /app/backend/dist ./backend/
 COPY --from=builder /app/backend/package*.json ./backend/
 COPY --from=builder /app/backend/src/database ./backend/database/
 COPY --from=builder /app/backend/src/config ./backend/config/
+# SST: Copy frontend ui-options.json to path where compiled backend expects it
+# The compiled JS at /app/backend/config/uiOptions.js imports '../../../frontend/src/config/ui-options.json'
+# Path resolution: /app/backend/config/ -> ../../.. -> /  -> /frontend/src/config/
+RUN mkdir -p /frontend/src/config
+COPY --from=builder /app/frontend/src/config/ui-options.json /frontend/src/config/
 
 # Copy built frontend
 COPY --from=builder /app/frontend/dist ./frontend/

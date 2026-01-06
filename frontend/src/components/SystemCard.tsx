@@ -26,6 +26,7 @@ import {
 import { getSensorLabel } from "../config/sensorLabels";
 import { InlineEdit } from "./InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
+import { getOption, getValues, getLabel, interpolateTooltip } from "../utils/uiOptions";
 
 interface SystemCardProps {
   system: SystemData;
@@ -791,67 +792,51 @@ const SystemCard: React.FC<SystemCardProps> = ({
             <div className="info-row">
               {averageTemperature && (
                 <div className="info-item info-item-vertical">
-                  <span className="label">
-                    Average
-                    <br />
-                    temp:
-                  </span>
+                  <span className="label">Avg °C:</span>
                   <span
                     className={`value temperature temperature-${getTemperatureClass(
                       averageTemperature
                     )}`}
                   >
-                    {averageTemperature.toFixed(1)} °C
+                    {averageTemperature.toFixed(1)} <span className="unit-small">°C</span>
                   </span>
                 </div>
               )}
               {highestTemperature && (
                 <div className="info-item info-item-vertical">
-                  <span className="label">
-                    Highest
-                    <br />
-                    temp:
-                  </span>
+                  <span className="label">Peak °C:</span>
                   <span
                     className={`value temperature temperature-${getTemperatureClass(
                       highestTemperature
                     )}`}
                   >
-                    {highestTemperature.toFixed(1)} °C
+                    {highestTemperature.toFixed(1)} <span className="unit-small">°C</span>
                   </span>
                 </div>
               )}
               {averageFanRPM !== null && system.current_fan_speeds && (
                 <div className="info-item info-item-vertical">
-                  <span className="label">
-                    Average
-                    <br />
-                    fan speed:
-                  </span>
+                  <span className="label">Avg RPM:</span>
                   <span
                     className={`value temperature temperature-${getFanRPMClass(
                       averageFanRPM,
                       system.current_fan_speeds
                     )}`}
                   >
-                    {Math.round(averageFanRPM)} RPM
+                    {Math.round(averageFanRPM)} <span className="unit-small">RPM</span>
                   </span>
                 </div>
               )}
               {highestFanRPM !== null && system.current_fan_speeds && (
                 <div className="info-item info-item-vertical">
-                  <span className="label">
-                    Highest
-                    <br />
-                    fan speed:
-                  </span>
+                  <span className="label">Peak RPM:</span>
                   <span
                     className={`value temperature temperature-${getFanRPMClass(
                       highestFanRPM,
                       system.current_fan_speeds
                     )}`}
                   >
-                    {highestFanRPM} RPM
+                    {highestFanRPM} <span className="unit-small">RPM</span>
                   </span>
                 </div>
               )}
@@ -859,182 +844,16 @@ const SystemCard: React.FC<SystemCardProps> = ({
           )}
           {system.status === "online" && (
             <>
+              {/* Row 1: Fan Control, Log Level */}
               <div className="info-row">
                 <div className="info-item info-item-vertical">
-                  <span className="label">Agent rate:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={agentInterval}
-                    onChange={(e) =>
-                      handleAgentIntervalChange(parseFloat(e.target.value))
-                    }
-                    disabled={loading === "agent-interval" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : "Agent data collection interval"
-                    }
-                  >
-                    <option value={0.5}>0.5s</option>
-                    <option value={1}>1s</option>
-                    <option value={2}>2s</option>
-                    <option value={3}>3s</option>
-                    <option value={5}>5s</option>
-                    <option value={10}>10s</option>
-                    <option value={15}>15s</option>
-                    <option value={30}>30s</option>
-                  </select>
-                  {loading === "agent-interval" && (
-                    <span className="loading-spinner">⏳</span>
-                  )}
-                  {/* Filter duplicates and Sensor tolerance inputs removed (deprecated feature) */}
-                </div>
-              </div>
-              <div className="info-row">
-                <div className="info-item info-item-vertical">
-                  <span className="label">Fan Step:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={fanStep}
-                    onChange={(e) =>
-                      handleFanStepChange(parseInt(e.target.value))
-                    }
-                    disabled={loading === "fan-step" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : `Determines the incremental percentage change in fan speed when adjusting towards the target temperature. Instead of making abrupt changes, the fan speed will increase or decrease in defined steps, providing smoother transitions and reducing wear on the fan. Changes are applied every ${agentInterval}s (Agent Rate).`
-                    }
-                  >
-                    <option value={3}>3%</option>
-                    <option value={5}>5%</option>
-                    <option value={10}>10%</option>
-                    <option value={15}>15%</option>
-                    <option value={25}>25%</option>
-                    <option value={50}>50%</option>
-                    <option value={100}>Disable (instant)</option>
-                  </select>
-                  {loading === "fan-step" && (
-                    <span className="loading-spinner">⏳</span>
-                  )}
-                </div>
-                <div className="info-item info-item-vertical">
-                  <span className="label">Hysteresis:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={hysteresis}
-                    onChange={(e) =>
-                      handleHysteresisChange(parseFloat(e.target.value))
-                    }
-                    disabled={loading === "hysteresis" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : "Temperature tolerance before adjusting fan speed. The fan will only change speed when temperature moves more than this amount from the target, preventing constant micro-adjustments. Higher values = more stability, lower values = more responsive cooling."
-                    }
-                  >
-                    <option value={0.0}>Disable (instant)</option>
-                    <option value={0.5}>0.5°C</option>
-                    <option value={1.0}>1.0°C</option>
-                    <option value={2.0}>2.0°C</option>
-                    <option value={3.0}>3.0°C</option>
-                    <option value={5.0}>5.0°C</option>
-                    <option value={7.5}>7.5°C</option>
-                    <option value={10.0}>10.0°C</option>
-                  </select>
-                  {loading === "hysteresis" && (
-                    <span className="loading-spinner">⏳</span>
-                  )}
-                </div>
-                <div className="info-item info-item-vertical">
-                  <span className="label">Emergency Temp:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={emergencyTemp}
-                    onChange={(e) =>
-                      handleEmergencyTempChange(parseFloat(e.target.value))
-                    }
-                    disabled={loading === "emergency-temp" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : "Temperature threshold that overrides all controls and sets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety."
-                    }
-                  >
-                    <option value={70}>70°C</option>
-                    <option value={75}>75°C</option>
-                    <option value={80}>80°C</option>
-                    <option value={85}>85°C</option>
-                    <option value={90}>90°C</option>
-                    <option value={95}>95°C</option>
-                    <option value={100}>100°C</option>
-                  </select>
-                  {loading === "emergency-temp" && (
-                    <span className="loading-spinner">⏳</span>
-                  )}
-                </div>
-                <div className="info-item info-item-vertical">
-                  <span className="label">Failsafe Speed:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={failsafeSpeed}
-                    onChange={(e) =>
-                      handleFailsafeSpeedChange(parseInt(e.target.value))
-                    }
-                    disabled={loading === "failsafe-speed" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : "Fan speed applied when backend connection is lost. 0% allows fans to stop (NVIDIA GPUs reset to auto-control)."
-                    }
-                  >
-                    <option value={0}>0% (allow stop)</option>
-                    <option value={10}>10%</option>
-                    <option value={20}>20%</option>
-                    <option value={30}>30%</option>
-                    <option value={40}>40%</option>
-                    <option value={50}>50%</option>
-                    <option value={60}>60%</option>
-                    <option value={70}>70% (default)</option>
-                    <option value={80}>80%</option>
-                    <option value={90}>90%</option>
-                    <option value={100}>100% (full speed)</option>
-                  </select>
-                  {loading === "failsafe-speed" && (
-                    <span className="loading-spinner">⏳</span>
-                  )}
-                </div>
-                <div className="info-item info-item-vertical">
-                  <span className="label">Log Level:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={logLevel}
-                    onChange={(e) => handleLogLevelChange(e.target.value)}
-                    disabled={loading === "log-level" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : "Agent logging verbosity. TRACE: very detailed debug info, DEBUG: detailed diagnostics, INFO: normal operation logs, WARN: warnings, ERROR: errors only."
-                    }
-                  >
-                    <option value="TRACE">TRACE</option>
-                    <option value="DEBUG">DEBUG</option>
-                    <option value="INFO">INFO</option>
-                    <option value="WARN">WARN</option>
-                    <option value="ERROR">ERROR</option>
-                  </select>
-                  {loading === "log-level" && (
-                    <span className="loading-spinner">⏳</span>
-                  )}
-                </div>
-                <div className="info-item info-item-vertical">
-                  <span className="label">Fan Control:</span>
+                  <span className="label" title={isReadOnly ? readOnlyTooltip : getOption('fanControl').tooltip}>{getLabel('fanControl')}:</span>
                   <label
                     className="checkbox-container"
                     title={
                       isReadOnly
                         ? readOnlyTooltip
-                        : "Enable or disable fan speed control. When disabled, the agent will ignore all fan speed commands."
+                        : getOption('fanControl').tooltip
                     }
                   >
                     <input
@@ -1052,6 +871,150 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       <span className="loading-spinner">⏳</span>
                     )}
                   </label>
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('logLevel').tooltip, { logLevel })}>{getLabel('logLevel')}:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={logLevel}
+                    onChange={(e) => handleLogLevelChange(e.target.value)}
+                    disabled={loading === "log-level" || isReadOnly}
+                    title={
+                      isReadOnly
+                        ? readOnlyTooltip
+                        : interpolateTooltip(getOption('logLevel').tooltip, { logLevel })
+                    }
+                  >
+                    {(getValues('logLevel') as { value: string; label: string }[]).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {loading === "log-level" && (
+                    <span className="loading-spinner">⏳</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 2: Emergency Temp, Failsafe Speed */}
+              <div className="info-row">
+                <div className="info-item info-item-vertical">
+                  <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('emergencyTemp').tooltip, { emergencyTemp })}>{getLabel('emergencyTemp')}:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={emergencyTemp}
+                    onChange={(e) =>
+                      handleEmergencyTempChange(parseFloat(e.target.value))
+                    }
+                    disabled={loading === "emergency-temp" || isReadOnly}
+                    title={
+                      isReadOnly
+                        ? readOnlyTooltip
+                        : interpolateTooltip(getOption('emergencyTemp').tooltip, { emergencyTemp })
+                    }
+                  >
+                    {(getValues('emergencyTemp') as { value: number; label: string }[]).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {loading === "emergency-temp" && (
+                    <span className="loading-spinner">⏳</span>
+                  )}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('failsafeSpeed').tooltip, { failsafeSpeed })}>{getLabel('failsafeSpeed')}:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={failsafeSpeed}
+                    onChange={(e) =>
+                      handleFailsafeSpeedChange(parseInt(e.target.value))
+                    }
+                    disabled={loading === "failsafe-speed" || isReadOnly}
+                    title={
+                      isReadOnly
+                        ? readOnlyTooltip
+                        : interpolateTooltip(getOption('failsafeSpeed').tooltip, { failsafeSpeed })
+                    }
+                  >
+                    {(getValues('failsafeSpeed') as { value: number; label: string }[]).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {loading === "failsafe-speed" && (
+                    <span className="loading-spinner">⏳</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Row 3: Agent rate, Fan Step, Hysteresis */}
+              <div className="info-row">
+                <div className="info-item info-item-vertical">
+                  <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('updateInterval').tooltip, { agentInterval })}>{getLabel('updateInterval')}:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={agentInterval}
+                    onChange={(e) =>
+                      handleAgentIntervalChange(parseFloat(e.target.value))
+                    }
+                    disabled={loading === "agent-interval" || isReadOnly}
+                    title={
+                      isReadOnly
+                        ? readOnlyTooltip
+                        : interpolateTooltip(getOption('updateInterval').tooltip, { agentInterval })
+                    }
+                  >
+                    {(getValues('updateInterval') as { value: number; label: string }[]).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {loading === "agent-interval" && (
+                    <span className="loading-spinner">⏳</span>
+                  )}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('fanStep').tooltip, { fanStep, agentInterval })}>{getLabel('fanStep')}:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={fanStep}
+                    onChange={(e) =>
+                      handleFanStepChange(parseInt(e.target.value))
+                    }
+                    disabled={loading === "fan-step" || isReadOnly}
+                    title={
+                      isReadOnly
+                        ? readOnlyTooltip
+                        : interpolateTooltip(getOption('fanStep').tooltip, { fanStep, agentInterval })
+                    }
+                  >
+                    {(getValues('fanStep') as { value: number; label: string }[]).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {loading === "fan-step" && (
+                    <span className="loading-spinner">⏳</span>
+                  )}
+                </div>
+                <div className="info-item info-item-vertical">
+                  <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('hysteresis').tooltip, { hysteresis })}>{getLabel('hysteresis')}:</span>
+                  <select
+                    className="agent-interval-select"
+                    value={hysteresis}
+                    onChange={(e) =>
+                      handleHysteresisChange(parseFloat(e.target.value))
+                    }
+                    disabled={loading === "hysteresis" || isReadOnly}
+                    title={
+                      isReadOnly
+                        ? readOnlyTooltip
+                        : interpolateTooltip(getOption('hysteresis').tooltip, { hysteresis })
+                    }
+                  >
+                    {(getValues('hysteresis') as { value: number; label: string }[]).map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  {loading === "hysteresis" && (
+                    <span className="loading-spinner">⏳</span>
+                  )}
                 </div>
               </div>
             </>

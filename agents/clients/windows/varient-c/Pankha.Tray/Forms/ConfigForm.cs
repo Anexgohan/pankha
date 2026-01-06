@@ -106,15 +106,15 @@ public class ConfigForm : Form
         var hwY = 22;
         // Populate Update Interval from UIOptions
         var updateIntervals = UIOptions.Instance.GetUpdateIntervals();
-        var updateItems = updateIntervals.Select(v => $"{v}s").ToArray();
-        AddComboBoxRow(hardwareGroup, "Agent Rate:", ref _updateIntervalComboBox, ref hwY, 100, updateItems);
+        var updateItems = updateIntervals.Select(v => v.Label).ToArray();
+        AddComboBoxRow(hardwareGroup, $"{UIOptions.Instance.GetLabel("updateInterval")}:", ref _updateIntervalComboBox, ref hwY, 100, updateItems);
 
-        AddCheckBoxRow(hardwareGroup, "Enable Fan Control", ref _enableFanControlCheckBox, ref hwY, 100);
+        AddCheckBoxRow(hardwareGroup, UIOptions.Instance.GetLabel("fanControl"), ref _enableFanControlCheckBox, ref hwY, 100);
 
         // Populate Emergency Temp from UIOptions
         var emergencyTemps = UIOptions.Instance.GetEmergencyTemps();
-        var emergencyItems = emergencyTemps.Select(v => $"{v}°C").ToArray();
-        AddComboBoxRow(hardwareGroup, "Emergency Temp:", ref _emergencyTempComboBox, ref hwY, 100, emergencyItems);
+        var emergencyItems = emergencyTemps.Select(v => v.Label).ToArray();
+        AddComboBoxRow(hardwareGroup, $"{UIOptions.Instance.GetLabel("emergencyTemp")}:", ref _emergencyTempComboBox, ref hwY, 100, emergencyItems);
 
         AddNumericRow(hardwareGroup, "Failsafe (%):", ref _failsafeSpeedNumeric, ref hwY, 100, 0, 100, 0);
 
@@ -134,12 +134,12 @@ public class ConfigForm : Form
         // Populate Fan Step from UIOptions
         var fanSteps = UIOptions.Instance.GetFanSteps();
         var fanStepItems = fanSteps.Select(v => v.Label).ToArray();
-        AddComboBoxRow(monitorGroup, "Fan Step:", ref _fanStepComboBox, ref monY, 100, fanStepItems);
+        AddComboBoxRow(monitorGroup, $"{UIOptions.Instance.GetLabel("fanStep")}:", ref _fanStepComboBox, ref monY, 100, fanStepItems);
 
         // Populate Hysteresis from UIOptions
         var hysteresis = UIOptions.Instance.GetHysteresisOptions();
         var hysteresisItems = hysteresis.Select(v => v.Label).ToArray();
-        AddComboBoxRow(monitorGroup, "Hysteresis:", ref _hysteresisComboBox, ref monY, 100, hysteresisItems);
+        AddComboBoxRow(monitorGroup, $"{UIOptions.Instance.GetLabel("hysteresis")}:", ref _hysteresisComboBox, ref monY, 100, hysteresisItems);
 
         y += monitorGroup.Height + 10;
 
@@ -156,7 +156,7 @@ public class ConfigForm : Form
         // Populate Log Level from UIOptions
         var logLevels = UIOptions.Instance.GetLogLevels();
         var logLevelItems = logLevels.Select(v => v.Label).ToArray();
-        AddComboBoxRow(logGroup, "Log Level:", ref _logLevelComboBox, ref logY, 80, logLevelItems);
+        AddComboBoxRow(logGroup, $"{UIOptions.Instance.GetLabel("logLevel")}:", ref _logLevelComboBox, ref logY, 80, logLevelItems);
 
         y += logGroup.Height + 15;
 
@@ -295,14 +295,14 @@ public class ConfigForm : Form
 
                 // Set Update Interval ComboBox (now in Agent section)
                 var updateIntervals = UIOptions.Instance.GetUpdateIntervals();
-                var updateIdx = Array.IndexOf(updateIntervals, _currentConfig.Agent.UpdateInterval);
+                var updateIdx = Array.FindIndex(updateIntervals, u => Math.Abs(u.Value - _currentConfig.Agent.UpdateInterval) < 0.01);
                 if (updateIdx >= 0) _updateIntervalComboBox.SelectedIndex = updateIdx;
 
                 _enableFanControlCheckBox.Checked = _currentConfig.Hardware.EnableFanControl;
 
                 // Set Emergency Temp ComboBox
                 var emergencyTemps = UIOptions.Instance.GetEmergencyTemps();
-                var emergencyIdx = Array.IndexOf(emergencyTemps, (int)_currentConfig.Hardware.EmergencyTemp);
+                var emergencyIdx = Array.FindIndex(emergencyTemps, e => e.Value == (int)_currentConfig.Hardware.EmergencyTemp);
                 if (emergencyIdx >= 0) _emergencyTempComboBox.SelectedIndex = emergencyIdx;
 
                 _failsafeSpeedNumeric.Value = _currentConfig.Hardware.FailsafeSpeed;
@@ -436,14 +436,14 @@ public class ConfigForm : Form
             // Read Update Interval from ComboBox (now in Agent section)
             var updateIntervals = UIOptions.Instance.GetUpdateIntervals();
             if (_updateIntervalComboBox.SelectedIndex >= 0 && _updateIntervalComboBox.SelectedIndex < updateIntervals.Length)
-                _currentConfig.Agent.UpdateInterval = updateIntervals[_updateIntervalComboBox.SelectedIndex];
+                _currentConfig.Agent.UpdateInterval = updateIntervals[_updateIntervalComboBox.SelectedIndex].Value;
 
             _currentConfig.Hardware.EnableFanControl = _enableFanControlCheckBox.Checked;
 
             // Read Emergency Temp from ComboBox
             var emergencyTemps = UIOptions.Instance.GetEmergencyTemps();
             if (_emergencyTempComboBox.SelectedIndex >= 0 && _emergencyTempComboBox.SelectedIndex < emergencyTemps.Length)
-                _currentConfig.Hardware.EmergencyTemp = emergencyTemps[_emergencyTempComboBox.SelectedIndex];
+                _currentConfig.Hardware.EmergencyTemp = emergencyTemps[_emergencyTempComboBox.SelectedIndex].Value;
 
             _currentConfig.Hardware.FailsafeSpeed = (int)_failsafeSpeedNumeric.Value;
 

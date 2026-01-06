@@ -4,6 +4,14 @@ import Database from "../database/database";
 import { FanControlCommand } from "../types/agent";
 import { AgentManager } from "./AgentManager";
 import { log } from "../utils/logger";
+import {
+  validFanSteps,
+  validHysteresis,
+  validEmergencyTemps,
+  validUpdateIntervals,
+  validLogLevels,
+  validFailsafeSpeeds,
+} from "../config/uiOptions";
 
 interface PendingCommand {
   command: FanControlCommand;
@@ -156,9 +164,9 @@ export class CommandDispatcher extends EventEmitter {
     interval: number,
     priority: "low" | "normal" | "high" | "emergency" = "normal"
   ): Promise<any> {
-    // Validate interval range (0.5-30 seconds)
-    if (interval < 0.5 || interval > 30) {
-      throw new Error("Update interval must be between 0.5 and 30 seconds");
+    // Validate interval range using SST values
+    if (!validUpdateIntervals.includes(interval)) {
+      throw new Error(`Update interval must be one of: ${validUpdateIntervals.join(", ")} seconds`);
     }
 
     log.info(
@@ -182,11 +190,10 @@ export class CommandDispatcher extends EventEmitter {
     step: number,
     priority: "low" | "normal" | "high" | "emergency" = "normal"
   ): Promise<any> {
-    // Validate step (3, 5, 10, 15, 25, 50, 100)
-    const validSteps = [3, 5, 10, 15, 25, 50, 100];
-    if (!validSteps.includes(step)) {
+    // Validate step using SST values
+    if (!validFanSteps.includes(step)) {
       throw new Error(
-        "Fan step must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)"
+        `Fan step must be one of: ${validFanSteps.join(", ")}`
       );
     }
 
@@ -206,9 +213,9 @@ export class CommandDispatcher extends EventEmitter {
     hysteresis: number,
     priority: "low" | "normal" | "high" | "emergency" = "normal"
   ): Promise<any> {
-    // Validate hysteresis (0.0-10.0°C)
-    if (hysteresis < 0.0 || hysteresis > 10.0) {
-      throw new Error("Hysteresis must be between 0.0 (disable) and 10.0°C");
+    // Validate hysteresis using SST values
+    if (!validHysteresis.includes(hysteresis)) {
+      throw new Error(`Hysteresis must be one of: ${validHysteresis.join(", ")}°C`);
     }
 
     log.info(
@@ -227,9 +234,9 @@ export class CommandDispatcher extends EventEmitter {
     temp: number,
     priority: "low" | "normal" | "high" | "emergency" = "normal"
   ): Promise<any> {
-    // Validate temperature (70-100°C)
-    if (temp < 70.0 || temp > 100.0) {
-      throw new Error("Emergency temperature must be between 70.0 and 100.0°C");
+    // Validate temperature using SST values
+    if (!validEmergencyTemps.includes(temp)) {
+      throw new Error(`Emergency temperature must be one of: ${validEmergencyTemps.join(", ")}°C`);
     }
 
     log.info(
@@ -248,11 +255,10 @@ export class CommandDispatcher extends EventEmitter {
     level: string,
     priority: "low" | "normal" | "high" | "emergency" = "normal"
   ): Promise<any> {
-    // Validate log level
-    const validLevels = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"];
-    if (!validLevels.includes(level.toUpperCase())) {
+    // Validate log level using SST values
+    if (!validLogLevels.map(l => l.toUpperCase()).includes(level.toUpperCase())) {
       throw new Error(
-        "Log level must be one of: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL"
+        `Log level must be one of: ${validLogLevels.join(", ")}`
       );
     }
 
@@ -277,9 +283,9 @@ export class CommandDispatcher extends EventEmitter {
     speed: number,
     priority: "low" | "normal" | "high" | "emergency" = "normal"
   ): Promise<any> {
-    // Validate speed (0-100%)
-    if (speed < 0 || speed > 100) {
-      throw new Error("Failsafe speed must be between 0 and 100%");
+    // Validate speed using SST values
+    if (!validFailsafeSpeeds.includes(speed)) {
+      throw new Error(`Failsafe speed must be one of: ${validFailsafeSpeeds.join(", ")}%`);
     }
 
     log.info(

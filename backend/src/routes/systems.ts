@@ -6,6 +6,13 @@ import { DataAggregator } from "../services/DataAggregator";
 import { FanProfileController } from "../services/FanProfileController";
 import { licenseManager } from "../license/LicenseManager";
 import { log } from "../utils/logger";
+import {
+  validFanSteps,
+  validHysteresis,
+  validLogLevels,
+  validEmergencyTemps,
+  validUpdateIntervals,
+} from "../config/uiOptions";
 
 const router = Router();
 const db = Database.getInstance();
@@ -552,9 +559,9 @@ router.put("/:id/update-interval", async (req: Request, res: Response) => {
     const systemId = parseInt(req.params.id);
     const { interval, priority = "normal" } = req.body;
 
-    if (typeof interval !== "number" || interval < 0.5 || interval > 30) {
+    if (!validUpdateIntervals.includes(interval)) {
       return res.status(400).json({
-        error: "Interval must be a number between 0.5 and 30 seconds",
+        error: `Interval must be one of: ${validUpdateIntervals.join(", ")} seconds`,
       });
     }
 
@@ -807,10 +814,9 @@ router.put("/:id/fan-step", async (req: Request, res: Response) => {
     const systemId = parseInt(req.params.id);
     const { step, priority = "normal" } = req.body;
 
-    const validSteps = [3, 5, 10, 15, 25, 50, 100];
-    if (!validSteps.includes(step)) {
+    if (!validFanSteps.includes(step)) {
       return res.status(400).json({
-        error: "Step must be one of: 3, 5, 10, 15, 25, 50, 100 (disable)",
+        error: `Step must be one of: ${validFanSteps.join(", ")}`,
       });
     }
 
@@ -848,11 +854,9 @@ router.put("/:id/hysteresis", async (req: Request, res: Response) => {
     const systemId = parseInt(req.params.id);
     const { hysteresis, priority = "normal" } = req.body;
 
-    const validHysteresis = [0, 0.5, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0];
     if (!validHysteresis.includes(hysteresis)) {
       return res.status(400).json({
-        error:
-          "Hysteresis must be one of: 0 (disable), 0.5, 1.0, 2.0, 3.0, 5.0, 7.5, 10.0",
+        error: `Hysteresis must be one of: ${validHysteresis.join(", ")}`,
       });
     }
 
@@ -891,10 +895,10 @@ router.put("/:id/emergency-temp", async (req: Request, res: Response) => {
     const systemId = parseInt(req.params.id);
     const { temp, priority = "normal" } = req.body;
 
-    if (typeof temp !== "number" || temp < 70 || temp > 100) {
+    if (!validEmergencyTemps.includes(temp)) {
       return res
         .status(400)
-        .json({ error: "Emergency temp must be between 70 and 100°C" });
+        .json({ error: `Emergency temp must be one of: ${validEmergencyTemps.join(", ")}°C` });
     }
 
     const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [
@@ -932,11 +936,9 @@ router.put("/:id/log-level", async (req: Request, res: Response) => {
     const systemId = parseInt(req.params.id);
     const { level, priority = "normal" } = req.body;
 
-    const validLevels = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL"];
-    if (!validLevels.includes(level.toUpperCase())) {
+    if (!validLogLevels.map(l => l.toUpperCase()).includes(level.toUpperCase())) {
       return res.status(400).json({
-        error:
-          "Log level must be one of: TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL",
+        error: `Log level must be one of: ${validLogLevels.join(", ")}`,
       });
     }
 
