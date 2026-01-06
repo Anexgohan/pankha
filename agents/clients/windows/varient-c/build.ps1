@@ -223,6 +223,26 @@ $(Format-TupleArray $options.failsafeSpeed.values "int")
         }
         return template;
     }
+
+    // ========== VALIDATION ARRAYS (values only, for CommandHandler) ==========
+
+    /// <summary>Valid update interval values in seconds</summary>
+    public static readonly double[] ValidUpdateIntervals = UpdateIntervals.Select(x => x.Value).ToArray();
+
+    /// <summary>Valid fan step percentage values</summary>
+    public static readonly int[] ValidFanSteps = FanSteps.Select(x => x.Value).ToArray();
+
+    /// <summary>Valid hysteresis temperature values in °C</summary>
+    public static readonly double[] ValidHysteresis = HysteresisOptions.Select(x => x.Value).ToArray();
+
+    /// <summary>Valid emergency temperature values in °C</summary>
+    public static readonly int[] ValidEmergencyTemps = EmergencyTemps.Select(x => x.Value).ToArray();
+
+    /// <summary>Valid log level values</summary>
+    public static readonly string[] ValidLogLevels = LogLevels.Select(x => x.Value).ToArray();
+
+    /// <summary>Valid failsafe speed percentage values</summary>
+    public static readonly int[] ValidFailsafeSpeeds = FailsafeSpeedOptions.Select(x => x.Value).ToArray();
 }
 "@
 
