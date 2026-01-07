@@ -20,6 +20,7 @@ interface SystemDelta {
     emergency_temp?: number;
     log_level?: string;
     enable_fan_control?: boolean;
+    name?: string; // Agent name change
   };
 }
 
@@ -141,6 +142,9 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       }
       if (delta.changes.enable_fan_control !== undefined) {
         system.enable_fan_control = delta.changes.enable_fan_control;
+      }
+      if (delta.changes.name !== undefined) {
+        system.name = delta.changes.name;
       }
 
       system.last_seen = delta.timestamp;

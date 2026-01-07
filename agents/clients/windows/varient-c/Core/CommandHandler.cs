@@ -65,6 +65,9 @@ public class CommandHandler
                 case "setEnableFanControl":
                     return await HandleSetEnableFanControlAsync(commandId, payload);
 
+                case "setAgentName":
+                    return await HandleSetAgentNameAsync(commandId, payload);
+
                 case "ping":
                     return CreateSuccessResponse(commandId, new { pong = true });
 
@@ -251,6 +254,32 @@ public class CommandHandler
         _logger.Information("✏️ Fan Control changed: {Old} → {New}", oldStatus, status);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { enabled }));
+    }
+
+    private Task<CommandResponse> HandleSetAgentNameAsync(string commandId, Dictionary<string, object> payload)
+    {
+        var name = GetPayloadValue<string>(payload, "name");
+
+        // Validate name
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Task.FromResult(CreateErrorResponse(commandId, "Agent name cannot be empty"));
+        }
+
+        var trimmedName = name.Trim();
+        if (trimmedName.Length > 255)
+        {
+            return Task.FromResult(CreateErrorResponse(commandId, "Agent name must be 255 characters or less"));
+        }
+
+        // Update config
+        var oldName = _config.Agent.Name;
+        _config.Agent.Name = trimmedName;
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
+
+        _logger.Information("✏️ Agent Name changed: {Old} → {New}", oldName, trimmedName);
+
+        return Task.FromResult(CreateSuccessResponse(commandId, new { name = trimmedName }));
     }
 
     private T GetPayloadValue<T>(Dictionary<string, object> payload, string key)

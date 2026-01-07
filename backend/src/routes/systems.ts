@@ -4,6 +4,7 @@ import { AgentManager } from "../services/AgentManager";
 import { CommandDispatcher } from "../services/CommandDispatcher";
 import { DataAggregator } from "../services/DataAggregator";
 import { FanProfileController } from "../services/FanProfileController";
+import { WebSocketHub } from "../services/WebSocketHub";
 import { licenseManager } from "../license/LicenseManager";
 import { log } from "../utils/logger";
 import {
@@ -20,6 +21,7 @@ const agentManager = AgentManager.getInstance();
 const commandDispatcher = CommandDispatcher.getInstance();
 const dataAggregator = DataAggregator.getInstance();
 const fanProfileController = FanProfileController.getInstance();
+const webSocketHub = WebSocketHub.getInstance();
 
 /**
  * Check if a system can be controlled based on license tier agent limit.
@@ -1174,6 +1176,73 @@ router.put("/:id/fans/:fanId/label", async (req: Request, res: Response) => {
   } catch (error) {
     log.error("Error updating fan label:", "systems", error);
     res.status(500).json({ error: "Failed to update fan label" });
+  }
+});
+
+// PUT /api/systems/:id/name - Update agent name (display name)
+router.put("/:id/name", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const { name } = req.body;
+
+    // Validation
+    if (!name || typeof name !== "string") {
+      return res
+        .status(400)
+        .json({ error: "Name is required and must be a string" });
+    }
+
+    const trimmedName = name.trim();
+    if (trimmedName.length === 0) {
+      return res.status(400).json({ error: "Name cannot be empty" });
+    }
+
+    if (trimmedName.length > 255) {
+      return res
+        .status(400)
+        .json({ error: "Name must be 255 characters or less" });
+    }
+
+    // Verify system exists and get old name + agent_id
+    const system = await db.get("SELECT id, name, agent_id FROM systems WHERE id = $1", [
+      systemId,
+    ]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+
+    // Update name in database
+    await db.run(
+      `UPDATE systems SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+      [trimmedName, systemId]
+    );
+
+    // Dispatch command to sync name to agent config
+    try {
+      await commandDispatcher.setAgentName(system.agent_id, trimmedName);
+    } catch (cmdError) {
+      // Log but don't fail - agent may be offline
+      log.warn(
+        `Failed to sync name to agent ${system.agent_id}: ${cmdError}`,
+        "systems"
+      );
+    }
+
+    // Broadcast name change to all subscribed frontend clients for instant update
+    webSocketHub.broadcastNameChange(system.agent_id, trimmedName);
+
+    log.info(
+      `Agent name updated: "${system.name}" -> "${trimmedName}"`,
+      "systems"
+    );
+
+    res.json({
+      message: "Agent name updated successfully",
+      name: trimmedName,
+    });
+  } catch (error) {
+    log.error("Error updating agent name:", "systems", error);
+    res.status(500).json({ error: "Failed to update agent name" });
   }
 });
 

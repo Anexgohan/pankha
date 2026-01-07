@@ -15,7 +15,6 @@ namespace Pankha.WixSharpInstaller
     {
         private Label banner;
         private Label title;
-        private Label description;
         
         private Button changeBtn;
         private Label changeLbl;

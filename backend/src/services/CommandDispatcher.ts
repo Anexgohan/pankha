@@ -318,6 +318,36 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
+   * Set agent name - sync display name to agent config
+   */
+  public async setAgentName(
+    agentId: string,
+    name: string,
+    priority: "low" | "normal" | "high" | "emergency" = "normal"
+  ): Promise<any> {
+    // Basic validation
+    const trimmedName = name.trim();
+    if (trimmedName.length === 0) {
+      throw new Error("Agent name cannot be empty");
+    }
+    if (trimmedName.length > 255) {
+      throw new Error("Agent name must be 255 characters or less");
+    }
+
+    log.info(
+      ` Setting agent name for ${agentId}: "${trimmedName}"`,
+      "CommandDispatcher"
+    );
+
+    return this.sendCommand(
+      agentId,
+      "setAgentName",
+      { name: trimmedName },
+      priority
+    );
+  }
+
+  /**
    * Apply a fan profile to a system
    */
   public async applyFanProfile(

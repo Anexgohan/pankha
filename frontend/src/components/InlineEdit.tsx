@@ -7,6 +7,7 @@ interface InlineEditProps {
   onSave: (newValue: string) => Promise<void>;
   placeholder?: string;
   className?: string;
+  showHardwareId?: boolean;
 }
 
 export const InlineEdit: React.FC<InlineEditProps> = ({
@@ -15,6 +16,7 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
   onSave,
   placeholder = "Click to edit",
   className = "",
+  showHardwareId = true,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value);
@@ -127,7 +129,7 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
           </button>
         </div>
         {error && <div className="inline-edit-error">{error}</div>}
-        <div className="inline-edit-hardware-id">{hardwareId}</div>
+        {showHardwareId && <div className="inline-edit-hardware-id">{hardwareId}</div>}
       </div>
     );
   }
@@ -142,7 +144,7 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
         {value || placeholder}
         <span className="inline-edit-icon">✏️</span>
       </span>
-      <div className="inline-edit-hardware-id">{hardwareId}</div>
+      {showHardwareId && <div className="inline-edit-hardware-id">{hardwareId}</div>}
     </div>
   );
 };

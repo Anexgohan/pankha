@@ -974,6 +974,21 @@ export class WebSocketHub extends EventEmitter {
   }
 
   /**
+   * Broadcast agent name change to all subscribed clients
+   */
+  public broadcastNameChange(agentId: string, newName: string): void {
+    const delta = {
+      agentId,
+      timestamp: new Date().toISOString(),
+      changes: {
+        name: newName,
+      },
+    };
+    this.broadcast("systemDelta", delta, [`system:${agentId}`, "systems:all"]);
+    log.debug(`Broadcasted name change for agent ${agentId}: ${newName}`, "WebSocketHub");
+  }
+
+  /**
    * Send command to agent via WebSocket
    */
   public sendCommandToAgent(agentId: string, command: any): boolean {

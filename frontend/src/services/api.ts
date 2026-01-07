@@ -78,6 +78,17 @@ export const updateFanLabel = async (
   return response.data;
 };
 
+// Agent Name
+export const updateAgentName = async (
+  systemId: number,
+  name: string
+): Promise<void> => {
+  const response = await api.put(`/api/systems/${systemId}/name`, {
+    name,
+  });
+  return response.data;
+};
+
 // Fan Control
 export const setFanSpeed = async (
   systemId: number,

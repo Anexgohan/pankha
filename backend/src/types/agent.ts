@@ -91,7 +91,8 @@ export interface FanControlCommand {
     | "setEmergencyTemp"
     | "setLogLevel"
     | "setFailsafeSpeed"
-    | "setEnableFanControl";
+    | "setEnableFanControl"
+    | "setAgentName";
   payload: {
     fanId?: string;
     speed?: number;
@@ -109,6 +110,7 @@ export interface FanControlCommand {
     level?: string; // For setLogLevel command
     failsafeSpeed?: number; // For setFailsafeSpeed command (0-100%)
     enabled?: boolean; // For setEnableFanControl command
+    name?: string; // For setAgentName command
   };
   timestamp: number;
   priority: "low" | "normal" | "high" | "emergency";

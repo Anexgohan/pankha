@@ -725,12 +725,9 @@ namespace Pankha.WixSharpInstaller
     {
         private CheckBox resetConfigCheckBox;
         private Label descriptionLabel;
-        private Panel bottomPanel;
         private Button backButton;
         private Button nextButton;
         private Button cancelButton;
-        private Panel topBorder;
-        private Panel bottomBorder; // We will use predefined panels if possible or create standard shell
         
         // Standard Banner components
         private PictureBox banner;

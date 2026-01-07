@@ -12,6 +12,7 @@ import {
   getFanAssignments,
   updateSensorLabel,
   updateFanLabel,
+  updateAgentName,
 } from "../services/api";
 import { useSensorVisibility } from "../contexts/SensorVisibilityContext";
 import {
@@ -739,7 +740,18 @@ const SystemCard: React.FC<SystemCardProps> = ({
       <div className="system-header">
         <div className="system-title">
           <div className="title-left">
-            <h3>{system.name}</h3>
+            <h3>
+              <InlineEdit
+                value={system.name}
+                hardwareId={`agent-${system.id}`}
+                onSave={async (newName) => {
+                  await updateAgentName(system.id, newName);
+                  onUpdate();
+                }}
+                className="agent-name-edit"
+                showHardwareId={false}
+              />
+            </h3>
             <span
               className="status-badge"
               style={{ backgroundColor: getStatusColor(system.status) }}
@@ -1575,6 +1587,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
   // Only re-render if these specific properties changed
   return (
     prevProps.system.id === nextProps.system.id &&
+    prevProps.system.name === nextProps.system.name &&
     prevProps.system.status === nextProps.system.status &&
     prevProps.system.real_time_status === nextProps.system.real_time_status &&
     prevProps.system.last_seen === nextProps.system.last_seen &&

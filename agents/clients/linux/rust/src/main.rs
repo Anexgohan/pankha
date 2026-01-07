@@ -1626,6 +1626,16 @@ impl WebSocketClient {
                     (false, Some("Missing or invalid enabled".to_string()), serde_json::json!({}))
                 }
             }
+            "setAgentName" => {
+                if let Some(name) = payload.get("name").and_then(|v| v.as_str()) {
+                    match self.set_agent_name(name).await {
+                        Ok(_) => (true, None, serde_json::json!({"name": name})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid name".to_string()), serde_json::json!({}))
+                }
+            }
             "ping" => (true, None, serde_json::json!({"pong": true})),
             _ => {
                 warn!("Unknown command: {}", command_type);
@@ -1851,6 +1861,36 @@ impl WebSocketClient {
         let status = if enabled { "enabled" } else { "disabled" };
         let old_status = if old_enabled { "enabled" } else { "disabled" };
         info!("✏️  Fan Control changed: {} → {}", old_status, status);
+        Ok(())
+    }
+
+    async fn set_agent_name(&self, name: &str) -> Result<()> {
+        // Validate name
+        let trimmed_name = name.trim();
+        if trimmed_name.is_empty() {
+            return Err(anyhow::anyhow!("Agent name cannot be empty"));
+        }
+        if trimmed_name.len() > 255 {
+            return Err(anyhow::anyhow!("Agent name must be 255 characters or less"));
+        }
+
+        // Update config quickly with minimal lock time
+        let old_name;
+        {
+            let mut config = self.config.write().await;
+            old_name = config.agent.name.clone();
+            config.agent.name = trimmed_name.to_string();
+        } // Lock released here
+
+        // Perform I/O outside of lock
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
+
+        info!("✏️  Agent Name changed: {} → {}", old_name, trimmed_name);
         Ok(())
     }
 
