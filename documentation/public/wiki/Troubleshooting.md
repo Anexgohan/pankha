@@ -14,16 +14,14 @@
 *   **Fix**: Ensure your URL starts with `ws://`. If you are running behind a reverse proxy (like Nginx Proxy Manager), ensure that WebSocket support is enabled.
 
 ### Agent Disconnects After Backend Restart
-*   **Cause**: Current version requires manual reconnection after backend restarts.
-*   **Workaround**:
+*   **Info**: Agents have automatic reconnection with exponential backoff. They will retry indefinitely until the backend is available again. If you need to force a reconnect:
     ```bash
     # Linux
-    ./pankha-agent -x && ./pankha-agent -s
+    ./pankha-agent --restart
     
-    # Windows (run as Administrator)
-    pankha-agent.exe --restart
+    # Windows (via Tray Icon)
+    Right-click Tray -> Restart Service
     ```
-*   **Note**: Future versions will include automatic reconnection handling.
 
 ## Server Issues
 
@@ -97,13 +95,13 @@
         ```
         > Rebooting restores BIOS defaults.
 
-### Duplicate Sensors Showing
-*   **Cause**: Many motherboards report the same sensor via multiple chips.
-*   **Fix**: Enable filtering in `config.json`:
-    ```json
-    "filter_duplicate_sensors": true,
-    "duplicate_sensor_tolerance": 2.0
-    ```
+### Agent Shows "Disconnected" but Backend is Running
+*   **Cause**: Network partition or firewall blocking WebSocket.
+*   **Fix**: 
+    1.  Check backend logs: `docker compose logs app --tail=100`
+    2.  Verify agent can reach backend: `curl http://<server-ip>:3000/health`
+    3.  Check agent config.json has correct `server_url`
+    4.  Restart agent: `./pankha-agent --restart`
 
 ## Usage Questions
 

@@ -6,6 +6,7 @@ The Pankha Linux agent is a lightweight, single-binary application written in Ru
 *   **Zero Dependencies**: No Python or Ruby runtime required.
 *   **Low Resource Usage**: Typically uses <10MB RAM and <1% CPU.
 *   **Hardware Support**: Supports any sensor supported by `lm-sensors`.
+*   **Failsafe Mode**: Autonomous fan control when disconnected (configurable `failsafe_speed`, default 70%).
 
 ## Installation
 

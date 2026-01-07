@@ -2,6 +2,12 @@
 
 The Pankha Windows Agent is a native .NET 8 application that runs as a Background Service, with an accompanying System Tray application for easy management.
 
+## Features
+*   **Two-Process Architecture**: Background Service handles hardware access; Tray App provides GUI control.
+*   **LibreHardwareMonitor**: Full GPU, CPU, motherboard sensor support.
+*   **Failsafe Mode**: Autonomous fan control when disconnected (GPU → auto, others → `failsafe_speed`).
+*   **Ring0 Driver**: Kernel driver for low-level hardware access (auto-extracted on first run).
+
 ## Installation
 
 1.  **Download**: Get the latest `pankha-agent-windows_x64.msi` from the [Releases Page](https://github.com/Anexgohan/pankha/releases).

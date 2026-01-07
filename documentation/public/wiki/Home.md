@@ -6,9 +6,10 @@ Pankha is an open-source, distributed fan control system designed for self-hoste
 
 ## Key Features
 
-*   ** centralized Control**: Manage fan curves and speeds for your NAS, gaming PC, and servers from one UI.
+*   **Centralized Control**: Manage fan curves and speeds for your NAS, gaming PC, and servers from one UI.
 *   **Real-time Monitoring**: WebSocket-based architecture provides instant feedback (<100ms latency).
 *   **Hardware Safety**:
+    *   **Failsafe Mode**: Agents autonomously control fans when disconnected (configurable speed).
     *   **Emergency Stop**: Hard override to max fans if critical temps are reached.
     *   **Connectivity Watchdog**: Agents auto-reconnect; Backend alerts if an agent goes offline.
 *   **Cross-Platform Agents**:
@@ -25,6 +26,7 @@ Pankha is an open-source, distributed fan control system designed for self-hoste
 
 ## Getting Started
 
-1.  **[Installation](Installation)**: Deploy the server using Docker Compose.
-2.  **[agents](Agents-Linux)**: Deploy agents to your machines.
-3.  **[Configuration](Configuration)**: Customize your setup.
+1.  **[Server Installation](Server-Installation)**: Deploy the server using Docker Compose.
+2.  **[Linux Agent](Agents-Linux)**: Deploy agents to your Linux machines.
+3.  **[Windows Agent](Agents-Windows)**: Deploy agents to your Windows machines.
+4.  **[Server Configuration](Server-Configuration)**: Customize your setup.

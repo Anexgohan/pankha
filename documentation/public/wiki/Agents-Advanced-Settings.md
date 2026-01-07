@@ -18,14 +18,20 @@ Each agent has specific settings to fine-tune its behavior. You can edit these i
 *   **Action**: All fans are immediately forced to **100% speed** to protect hardware.
 *   **Offline Failsafe**: When the agent loses connection to the backend, it continues monitoring temperatures locally. If any sensor hits the emergency threshold while disconnected, the agent autonomously triggers 100% fan speed—**no backend required**.
 
-### Minimum Fan Speed (Safety Floor)
-*   **Purpose**: Hardware protection—prevents fans from ever stopping completely.
-*   **How it works**: Even if the backend sends a 0% speed command (or goes offline), the agent will **never** set fans below this value.
-*   **Default**: 30%
+### Failsafe Speed
+*   **Purpose**: Hardware protection when agent loses connection to backend.
+*   **How it works**: When disconnected, the agent sets ALL fans to this speed percentage.
+*   **Default**: 70%
 *   **Why it matters**:
-    *   Prevents fan stalling (can damage bearings on some fans)
-    *   Ensures airflow during backend outages
-    *   Protects against accidental full-stop commands
+    *   Ensures cooling continues during backend outages
+    *   Configurable: 0-100% (30-70% recommended)
+    *   Works with Emergency Temperature: if any sensor ≥ `emergency_temp`, fans go to 100%
+*   **Windows Special Case**: GPU fans go to "auto" (driver control), other fans use `failsafe_speed`.
+
+### Enable Fan Control
+*   **Purpose**: Toggle whether this agent can control fans.
+*   **When Disabled**: Agent is read-only (monitoring only, no fan speed commands accepted).
+*   **Use Case**: Temporarily disable control during maintenance or testing.
 
 ---
 
@@ -49,16 +55,12 @@ Each agent has specific settings to fine-tune its behavior. You can edit these i
 
 ---
 
-## Sensor Management
+## Agent Identity
 
-### Filter Duplicates
-*   **Purpose**: Hides redundant sensors. Many motherboards report the same physical sensor via multiple chips (e.g., both `k10temp` and `it8628` might report CPU Temp).
-*   **Action**: When enabled, the agent compares sensor values and hides duplicates to declutter the dashboard.
-
-### Sensor Tolerance
-*   **Purpose**: Used with "Filter Duplicates".
-*   **How it works**: Defines the margin of error for considering two sensors "identical".
-*   **Example**: If set to **1.0°C**, and Sensor A is 45.0°C and Sensor B is 45.8°C, they are considered duplicates.
+### Agent Name
+*   **Purpose**: Display name shown on the dashboard.
+*   **How it works**: Can be changed via dashboard settings or `config.json`.
+*   **Default**: System hostname.
 
 ---
 
