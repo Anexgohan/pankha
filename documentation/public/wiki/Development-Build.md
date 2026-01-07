@@ -63,11 +63,13 @@ cargo build --release
 # Binary: target/release/pankha-agent
 ```
 
-### Windows Agent (.NET)
-```bash
-cd agents/clients/windows/dotnet
-dotnet build -c Release
-# Output: bin/Release/net8.0-windows/
+### Windows Agent (.NET 8)
+```powershell
+cd agents/clients/windows/varient-c
+.\build.ps1 -Menu              # Interactive menu
+# OR
+.\build.ps1 -Clean -Publish -BuildInstaller
+# Output: publish/win-x64/installer/pankha-agent-windows_x64.msi
 ```
 
 ---

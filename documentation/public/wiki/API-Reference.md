@@ -128,12 +128,14 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 
 ### Events (Server → Client)
 
-| Event             | Description                               |
-| ----------------- | ----------------------------------------- |
-| `fullState`       | Complete snapshot on connection           |
-| `systemDelta`     | Incremental updates (bandwidth optimized) |
-| `agentRegistered` | Agent connected                           |
-| `agentOffline`    | Agent disconnected                        |
+| Event                | Description                               |
+| -------------------- | ----------------------------------------- |
+| `fullState`          | Complete snapshot on connection           |
+| `systemDelta`        | Incremental updates (bandwidth optimized) |
+| `agentRegistered`    | Agent connected                           |
+| `agentOffline`       | Agent disconnected                        |
+| `agentError`         | Agent error occurred                      |
+| `agentConfigUpdated` | Config change (immediate broadcast)       |
 
 ### Example: systemDelta
 ```json
@@ -191,14 +193,15 @@ curl http://localhost:3000/health
 }
 ```
 
-| Code | Meaning             |
-| ---- | ------------------- |
-| 200  | Success             |
-| 201  | Created             |
-| 400  | Bad request         |
-| 404  | Not found           |
-| 500  | Server error        |
-| 503  | Service unavailable |
+| Code | Meaning                                    |
+| ---- | ------------------------------------------ |
+| 200  | Success                                    |
+| 201  | Created                                    |
+| 400  | Bad request                                |
+| 403  | Forbidden (license limit / read-only mode) |
+| 404  | Not found                                  |
+| 500  | Server error                               |
+| 503  | Service unavailable                        |
 
 ---
 
