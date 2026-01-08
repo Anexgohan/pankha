@@ -14,17 +14,22 @@
   --bg-panels_02: #242424f6;
 
   /* Text Colors */
-  --text-primary: var(--neutral-700);
+  --text-primary: var(--neutral-800);
   --text-secondary: var(--neutral-600);
   --text-tertiary: var(--neutral-500);
 
   /* Border Colors */
   --border-color: var(--neutral-100);
+  --border-color-dimmed: var(--neutral-100) / 0.50;
   --border-light: var(--neutral-200);
 
   /* Shadows (using spacing tokens) */
   --shadow: var(--shadow-sm);
   --shadow-hover: var(--shadow-md);
+
+  /* Dims, Fades and Transparencies */
+  --solid-dimmed: #dddddd30;
+  --solid-transparent: #00000000;
 }
 
 [data-theme="light"] {
@@ -39,5 +44,9 @@
 
   /* Border Colors */
   --border-color: var(--neutral-200);
+  --border-color-dimmed: var(--neutral-200) / 0.25;
   --border-light: var(--neutral-300);
+
+    /* Dims, Fades and Transparencies */
+  --solid-dimmed: #44444430;
 }

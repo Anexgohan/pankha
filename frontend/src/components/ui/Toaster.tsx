@@ -15,9 +15,11 @@
 import { Toaster as SonnerToaster } from 'sonner';
 
 // Custom styles for toast button positioning
+// close button [data-close-button] and copy button [data-button]
 const toastStyles = `
   [data-sonner-toast] {
     overflow: visible !important;
+    top: 70px !important;
   }
   [data-sonner-toast] [data-close-button] {
     position: absolute !important;
@@ -38,15 +40,17 @@ const toastStyles = `
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    border: 1px solid var(--neutral-500) !important;
+    border: 0px solid var(--border-color) !important;
     padding: 2px 2px !important;
     cursor: pointer !important;
+    background: var(--solid-transparent) !important;
   }
   [data-sonner-toast] button[data-button]:hover {
-    background: var(--bg-panels_01) !important;
+    background: var(--solid-dimmed) !important;
   }
 `;
 
+// Main Toaster Notification Box Component
 export function Toaster() {
   return (
     <>
@@ -63,7 +67,7 @@ export function Toaster() {
           style: {
             // Use semantic tokens from semantic.css for theme compatibility
             background: 'var(--bg-panels_02)',
-            border: '1px solid var(--border-color)',
+            border: '1px solid var(--solid-dimmed)',
             color: 'var(--text-primary)',
             boxShadow: 'var(--bg-tertiary)',
           },
