@@ -11,6 +11,7 @@ import type {
 import FanProfileEditor from './FanProfileEditor';
 import FanCurveChart from './FanCurveChart';
 import ProfileImportExport from './ProfileImportExport';
+import { toast } from '../utils/toast';
 
 const FanProfileManager: React.FC = () => {
   const [profiles, setProfiles] = useState<FanProfile[]>([]);
@@ -86,7 +87,7 @@ const FanProfileManager: React.FC = () => {
       await deleteFanProfile(profileId);
       await loadData(); // Reload data
     } catch (err) {
-      alert('Failed to delete profile: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      toast.error('Failed to delete profile: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 

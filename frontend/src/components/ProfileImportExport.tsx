@@ -10,6 +10,8 @@ import type {
   ImportResult,
   DefaultProfileInfo
 } from '../services/fanProfilesApi';
+import { getImportStatusColor } from '../utils/statusColors';
+import { toast } from '../utils/toast';
 
 interface ProfileImportExportProps {
   profiles: any[];
@@ -45,7 +47,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       setSelectedDefaults(new Set(notExisting));
     } catch (error) {
       console.error('Failed to fetch default profiles:', error);
-      alert('Failed to fetch default profiles: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Failed to fetch default profiles: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -55,7 +57,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       await downloadFanProfilesExport({ include_system_profiles: true });
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsExporting(false);
     }
@@ -67,7 +69,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
         .map((checkbox) => parseInt((checkbox as HTMLInputElement).value));
 
       if (selectedProfileIds.length === 0) {
-        alert('Please select at least one profile to export');
+        toast.error('Please select at least one profile to export');
         return;
       }
 
@@ -78,7 +80,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       });
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsExporting(false);
     }
@@ -96,7 +98,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       }
     } catch (error) {
       console.error('Restore defaults failed:', error);
-      alert('Restore defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Restore defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsLoadingDefaults(false);
     }
@@ -105,7 +107,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
   const handleLoadSelectedDefaults = async () => {
     try {
       if (selectedDefaults.size === 0) {
-        alert('Please select at least one profile to load');
+        toast.error('Please select at least one profile to load');
         return;
       }
 
@@ -121,7 +123,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       }
     } catch (error) {
       console.error('Load defaults failed:', error);
-      alert('Load defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Load defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsLoadingDefaults(false);
     }
@@ -161,7 +163,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
         processImport(data.profiles);
       } catch (error) {
         console.error('File processing error:', error);
-        alert('Failed to process file: ' + (error instanceof Error ? error.message : 'Invalid file format'));
+        toast.error('Failed to process file: ' + (error instanceof Error ? error.message : 'Invalid file format'));
       }
     };
     reader.readAsText(file);
@@ -185,7 +187,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       }
     } catch (error) {
       console.error('Import failed:', error);
-      alert('Import failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Import failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
@@ -195,15 +197,6 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       case 'skipped': return '⏭️';
       case 'error': return '❌';
       default: return '❓';
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'imported': return '#4CAF50';
-      case 'skipped': return '#FF9800';
-      case 'error': return '#F44336';
-      default: return '#9E9E9E';
     }
   };
 
@@ -439,7 +432,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                   <div key={index} className="profile-result-item">
                     <span
                       className="status-icon"
-                      style={{ color: getStatusColor(profile.status) }}
+                      style={{ color: getImportStatusColor(profile.status) }}
                     >
                       {getStatusIcon(profile.status)}
                     </span>

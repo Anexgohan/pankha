@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { emergencyStop, getOverview } from '../services/api';
+import { toast } from '../utils/toast';
 import SystemCard from './SystemCard';
 import OverviewStats from './OverviewStats';
 import ThemeToggle from './ThemeToggle';
@@ -23,7 +24,8 @@ const Dashboard: React.FC = () => {
     systems,
     connectionState,
     error,
-    reconnect
+    reconnect,
+    removeSystem
   } = useWebSocketData();
 
   // Fetch overview data separately (could be added to WebSocket later)
@@ -71,9 +73,9 @@ const Dashboard: React.FC = () => {
     if (window.confirm('Are you sure you want to trigger emergency stop for ALL systems? This will set all fans to maximum speed.')) {
       try {
         await emergencyStop();
-        alert('Emergency stop triggered successfully');
+        toast.success('Emergency stop triggered successfully');
       } catch (err) {
-        alert('Emergency stop failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        toast.error('Emergency stop failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
       }
     }
   };
@@ -204,6 +206,7 @@ const Dashboard: React.FC = () => {
                   key={system.id}
                   system={system}
                   onUpdate={handleUpdate}
+                  onRemove={() => removeSystem(system.id)}
                   expandedSensors={expandedSensors[system.id] || false}
                   expandedFans={expandedFans[system.id] || false}
                   onToggleSensors={(expanded) => setExpandedSensors(prev => ({...prev, [system.id]: expanded}))}

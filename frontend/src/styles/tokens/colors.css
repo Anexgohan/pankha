@@ -1,5 +1,16 @@
 /* ===================================
    Pankha Design System - Color Tokens
+   ===================================
+   
+   PURPOSE: Base color palette definitions only.
+   - Brand colors (primary, accent)
+   - Status colors (success, warning, error, info)
+   - Neutral color scale (50-900)
+   - Temperature status colors
+   
+   For contextual/semantic usage (backgrounds, borders, text),
+   see: semantic.css
+   
    Dark Mode is Default
    =================================== */
 

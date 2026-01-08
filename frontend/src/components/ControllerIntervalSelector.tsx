@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getControllerStatus, setControllerInterval } from '../services/api';
+import { toast } from '../utils/toast';
 
 interface ControllerIntervalOption {
   value: number;
@@ -43,7 +44,7 @@ const ControllerIntervalSelector: React.FC = () => {
       console.log(`✅ Backend controller interval changed to ${newInterval}ms`);
     } catch (error) {
       console.error('Failed to set controller interval:', error);
-      alert('Failed to update backend controller interval. Please try again.');
+      toast.error('Failed to update backend controller interval. Please try again.');
     } finally {
       setLoading(false);
     }

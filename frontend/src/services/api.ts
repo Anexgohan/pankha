@@ -253,4 +253,26 @@ export const deleteLicense = async () => {
   return response.data;
 };
 
+// Sensor Visibility
+export const updateSensorVisibility = async (
+  systemId: number,
+  sensorId: number,
+  isHidden: boolean
+): Promise<void> => {
+  await api.put(`/api/systems/${systemId}/sensors/${sensorId}/visibility`, {
+    is_hidden: isHidden,
+  });
+};
+
+export const updateGroupVisibility = async (
+  systemId: number,
+  groupId: string,
+  isHidden: boolean
+): Promise<void> => {
+  await api.put(`/api/systems/${systemId}/sensor-groups/${groupId}/visibility`, {
+    is_hidden: isHidden,
+  });
+};
+
 export default api;
+

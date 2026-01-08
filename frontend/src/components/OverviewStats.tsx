@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SystemOverview } from '../types/api';
+import { formatTemperature } from '../utils/formatters';
 
 interface OverviewStatsProps {
   overview: SystemOverview;
@@ -76,14 +77,14 @@ const OverviewStats: React.FC<OverviewStatsProps> = ({ overview }) => {
       
       <div className="stat-card temperature">
         <div className="stat-value">
-          {overview.avgTemperature ? `${overview.avgTemperature.toFixed(1)}°C` : 'N/A'}
+          {formatTemperature(overview.avgTemperature)}
         </div>
         <div className="stat-label">Avg Temperature</div>
       </div>
       
       <div className="stat-card temperature">
         <div className="stat-value">
-          {overview.highestTemperature ? `${overview.highestTemperature.toFixed(1)}°C` : 'N/A'}
+          {formatTemperature(overview.highestTemperature)}
         </div>
         <div className="stat-label">Highest Temperature</div>
       </div>

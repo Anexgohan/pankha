@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import type { FanReading, SensorReading } from '../types/api';
 import type { FanProfile } from '../services/fanProfilesApi';
+import { sortSensorGroupIds } from '../utils/sensorUtils';
+import { formatTemperature } from '../utils/formatters';
+import { toast } from '../utils/toast';
 import './BulkEditPanel.css';
 
 interface BulkEditPanelProps {
@@ -91,12 +94,12 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
 
   const handleApply = async () => {
     if (selectedFanIds.size === 0) {
-      alert('Please select at least one fan');
+      toast.error('Please select at least one fan');
       return;
     }
 
     if (!bulkSensorId && !bulkProfileId) {
-      alert('Please select a Control Sensor or Fan Profile to apply');
+      toast.error('Please select a Control Sensor or Fan Profile to apply');
       return;
     }
 
@@ -109,7 +112,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
       );
       onClose();
     } catch (error) {
-      alert('Failed to apply changes: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('Failed to apply changes: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -159,22 +162,14 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
               >
                 <option value="">Don't change</option>
                 <option value="__highest__">
-                  🔥 Highest ({highestTemperature?.toFixed(1) || '0.0'}°C)
+                  🔥 Highest ({formatTemperature(highestTemperature, '0.0°C')})
                 </option>
                 <option disabled>────────────────────</option>
 
                 {/* Sensor Groups */}
                 {(() => {
                   const sensorGroups = groupSensorsByChip(sensors);
-                  const sortedGroupIds = Object.keys(sensorGroups).sort((a, b) => {
-                    const order = ['k10temp', 'coretemp', 'it8628', 'it87', 'nvme', 'gigabyte_wmi', 'asus_wmi', 'acpitz', 'thermal'];
-                    const aIndex = order.indexOf(a);
-                    const bIndex = order.indexOf(b);
-                    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-                    if (aIndex !== -1) return -1;
-                    if (bIndex !== -1) return 1;
-                    return a.localeCompare(b);
-                  });
+                  const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
 
                   const groupsWithMultipleSensors = sortedGroupIds.filter(
                     groupId => sensorGroups[groupId].length > 1
@@ -194,7 +189,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                             value={`__group__${groupId}`}
                             title="Selecting a group uses the Highest Temperature of that group"
                           >
-                            📊 {getChipDisplayName(groupId)} ({highestTemp.toFixed(1)}°C)
+                            📊 {getChipDisplayName(groupId)} ({formatTemperature(highestTemp)})
                           </option>
                         );
                       })}
@@ -206,7 +201,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                 <option disabled>(Sensors)</option>
                 {sensors.map((sensor) => (
                   <option key={sensor.id} value={sensor.id}>
-                    {getSensorDisplayName(sensor.id, sensor.name, sensor.label)} ({sensor.temperature.toFixed(1)}°C)
+                    {getSensorDisplayName(sensor.id, sensor.name, sensor.label)} ({formatTemperature(sensor.temperature)})
                   </option>
                 ))}
               </select>

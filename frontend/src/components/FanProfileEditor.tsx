@@ -10,6 +10,7 @@ import type {
   UpdateFanProfileRequest
 } from '../services/fanProfilesApi';
 import FanCurveChart from './FanCurveChart';
+import { toast } from '../utils/toast';
 
 interface FanProfileEditorProps {
   profile?: FanProfile | null;
@@ -104,7 +105,7 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
 
   const handleRemovePoint = (index: number) => {
     if (curvePoints.length <= 2) {
-      alert('A fan curve must have at least 2 points');
+      toast.error('A fan curve must have at least 2 points');
       return;
     }
     setCurvePoints(curvePoints.filter((_, i) => i !== index));

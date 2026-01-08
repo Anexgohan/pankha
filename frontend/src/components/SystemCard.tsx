@@ -13,6 +13,8 @@ import {
   updateSensorLabel,
   updateFanLabel,
   updateAgentName,
+  updateSensorVisibility,
+  updateGroupVisibility,
 } from "../services/api";
 import { useSensorVisibility } from "../contexts/SensorVisibilityContext";
 import {
@@ -24,7 +26,12 @@ import {
   setFanSensor,
   getFanConfigurations,
 } from "../services/fanConfigurationsApi";
-import { getSensorLabel } from "../config/sensorLabels";
+import { getSensorLabel, getChipDisplayName } from "../config/sensorLabels";
+import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../utils/sensorUtils";
+import { getSensorDisplayName, getFanDisplayName } from "../utils/displayNames";
+import { getAgentStatusColor } from "../utils/statusColors";
+import { formatTemperature } from "../utils/formatters";
+import { toast } from "../utils/toast";
 import { InlineEdit } from "./InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
 import { getOption, getValues, getLabel, interpolateTooltip } from "../utils/uiOptions";
@@ -32,6 +39,7 @@ import { getOption, getValues, getLabel, interpolateTooltip } from "../utils/uiO
 interface SystemCardProps {
   system: SystemData;
   onUpdate: () => void;
+  onRemove: () => void;
   expandedSensors: boolean;
   expandedFans: boolean;
   onToggleSensors: (expanded: boolean) => void;
@@ -41,6 +49,7 @@ interface SystemCardProps {
 const SystemCard: React.FC<SystemCardProps> = ({
   system,
   onUpdate,
+  onRemove,
   expandedSensors,
   expandedFans,
   onToggleSensors,
@@ -221,16 +230,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
     if (sensorDbId) {
       try {
         const isHidden = !isSensorHidden(sensorId); // Will be toggled state
-        await fetch(
-          `${import.meta.env.VITE_API_BASE_URL}/api/systems/${
-            system.id
-          }/sensors/${sensorDbId}/visibility`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ is_hidden: isHidden }),
-          }
-        );
+        await updateSensorVisibility(system.id, sensorDbId, isHidden);
       } catch (error) {
         console.error("Failed to sync sensor visibility to backend:", error);
       }
@@ -245,31 +245,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
     // Sync to backend
     try {
       const isHidden = !isGroupHidden(groupId); // Will be toggled state
-      await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/systems/${
-          system.id
-        }/sensor-groups/${groupId}/visibility`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ is_hidden: isHidden }),
-        }
-      );
+      await updateGroupVisibility(system.id, groupId, isHidden);
     } catch (error) {
       console.error("Failed to sync group visibility to backend:", error);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "online":
-        return "#4CAF50";
-      case "offline":
-        return "#9E9E9E";
-      case "error":
-        return "#F44336";
-      default:
-        return "#FF9800";
     }
   };
 
@@ -304,38 +282,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
     return "normal"; // Low RPM (green)
   };
 
-  const deriveSensorGroupId = (sensor: SensorReading): string => {
-    // Hardware-agnostic pattern extraction for sensor grouping
-
-    // Pattern 1: Standard format ending with _<number> (e.g., k10temp_1, acpitz_2, nvme_3)
-    // This also handles cases like nvidiagpu_0_temperature_0 (extracts nvidiagpu_0_temperature)
-    // BUT we want to prioritize extracting the CHIP ID if possible.
-
-    // Strategy:
-    // 1. Look for "Chip ID" pattern: [alphanumeric]_[digits] (e.g. nvidiagpu_0, amdcpu_0)
-    //    This covers most Windows/Linux indexed chips.
-    const indexedChipMatch = sensor.id.match(/^([a-z0-9]+_\d+)/i);
-    if (indexedChipMatch?.[1]) {
-      return indexedChipMatch[1];
-    }
-
-    // 2. Look for "Chip ID" pattern without index: [alphanumeric]_ (e.g. k10temp_tctl, it8628_fan1)
-    //    This covers Linux chips that don't have an index suffix on the chip name itself.
-    const nonIndexedChipMatch = sensor.id.match(/^([a-z0-9]+)_/i);
-    if (nonIndexedChipMatch?.[1]) {
-      return nonIndexedChipMatch[1];
-    }
-
-    // 3. Fallback to old logic for safety (e.g. if ID has no underscores)
-    const standardMatch = sensor.id.match(/^([a-z0-9_]+?)_\d+$/i);
-    if (standardMatch?.[1]) {
-      return standardMatch[1];
-    }
-
-    // Fallback to sensor type
-    return sensor.type || "other";
-  };
-
   const getSensorIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case "cpu":
@@ -354,34 +300,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
     }
   };
 
-  const getSensorDisplayName = (id: string, name: string, label: string) => {
-    // Priority: 1. Actual label from backend, 2. Name from backend, 3. ID as last resort
-    if (label && label !== id) {
-      return label;
-    }
-
-    if (name && name !== id) {
-      return name;
-    }
-
-    // No fallback mappings - just use the ID as provided by the hardware
-    return id;
-  };
-
-  const getFanDisplayName = (id: string, name: string, label: string) => {
-    // Priority: 1. Actual label from backend, 2. Name from backend, 3. ID as last resort
-    if (label && label !== id) {
-      return label;
-    }
-
-    if (name && name !== id) {
-      return name;
-    }
-
-    // No fallback mappings - just use the ID as provided by the hardware
-    return id;
-  };
-
   // Removed manual fan speed control - profiles handle speed now
   // Original handleFanSpeedChange function removed as fans are now controlled via profiles
 
@@ -397,9 +315,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
     try {
       setLoading("delete");
       await deleteSystem(system.id);
-      onUpdate();
+      toast.success(`System "${system.name}" deleted successfully`);
+      onRemove();
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to delete system: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -415,7 +334,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setAgentInterval(newInterval);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to set agent refresh rate: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -434,7 +353,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setFanStepLocal(newStep);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to set fan step: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -450,7 +369,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setHysteresisLocal(newHysteresis);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to set hysteresis: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -466,7 +385,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setEmergencyTempLocal(newTemp);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to set emergency temperature: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -482,7 +401,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setLogLevelLocal(newLevel);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to set log level: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -498,7 +417,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setFailsafeSpeedLocal(newSpeed);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to set failsafe speed: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -514,7 +433,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setEnableFanControlLocal(enabled);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to set enable fan control: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -531,7 +450,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setLoading(`fan-profile-${fan.id}`);
 
       if (!fan.dbId) {
-        alert("Fan database ID not available. Please refresh the page.");
+        toast.error("Fan database ID not available. Please refresh the page.");
         setLoading(null);
         return;
       }
@@ -554,7 +473,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
           if (sensor?.dbId) {
             sensorDbId = sensor.dbId;
           } else {
-            alert(
+            toast.error(
               "Please select a sensor first or refresh the page to get updated sensor data."
             );
             setLoading(null);
@@ -570,7 +489,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       });
       onUpdate();
     } catch (error) {
-      alert(
+      toast.error(
         "Failed to assign fan profile: " +
           (error instanceof Error ? error.message : "Unknown error")
       );
@@ -681,38 +600,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
     ? Math.max(...system.current_fan_speeds.map((fan) => fan.rpm))
     : null;
 
-  // Group sensors by chip type for better organization
-  const groupSensorsByChip = (sensors: SensorReading[]) => {
-    const groups: Record<string, SensorReading[]> = {};
-
-    sensors.forEach((sensor) => {
-      // Extract chip name from sensor ID (e.g., "k10temp_1" -> "k10temp")
-      const chipName = deriveSensorGroupId(sensor);
-
-      if (!groups[chipName]) {
-        groups[chipName] = [];
-      }
-      groups[chipName].push(sensor);
-    });
-
-    return groups;
-  };
-
-  // Get friendly chip display names with hardware model
-  const getChipDisplayName = (
-    chipId: string,
-    sensors?: SensorReading[]
-  ): string => {
-    const label = getSensorLabel(chipId);
-
-    // If sensors provided, try to get hardware name from first sensor
-    if (sensors && sensors.length > 0 && sensors[0].hardwareName) {
-      return `${label} (${sensors[0].hardwareName})`;
-    }
-
-    return label;
-  };
-
   // Check if a sensor is hidden (either individually or via group)
   const isSensorOrGroupHidden = (sensor: SensorReading): boolean => {
     // Check backend hidden flag (from database)
@@ -754,7 +641,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
             </h3>
             <span
               className="status-badge"
-              style={{ backgroundColor: getStatusColor(system.status) }}
+              style={{ backgroundColor: getAgentStatusColor(system.status) }}
             >
               {system.status}
             </span>
@@ -810,7 +697,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       averageTemperature
                     )}`}
                   >
-                    {averageTemperature.toFixed(1)} <span className="unit-small">°C</span>
+                    {formatTemperature(averageTemperature, '0.0')}
                   </span>
                 </div>
               )}
@@ -822,7 +709,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       highestTemperature
                     )}`}
                   >
-                    {highestTemperature.toFixed(1)} <span className="unit-small">°C</span>
+                    {formatTemperature(highestTemperature, '0.0')}
                   </span>
                 </div>
               )}
@@ -1101,33 +988,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     const sensorGroups = groupSensorsByChip(filteredSensors);
 
                     // Sort groups for consistent display order
-                    const sortedGroups = Object.entries(sensorGroups).sort(
-                      (a, b) => {
-                        const order = [
-                          "k10temp",
-                          "coretemp",
-                          "it8628",
-                          "it87",
-                          "nvme",
-                          "gigabyte_wmi",
-                          "asus_wmi",
-                          "acpitz",
-                          "thermal",
-                        ];
-                        const aIndex = order.indexOf(a[0]);
-                        const bIndex = order.indexOf(b[0]);
-
-                        // If both found in order array, sort by that
-                        if (aIndex !== -1 && bIndex !== -1)
-                          return aIndex - bIndex;
-                        // If only a is in order, a comes first
-                        if (aIndex !== -1) return -1;
-                        // If only b is in order, b comes first
-                        if (bIndex !== -1) return 1;
-                        // Otherwise alphabetical
-                        return a[0].localeCompare(b[0]);
-                      }
-                    );
+                    const sortedGroups = sortSensorGroups(sensorGroups);
 
                     // Filter out hidden groups unless showHiddenSensors is true
                     const visibleGroups = sortedGroups.filter(
@@ -1241,7 +1102,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                           sensor.critTemp
                                         )}`}
                                       >
-                                        {sensor.temperature.toFixed(1)}°C
+                                        {formatTemperature(sensor.temperature)}
                                       </span>
                                       {sensor.maxTemp && (
                                         <span className="temp-limit">
@@ -1401,8 +1262,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           value="__highest__"
                           title="Use the Highest Temperature on the system"
                         >
-                          🔥 Highest ({highestTemperature?.toFixed(1) || "0.0"}
-                          °C)
+                          🔥 Highest ({formatTemperature(highestTemperature, '0.0°C')})
                         </option>
 
                         {/* Separator */}
@@ -1418,28 +1278,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
                           const sensorGroups =
                             groupSensorsByChip(visibleSensors);
-                          const sortedGroupIds = Object.keys(sensorGroups).sort(
-                            (a, b) => {
-                              const order = [
-                                "k10temp",
-                                "coretemp",
-                                "it8628",
-                                "it87",
-                                "nvme",
-                                "gigabyte_wmi",
-                                "asus_wmi",
-                                "acpitz",
-                                "thermal",
-                              ];
-                              const aIndex = order.indexOf(a);
-                              const bIndex = order.indexOf(b);
-                              if (aIndex !== -1 && bIndex !== -1)
-                                return aIndex - bIndex;
-                              if (aIndex !== -1) return -1;
-                              if (bIndex !== -1) return 1;
-                              return a.localeCompare(b);
-                            }
-                          );
+                          const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
 
                           const groupsWithMultipleSensors =
                             sortedGroupIds.filter(
@@ -1465,7 +1304,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                   >
                                     📊{" "}
                                     {getChipDisplayName(groupId, groupSensors)}{" "}
-                                    ({highestTemp.toFixed(1)}°C)
+                                    ({formatTemperature(highestTemp)})
                                   </option>
                                 );
                               })}
@@ -1490,7 +1329,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                 sensor.name,
                                 sensor.label
                               )}{" "}
-                              ({sensor.temperature.toFixed(1)}°C)
+                              ({formatTemperature(sensor.temperature)})
                             </option>
                           ))}
                       </select>
@@ -1599,6 +1438,9 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.fan_step_percent === nextProps.system.fan_step_percent &&
     prevProps.system.emergency_temp === nextProps.system.emergency_temp &&
     prevProps.system.log_level === nextProps.system.log_level &&
+    prevProps.system.failsafe_speed === nextProps.system.failsafe_speed &&
+    prevProps.system.enable_fan_control ===
+      nextProps.system.enable_fan_control &&
     prevProps.system.read_only === nextProps.system.read_only && // License limit status
     // Explicit sensor/fan array checks (reference equality works because mergeDelta creates new arrays)
     prevProps.system.current_temperatures ===

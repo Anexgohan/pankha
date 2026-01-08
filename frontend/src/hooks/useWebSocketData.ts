@@ -31,6 +31,7 @@ interface UseWebSocketDataReturn {
   error: string | null;
   lastUpdate: Date;
   reconnect: () => void;
+  removeSystem: (systemId: number) => void;
 }
 
 /**
@@ -448,6 +449,11 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     };
   }, [connect]);
 
+  // Remove a system from state (called after deletion via REST API)
+  const removeSystem = useCallback((systemId: number) => {
+    setSystems(prev => prev.filter(s => s.id !== systemId));
+  }, []);
+
   return {
     systems,
     isConnected,
@@ -455,5 +461,6 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     error,
     lastUpdate,
     reconnect: connect,
+    removeSystem,
   };
 }
