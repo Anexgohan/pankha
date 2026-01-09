@@ -15,8 +15,9 @@ COPY package*.json ./
 COPY frontend/package*.json ./frontend/
 COPY backend/package*.json ./backend/
 
-# Install dependencies
-RUN npm install
+# Install dependencies (npm ci is faster and deterministic)
+# RUN npm install
+RUN npm ci
 
 # Copy source code
 COPY frontend/ ./frontend/
@@ -32,11 +33,10 @@ FROM node:20-alpine AS production
 ARG VERSION=dev
 ENV PANKHA_VERSION=$VERSION
 
-# Install nginx for serving static files
-RUN apk add --no-cache nginx curl
-
-# Symlink nginx error log to stderr for docker logs visibility
-RUN ln -sf /dev/stderr /var/log/nginx/error.log
+# Runtime dependencies and directory setup
+RUN apk add --no-cache nginx curl && \
+    ln -sf /dev/stderr /var/log/nginx/error.log && \
+    mkdir -p /app/data /frontend/src/config
 
 WORKDIR /app
 
@@ -48,7 +48,6 @@ COPY --from=builder /app/backend/src/config ./backend/config/
 # SST: Copy frontend ui-options.json to path where compiled backend expects it
 # The compiled JS at /app/backend/config/uiOptions.js imports '../../../frontend/src/config/ui-options.json'
 # Path resolution: /app/backend/config/ -> ../../.. -> /  -> /frontend/src/config/
-RUN mkdir -p /frontend/src/config
 COPY --from=builder /app/frontend/src/config/ui-options.json /frontend/src/config/
 
 # Copy built frontend
@@ -61,18 +60,11 @@ COPY --from=builder /app/package*.json ./
 # Setup nginx configuration
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 
-# Create data directory
-RUN mkdir -p /app/data
-
-# Health check script
+# Copy and setup startup scripts
 COPY docker/healthcheck.sh /healthcheck.sh
-RUN chmod +x /healthcheck.sh
-
-# Expose port
-EXPOSE 3000
-
-# Start script
 COPY docker/start.sh /start.sh
-RUN chmod +x /start.sh
+RUN chmod +x /healthcheck.sh /start.sh
+
+EXPOSE 3000
 
 CMD ["/start.sh"]

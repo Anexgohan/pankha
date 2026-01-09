@@ -49,3 +49,12 @@ coverage
 tmp
 temp
 *.tmp
+
+# Directories not needed for Docker build (context size reduction)
+agents/
+documentation/
+custom-files/
+samples/
+backups/
+.github/
+.claude/

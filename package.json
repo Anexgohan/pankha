@@ -12,7 +12,7 @@
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "POSTGRES_HOST=localhost WS_PORT=3003 npm run dev --workspace=backend",
-    "build": "npm run build --workspace=frontend && npm run build --workspace=backend",
+    "build": "concurrently \"npm run build --workspace=frontend\" \"npm run build --workspace=backend\"",
     "test": "npm run test --workspace=frontend && npm run test --workspace=backend",
     "lint": "npm run lint --workspace=frontend && npm run lint --workspace=backend",
     "typecheck": "npm run typecheck --workspace=frontend && npm run typecheck --workspace=backend"
