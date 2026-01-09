@@ -51,15 +51,15 @@ button:focus-visible {
 /* X Button */
 .delete-button {
   border-radius: var(--radius-circle);
-  width: 8px;
-  height: 8px;
+  width: 4px;
+  height: 4px;
   font-size: 20px;
   font-weight: var(--font-weight-bold);
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: rgba(255, 255, 255, 0);
-  color: white;
+  color: var(--text-secondary);
   border: 1px rgba(128, 128, 128, 0.750) hidden;
   border-radius: var(--radius-sm);
   font-weight: var(--font-weight-medium);

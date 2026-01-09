@@ -109,7 +109,9 @@ const Dashboard: React.FC = () => {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1>Pankha Fan Control</h1>
+        <h1>
+          Pankha Fan Control <span style={{ fontSize: 'var(--spacing-3xl)', opacity: 1.0, fontWeight: 'bold' }}>( पंखा )</span>
+        </h1>
         <div className="header-controls">
           {/* Connection Status Indicator */}
           <div className={`connection-status status-${connectionState}`}>

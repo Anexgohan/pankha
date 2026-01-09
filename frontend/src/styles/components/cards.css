@@ -21,12 +21,19 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-3xl);
+  margin-bottom: var(--spacing-xl);
+  background: var(--bg-primary);
 }
 
 .stat-card {
   text-align: center;
   border-left: 4px solid var(--color-info);
+  /* padding-top: 4px;
+  padding-bottom: 12px;
+  padding-left: 4px;
+  padding-right: 4px; */
+  /* var(top) var(right) var(bottom) var(left) */
+  padding: var(--spacing-md) var(--spacing-xs) var(--spacing-lg) var(--spacing-xs);
 }
 
 .stat-card.online {

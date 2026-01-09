@@ -34,8 +34,8 @@
 
 [data-theme="light"] {
   /* Backgrounds */
-  --bg-primary: #f5f5f5;
-  --bg-secondary: #ffffff;
+  --bg-primary: #dddddd;
+  --bg-secondary: #eeeeee;
   --bg-tertiary: #f9f9f9;
   --bg-hover: #f0f0f0;
   --bg-active: #e0e0e0;
