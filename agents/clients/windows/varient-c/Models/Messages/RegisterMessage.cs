@@ -34,6 +34,9 @@ public class RegisterData
     [JsonProperty("fan_step_percent")]
     public int FanStepPercent { get; set; }
 
+    [JsonProperty("failsafe_speed")]
+    public int FailsafeSpeed { get; set; }
+
     [JsonProperty("hysteresis_temp")]
     public double HysteresisTemp { get; set; }
 

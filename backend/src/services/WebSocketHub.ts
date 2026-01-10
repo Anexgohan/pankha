@@ -13,7 +13,14 @@ import {
   defaultFanStep, 
   defaultHysteresis, 
   defaultEmergencyTemp, 
-  defaultLogLevel 
+  defaultLogLevel,
+  defaultFailsafeSpeed,
+  validUpdateIntervals,
+  validFanSteps,
+  validHysteresis,
+  validEmergencyTemps,
+  validLogLevels,
+  validFailsafeSpeeds
 } from '../config/uiOptions';
 
 interface ClientConnection {
@@ -522,10 +529,7 @@ export class WebSocketHub extends EventEmitter {
         apiEndpoint: `http://${client?.metadata.ip || "unknown"}:8080`, // Mock endpoint
         websocketEndpoint: `ws://${client?.metadata.ip || "unknown"}:8081`, // Mock endpoint
         authToken: registrationData.auth_token || "websocket-agent-token",
-        updateInterval: 
-          (registrationData.update_interval > 100 
-            ? Math.round(registrationData.update_interval / 1000) 
-            : registrationData.update_interval) || defaultUpdateInterval,
+        updateInterval: registrationData.update_interval || 3000, // From client config or default
         capabilities: registrationData.capabilities || {
           sensors: [],
           fans: [],
@@ -549,31 +553,59 @@ export class WebSocketHub extends EventEmitter {
         );
         const savedConfig = system?.config_data || {};
 
-        // Apply saved configuration, with priority to database values over registration data
         const regInterval = registrationData.update_interval;
         const normalizedRegInterval = regInterval > 100 ? Math.round(regInterval / 1000) : regInterval;
 
+        // Helper to get strictly validated value from savedConfig -> registration -> default
+        const getValid = <T>(key: string, saved: T | undefined, reg: T | undefined, validArray: T[], defaultValue: T): T => {
+          if (saved !== undefined && validArray.includes(saved)) return saved;
+          if (reg !== undefined && validArray.includes(reg)) return reg;
+          return defaultValue;
+        };
+
         const finalConfig = {
-          update_interval:
-            savedConfig.update_interval ??
-            normalizedRegInterval ??
-            defaultUpdateInterval,
-          fan_step_percent:
-            savedConfig.fan_step_percent ?? 
-            registrationData.fan_step_percent ?? 
-            defaultFanStep,
-          hysteresis_temp:
-            savedConfig.hysteresis_temp ?? 
-            registrationData.hysteresis_temp ?? 
-            defaultHysteresis,
-          emergency_temp:
-            savedConfig.emergency_temp ?? 
-            registrationData.emergency_temp ?? 
-            defaultEmergencyTemp,
-          log_level: 
-            savedConfig.log_level ?? 
-            registrationData.log_level ?? 
-            defaultLogLevel,
+          update_interval: getValid(
+            'updateInterval',
+            savedConfig.update_interval,
+            normalizedRegInterval,
+            validUpdateIntervals,
+            defaultUpdateInterval
+          ),
+          fan_step_percent: getValid(
+            'fanStep',
+            savedConfig.fan_step_percent,
+            registrationData.fan_step_percent,
+            validFanSteps,
+            defaultFanStep
+          ),
+          hysteresis_temp: getValid(
+            'hysteresis',
+            savedConfig.hysteresis_temp,
+            registrationData.hysteresis_temp,
+            validHysteresis,
+            defaultHysteresis
+          ),
+          emergency_temp: getValid(
+            'emergencyTemp',
+            savedConfig.emergency_temp,
+            registrationData.emergency_temp,
+            validEmergencyTemps,
+            defaultEmergencyTemp
+          ),
+          log_level: getValid(
+            'logLevel',
+            savedConfig.log_level?.toUpperCase(),
+            registrationData.log_level?.toUpperCase(),
+            validLogLevels,
+            defaultLogLevel
+          ),
+          failsafe_speed: getValid(
+            'failsafeSpeed',
+            savedConfig.failsafe_speed,
+            registrationData.failsafe_speed,
+            validFailsafeSpeeds,
+            defaultFailsafeSpeed
+          ),
         };
 
         // Set configuration in AgentManager
@@ -621,6 +653,13 @@ export class WebSocketHub extends EventEmitter {
           this.agentManager.setAgentLogLevel(agentId, finalConfig.log_level);
           log.info(
             ` Agent ${agentId} log level: ${finalConfig.log_level}`,
+            "WebSocketHub"
+          );
+        }
+        if (finalConfig.failsafe_speed !== undefined) {
+          this.agentManager.setAgentFailsafeSpeed(agentId, finalConfig.failsafe_speed);
+          log.info(
+            ` Agent ${agentId} failsafe speed: ${finalConfig.failsafe_speed}%`,
             "WebSocketHub"
           );
         }

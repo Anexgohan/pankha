@@ -25,7 +25,7 @@ public class ConfigForm : Form
     private ComboBox _updateIntervalComboBox = null!;  // Changed from NumericUpDown
     private CheckBox _enableFanControlCheckBox = null!;
     private ComboBox _emergencyTempComboBox = null!;   // Changed from NumericUpDown
-    private NumericUpDown _failsafeSpeedNumeric = null!;
+    private ComboBox _failsafeSpeedComboBox = null!;   // Changed from NumericUpDown
 
     // Monitoring Settings
     private ComboBox _fanStepComboBox = null!;         // Changed from NumericUpDown
@@ -116,7 +116,10 @@ public class ConfigForm : Form
         var emergencyItems = emergencyTemps.Select(v => v.Label).ToArray();
         AddComboBoxRow(hardwareGroup, $"{UIOptions.Instance.GetLabel("emergencyTemp")}:", ref _emergencyTempComboBox, ref hwY, 100, emergencyItems);
 
-        AddNumericRow(hardwareGroup, "Failsafe (%):", ref _failsafeSpeedNumeric, ref hwY, 100, 0, 100, 0);
+        // Populate Failsafe Speed from UIOptions
+        var failsafeSpeeds = UIOptions.Instance.GetFailsafeSpeedOptions();
+        var failsafeItems = failsafeSpeeds.Select(v => v.Label).ToArray();
+        AddComboBoxRow(hardwareGroup, $"{UIOptions.Instance.GetLabel("failsafeSpeed")}:", ref _failsafeSpeedComboBox, ref hwY, 100, failsafeItems);
 
         y += hardwareGroup.Height + 10;
 
@@ -305,7 +308,10 @@ public class ConfigForm : Form
                 var emergencyIdx = Array.FindIndex(emergencyTemps, e => e.Value == (int)_currentConfig.Hardware.EmergencyTemp);
                 if (emergencyIdx >= 0) _emergencyTempComboBox.SelectedIndex = emergencyIdx;
 
-                _failsafeSpeedNumeric.Value = _currentConfig.Hardware.FailsafeSpeed;
+                // Set Failsafe Speed ComboBox
+                var failsafeSpeeds = UIOptions.Instance.GetFailsafeSpeedOptions();
+                var failsafeIdx = Array.FindIndex(failsafeSpeeds, f => f.Value == _currentConfig.Hardware.FailsafeSpeed);
+                if (failsafeIdx >= 0) _failsafeSpeedComboBox.SelectedIndex = failsafeIdx;
 
                 // Set Fan Step ComboBox (now in Hardware, formerly Monitoring)
                 var fanSteps = UIOptions.Instance.GetFanSteps();
@@ -445,7 +451,10 @@ public class ConfigForm : Form
             if (_emergencyTempComboBox.SelectedIndex >= 0 && _emergencyTempComboBox.SelectedIndex < emergencyTemps.Length)
                 _currentConfig.Hardware.EmergencyTemp = emergencyTemps[_emergencyTempComboBox.SelectedIndex].Value;
 
-            _currentConfig.Hardware.FailsafeSpeed = (int)_failsafeSpeedNumeric.Value;
+            // Read Failsafe Speed from ComboBox
+            var failsafeSpeeds = UIOptions.Instance.GetFailsafeSpeedOptions();
+            if (_failsafeSpeedComboBox.SelectedIndex >= 0 && _failsafeSpeedComboBox.SelectedIndex < failsafeSpeeds.Length)
+                _currentConfig.Hardware.FailsafeSpeed = failsafeSpeeds[_failsafeSpeedComboBox.SelectedIndex].Value;
 
             // Read Fan Step from ComboBox (now in Hardware, formerly Monitoring)
             var fanSteps = UIOptions.Instance.GetFanSteps();

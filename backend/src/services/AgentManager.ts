@@ -120,6 +120,9 @@ export class AgentManager extends EventEmitter {
       if (!this.agentEmergencyTemp.has(agentConfig.agentId)) {
         this.agentEmergencyTemp.set(agentConfig.agentId, defaultEmergencyTemp);
       }
+      if (!this.agentFailsafeSpeed.has(agentConfig.agentId)) {
+        this.agentFailsafeSpeed.set(agentConfig.agentId, defaultFailsafeSpeed);
+      }
 
       log.info(
         ` Agent ${agentConfig.agentId} registered with update interval: ${intervalSeconds}s`,

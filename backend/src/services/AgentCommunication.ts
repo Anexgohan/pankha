@@ -327,6 +327,13 @@ export class AgentCommunication extends EventEmitter {
                 true
               );
             }
+            if (config.failsafe_speed !== undefined) {
+              await this.agentManager.setAgentFailsafeSpeed(
+                agentId,
+                config.failsafe_speed,
+                true
+              );
+            }
             if (config.name !== undefined) {
               await this.agentManager.setAgentName(agentId, config.name, true);
             }

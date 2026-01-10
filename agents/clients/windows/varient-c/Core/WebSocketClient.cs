@@ -179,6 +179,7 @@ public class WebSocketClient : IDisposable
                         hysteresis_temp = _config.Hardware.HysteresisTemp,
                         emergency_temp = _config.Hardware.EmergencyTemp,
                         log_level = _config.Agent.LogLevel.ToUpperInvariant(),
+                        failsafe_speed = _config.Hardware.FailsafeSpeed,
                         name = _config.Agent.Name
                     }
                 }
@@ -216,6 +217,7 @@ public class WebSocketClient : IDisposable
                     AgentVersion = Pankha.WindowsAgent.Platform.VersionHelper.GetVersion(),
                     UpdateInterval = _config.Agent.UpdateInterval * 1000, // seconds to ms
                     FanStepPercent = _config.Hardware.FanStepPercent,
+                    FailsafeSpeed = _config.Hardware.FailsafeSpeed,
                     HysteresisTemp = _config.Hardware.HysteresisTemp,
                     EmergencyTemp = _config.Hardware.EmergencyTemp,
                     LogLevel = _config.Agent.LogLevel.ToUpperInvariant(),
