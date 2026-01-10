@@ -115,7 +115,7 @@
 }
 
 .fan-profiles-section {
-  background: #1d1d1d;
+  background: var(--bg-primary);
   border-radius: var(--radius-lg);
   padding: var(--spacing-xl);
   box-shadow: var(--shadow);
