@@ -83,7 +83,7 @@ const Dashboard: React.FC = () => {
   // Show loading only when connecting for the first time
   if (connectionState === 'connecting' && systems.length === 0) {
     return (
-      <div className="dashboard loading">
+      <div className="dashboard dashboard-full-page-loading">
         <div className="loading-spinner">
           <div className="spinner"></div>
           <p>Connecting to server...</p>
@@ -94,7 +94,7 @@ const Dashboard: React.FC = () => {
 
   if (error && systems.length === 0) {
     return (
-      <div className="dashboard error">
+      <div className="dashboard dashboard-full-page-error">
         <div className="error-message">
           <h2>Connection Error</h2>
           <p>{error}</p>
@@ -117,7 +117,7 @@ const Dashboard: React.FC = () => {
           <div className={`connection-status status-${connectionState}`}>
             {connectionState === 'connected' && (
               <>
-                <span className="status-indicator connected">
+                <span className="connection-status-indicator connected">
                   🟢 Live
                 </span>
                 <span className="last-update">Real-time</span>
@@ -125,7 +125,7 @@ const Dashboard: React.FC = () => {
             )}
             {connectionState === 'connecting' && (
               <>
-                <span className="status-indicator connecting">
+                <span className="connection-status-indicator connecting">
                   🟡 Connecting...
                 </span>
                 <span className="last-update">Please wait</span>
@@ -133,7 +133,7 @@ const Dashboard: React.FC = () => {
             )}
             {connectionState === 'disconnected' && (
               <>
-                <span className="status-indicator disconnected">
+                <span className="connection-status-indicator disconnected">
                   🔴 Disconnected
                 </span>
                 <button onClick={reconnect} className="reconnect-btn">
@@ -143,7 +143,7 @@ const Dashboard: React.FC = () => {
             )}
             {connectionState === 'error' && (
               <>
-                <span className="status-indicator error">
+                <span className="connection-status-indicator error">
                   ⚠️ Error
                 </span>
                 <button onClick={reconnect} className="reconnect-btn">

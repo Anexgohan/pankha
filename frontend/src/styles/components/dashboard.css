@@ -41,19 +41,19 @@
   font-size: var(--font-size-base);
 }
 
-.status-indicator {
+.connection-status-indicator {
   font-weight: var(--font-weight-semibold);
 }
 
-.status-indicator.connected {
+.connection-status-indicator.connected {
   color: var(--color-success);
 }
 
-.status-indicator.polling {
+.connection-status-indicator.polling {
   color: var(--color-warning, #f59e0b);
 }
 
-.status-indicator.disconnected {
+.connection-status-indicator.disconnected {
   color: var(--color-error);
 }
 
@@ -216,7 +216,7 @@
 }
 
 /* Loading States */
-.loading {
+.dashboard-full-page-loading {
   display: flex;
   justify-content: center;
   align-items: center;
@@ -251,7 +251,7 @@
 }
 
 /* Error States */
-.error {
+.dashboard-full-page-error {
   display: flex;
   justify-content: center;
   align-items: center;
