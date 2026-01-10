@@ -8,6 +8,13 @@ import { AgentCommunication } from "./AgentCommunication";
 import { DeltaComputer } from "./DeltaComputer";
 import { licenseManager } from "../license";
 import { log } from "../utils/logger";
+import { 
+  defaultUpdateInterval, 
+  defaultFanStep, 
+  defaultHysteresis, 
+  defaultEmergencyTemp, 
+  defaultLogLevel 
+} from '../config/uiOptions';
 
 interface ClientConnection {
   id: string;
@@ -515,7 +522,10 @@ export class WebSocketHub extends EventEmitter {
         apiEndpoint: `http://${client?.metadata.ip || "unknown"}:8080`, // Mock endpoint
         websocketEndpoint: `ws://${client?.metadata.ip || "unknown"}:8081`, // Mock endpoint
         authToken: registrationData.auth_token || "websocket-agent-token",
-        updateInterval: registrationData.update_interval || 3000, // From client config or default
+        updateInterval: 
+          (registrationData.update_interval > 100 
+            ? Math.round(registrationData.update_interval / 1000) 
+            : registrationData.update_interval) || defaultUpdateInterval,
         capabilities: registrationData.capabilities || {
           sensors: [],
           fans: [],
@@ -540,18 +550,30 @@ export class WebSocketHub extends EventEmitter {
         const savedConfig = system?.config_data || {};
 
         // Apply saved configuration, with priority to database values over registration data
+        const regInterval = registrationData.update_interval;
+        const normalizedRegInterval = regInterval > 100 ? Math.round(regInterval / 1000) : regInterval;
+
         const finalConfig = {
           update_interval:
             savedConfig.update_interval ??
-            registrationData.update_interval ??
-            3,
+            normalizedRegInterval ??
+            defaultUpdateInterval,
           fan_step_percent:
-            savedConfig.fan_step_percent ?? registrationData.fan_step_percent,
+            savedConfig.fan_step_percent ?? 
+            registrationData.fan_step_percent ?? 
+            defaultFanStep,
           hysteresis_temp:
-            savedConfig.hysteresis_temp ?? registrationData.hysteresis_temp,
+            savedConfig.hysteresis_temp ?? 
+            registrationData.hysteresis_temp ?? 
+            defaultHysteresis,
           emergency_temp:
-            savedConfig.emergency_temp ?? registrationData.emergency_temp,
-          log_level: savedConfig.log_level ?? registrationData.log_level,
+            savedConfig.emergency_temp ?? 
+            registrationData.emergency_temp ?? 
+            defaultEmergencyTemp,
+          log_level: 
+            savedConfig.log_level ?? 
+            registrationData.log_level ?? 
+            defaultLogLevel,
         };
 
         // Set configuration in AgentManager

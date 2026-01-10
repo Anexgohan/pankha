@@ -174,7 +174,7 @@ public class WebSocketClient : IDisposable
                     agentId = _config.Agent.Id,
                     config = new
                     {
-                        update_interval = (int)_config.Agent.UpdateInterval, // seconds
+                        update_interval = _config.Agent.UpdateInterval, // seconds
                         fan_step_percent = _config.Hardware.FanStepPercent,
                         hysteresis_temp = _config.Hardware.HysteresisTemp,
                         emergency_temp = _config.Hardware.EmergencyTemp,
@@ -214,7 +214,7 @@ public class WebSocketClient : IDisposable
                     AgentId = _config.Agent.Id,
                     Name = _config.Agent.Name,
                     AgentVersion = Pankha.WindowsAgent.Platform.VersionHelper.GetVersion(),
-                    UpdateInterval = (int)(_config.Agent.UpdateInterval * 1000), // seconds to ms
+                    UpdateInterval = _config.Agent.UpdateInterval * 1000, // seconds to ms
                     FanStepPercent = _config.Hardware.FanStepPercent,
                     HysteresisTemp = _config.Hardware.HysteresisTemp,
                     EmergencyTemp = _config.Hardware.EmergencyTemp,

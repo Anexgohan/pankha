@@ -34,7 +34,7 @@ import { formatTemperature } from "../utils/formatters";
 import { toast } from "../utils/toast";
 import { InlineEdit } from "./InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
-import { getOption, getValues, getLabel, getCleanLabel, interpolateTooltip } from "../utils/uiOptions";
+import { getOption, getValues, getLabel, getCleanLabel, interpolateTooltip, getDefault } from "../utils/uiOptions";
 
 interface SystemCardProps {
   system: SystemData;
@@ -57,26 +57,26 @@ const SystemCard: React.FC<SystemCardProps> = ({
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const [agentInterval, setAgentInterval] = useState<number>(
-    system.current_update_interval || 3
+    system.current_update_interval ?? getDefault<number>('updateInterval')
   );
   // filterDuplicates and sensorTolerance state removed (deprecated feature)
   const [fanStep, setFanStepLocal] = useState<number>(
-    system.fan_step_percent || 5
+    system.fan_step_percent ?? getDefault<number>('fanStep')
   );
   const [hysteresis, setHysteresisLocal] = useState<number>(
-    system.hysteresis_temp || 3.0
+    system.hysteresis_temp ?? getDefault<number>('hysteresis')
   );
   const [emergencyTemp, setEmergencyTempLocal] = useState<number>(
-    system.emergency_temp || 85.0
+    system.emergency_temp ?? getDefault<number>('emergencyTemp')
   );
   const [logLevel, setLogLevelLocal] = useState<string>(
-    system.log_level || "INFO"
+    system.log_level ?? getDefault<string>('logLevel')
   );
   const [failsafeSpeed, setFailsafeSpeedLocal] = useState<number>(
-    system.failsafe_speed || 70
+    system.failsafe_speed ?? getDefault<number>('failsafeSpeed')
   );
   const [enableFanControl, setEnableFanControlLocal] = useState<boolean>(
-    system.enable_fan_control ?? true
+    system.enable_fan_control ?? getDefault<boolean>('fanControl')
   );
   const [showHiddenSensors, setShowHiddenSensors] = useState(false);
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);

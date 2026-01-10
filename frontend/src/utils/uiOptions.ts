@@ -102,8 +102,8 @@ export function getTooltip(key: OptionKey): string {
  * @param key - The option key from ui-options.json
  * @returns The default value
  */
-export function getDefault(key: OptionKey): number | string | boolean {
-  return uiOptions.options[key].default;
+export function getDefault<T>(key: OptionKey): T {
+  return uiOptions.options[key].default as T;
 }
 
 // Export the full options object for direct access

@@ -29,7 +29,7 @@ public class RegisterData
     public string AgentVersion { get; set; } = "1.0.0-windows";
 
     [JsonProperty("update_interval")]
-    public int UpdateInterval { get; set; } // milliseconds
+    public double UpdateInterval { get; set; } // milliseconds
 
     [JsonProperty("fan_step_percent")]
     public int FanStepPercent { get; set; }
