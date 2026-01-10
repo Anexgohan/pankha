@@ -1,6 +1,5 @@
 using System;
 using System.Diagnostics;
-using System.Drawing;
 using WixSharp;
 using WixSharp.CommonTasks;
 using WixSharp.UI.Forms;
@@ -220,37 +219,16 @@ namespace Pankha.WixSharpInstaller
                     new Property("RESET_CONFIG", "0") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } },
                     new Property("KEEP_LOGS", "1") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } },
                     new Property("MSIRESTARTMANAGERCONTROL", "Disable"), // Prevent killing apps like procexp
-                    new Property("MSIDISABLERMRESTART", "1") // Legacy disable for Restart Manager interaction
+                    new Property("MSIDISABLERMRESTART", "1"), // Legacy disable for Restart Manager interaction
+                    new Property("AgentExe", Config.Filenames.AgentExe),
+                    new Property("AgentUI", Config.Filenames.AgentUI)
                 };
 
                 // Enable full UI for uninstall
                 project.EnableUninstallFullUI();
 
-                // Define Properties to carry config values to Runtime
-                // Manufacturer and Product are already standard properties set via project.ControlPanelInfo
-                project.Properties = new[] 
-                {
-                    new Property("AgentExe", Config.Filenames.AgentExe),
-                    new Property("AgentUI", Config.Filenames.AgentUI)
-                };
-
                 // CRITICAL: Pass these properties to Deferred Actions
-                // Note: Manufacturer and ProductName are standard properties available in Immediate sequence.
-                // We pass them to Deferred here.
-                // Note: WixSharp property "Product" might be "ProductName" in MSI? 
-                // Let's check wxs. <Product Name="..."/> -> Property `ProductName`.
-                // So we should pass `ProductName` instead of `Product`?
-                // The wxs shows: <Property Id="Product" Value="Pankha Windows Agent" /> (Line 159) - This was my manual addition colliding.
-                // The WXS Product Element has `Name="Pankha Windows Agent"`.
-                // In MSI, the property is `ProductName`.
-                
-                // So my manual property `Product` was creating a valid property named `Product`, 
-                // but if I remove it, does `Product` property exist? No. `ProductName` exists.
-                
-                // So getting `Product` in `OnAfterInstall` using `GetProperty("Product")` failed?
-                // Or I should use `ProductName`.
-                
-                // Let's use standard `ProductName`.
+                // Note: Standard MSI properties like Manufacturer and ProductName must be explicitly included for Deferred actions.
                 project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI,UPGRADINGPRODUCTCODE";
 
                 // Event handlers

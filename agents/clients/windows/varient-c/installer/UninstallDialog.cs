@@ -97,10 +97,7 @@ namespace Pankha.WixSharpInstaller
                 BackColor = Color.White
             };
             middlePanel.Controls.Add(middleDesc);
-            this.description = middleDesc; // Re-assigning to the existing field if needed, but the original field was using the banner one?
-            // Wait, looking at original code, 'description' was added to middlePanel.
-            // But I just added a description to the banner.
-            // Let's check the field definitions.
+            this.infoText = middleDesc;
 
             // Separator line
             var separator = new Label
