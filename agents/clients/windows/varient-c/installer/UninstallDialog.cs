@@ -57,13 +57,25 @@ namespace Pankha.WixSharpInstaller
             title = new Label
             {
                 Text = "Remove Pankha Windows Agent", // Default
-                Font = new Font("Tahoma", 12F, FontStyle.Bold),
-                Location = new Point(11, 8),
-                Size = new Size(400, 40),
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Location = new Point(15, 8),
+                Size = new Size(350, 24),
                 BackColor = Color.White,
                 AutoSize = false
             };
             banner.Controls.Add(title);
+
+            // Banner Description (Subtitle)
+            description = new Label
+            {
+                Text = "Choose how to handle existing configuration.", // Default
+                Font = new Font("Segoe UI", 8.25F),
+                Location = new Point(25, 32),
+                Size = new Size(350, 16),
+                BackColor = Color.White,
+                AutoSize = false
+            };
+            banner.Controls.Add(description);
 
             // Middle panel (white background)
             middlePanel = new Panel
@@ -74,17 +86,21 @@ namespace Pankha.WixSharpInstaller
             };
             this.Controls.Add(middlePanel);
 
-            // Description
-            description = new Label
+            // Description in Middle Panel
+            var middleDesc = new Label
             {
                 Text = "Clicking Next will uninstall Pankha with the following options...", // Default
-                Font = new Font("Tahoma", 8.25F),
-                Location = new Point(20, 15),
-                Size = new Size(450, 120),
+                Font = new Font("Segoe UI", 9F),
+                Location = new Point(25, 20),
+                Size = new Size(440, 110),
                 AutoSize = false,
                 BackColor = Color.White
             };
-            middlePanel.Controls.Add(description);
+            middlePanel.Controls.Add(middleDesc);
+            this.description = middleDesc; // Re-assigning to the existing field if needed, but the original field was using the banner one?
+            // Wait, looking at original code, 'description' was added to middlePanel.
+            // But I just added a description to the banner.
+            // Let's check the field definitions.
 
             // Separator line
             var separator = new Label
@@ -100,8 +116,8 @@ namespace Pankha.WixSharpInstaller
             configOptionCheckBox = new CheckBox
             {
                 Text = "Keep configuration files (config.json)", // Default
-                Font = new Font("Tahoma", 8.25F, FontStyle.Bold),
-                Location = new Point(20, 160),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(25, 145),
                 Size = new Size(450, 24),
                 Checked = true, // Default
                 BackColor = Color.White
@@ -114,8 +130,8 @@ namespace Pankha.WixSharpInstaller
             keepLogsCheckBox = new CheckBox
             {
                 Text = "Keep logs directory",
-                Font = new Font("Tahoma", 8.25F, FontStyle.Bold),
-                Location = new Point(20, 185), // Below config checkbox
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(25, 170), // Below config checkbox
                 Size = new Size(450, 24),
                 Checked = true,
                 BackColor = Color.White
@@ -126,10 +142,10 @@ namespace Pankha.WixSharpInstaller
             infoText = new Label
             {
                 Text = "Defaulting to Keep Configuration...", // Default
-                Font = new Font("Tahoma", 8.25F),
+                Font = new Font("Segoe UI", 8.25F),
                 ForeColor = Color.Gray,
 
-                Location = new Point(40, 215), // Moved down
+                Location = new Point(40, 205), // Moved down
                 Size = new Size(430, 40),
                 AutoSize = false,
                 BackColor = Color.White
@@ -265,7 +281,6 @@ namespace Pankha.WixSharpInstaller
                     SetupRemoveMode();
                 }
 
-                // Set banner image if available
                 try
                 {
                     banner.BackgroundImage = Runtime.Session.GetResourceBitmap("WixUI_Bmp_Banner");

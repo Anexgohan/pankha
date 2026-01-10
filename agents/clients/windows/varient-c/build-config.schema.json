@@ -1,0 +1,102 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Pankha Build Configuration",
+    "description": "Schema for the Pankha installer build configuration file",
+    "type": "object",
+    "properties": {
+        "$schema": {
+            "type": "string"
+        },
+        "Manufacturer": {
+            "type": "string",
+            "description": "Company or individual manufacturer name"
+        },
+        "Product": {
+            "type": "string",
+            "description": "Full formal product name"
+        },
+        "Paths": {
+            "type": "object",
+            "properties": {
+                "WixBin": {
+                    "type": "string",
+                    "description": "Path to WiX Toolset binaries (supports %UserProfile%)"
+                },
+                "BuildArtifacts": {
+                    "type": "string",
+                    "description": "Directory relative to project root containing built binaries"
+                },
+                "InstallerOutput": {
+                    "type": "string",
+                    "description": "Directory where the resulting MSI will be placed"
+                },
+                "AppIcon_256": {
+                    "type": "string",
+                    "description": "Path to the high-resolution (256x256) branding asset (.ico, .png, or .jpg)"
+                }
+            },
+            "required": ["WixBin", "BuildArtifacts", "InstallerOutput", "AppIcon_256"]
+        },
+        "Filenames": {
+            "type": "object",
+            "properties": {
+                "AgentExe": {
+                    "type": "string",
+                    "description": "Filename of the main agent executable"
+                },
+                "AgentUI": {
+                    "type": "string",
+                    "description": "Filename of the tray/UI application"
+                },
+                "InstallerMsi": {
+                    "type": "string",
+                    "description": "The desired filename for the output MSI"
+                },
+                "InstallerExe": {
+                    "type": "string",
+                    "description": "The desired filename for the output Setup.exe wrapper"
+                },
+                "ShortName": {
+                    "type": "string",
+                    "description": "Short branding name (used for shortcuts)"
+                }
+            },
+            "required": ["AgentExe", "AgentUI", "InstallerMsi", "InstallerExe", "ShortName"]
+        },
+        "Branding": {
+            "type": "object",
+            "properties": {
+                "ColorPrimary": {
+                    "type": "string",
+                    "format": "color",
+                    "description": "Primary theme color for the installer accent frame (Hex code, supports Alpha)",
+                    "pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"
+                },
+                "ColorSecondary": {
+                    "type": "string",
+                    "format": "color",
+                    "description": "Secondary theme color for the installer accent frame (Hex code, supports Alpha)",
+                    "pattern": "^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$"
+                },
+                "BannerFlag": {
+                    "type": "string",
+                    "description": "Path to a custom background image for the logo area (Ribbon/Flag). Recommend PNG format."
+                },
+                "BannerWidth": {
+                    "type": "integer",
+                    "description": "Width of the branding ribbon/flag in pixels."
+                },
+                "BannerHeight": {
+                    "type": "integer",
+                    "description": "Height of the branding ribbon/flag in pixels."
+                },
+                "BannerRightMargin": {
+                    "type": "integer",
+                    "description": "Right margin offset for the branding ribbon in pixels."
+                }
+            },
+            "required": ["ColorPrimary", "ColorSecondary"]
+        }
+    },
+    "required": ["Manufacturer", "Product", "Paths", "Filenames", "Branding"]
+}

@@ -10,6 +10,9 @@ using System.Security.Principal;
 using Microsoft.Deployment.WindowsInstaller;
 using Newtonsoft.Json;
 using System.Collections.Generic;
+using System.Linq;
+using System.Drawing;
+using System.Drawing.Imaging;
 
 namespace Pankha.WixSharpInstaller
 {
@@ -20,6 +23,17 @@ namespace Pankha.WixSharpInstaller
         public string Product { get; set; }
         public BuildPaths Paths { get; set; }
         public BuildFilenames Filenames { get; set; }
+        public BrandingConfig Branding { get; set; }
+    }
+
+    public class BrandingConfig
+    {
+        public string ColorPrimary { get; set; }
+        public string ColorSecondary { get; set; }
+        public string BannerFlag { get; set; }
+        public int? BannerWidth { get; set; }
+        public int? BannerHeight { get; set; }
+        public int? BannerRightMargin { get; set; }
     }
 
     public class BuildPaths
@@ -164,6 +178,9 @@ namespace Pankha.WixSharpInstaller
                 project.ControlPanelInfo.Manufacturer = Config.Manufacturer;
                 project.ControlPanelInfo.ProductIcon = iconPath;
 
+                // Register logo as a binary resource for custom dialogs to use (Plug & Play)
+                project.AddBinary(new Binary(new Id("ProductLogo"), iconPath));
+
                 // Automatic upgrades
                 project.MajorUpgrade = new MajorUpgrade
                 {
@@ -175,11 +192,18 @@ namespace Pankha.WixSharpInstaller
                 // Setup ManagedUI
                 project.ManagedUI = new ManagedUI();
                 project.ManagedUI.Icon = IO.Path.Combine("..", Config.Paths.AppIcon_256);
+                
+                // Branded Banners (Plug & Play)
+                string bannerPath = CreateBrandedBanner(iconPath);
+                if (bannerPath != null)
+                {
+                    project.BannerImage = bannerPath;
+                }
 
                 // Install dialogs
                 project.ManagedUI.InstallDialogs.Add<WelcomeDialog>()
                                                  .Add<InstallDirDialog>()
-                                                 .Add<ConfigurationDialog>() // Add our custom dialog
+                                                 .Add<ConfigurationDialog>()
                                                  .Add<ProgressDialog>()
                                                  .Add<ConditionalExitDialog>();
 
@@ -231,7 +255,7 @@ namespace Pankha.WixSharpInstaller
 
                 // Event handlers
                 project.BeforeInstall += OnBeforeInstall;
-                project.AfterInstall += OnAfterInstall;
+                project.AfterInstall += project_AfterInstall;
                 project.UIInitialized += Project_UIInitialized;
 
                 // Build Output
@@ -395,7 +419,7 @@ namespace Pankha.WixSharpInstaller
             }
         }
 
-        static void OnAfterInstall(SetupEventArgs e)
+        static void project_AfterInstall(SetupEventArgs e)
         {
             // ... (Setup) ...
             string logType = "unknown";
@@ -717,117 +741,114 @@ namespace Pankha.WixSharpInstaller
             }
             catch {}
         }
-    }
 
-
-
-    public class ConfigurationDialog : ManagedForm, IManagedDialog
-    {
-        private CheckBox resetConfigCheckBox;
-        private Label descriptionLabel;
-        private Button backButton;
-        private Button nextButton;
-        private Button cancelButton;
-        
-        // Standard Banner components
-        private PictureBox banner;
-        private Label bannerTitle;
-        private Label bannerDescription;
-
-        public ConfigurationDialog()
+        private static string CreateBrandedBanner(string iconPath)
         {
-            // Basic Form Init
-            this.ClientSize = new System.Drawing.Size(494, 312);
-            this.Text = "Pankha Windows Agent Setup";
-            
-            InitializeComponent();
-        }
-
-        private void InitializeComponent()
-        {
-            // 1. Banner
-            this.banner = new PictureBox();
-            this.banner.Size = new System.Drawing.Size(494, 58);
-            this.banner.Location = new System.Drawing.Point(0, 0);
-            this.banner.BackColor = System.Drawing.Color.White;
-            // banner.Image = ... (ManagedUI handles resources usually, or we skip image)
-            
-            this.bannerTitle = new Label();
-            this.bannerTitle.Text = "Configuration Options";
-            this.bannerTitle.Font = new System.Drawing.Font("Tahoma", 9F, System.Drawing.FontStyle.Bold);
-            this.bannerTitle.Location = new System.Drawing.Point(15, 15);
-            this.bannerTitle.AutoSize = true;
-            this.bannerTitle.BackColor = System.Drawing.Color.White;
-
-            this.bannerDescription = new Label();
-            this.bannerDescription.Text = "Choose how to handle existing configuration.";
-            this.bannerDescription.Location = new System.Drawing.Point(25, 35);
-            this.bannerDescription.AutoSize = true;
-            this.bannerDescription.BackColor = System.Drawing.Color.White;
-
-            // Lines
-            var line1 = new Panel { Location = new Point(0, 58), Size = new Size(494, 1), BackColor = SystemColors.ControlDark };
-            var line2 = new Panel { Location = new Point(0, 268), Size = new Size(494, 1), BackColor = SystemColors.ControlDark };
-
-            // 2. Content
-            this.descriptionLabel = new Label();
-            this.descriptionLabel.Text = "If you are upgrading or reinstalling, you can choose to keep your existing configuration logic and logs, or perform a clean install.";
-            this.descriptionLabel.Location = new Point(25, 80);
-            this.descriptionLabel.Size = new Size(440, 40);
-
-            this.resetConfigCheckBox = new CheckBox();
-            this.resetConfigCheckBox.Text = "Reset configuration (Clean Install)";
-            this.resetConfigCheckBox.Location = new Point(25, 140);
-            this.resetConfigCheckBox.Size = new Size(400, 20);
-            this.resetConfigCheckBox.Font = new Font("Tahoma", 9F, FontStyle.Bold); // Emphasize
-            
-            var resetDesc = new Label();
-            resetDesc.Text = "WARNING: If checked, your existing 'config.json' and 'logs' folder will be DELETED.\nSelect this if you want to start fresh.";
-            resetDesc.Location = new Point(42, 165); // Indented under checkbox
-            resetDesc.Size = new Size(400, 40);
-            resetDesc.ForeColor = Color.DarkRed;
-
-            // 3. Buttons (Bottom Panel)
-            
-            this.backButton = new Button { Text = "< Back", Location = new Point(224, 279), Size = new Size(75, 23) };
-            this.nextButton = new Button { Text = "Next >", Location = new Point(304, 279), Size = new Size(75, 23) };
-            this.cancelButton = new Button { Text = "Cancel", Location = new Point(404, 279), Size = new Size(75, 23) };
-
-            this.backButton.Click += (s, e) => Shell.GoPrev();
-            this.nextButton.Click += (s, e) => Shell.GoNext();
-            this.cancelButton.Click += (s, e) => Shell.Cancel();
-
-            // Add Controls
-            this.Controls.Add(bannerTitle);
-            this.Controls.Add(bannerDescription);
-            this.Controls.Add(banner);
-            this.Controls.Add(line1);
-            
-            this.Controls.Add(descriptionLabel);
-            this.Controls.Add(resetConfigCheckBox);
-            this.Controls.Add(resetDesc);
-            
-            this.Controls.Add(line2);
-            this.Controls.Add(backButton);
-            this.Controls.Add(nextButton);
-            this.Controls.Add(cancelButton);
-
-            this.Load += ConfigurationDialog_Load;
-        }
-
-        private void ConfigurationDialog_Load(object sender, EventArgs e)
-        {
-            // Bind Property
-            string val = MsiRuntime.Session["RESET_CONFIG"];
-            this.resetConfigCheckBox.Checked = (val == "1");
-
-            // Save on change
-            this.resetConfigCheckBox.CheckedChanged += (s, ev) => 
+            try
             {
-                MsiRuntime.Session["RESET_CONFIG"] = this.resetConfigCheckBox.Checked ? "1" : "0";
-            };
+                Image logo = null;
+                bool isIcon = IO.Path.GetExtension(iconPath).ToLower() == ".ico";
+
+                if (isIcon)
+                {
+                    using (var icon = new Icon(iconPath, 256, 256))
+                        logo = icon.ToBitmap();
+                }
+                else
+                {
+                    logo = Image.FromFile(iconPath);
+                }
+
+                using (logo)
+                using (var banner = new Bitmap(493, 58))
+                using (var g = Graphics.FromImage(banner))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+
+                    // Base background
+                    g.Clear(Color.White);
+
+                    // Vertical Accent Frame Dimensions
+                    int frameWidth = Config?.Branding?.BannerWidth ?? 72; 
+                    int frameHeight = Config?.Branding?.BannerHeight ?? 58; 
+                    int rightMargin = Config?.Branding?.BannerRightMargin ?? 16;
+                    var frameRect = new Rectangle(493 - frameWidth - rightMargin, 0, frameWidth, frameHeight);
+                    
+                    // Colors
+                    Color primary = Color.FromArgb(45, 65, 90);
+                    Color secondary = Color.FromArgb(30, 45, 65);
+                    try 
+                    {
+                        if (!string.IsNullOrEmpty(Config?.Branding?.ColorPrimary))
+                            primary = ColorTranslator.FromHtml(Config.Branding.ColorPrimary);
+                        if (!string.IsNullOrEmpty(Config?.Branding?.ColorSecondary))
+                            secondary = ColorTranslator.FromHtml(Config.Branding.ColorSecondary);
+                    } catch { }
+
+                    // Custom Flag Background
+                    bool bgDrawn = false;
+                    string flagPath = Config?.Branding?.BannerFlag;
+                    if (!string.IsNullOrEmpty(flagPath))
+                    {
+                        try 
+                        {
+                            string fullPath = flagPath;
+                            if (!IO.Path.IsPathRooted(fullPath))
+                                fullPath = IO.Path.Combine(IO.Path.GetDirectoryName(iconPath), "..", "..", flagPath);
+                            
+                            if (IO.File.Exists(fullPath))
+                            {
+                                using (var bgImg = Image.FromFile(fullPath))
+                                {
+                                    g.DrawImage(bgImg, frameRect);
+                                    bgDrawn = true;
+                                }
+                            }
+                        } catch { }
+                    }
+
+                    if (!bgDrawn)
+                    {
+                        // Procedural ribbon fill
+                        using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(frameRect, primary, secondary, 0f))
+                        {
+                            var blend = new System.Drawing.Drawing2D.ColorBlend();
+                            blend.Colors = new[] { secondary, primary, secondary };
+                            blend.Positions = new[] { 0.0f, 0.5f, 1.0f };
+                            brush.InterpolationColors = blend;
+                            g.FillRectangle(brush, frameRect);
+                        }
+                    }
+
+                    // Logo Centering
+                    int logoSize = 44;
+                    int logoX = frameRect.X + (frameRect.Width - logoSize) / 2;
+                    int logoY = (frameRect.Height - logoSize) / 2;
+
+                    // Shadow
+                    for (int i = 1; i <= 6; i++)
+                    {
+                        using (var b = new SolidBrush(Color.FromArgb(25 / i, Color.Black)))
+                            g.FillEllipse(b, logoX - i, logoY - i + 1, logoSize + (i * 2), logoSize + (i * 2));
+                    }
+
+                    // Render Logo
+                    g.DrawImage(logo, logoX, logoY, logoSize, logoSize);
+                    
+                    string tempPath = IO.Path.Combine(IO.Path.GetTempPath(), "pankha_banner.bmp");
+                    banner.Save(tempPath, ImageFormat.Bmp);
+                    return tempPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Warning: Could not create branded banner: " + ex.Message);
+                return null;
+            }
         }
     }
+
 
 
     public class ConditionalExitDialog : ExitDialog

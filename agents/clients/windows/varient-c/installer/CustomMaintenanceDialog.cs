@@ -60,13 +60,25 @@ namespace Pankha.WixSharpInstaller
             title = new Label
             {
                 Text = "Change, repair, or remove installation",
-                Font = new Font("Tahoma", 12F, FontStyle.Bold),
-                Location = new Point(11, 8),
-                Size = new Size(400, 40),
+                Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                Location = new Point(15, 8),
+                Size = new Size(350, 24),
                 BackColor = Color.White,
                 AutoSize = false
             };
             banner.Controls.Add(title);
+
+            // Banner Description (Subtitle)
+            var bannerDesc = new Label
+            {
+                Text = "Select the operation you wish to perform.",
+                Font = new Font("Segoe UI", 8.25F),
+                Location = new Point(25, 32),
+                Size = new Size(350, 16),
+                BackColor = Color.White,
+                AutoSize = false
+            };
+            banner.Controls.Add(bannerDesc);
 
             // Middle Panel
             middlePanel = new Panel
@@ -79,8 +91,8 @@ namespace Pankha.WixSharpInstaller
 
             var mainInstruction = new Label
             {
-                Text = "Select the operation you wish to perform.",
-                Font = new Font("Tahoma", 9F),
+                Text = "Select the operation you wish to perform below.",
+                Font = new Font("Segoe UI", 9F),
                 Location = new Point(20, 15),
                 Size = new Size(450, 20),
                 BackColor = Color.White
@@ -101,6 +113,7 @@ namespace Pankha.WixSharpInstaller
             changeLbl = new Label
             {
                 Text = "Lets you change the way features are installed.",
+                Font = new Font("Segoe UI", 9F),
                 Location = new Point(170, 53),
                 Size = new Size(300, 30),
                 BackColor = Color.White
@@ -121,6 +134,7 @@ namespace Pankha.WixSharpInstaller
             repairLbl = new Label
             {
                 Text = "Repairs errors in the most recent installation by fixing missing and corrupt files, shortcuts, and registry entries.",
+                Font = new Font("Segoe UI", 9F),
                 Location = new Point(170, 103),
                 Size = new Size(300, 40),
                 BackColor = Color.White
@@ -141,6 +155,7 @@ namespace Pankha.WixSharpInstaller
             removeLbl = new Label
             {
                 Text = "Removes [ProductName] from your computer.",
+                Font = new Font("Segoe UI", 9F),
                 Location = new Point(170, 163),
                 Size = new Size(300, 20),
                 BackColor = Color.White
@@ -199,9 +214,8 @@ namespace Pankha.WixSharpInstaller
             try
             {
                 banner.BackgroundImage = Runtime.Session.GetResourceBitmap("WixUI_Bmp_Banner");
-
             }
-            catch {}
+            catch { }
         }
 
         void Change_Click(object sender, EventArgs e)

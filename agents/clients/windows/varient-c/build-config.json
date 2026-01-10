@@ -1,4 +1,5 @@
 {
+    "$schema": "./build-config.schema.json",
     "Manufacturer": "Pankha Fan Control",
     "Product": "Pankha Windows Agent",
     "Paths": {
@@ -13,5 +14,13 @@
         "InstallerMsi": "pankha-agent-windows_x64.msi",
         "InstallerExe": "pankha-agent-windows_setup_x64.exe",
         "ShortName": "Pankha Agent"
+    },
+    "Branding": {
+        "ColorPrimary": "#384569",
+        "ColorSecondary": "#1d2a4d",
+        "BannerFlag": "graphics\\banners\\BannerFlag_128x128.png",
+        "BannerWidth": 72,
+        "BannerHeight": 64,
+        "BannerRightMargin": 16
     }
 }
