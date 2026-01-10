@@ -829,6 +829,9 @@ router.put("/:id/fan-step", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "System not found" });
     }
 
+    // Optimistic Update: Update memory and database immediately
+    await agentManager.setAgentFanStep(system.agent_id, step, true);
+
     const result = await commandDispatcher.setFanStep(
       system.agent_id,
       step,
@@ -868,6 +871,9 @@ router.put("/:id/hysteresis", async (req: Request, res: Response) => {
     if (!system) {
       return res.status(404).json({ error: "System not found" });
     }
+
+    // Optimistic Update: Update memory and database immediately
+    await agentManager.setAgentHysteresis(system.agent_id, hysteresis, true);
 
     const result = await commandDispatcher.setHysteresis(
       system.agent_id,
@@ -910,6 +916,9 @@ router.put("/:id/emergency-temp", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "System not found" });
     }
 
+    // Optimistic Update: Update memory and database immediately
+    await agentManager.setAgentEmergencyTemp(system.agent_id, temp, true);
+
     const result = await commandDispatcher.setEmergencyTemp(
       system.agent_id,
       temp,
@@ -951,6 +960,9 @@ router.put("/:id/log-level", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "System not found" });
     }
 
+    // Optimistic Update: Update memory and database immediately
+    await agentManager.setAgentLogLevel(system.agent_id, level.toUpperCase(), true);
+
     const result = await commandDispatcher.setLogLevel(
       system.agent_id,
       level.toUpperCase(),
@@ -991,6 +1003,9 @@ router.put("/:id/failsafe-speed", async (req: Request, res: Response) => {
       return res.status(404).json({ error: "System not found" });
     }
 
+    // Optimistic Update: Update memory and database immediately
+    await agentManager.setAgentFailsafeSpeed(system.agent_id, speed, true);
+
     const result = await commandDispatcher.setFailsafeSpeed(
       system.agent_id,
       speed,
@@ -1029,6 +1044,9 @@ router.put("/:id/enable-fan-control", async (req: Request, res: Response) => {
     if (!system) {
       return res.status(404).json({ error: "System not found" });
     }
+
+    // Optimistic Update: Update memory and database immediately
+    await agentManager.setAgentEnableFanControl(system.agent_id, enabled, true);
 
     const result = await commandDispatcher.setEnableFanControl(
       system.agent_id,
@@ -1216,6 +1234,9 @@ router.put("/:id/name", async (req: Request, res: Response) => {
       `UPDATE systems SET name = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
       [trimmedName, systemId]
     );
+
+    // Optimistic Update: Set name in memory
+    await agentManager.setAgentName(system.agent_id, trimmedName, false); // DB update already happened above at line 1215
 
     // Dispatch command to sync name to agent config
     try {

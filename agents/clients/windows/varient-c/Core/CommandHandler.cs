@@ -183,7 +183,7 @@ public class CommandHandler
 
         _logger.Information("✏️ Emergency Temp changed: {Old}°C → {New}°C", oldTemp, temp);
 
-        return Task.FromResult(CreateSuccessResponse(commandId, new { temperature = temp }));
+        return Task.FromResult(CreateSuccessResponse(commandId, new { temp = temp }));
     }
 
     private Task<CommandResponse> HandleSetLogLevelAsync(string commandId, Dictionary<string, object> payload)

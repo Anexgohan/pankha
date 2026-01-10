@@ -621,6 +621,16 @@ export class CommandDispatcher extends EventEmitter {
         });
       }
       if (
+        pendingCommand.command.type === "setAgentName" &&
+        response.data?.name !== undefined
+      ) {
+        this.agentManager.setAgentName(
+          pendingCommand.command.agentId,
+          response.data.name,
+          true
+        );
+      }
+      if (
         pendingCommand.command.type === "setEmergencyTemp" &&
         response.data?.temp !== undefined
       ) {
