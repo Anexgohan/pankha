@@ -606,6 +606,12 @@ export class WebSocketHub extends EventEmitter {
             validFailsafeSpeeds,
             defaultFailsafeSpeed
           ),
+          // Shared Consent Logic for fan control: 
+          // If the agent reports false (local override), the system stays false.
+          // Otherwise, we use the saved database configuration or system default.
+          enable_fan_control: (registrationData.capabilities?.fan_control === false)
+            ? false
+            : (savedConfig.enable_fan_control ?? true),
         };
 
         // Set configuration in AgentManager
@@ -660,6 +666,13 @@ export class WebSocketHub extends EventEmitter {
           this.agentManager.setAgentFailsafeSpeed(agentId, finalConfig.failsafe_speed);
           log.info(
             ` Agent ${agentId} failsafe speed: ${finalConfig.failsafe_speed}%`,
+            "WebSocketHub"
+          );
+        }
+        if (finalConfig.enable_fan_control !== undefined) {
+          this.agentManager.setAgentEnableFanControl(agentId, finalConfig.enable_fan_control);
+          log.info(
+            ` Agent ${agentId} enable fan control: ${finalConfig.enable_fan_control} (Shared Consent)`,
             "WebSocketHub"
           );
         }

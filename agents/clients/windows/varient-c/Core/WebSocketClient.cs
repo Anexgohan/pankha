@@ -180,6 +180,7 @@ public class WebSocketClient : IDisposable
                         emergency_temp = _config.Hardware.EmergencyTemp,
                         log_level = _config.Agent.LogLevel.ToUpperInvariant(),
                         failsafe_speed = _config.Hardware.FailsafeSpeed,
+                        enable_fan_control = _config.Hardware.EnableFanControl,
                         name = _config.Agent.Name
                     }
                 }

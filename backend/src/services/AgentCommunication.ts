@@ -334,6 +334,13 @@ export class AgentCommunication extends EventEmitter {
                 true
               );
             }
+            if (config.enable_fan_control !== undefined) {
+              await this.agentManager.setAgentEnableFanControl(
+                agentId,
+                config.enable_fan_control,
+                true
+              );
+            }
             if (config.name !== undefined) {
               await this.agentManager.setAgentName(agentId, config.name, true);
             }
