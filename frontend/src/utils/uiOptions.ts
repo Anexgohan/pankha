@@ -9,7 +9,7 @@ interface OptionWithValues {
   description: string;
   tooltip: string;
   unit?: string;
-  values: (number | { value: number | string; label: string })[];
+  values: (number | { value: number | string; label: string; cleanLabel?: string })[];
   default: number | string;
   min?: number;
   max?: number;
@@ -55,9 +55,28 @@ export function getOption(key: OptionKey): UIOption {
  * @param key - The option key from ui-options.json
  * @returns Array of values or empty array if no values defined
  */
-export function getValues(key: OptionKey): (number | { value: number | string; label: string })[] {
+export function getValues(key: OptionKey): (number | { value: number | string; label: string; cleanLabel?: string })[] {
   const opt = uiOptions.options[key];
   return 'values' in opt ? opt.values : [];
+}
+
+/**
+ * Get the clean label for a specific value of an option.
+ * This is used for the "Closed" state of our Stealth-Overlay dropdowns.
+ * 
+ * @param key - The option key from ui-options.json
+ * @param value - The value to look up
+ * @returns The clean label if found, or the regular label, or the value itself
+ */
+export function getCleanLabel(key: OptionKey, value: number | string): string {
+  const values = getValues(key);
+  const found = values.find(v => (typeof v === 'object' && v.value === value) || v === value);
+  
+  if (typeof found === 'object') {
+    return found.cleanLabel || found.label;
+  }
+  
+  return String(found ?? value);
 }
 
 /**

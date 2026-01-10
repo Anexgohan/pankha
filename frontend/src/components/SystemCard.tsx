@@ -34,7 +34,7 @@ import { formatTemperature } from "../utils/formatters";
 import { toast } from "../utils/toast";
 import { InlineEdit } from "./InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
-import { getOption, getValues, getLabel, interpolateTooltip } from "../utils/uiOptions";
+import { getOption, getValues, getLabel, getCleanLabel, interpolateTooltip } from "../utils/uiOptions";
 
 interface SystemCardProps {
   system: SystemData;
@@ -773,21 +773,31 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 </div>
                 <div className="info-item info-item-vertical">
                   <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('logLevel').tooltip, { logLevel })}>{getLabel('logLevel')}:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={logLevel}
-                    onChange={(e) => handleLogLevelChange(e.target.value)}
-                    disabled={loading === "log-level" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('logLevel').tooltip, { logLevel })
-                    }
-                  >
-                    {(getValues('logLevel') as { value: string; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  {/* 
+                    Stealth-Overlay Pattern: 
+                    .select-display renders the "Clean Label" for the closed state.
+                    .select-engine is the invisible native picker that shows "Full Labels" when clicked.
+                  */}
+                  <div className="stealth-select-wrapper">
+                    <div className="agent-interval-select select-display">
+                      {getCleanLabel('logLevel', logLevel)}
+                    </div>
+                    <select
+                      className="agent-interval-select select-engine"
+                      value={logLevel}
+                      onChange={(e) => handleLogLevelChange(e.target.value)}
+                      disabled={loading === "log-level" || isReadOnly}
+                      title={
+                        isReadOnly
+                          ? readOnlyTooltip
+                          : interpolateTooltip(getOption('logLevel').tooltip, { logLevel })
+                      }
+                    >
+                      {(getValues('logLevel') as { value: string; label: string }[]).map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   {loading === "log-level" && (
                     <span className="loading-spinner">⏳</span>
                   )}
@@ -798,46 +808,56 @@ const SystemCard: React.FC<SystemCardProps> = ({
               <div className="info-row">
                 <div className="info-item info-item-vertical">
                   <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('emergencyTemp').tooltip, { emergencyTemp })}>{getLabel('emergencyTemp')}:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={emergencyTemp}
-                    onChange={(e) =>
-                      handleEmergencyTempChange(parseFloat(e.target.value))
-                    }
-                    disabled={loading === "emergency-temp" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('emergencyTemp').tooltip, { emergencyTemp })
-                    }
-                  >
-                    {(getValues('emergencyTemp') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="stealth-select-wrapper">
+                    <div className="agent-interval-select select-display">
+                      {getCleanLabel('emergencyTemp', emergencyTemp)}
+                    </div>
+                    <select
+                      className="agent-interval-select select-engine"
+                      value={emergencyTemp}
+                      onChange={(e) =>
+                        handleEmergencyTempChange(parseFloat(e.target.value))
+                      }
+                      disabled={loading === "emergency-temp" || isReadOnly}
+                      title={
+                        isReadOnly
+                          ? readOnlyTooltip
+                          : interpolateTooltip(getOption('emergencyTemp').tooltip, { emergencyTemp })
+                      }
+                    >
+                      {(getValues('emergencyTemp') as { value: number; label: string }[]).map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   {loading === "emergency-temp" && (
                     <span className="loading-spinner">⏳</span>
                   )}
                 </div>
                 <div className="info-item info-item-vertical">
                   <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('failsafeSpeed').tooltip, { failsafeSpeed })}>{getLabel('failsafeSpeed')}:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={failsafeSpeed}
-                    onChange={(e) =>
-                      handleFailsafeSpeedChange(parseInt(e.target.value))
-                    }
-                    disabled={loading === "failsafe-speed" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('failsafeSpeed').tooltip, { failsafeSpeed })
-                    }
-                  >
-                    {(getValues('failsafeSpeed') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="stealth-select-wrapper">
+                    <div className="agent-interval-select select-display">
+                      {getCleanLabel('failsafeSpeed', failsafeSpeed)}
+                    </div>
+                    <select
+                      className="agent-interval-select select-engine"
+                      value={failsafeSpeed}
+                      onChange={(e) =>
+                        handleFailsafeSpeedChange(parseInt(e.target.value))
+                      }
+                      disabled={loading === "failsafe-speed" || isReadOnly}
+                      title={
+                        isReadOnly
+                          ? readOnlyTooltip
+                          : interpolateTooltip(getOption('failsafeSpeed').tooltip, { failsafeSpeed })
+                      }
+                    >
+                      {(getValues('failsafeSpeed') as { value: number; label: string }[]).map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   {loading === "failsafe-speed" && (
                     <span className="loading-spinner">⏳</span>
                   )}
@@ -848,69 +868,84 @@ const SystemCard: React.FC<SystemCardProps> = ({
               <div className="info-row">
                 <div className="info-item info-item-vertical">
                   <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('updateInterval').tooltip, { agentInterval })}>{getLabel('updateInterval')}:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={agentInterval}
-                    onChange={(e) =>
-                      handleAgentIntervalChange(parseFloat(e.target.value))
-                    }
-                    disabled={loading === "agent-interval" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('updateInterval').tooltip, { agentInterval })
-                    }
-                  >
-                    {(getValues('updateInterval') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="stealth-select-wrapper">
+                    <div className="agent-interval-select select-display">
+                      {getCleanLabel('updateInterval', agentInterval)}
+                    </div>
+                    <select
+                      className="agent-interval-select select-engine"
+                      value={agentInterval}
+                      onChange={(e) =>
+                        handleAgentIntervalChange(parseFloat(e.target.value))
+                      }
+                      disabled={loading === "agent-interval" || isReadOnly}
+                      title={
+                        isReadOnly
+                          ? readOnlyTooltip
+                          : interpolateTooltip(getOption('updateInterval').tooltip, { agentInterval })
+                      }
+                    >
+                      {(getValues('updateInterval') as { value: number; label: string }[]).map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   {loading === "agent-interval" && (
                     <span className="loading-spinner">⏳</span>
                   )}
                 </div>
                 <div className="info-item info-item-vertical">
                   <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('fanStep').tooltip, { fanStep, agentInterval })}>{getLabel('fanStep')}:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={fanStep}
-                    onChange={(e) =>
-                      handleFanStepChange(parseInt(e.target.value))
-                    }
-                    disabled={loading === "fan-step" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('fanStep').tooltip, { fanStep, agentInterval })
-                    }
-                  >
-                    {(getValues('fanStep') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="stealth-select-wrapper">
+                    <div className="agent-interval-select select-display">
+                      {getCleanLabel('fanStep', fanStep)}
+                    </div>
+                    <select
+                      className="agent-interval-select select-engine"
+                      value={fanStep}
+                      onChange={(e) =>
+                        handleFanStepChange(parseInt(e.target.value))
+                      }
+                      disabled={loading === "fan-step" || isReadOnly}
+                      title={
+                        isReadOnly
+                          ? readOnlyTooltip
+                          : interpolateTooltip(getOption('fanStep').tooltip, { fanStep, agentInterval })
+                      }
+                    >
+                      {(getValues('fanStep') as { value: number; label: string }[]).map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   {loading === "fan-step" && (
                     <span className="loading-spinner">⏳</span>
                   )}
                 </div>
                 <div className="info-item info-item-vertical">
                   <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('hysteresis').tooltip, { hysteresis })}>{getLabel('hysteresis')}:</span>
-                  <select
-                    className="agent-interval-select"
-                    value={hysteresis}
-                    onChange={(e) =>
-                      handleHysteresisChange(parseFloat(e.target.value))
-                    }
-                    disabled={loading === "hysteresis" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('hysteresis').tooltip, { hysteresis })
-                    }
-                  >
-                    {(getValues('hysteresis') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
+                  <div className="stealth-select-wrapper">
+                    <div className="agent-interval-select select-display">
+                      {getCleanLabel('hysteresis', hysteresis)}
+                    </div>
+                    <select
+                      className="agent-interval-select select-engine"
+                      value={hysteresis}
+                      onChange={(e) =>
+                        handleHysteresisChange(parseFloat(e.target.value))
+                      }
+                      disabled={loading === "hysteresis" || isReadOnly}
+                      title={
+                        isReadOnly
+                          ? readOnlyTooltip
+                          : interpolateTooltip(getOption('hysteresis').tooltip, { hysteresis })
+                      }
+                    >
+                      {(getValues('hysteresis') as { value: number; label: string }[]).map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   {loading === "hysteresis" && (
                     <span className="loading-spinner">⏳</span>
                   )}

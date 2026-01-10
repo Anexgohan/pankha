@@ -39,11 +39,11 @@
       "description": "Agent logging verbosity.",
       "tooltip": "\"Log Level\" is the Agent logging verbosity. Currently set to {logLevel}.\nTRACE  : very detailed debug info \nDEBUG : detailed diagnostics \nINFO    : normal operation logs (default) \nWARN  : warnings and errors \nERROR : errors only.",
       "values": [
-        { "value": "TRACE", "label": "TRACE" },
-        { "value": "DEBUG", "label": "DEBUG" },
-        { "value": "INFO", "label": "INFO (default)" },
-        { "value": "WARN", "label": "WARN" },
-        { "value": "ERROR", "label": "ERROR" }
+        { "value": "TRACE", "label": "TRACE", "cleanLabel": "TRACE" },
+        { "value": "DEBUG", "label": "DEBUG", "cleanLabel": "DEBUG" },
+        { "value": "INFO", "label": "INFO (default)", "cleanLabel": "INFO" },
+        { "value": "WARN", "label": "WARN", "cleanLabel": "WARN" },
+        { "value": "ERROR", "label": "ERROR", "cleanLabel": "ERROR" }
       ],
       "default": "INFO"
     },
@@ -53,15 +53,15 @@
       "tooltip": "\"Emergency Temperature\" {emergencyTemp}°C is the temperature threshold that overrides all controls.\nSets fans to 100% immediately, bypassing Fan Step and Hysteresis for safety.\nFan Control must be enabled for this to take effect.",
       "unit": "°C",
       "values": [
-        { "value": 60, "label": "60°C" },
-        { "value": 65, "label": "65°C" },
-        { "value": 70, "label": "70°C" },
-        { "value": 75, "label": "75°C" },
-        { "value": 80, "label": "80°C" },
-        { "value": 85, "label": "85°C (default)" },
-        { "value": 90, "label": "90°C" },
-        { "value": 95, "label": "95°C" },
-        { "value": 100, "label": "100°C" }
+        { "value": 60, "label": "60°C", "cleanLabel": "60°C" },
+        { "value": 65, "label": "65°C", "cleanLabel": "65°C" },
+        { "value": 70, "label": "70°C", "cleanLabel": "70°C" },
+        { "value": 75, "label": "75°C", "cleanLabel": "75°C" },
+        { "value": 80, "label": "80°C", "cleanLabel": "80°C" },
+        { "value": 85, "label": "85°C (default)", "cleanLabel": "85°C" },
+        { "value": 90, "label": "90°C", "cleanLabel": "90°C" },
+        { "value": 95, "label": "95°C", "cleanLabel": "95°C" },
+        { "value": 100, "label": "100°C", "cleanLabel": "100°C" }
       ],
       "default": 85
     },
@@ -71,17 +71,17 @@
       "tooltip": "\"Failsafe Speed\" is the Fan speed {failsafeSpeed}% set when backend connection is lost (Agent goes into failsafe mode).\nWarning: 0% allows fans to stop only overridden by \"Emergency Temperature\" Threshold.",
       "unit": "%",
       "values": [
-        { "value": 0, "label": "0% (allow stop)" },
-        { "value": 10, "label": "10%" },
-        { "value": 20, "label": "20%" },
-        { "value": 30, "label": "30%" },
-        { "value": 40, "label": "40%" },
-        { "value": 50, "label": "50%" },
-        { "value": 60, "label": "60%" },
-        { "value": 70, "label": "70% (default)" },
-        { "value": 80, "label": "80%" },
-        { "value": 90, "label": "90%" },
-        { "value": 100, "label": "100% (full speed)" }
+        { "value": 0, "label": "0% (allow stop)", "cleanLabel": "0%" },
+        { "value": 10, "label": "10%", "cleanLabel": "10%" },
+        { "value": 20, "label": "20%", "cleanLabel": "20%" },
+        { "value": 30, "label": "30%", "cleanLabel": "30%" },
+        { "value": 40, "label": "40%", "cleanLabel": "40%" },
+        { "value": 50, "label": "50%", "cleanLabel": "50%" },
+        { "value": 60, "label": "60%", "cleanLabel": "60%" },
+        { "value": 70, "label": "70% (default)", "cleanLabel": "70%" },
+        { "value": 80, "label": "80%", "cleanLabel": "80%" },
+        { "value": 90, "label": "90%", "cleanLabel": "90%" },
+        { "value": 100, "label": "100% (full speed)", "cleanLabel": "100%" }
       ],
       "default": 70
     },
@@ -91,15 +91,15 @@
       "tooltip": "Agent rate is the Agent data collection interval ({agentInterval}s).\nHow often the agent collects sensor data.\nLower = more responsive, higher = less agent CPU usage.",
       "unit": "s",
       "values": [
-        { "value": 0.5, "label": "0.5s (CPU Intensive)" },
-        { "value": 1, "label": "1s" },
-        { "value": 2, "label": "2s" },
-        { "value": 3, "label": "3s (Default)" },
-        { "value": 5, "label": "5s" },
-        { "value": 7, "label": "7s" },
-        { "value": 10, "label": "10s" },
-        { "value": 15, "label": "15s" },
-        { "value": 30, "label": "30s (Risks Overheating)" }
+        { "value": 0.5, "label": "0.5s (CPU Intensive)", "cleanLabel": "0.5s" },
+        { "value": 1, "label": "1s", "cleanLabel": "1s" },
+        { "value": 2, "label": "2s", "cleanLabel": "2s" },
+        { "value": 3, "label": "3s (Default)", "cleanLabel": "3s" },
+        { "value": 5, "label": "5s", "cleanLabel": "5s" },
+        { "value": 7, "label": "7s", "cleanLabel": "7s" },
+        { "value": 10, "label": "10s", "cleanLabel": "10s" },
+        { "value": 15, "label": "15s", "cleanLabel": "15s" },
+        { "value": 30, "label": "30s (Risks Overheating)", "cleanLabel": "30s" }
       ],
       "default": 3
     },
@@ -109,15 +109,15 @@
       "tooltip": "\"Fan Step\" is the Max fan speed {fanStep}% change every update cycle of (Agent Rate) {agentInterval}s.\nSmooth transitions reduce fan wear.\nLower % = slower, smoother. Disable = instant (jerky).",
       "unit": "%",
       "values": [
-        { "value": 2, "label": "2%" },
-        { "value": 3, "label": "3%" },
-        { "value": 5, "label": "5% (default)" },
-        { "value": 7, "label": "7%" },
-        { "value": 10, "label": "10%" },
-        { "value": 15, "label": "15%" },
-        { "value": 25, "label": "25%" },
-        { "value": 50, "label": "50%" },
-        { "value": 100, "label": "Disable (instant)" }
+        { "value": 2, "label": "2%", "cleanLabel": "2%" },
+        { "value": 3, "label": "3%", "cleanLabel": "3%" },
+        { "value": 5, "label": "5% (default)", "cleanLabel": "5%" },
+        { "value": 7, "label": "7%", "cleanLabel": "7%" },
+        { "value": 10, "label": "10%", "cleanLabel": "10%" },
+        { "value": 15, "label": "15%", "cleanLabel": "15%" },
+        { "value": 25, "label": "25%", "cleanLabel": "25%" },
+        { "value": 50, "label": "50%", "cleanLabel": "50%" },
+        { "value": 100, "label": "Disable (instant)", "cleanLabel": "Disable" }
       ],
       "default": 5
     },
@@ -127,17 +127,17 @@
       "tooltip": "\"Hysteresis\" is the Temperature tolerance ({hysteresis}°C) before adjusting fan speed.\nPrevents constant small adjustments.\nHigher values = more stability, lower values = more responsive cooling.",
       "unit": "°C",
       "values": [
-        { "value": 0.0, "label": "Disable (instant)" },
-        { "value": 0.5, "label": "0.5°C" },
-        { "value": 1.0, "label": "1.0°C" },
-        { "value": 1.5, "label": "1.5°C" },
-        { "value": 2.0, "label": "2.0°C (default)" },
-        { "value": 2.5, "label": "2.5°C" },
-        { "value": 3.0, "label": "3.0°C" },
-        { "value": 4.0, "label": "4.0°C" },
-        { "value": 5.0, "label": "5.0°C" },
-        { "value": 7.5, "label": "7.5°C" },
-        { "value": 10.0, "label": "10.0°C" }
+        { "value": 0.0, "label": "Disable (instant)", "cleanLabel": "Disable" },
+        { "value": 0.5, "label": "0.5°C", "cleanLabel": "0.5°C" },
+        { "value": 1.0, "label": "1.0°C", "cleanLabel": "1.0°C" },
+        { "value": 1.5, "label": "1.5°C", "cleanLabel": "1.5°C" },
+        { "value": 2.0, "label": "2.0°C (default)", "cleanLabel": "2.0°C" },
+        { "value": 2.5, "label": "2.5°C", "cleanLabel": "2.5°C" },
+        { "value": 3.0, "label": "3.0°C", "cleanLabel": "3.0°C" },
+        { "value": 4.0, "label": "4.0°C", "cleanLabel": "4.0°C" },
+        { "value": 5.0, "label": "5.0°C", "cleanLabel": "5.0°C" },
+        { "value": 7.5, "label": "7.5°C", "cleanLabel": "7.5°C" },
+        { "value": 10.0, "label": "10.0°C", "cleanLabel": "10.0°C" }
       ],
       "default": 2.0
     }
