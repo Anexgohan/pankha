@@ -1,6 +1,6 @@
 import React from 'react';
-import type { SystemOverview } from '../types/api';
-import { formatTemperature } from '../utils/formatters';
+import type { SystemOverview } from '../../types/api';
+import { formatTemperature } from '../../utils/formatters';
 
 interface OverviewStatsProps {
   overview: SystemOverview;
@@ -12,7 +12,7 @@ const OverviewStats: React.FC<OverviewStatsProps> = ({ overview }) => {
   const limitValue = hasLimit ? overview.agentLimit as number : null;
   const isOverLimit = overview.overLimit === true;
   const isAtLimit = hasLimit && limitValue !== null && overview.totalSystems >= limitValue;
-  
+
   // Get appropriate class for limit status
   const getLimitClass = () => {
     if (isOverLimit) return 'over-limit';
@@ -40,48 +40,48 @@ const OverviewStats: React.FC<OverviewStatsProps> = ({ overview }) => {
 
   return (
     <div className="overview-stats">
-      <div 
+      <div
         className={`stat-card ${getLimitClass()}`}
         title={getLimitTooltip()}
       >
         <div className="stat-value">{getSystemsDisplay()}</div>
         <div className="stat-label">Total Systems</div>
       </div>
-      
+
       <div className="stat-card online">
         <div className="stat-value">{overview.onlineSystems}</div>
         <div className="stat-label">Online</div>
       </div>
-      
+
       <div className="stat-card offline">
         <div className="stat-value">{overview.offlineSystems}</div>
         <div className="stat-label">Offline</div>
       </div>
-      
+
       {overview.systemsWithErrors > 0 && (
         <div className="stat-card error">
           <div className="stat-value">{overview.systemsWithErrors}</div>
           <div className="stat-label">Errors</div>
         </div>
       )}
-      
+
       <div className="stat-card">
         <div className="stat-value">{overview.totalSensors}</div>
         <div className="stat-label">Total Sensors</div>
       </div>
-      
+
       <div className="stat-card">
         <div className="stat-value">{overview.totalFans}</div>
         <div className="stat-label">Total Fans</div>
       </div>
-      
+
       <div className="stat-card temperature">
         <div className="stat-value">
           {formatTemperature(overview.avgTemperature)}
         </div>
         <div className="stat-label">Avg Temperature</div>
       </div>
-      
+
       <div className="stat-card temperature">
         <div className="stat-value">
           {formatTemperature(overview.highestTemperature)}

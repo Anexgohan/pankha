@@ -1,4 +1,4 @@
-import Dashboard from './components/Dashboard';
+import SystemsPage from './systems/components/SystemsPage';
 import { Branding } from './components/Branding';
 import { Toaster } from './components/ui/Toaster';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -11,7 +11,7 @@ function App() {
       <LicenseProvider>
         <SensorVisibilityProvider>
           <div className="App">
-            <Dashboard />
+            <SystemsPage />
             <Branding />
             <Toaster />
           </div>

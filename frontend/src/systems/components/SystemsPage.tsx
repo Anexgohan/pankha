@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
-import { emergencyStop, getOverview } from '../services/api';
-import { toast } from '../utils/toast';
+import { emergencyStop, getOverview } from '../../services/api';
+import { toast } from '../../utils/toast';
 import SystemCard from './SystemCard';
 import OverviewStats from './OverviewStats';
-import ThemeToggle from './ThemeToggle';
-import ControllerIntervalSelector from './ControllerIntervalSelector';
-import FanProfileManager from './FanProfileManager';
-import Settings from './Settings';
-import { useWebSocketData } from '../hooks/useWebSocketData';
+import ThemeToggle from '../../components/ThemeToggle';
+import ControllerIntervalSelector from '../../components/ControllerIntervalSelector';
+import FanProfileManager from '../../fan-profiles/components/FanProfileManager';
+import Settings from '../../settings/components/Settings';
+import { useWebSocketData } from '../../hooks/useWebSocketData';
 
 type TabType = 'systems' | 'profiles' | 'settings';
 
-const Dashboard: React.FC = () => {
+const SystemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
   const [overview, setOverview] = useState<any>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -168,19 +168,19 @@ const Dashboard: React.FC = () => {
 
       <nav className="dashboard-nav">
         <div className="nav-tabs">
-          <button 
+          <button
             className={`nav-tab ${activeTab === 'systems' ? 'active' : ''}`}
             onClick={() => setActiveTab('systems')}
           >
             🖥️ Systems Monitor
           </button>
-          <button 
+          <button
             className={`nav-tab ${activeTab === 'profiles' ? 'active' : ''}`}
             onClick={() => setActiveTab('profiles')}
           >
             📊 Fan Profiles
           </button>
-          <button 
+          <button
             className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
@@ -261,4 +261,4 @@ const Dashboard: React.FC = () => {
   );
 };
 
-export default Dashboard;
+export default SystemsPage;

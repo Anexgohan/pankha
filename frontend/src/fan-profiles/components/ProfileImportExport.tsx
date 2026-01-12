@@ -4,14 +4,14 @@ import {
   importFanProfiles,
   getDefaultProfiles,
   loadDefaultProfiles
-} from '../services/fanProfilesApi';
+} from '../../services/fanProfilesApi';
 import type {
   ImportFanProfilesRequest,
   ImportResult,
   DefaultProfileInfo
-} from '../services/fanProfilesApi';
-import { getImportStatusColor } from '../utils/statusColors';
-import { toast } from '../utils/toast';
+} from '../../services/fanProfilesApi';
+import { getImportStatusColor } from '../../utils/statusColors';
+import { toast } from '../../utils/toast';
 
 interface ProfileImportExportProps {
   profiles: any[];

@@ -3,15 +3,15 @@ import {
   getFanProfiles,
   getFanProfileStats,
   deleteFanProfile
-} from '../services/fanProfilesApi';
+} from '../../services/fanProfilesApi';
 import type {
   FanProfile,
   FanProfileStats
-} from '../services/fanProfilesApi';
+} from '../../services/fanProfilesApi';
 import FanProfileEditor from './FanProfileEditor';
 import FanCurveChart from './FanCurveChart';
 import ProfileImportExport from './ProfileImportExport';
-import { toast } from '../utils/toast';
+import { toast } from '../../utils/toast';
 
 const FanProfileManager: React.FC = () => {
   const [profiles, setProfiles] = useState<FanProfile[]>([]);

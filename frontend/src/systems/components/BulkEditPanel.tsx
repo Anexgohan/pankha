@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import type { FanReading, SensorReading } from '../types/api';
-import type { FanProfile } from '../services/fanProfilesApi';
-import { sortSensorGroupIds } from '../utils/sensorUtils';
-import { formatTemperature } from '../utils/formatters';
-import { toast } from '../utils/toast';
-import './BulkEditPanel.css';
+import type { FanReading, SensorReading } from '../../types/api';
+import type { FanProfile } from '../../services/fanProfilesApi';
+import { sortSensorGroupIds } from '../../utils/sensorUtils';
+import { formatTemperature } from '../../utils/formatters';
+import { toast } from '../../utils/toast';
+import '../styles/bulk-edit-panel.css';
 
 interface BulkEditPanelProps {
   fans: FanReading[];

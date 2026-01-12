@@ -3,9 +3,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useLicense } from '../license';
-import { setLicense, getPricing, deleteLicense } from '../services/api';
-import './Settings.css';
+import { useLicense } from '../../license';
+import { setLicense, getPricing, deleteLicense } from '../../services/api';
+import '../styles/settings.css';
 
 type SettingsTab = 'general' | 'license' | 'about';
 

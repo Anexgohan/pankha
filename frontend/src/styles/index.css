@@ -13,14 +13,23 @@
 @import './base/reset.css';
 @import './base/global.css';
 
-/* 3. Components */
+/* 3. Shared Components */
 @import './components/buttons.css';
-@import './components/cards.css';
 @import './components/forms.css';
-@import './components/dashboard.css';
-@import './components/sensors-fans.css';
 @import './components/badges.css';
-@import './components/profile-editor.css';
 
-/* 4. Responsive Design */
+/* 4. Page-Specific Styles */
+/* Systems Monitor Page */
+@import '../systems/styles/dashboard.css';
+@import '../systems/styles/cards.css';
+@import '../systems/styles/sensors-fans.css';
+@import '../systems/styles/bulk-edit-panel.css';
+
+/* Fan Profiles Page */
+@import '../fan-profiles/styles/profile-editor.css';
+
+/* Settings Page */
+@import '../settings/styles/settings.css';
+
+/* 5. Responsive Design */
 @import './base/responsive.css';

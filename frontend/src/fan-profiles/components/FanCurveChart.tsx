@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import type { FanCurvePoint } from '../services/fanProfilesApi';
+import type { FanCurvePoint } from '../../services/fanProfilesApi';
 
 interface FanCurveChartProps {
   curvePoints: FanCurvePoint[];

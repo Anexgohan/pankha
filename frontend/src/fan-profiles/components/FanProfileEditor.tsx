@@ -3,14 +3,14 @@ import {
   createFanProfile,
   updateFanProfile,
   getFanProfiles
-} from '../services/fanProfilesApi';
+} from '../../services/fanProfilesApi';
 import type {
   FanProfile,
   CreateFanProfileRequest,
   UpdateFanProfileRequest
-} from '../services/fanProfilesApi';
+} from '../../services/fanProfilesApi';
 import FanCurveChart from './FanCurveChart';
-import { toast } from '../utils/toast';
+import { toast } from '../../utils/toast';
 
 interface FanProfileEditorProps {
   profile?: FanProfile | null;
