@@ -9,6 +9,10 @@ import { setLicense, getPricing, deleteLicense } from '../../services/api';
 import { formatDate } from '../../utils/formatters';
 import '../styles/settings.css';
 
+// Graph scale configuration constants
+const GRAPH_SCALE_MIN_HOURS = 1;
+const GRAPH_SCALE_MAX_HOURS = 720; // 30 days
+
 type SettingsTab = 'general' | 'license' | 'about';
 
 interface TierPricing {
@@ -96,7 +100,7 @@ const Settings: React.FC = () => {
   const handleCustomScaleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const val = parseInt(customScaleInput, 10);
-    if (!isNaN(val) && val >= 1 && val <= 720) {
+    if (!isNaN(val) && val >= GRAPH_SCALE_MIN_HOURS && val <= GRAPH_SCALE_MAX_HOURS) {
       updateGraphScale(val);
       setIsCustomScale(false);
     }
@@ -251,10 +255,10 @@ const Settings: React.FC = () => {
                     </div>
                   ) : (
                     <form onSubmit={handleCustomScaleSubmit} className="scale-custom-form">
-                      <input 
-                        type="number" 
-                        min="1" 
-                        max="720"
+                      <input
+                        type="number"
+                        min={GRAPH_SCALE_MIN_HOURS}
+                        max={GRAPH_SCALE_MAX_HOURS}
                         autoFocus
                         value={customScaleInput}
                         onChange={(e) => setCustomScaleInput(e.target.value)}

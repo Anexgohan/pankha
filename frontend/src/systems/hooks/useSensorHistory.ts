@@ -3,6 +3,13 @@ import { getSensorHistory } from '../../services/api';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import type { HistoryDataPoint, SensorHistory } from '../../types/api';
 
+/** API response shape for history endpoint */
+interface HistoryApiResponse {
+  data: HistoryDataPoint[];
+  data_points: number;
+  total_available: number;
+}
+
 /**
  * Hook to manage fetching and caching of historical sensor data.
  * Optimized for lazy loading on section expansion and background refreshing.
@@ -16,59 +23,36 @@ export const useSensorHistory = (systemId: number) => {
   const lastScale = useRef<number>(graphScale);
 
   // Group flat history points by sensor/fan name for easy lookup
-  const processHistory = (data: HistoryDataPoint[]) => {
+  const processHistory = useCallback((data: HistoryDataPoint[]) => {
     const grouped: SensorHistory = {};
-    
+
     data.forEach(point => {
       const name = point.sensor_name || point.fan_name;
       if (!name) return;
-      
+
       if (!grouped[name]) {
         grouped[name] = [];
       }
-      
+
       // Ensure temperature is a number (API might return decimal as string)
-      const temp = typeof point.temperature === 'string' 
-        ? parseFloat(point.temperature) 
+      const temp = typeof point.temperature === 'string'
+        ? parseFloat(point.temperature)
         : point.temperature;
-        
+
       grouped[name].push({
         ...point,
         temperature: isNaN(temp as number) ? 0 : temp
       });
     });
-    
+
     return grouped;
-  };
-
-  // Fetch global setting once
-  const fetchGlobalSetting = useCallback(async () => {
-    try {
-      const { getSetting } = await import('../../services/api');
-      const setting = await getSetting('graph_history_hours');
-      if (setting && setting.setting_value) {
-        // No local state needed, context handled it, but let's keep it defined if needed
-        // Actually, context already fetches it. We just need to ensure fetchHistory is ready.
-      }
-    } catch (err) {
-      console.error('Failed to fetch global graph hours setting:', err);
-    }
   }, []);
-
-  // React to graph scale changes
-  useEffect(() => {
-    if (graphScale !== lastScale.current) {
-      lastScale.current = graphScale;
-      // Trigger a refresh with the new scale
-      fetchHistory(graphScale, true);
-    }
-  }, [graphScale, systemId]);
 
   const fetchHistory = useCallback(async (hours?: number, refresh: boolean = false) => {
     // Use provided hours or fallback to graphScale from context
     const hoursToFetch = hours !== undefined ? hours : graphScale;
-    
-    // Only fetch if forced refresh or if we haven't fetched in the last 4 minutes 
+
+    // Only fetch if forced refresh or if we haven't fetched in the last 4 minutes
     const now = Date.now();
     if (!refresh && (now - lastFetched.current < 240000) && lastFetched.current !== 0) {
       return;
@@ -78,8 +62,10 @@ export const useSensorHistory = (systemId: number) => {
     setError(null);
     try {
       const result = await getSensorHistory(systemId, hoursToFetch);
-      // Backend returns { data: [...] }, ensure we use the array
-      const dataArray = Array.isArray(result) ? result : (result as any).data || [];
+      // Backend returns { data: [...] } or array directly - handle both
+      const dataArray = Array.isArray(result)
+        ? result
+        : (result as HistoryApiResponse).data || [];
       const groupedHistory = processHistory(dataArray);
       setHistory(groupedHistory);
       lastFetched.current = now;
@@ -89,12 +75,15 @@ export const useSensorHistory = (systemId: number) => {
     } finally {
       setLoading(false);
     }
-  }, [systemId, graphScale]); // Added graphScale to dependency
+  }, [systemId, graphScale, processHistory]);
 
-  // Fetch global settings on mount
+  // React to graph scale changes - refetch with new window
   useEffect(() => {
-    fetchGlobalSetting();
-  }, [fetchGlobalSetting]);
+    if (graphScale !== lastScale.current) {
+      lastScale.current = graphScale;
+      fetchHistory(graphScale, true);
+    }
+  }, [graphScale, fetchHistory]);
 
   return {
     history,

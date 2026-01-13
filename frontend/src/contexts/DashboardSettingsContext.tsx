@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { updateSetting } from '../services/api';
+import { updateSetting, getSetting, getHealth } from '../services/api';
 
 interface DashboardSettingsContextType {
   graphScale: number;
@@ -25,9 +25,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
 
   const fetchSettings = useCallback(async () => {
     try {
-      const { getSetting, getHealth } = await import('../services/api');
-      
-      // Fetch both setting and health for timezone
+      // Fetch both setting and health for timezone in parallel
       const [setting, health] = await Promise.all([
         getSetting('graph_history_hours'),
         getHealth()
@@ -36,7 +34,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       if (setting && setting.setting_value) {
         setGraphScale(parseInt(setting.setting_value, 10));
       }
-      
+
       if (health && health.timezone) {
         setTimezone(health.timezone);
       }

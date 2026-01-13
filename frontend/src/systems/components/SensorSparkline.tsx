@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useId } from 'react';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import type { HistoryDataPoint } from '../../types/api';
 
@@ -12,17 +12,17 @@ interface SensorSparklineProps {
  * High-performance bespoke SVG Sparkline component.
  * Uses Dynamic Local Scaling (Option C) and interactive Tooltips.
  */
-const SensorSparkline: React.FC<SensorSparklineProps> = ({ 
-  data, 
-  width = 300, 
+const SensorSparkline: React.FC<SensorSparklineProps> = ({
+  data,
+  width = 300,
   height = 24,
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const containerRef = useRef<SVGSVGElement>(null);
   const { timezone } = useDashboardSettings();
 
-  // Generate a unique ID for the gradient at the top (Rules of Hooks)
-  const gradientId = useMemo(() => `sparkline-grad-${Math.random().toString(36).substr(2, 9)}`, []);
+  // Generate a unique ID for the gradient (SSR-safe via React 18+ useId)
+  const gradientId = useId();
 
   // 1. Dynamic Local Scaling Math (Option C)
   const { points } = useMemo(() => {

@@ -1396,6 +1396,18 @@ router.get("/:id/sensor-visibility", async (req: Request, res: Response) => {
   }
 });
 
+// Allowed backend settings keys (whitelist for security)
+const ALLOWED_SETTINGS = [
+  'controller_update_interval',
+  'graph_history_hours',
+] as const;
+
+type AllowedSettingKey = typeof ALLOWED_SETTINGS[number];
+
+function isAllowedSetting(key: string): key is AllowedSettingKey {
+  return ALLOWED_SETTINGS.includes(key as AllowedSettingKey);
+}
+
 // GET /api/settings - Get all backend settings
 router.get("/settings", async (req: Request, res: Response) => {
   try {
@@ -1411,6 +1423,13 @@ router.get("/settings", async (req: Request, res: Response) => {
 router.get("/settings/:key", async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
+
+    if (!isAllowedSetting(key)) {
+      return res.status(400).json({
+        error: `Unknown setting key. Allowed: ${ALLOWED_SETTINGS.join(', ')}`
+      });
+    }
+
     const setting = await db.get("SELECT setting_value FROM backend_settings WHERE setting_key = $1", [key]);
     if (!setting) {
       return res.status(404).json({ error: "Setting not found" });
@@ -1427,6 +1446,12 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const { key } = req.params;
     const { value } = req.body;
+
+    if (!isAllowedSetting(key)) {
+      return res.status(400).json({
+        error: `Unknown setting key. Allowed: ${ALLOWED_SETTINGS.join(', ')}`
+      });
+    }
 
     if (value === undefined) {
       return res.status(400).json({ error: "Value is required" });
