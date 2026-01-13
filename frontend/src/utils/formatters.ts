@@ -29,9 +29,10 @@ export function formatRPM(rpm: number): string {
 /**
  * Format relative time (e.g., "5m ago", "2h ago").
  * @param lastSeen - ISO date string of last seen time
+ * @param timezone - Server timezone for cutoff formatting
  * @returns Human-readable relative time string
  */
-export function formatLastSeen(lastSeen?: string): string {
+export function formatLastSeen(lastSeen?: string, timezone: string = 'UTC'): string {
   if (!lastSeen) return 'Never';
   const date = new Date(lastSeen);
   const now = new Date();
@@ -41,7 +42,17 @@ export function formatLastSeen(lastSeen?: string): string {
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-  return date.toLocaleDateString();
+  return date.toLocaleDateString([], { timeZone: timezone });
+}
+
+/**
+ * Format date in server timezone.
+ * @param dateStr - ISO date string
+ * @param timezone - Server timezone
+ * @returns Formatted date string
+ */
+export function formatDate(dateStr: string, timezone: string = 'UTC'): string {
+  return new Date(dateStr).toLocaleDateString([], { timeZone: timezone });
 }
 
 /**

@@ -30,7 +30,8 @@ import { getChipDisplayName } from "../../config/sensorLabels";
 import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getAgentStatusColor } from "../../utils/statusColors";
-import { formatTemperature } from "../../utils/formatters";
+import { formatTemperature, formatLastSeen } from "../../utils/formatters";
+import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
@@ -58,6 +59,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onToggleFans,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
+  const { timezone } = useDashboardSettings();
   const [agentInterval, setAgentInterval] = useState<number>(
     system.current_update_interval ?? getDefault<number>('updateInterval')
   );
@@ -575,19 +577,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
     onUpdate();
   };
 
-  const formatLastSeen = (lastSeen?: string) => {
-    if (!lastSeen) return "Never";
-    const date = new Date(lastSeen);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-
-    if (diffMins < 1) return "Just now";
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-    return date.toLocaleDateString();
-  };
-
   // Filter visible sensors for dashboard stats (exclude hidden sensors and groups)
   const visibleSensors =
     system.current_temperatures?.filter(
@@ -681,7 +670,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
             </div>
             <div className="info-item">
               <span className="label">Last seen:</span>
-              <span className="value">{formatLastSeen(system.last_seen)}</span>
+              <span className="value">{formatLastSeen(system.last_seen, timezone)}</span>
             </div>
           </div>
           <div className="info-row">

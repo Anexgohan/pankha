@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { getSetting, updateSetting } from '../services/api';
+import { updateSetting } from '../services/api';
 
 interface DashboardSettingsContextType {
   graphScale: number;
   updateGraphScale: (hours: number) => Promise<void>;
   isLoading: boolean;
+  timezone: string;
 }
 
 const DashboardSettingsContext = createContext<DashboardSettingsContextType | undefined>(undefined);
@@ -19,13 +20,25 @@ export const useDashboardSettings = () => {
 
 export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [graphScale, setGraphScale] = useState<number>(24);
+  const [timezone, setTimezone] = useState<string>('UTC');
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchSettings = useCallback(async () => {
     try {
-      const setting = await getSetting('graph_history_hours');
+      const { getSetting, getHealth } = await import('../services/api');
+      
+      // Fetch both setting and health for timezone
+      const [setting, health] = await Promise.all([
+        getSetting('graph_history_hours'),
+        getHealth()
+      ]);
+
       if (setting && setting.setting_value) {
         setGraphScale(parseInt(setting.setting_value, 10));
+      }
+      
+      if (health && health.timezone) {
+        setTimezone(health.timezone);
       }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
@@ -51,7 +64,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   };
 
   return (
-    <DashboardSettingsContext.Provider value={{ graphScale, updateGraphScale, isLoading }}>
+    <DashboardSettingsContext.Provider value={{ graphScale, updateGraphScale, isLoading, timezone }}>
       {children}
     </DashboardSettingsContext.Provider>
   );

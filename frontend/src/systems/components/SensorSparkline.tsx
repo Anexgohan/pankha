@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useRef } from 'react';
+import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import type { HistoryDataPoint } from '../../types/api';
 
 interface SensorSparklineProps {
@@ -18,6 +19,7 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
 }) => {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const containerRef = useRef<SVGSVGElement>(null);
+  const { timezone } = useDashboardSettings();
 
   // Generate a unique ID for the gradient at the top (Rules of Hooks)
   const gradientId = useMemo(() => `sparkline-grad-${Math.random().toString(36).substr(2, 9)}`, []);
@@ -181,7 +183,11 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
         >
           <span className="tooltip-value">{activePoint.value.toFixed(1)}°C</span>
           <span className="tooltip-time">
-            {new Date(activePoint.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            {new Date(activePoint.timestamp).toLocaleTimeString([], { 
+              hour: '2-digit', 
+              minute: '2-digit',
+              timeZone: timezone 
+            })}
           </span>
         </div>
       )}

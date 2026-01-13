@@ -299,14 +299,17 @@ export const getSensorHistory = async (
   const startTime = new Date();
   startTime.setHours(startTime.getHours() - hours);
 
+  // Calculate limit based on hours (5 min interval = 12 points/hour * sensors * hours + buffer)
+  // 5000 covers ~24h for 15 sensors/fans, or ~12h for 30 sensors.
+  // For now, hardcode a higher safe limit.
   const response = await api.get(`/api/systems/${systemId}/history`, {
     params: {
-      start_time: startTime.toISOString(),
       end_time: endTime.toISOString(),
+      start_time: startTime.toISOString(),
+      limit: 10000, // Increased from default 1000 to prevent truncation
     },
   });
   return response.data;
 };
 
-export default api;
 

@@ -6,6 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useLicense } from '../../license';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense } from '../../services/api';
+import { formatDate } from '../../utils/formatters';
 import '../styles/settings.css';
 
 type SettingsTab = 'general' | 'license' | 'about';
@@ -62,7 +63,7 @@ const Settings: React.FC = () => {
   const [pricing, setPricing] = useState<PricingData | null>(null);
 
   // General Settings from Context
-  const { graphScale, updateGraphScale } = useDashboardSettings();
+  const { graphScale, updateGraphScale, timezone } = useDashboardSettings();
   const [isCustomScale, setIsCustomScale] = useState(false);
   const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
   
@@ -521,13 +522,13 @@ const Settings: React.FC = () => {
                     {license.activatedAt && (
                       <div className="limit-item">
                         <span className="limit-label">Activated</span>
-                        <span className="limit-value">{new Date(license.activatedAt).toLocaleDateString()}</span>
+                        <span className="limit-value">{formatDate(license.activatedAt, timezone)}</span>
                       </div>
                     )}
                     <div className="limit-item">
                       <span className="limit-label">Expires</span>
                       <span className="limit-value">
-                        {license.expiresAt ? new Date(license.expiresAt).toLocaleDateString() : 'Lifetime'}
+                        {license.expiresAt ? formatDate(license.expiresAt, timezone) : 'Lifetime'}
                       </span>
                     </div>
                     {(() => {

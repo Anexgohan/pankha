@@ -107,6 +107,8 @@ app.get('/health', (req, res) => {
   res.json({ 
     status: isInitialized ? 'ok' : 'initializing',
     timestamp: new Date().toISOString(),
+    timezone: process.env.TZ || process.env.TIMEZONE || 'UTC',
+    server_time: new Date().toLocaleString('en-US', { timeZone: process.env.TZ || process.env.TIMEZONE || 'UTC' }),
     service: 'pankha-backend',
     version: process.env.PANKHA_VERSION || 'dev',
     services: {
