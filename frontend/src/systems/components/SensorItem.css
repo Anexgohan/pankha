@@ -20,7 +20,7 @@
 .sensor-item-wrapper {
   display: flex;
   align-items: stretch;
-  gap: var(--spacing-xs);
+  /* gap: var(--spacing-xs); */
 }
 
 /* === HIDDEN STATE === */
