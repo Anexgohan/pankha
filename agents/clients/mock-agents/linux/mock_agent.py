@@ -49,6 +49,10 @@ class MockAgentConfig:
         self.fan_step_percent = config_dict.get("fan_step_percent", 5)
         self.hysteresis_temp = config_dict.get("hysteresis_temp", 3.0)
         self.emergency_temp = config_dict.get("emergency_temp", 85.0)
+        # New fields (v0.2.17+)
+        self.failsafe_speed = config_dict.get("failsafe_speed", 70)
+        self.log_level = config_dict.get("log_level", "INFO")
+        self.enable_fan_control = config_dict.get("enable_fan_control", True)
 
 # ============================================================================
 # MOCK HARDWARE GENERATOR
@@ -64,45 +68,77 @@ class MockHardware:
         self.start_time = time.time()
 
     def _create_sensors(self) -> List[Dict]:
-        """Create mock temperature sensors"""
+        """Create mock temperature sensors grouped by chip type (like real hardware)"""
         sensors = []
-        sensor_types = [
-            ("CPU Core", "cpu", 30, 85),
-            ("CPU Package", "cpu", 35, 90),
-            ("Motherboard", "motherboard", 25, 70),
-            ("NVMe", "storage", 30, 80),
-            ("GPU", "gpu", 30, 90),
-            ("VRM", "motherboard", 40, 95),
-            ("Chipset", "motherboard", 35, 75),
+        
+        # Define chip groups with their sensors (mimics real hardware)
+        # Each tuple: (chip_name, sensor_type, [(sensor_name, base_temp, max_temp), ...])
+        chip_groups = [
+            ("k10temp", "cpu", [
+                ("Tctl", 35, 95),
+                ("Tdie", 35, 95),
+                ("Tccd1", 30, 90),
+                ("Tccd2", 30, 90),
+            ]),
+            ("nvidia", "gpu", [
+                ("GPU Core", 30, 90),
+                ("GPU Hot Spot", 35, 95),
+                ("GPU Memory", 30, 85),
+            ]),
+            ("nvme", "storage", [
+                ("Composite", 25, 70),
+                ("Sensor 1", 25, 65),
+                ("Sensor 2", 25, 65),
+            ]),
+            ("it8628", "motherboard", [
+                ("System", 25, 60),
+                ("Chipset", 30, 70),
+                ("VRM MOS", 35, 100),
+                ("PCH", 30, 80),
+            ]),
         ]
-
-        for i in range(self.config.sensor_count):
-            sensor_type, chip, base_temp, max_temp = random.choice(sensor_types)
-            sensor_name = f"{sensor_type} {i % 4 + 1}" if i >= len(sensor_types) else f"{sensor_type} {i + 1}"
-
-            # Generate random base temperature within user's configured range
-            # Use middle 60% of range for base temp to allow variation in both directions
-            min_temp, max_temp_config = self.config.temp_range
-            range_size = max_temp_config - min_temp
-            base_min = min_temp + (range_size * 0.2)
-            base_max = max_temp_config - (range_size * 0.2)
-            random_base_temp = random.uniform(base_min, base_max)
-
-            sensor = {
-                "id": f"sensor_{i:03d}",
-                "name": sensor_name,
-                "temperature": round(random.uniform(*self.config.temp_range), 1),
-                "type": chip,
-                "max_temp": max_temp,
-                "crit_temp": max_temp + 10,
-                "chip": f"mock_{chip}",
-                "source": f"/sys/class/hwmon/hwmon{i}/temp{i+1}_input",
-                # Store base temperature for realistic variation (now uses configured range)
-                "_base_temp": random_base_temp,
-                "_variation": random.uniform(5, 15),
-            }
-            sensors.append(sensor)
-
+        
+        # Determine how many sensors per group based on total count
+        sensor_count = self.config.sensor_count
+        sensors_created = 0
+        group_idx = 0
+        
+        while sensors_created < sensor_count:
+            chip_name, sensor_type, sensor_defs = chip_groups[group_idx % len(chip_groups)]
+            hwmon_idx = group_idx
+            
+            # Add sensors from this chip group
+            for sensor_idx, (name, base_temp, max_temp) in enumerate(sensor_defs):
+                if sensors_created >= sensor_count:
+                    break
+                    
+                # Generate base temperature within user's configured range
+                min_temp, max_temp_config = self.config.temp_range
+                range_size = max_temp_config - min_temp
+                base_min = min_temp + (range_size * 0.2)
+                base_max = max_temp_config - (range_size * 0.2)
+                random_base_temp = random.uniform(base_min, base_max)
+                
+                # Use chip-specific ID like real agents
+                sensor_id = f"{chip_name}_{name.lower().replace(' ', '_')}"
+                
+                sensor = {
+                    "id": sensor_id,
+                    "name": name,
+                    "temperature": round(random.uniform(*self.config.temp_range), 1),
+                    "type": sensor_type,
+                    "max_temp": max_temp,
+                    "crit_temp": max_temp + 10,
+                    "chip": chip_name,
+                    "source": f"/sys/class/hwmon/hwmon{hwmon_idx}/temp{sensor_idx+1}_input",
+                    "_base_temp": random_base_temp,
+                    "_variation": random.uniform(5, 15),
+                }
+                sensors.append(sensor)
+                sensors_created += 1
+            
+            group_idx += 1
+        
         return sensors
 
     def _create_fans(self) -> List[Dict]:
@@ -353,10 +389,12 @@ class MockWebSocketClient:
                 "fan_step_percent": self.config.fan_step_percent,
                 "hysteresis_temp": self.config.hysteresis_temp,
                 "emergency_temp": self.config.emergency_temp,
+                "failsafe_speed": self.config.failsafe_speed,
+                "log_level": self.config.log_level,
                 "capabilities": {
                     "sensors": sensors,
                     "fans": fans,
-                    "fan_control": True
+                    "fan_control": self.config.enable_fan_control
                 }
             }
         }
@@ -463,19 +501,102 @@ class MockWebSocketClient:
         result_data = {}
 
         if command_type == "setFanSpeed":
-            fan_id = payload.get("fanId")
-            speed = payload.get("speed")
-
-            if fan_id and speed is not None:
-                success = self.hardware.set_fan_speed(fan_id, int(speed))
-                if not success:
-                    error_msg = f"Fan not found: {fan_id}"
+            if not self.config.enable_fan_control:
+                success = True
+                result_data = {"message": "Fan control is disabled"}
             else:
-                error_msg = "Missing fanId or speed in payload"
+                fan_id = payload.get("fanId")
+                speed = payload.get("speed")
+                if fan_id and speed is not None:
+                    success = self.hardware.set_fan_speed(fan_id, int(speed))
+                    if not success:
+                        error_msg = f"Fan not found: {fan_id}"
+                else:
+                    error_msg = "Missing fanId or speed in payload"
 
         elif command_type == "emergencyStop":
             self.hardware.emergency_stop()
             success = True
+
+        elif command_type == "setUpdateInterval":
+            interval = payload.get("interval")
+            if interval is not None:
+                self.config.update_interval = float(interval)
+                success = True
+                result_data = {"interval": interval}
+                logging.info(f"Update interval changed to {interval}s")
+            else:
+                error_msg = "Missing interval"
+
+        elif command_type == "setFanStep":
+            step = payload.get("step")
+            if step is not None:
+                self.config.fan_step_percent = int(step)
+                success = True
+                result_data = {"step": step}
+                logging.info(f"Fan step changed to {step}%")
+            else:
+                error_msg = "Missing step"
+
+        elif command_type == "setHysteresis":
+            hysteresis = payload.get("hysteresis")
+            if hysteresis is not None:
+                self.config.hysteresis_temp = float(hysteresis)
+                success = True
+                result_data = {"hysteresis": hysteresis}
+                logging.info(f"Hysteresis changed to {hysteresis}°C")
+            else:
+                error_msg = "Missing hysteresis"
+
+        elif command_type == "setEmergencyTemp":
+            temp = payload.get("temp")
+            if temp is not None:
+                self.config.emergency_temp = float(temp)
+                success = True
+                result_data = {"temp": temp}
+                logging.info(f"Emergency temp changed to {temp}°C")
+            else:
+                error_msg = "Missing temp"
+
+        elif command_type == "setLogLevel":
+            level = payload.get("level")
+            if level:
+                self.config.log_level = level.upper()
+                success = True
+                result_data = {"level": level}
+                logging.info(f"Log level changed to {level}")
+            else:
+                error_msg = "Missing level"
+
+        elif command_type == "setFailsafeSpeed":
+            speed = payload.get("speed")
+            if speed is not None:
+                self.config.failsafe_speed = int(speed)
+                success = True
+                result_data = {"speed": speed}
+                logging.info(f"Failsafe speed changed to {speed}%")
+            else:
+                error_msg = "Missing speed"
+
+        elif command_type == "setEnableFanControl":
+            enabled = payload.get("enabled")
+            if enabled is not None:
+                self.config.enable_fan_control = bool(enabled)
+                success = True
+                result_data = {"enabled": enabled}
+                logging.info(f"Fan control {'enabled' if enabled else 'disabled'}")
+            else:
+                error_msg = "Missing enabled"
+
+        elif command_type == "setAgentName":
+            name = payload.get("name")
+            if name:
+                self.config.agent_name = name
+                success = True
+                result_data = {"name": name}
+                logging.info(f"Agent name changed to {name}")
+            else:
+                error_msg = "Missing name"
 
         else:
             error_msg = f"Unknown command type: {command_type}"

@@ -309,7 +309,7 @@ export const getSensorHistory = async (
       limit: 10000, // Increased from default 1000 to prevent truncation
     },
   });
-  return response.data;
+  return response.data.data;
 };
 
 

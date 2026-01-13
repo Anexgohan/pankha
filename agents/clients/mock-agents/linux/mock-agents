@@ -121,6 +121,9 @@ class AgentManager:
                 "fan_step_percent": 5,
                 "hysteresis_temp": 3.0,
                 "emergency_temp": 85.0,
+                "failsafe_speed": 70,
+                "log_level": "INFO",
+                "enable_fan_control": True,
             }
 
             config["agents"].append(agent_config)
