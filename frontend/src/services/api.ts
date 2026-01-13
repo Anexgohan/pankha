@@ -253,6 +253,22 @@ export const deleteLicense = async () => {
   return response.data;
 };
 
+// Backend Settings
+export const getSettings = async () => {
+  const response = await api.get("/api/systems/settings");
+  return response.data;
+};
+
+export const getSetting = async (key: string) => {
+  const response = await api.get(`/api/systems/settings/${key}`);
+  return response.data;
+};
+
+export const updateSetting = async (key: string, value: string | number) => {
+  const response = await api.put(`/api/systems/settings/${key}`, { value });
+  return response.data;
+};
+
 // Sensor Visibility
 export const updateSensorVisibility = async (
   systemId: number,

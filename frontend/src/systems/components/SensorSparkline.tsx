@@ -161,7 +161,7 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
             />
             <circle 
               cx={activePoint.x} cy={activePoint.y} r="3" 
-              fill="currentColor" stroke="var(--bg-card)" strokeWidth="1"
+              fill="currentColor" stroke="var(--bg-secondary)" strokeWidth="1"
             />
           </g>
         )}

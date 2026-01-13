@@ -12,13 +12,13 @@ CREATE TABLE IF NOT EXISTS systems (
   auth_token VARCHAR(255),
   agent_version VARCHAR(50),
   status VARCHAR(50) CHECK(status IN ('online', 'offline', 'error', 'installing')) DEFAULT 'offline',
-  last_seen TIMESTAMP,
-  last_data_received TIMESTAMP,
+  last_seen TIMESTAMPTZ,
+  last_data_received TIMESTAMPTZ,
   capabilities JSONB, -- JSON data for agent capabilities and hardware info
   config_data JSONB,  -- JSON data for system-specific configuration
   fan_update_interval INTEGER DEFAULT 2000, -- Fan profile controller update interval in milliseconds
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Temperature Sensors (Dynamically Detected)
@@ -39,9 +39,9 @@ CREATE TABLE IF NOT EXISTS sensors (
   is_primary BOOLEAN DEFAULT false,         -- Primary sensor for this type
   user_selected BOOLEAN DEFAULT false,      -- User has manually selected this sensor
   is_hidden BOOLEAN DEFAULT false,          -- User has hidden this sensor from display
-  last_reading TIMESTAMP,                   -- Last successful reading
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_reading TIMESTAMPTZ,                 -- Last successful reading
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
   UNIQUE(system_id, sensor_name)
 );
@@ -52,8 +52,8 @@ CREATE TABLE IF NOT EXISTS sensor_group_visibility (
   system_id INTEGER NOT NULL,
   group_name VARCHAR(255) NOT NULL,         -- e.g., 'k10temp', 'gigabyte_wmi', 'nvme'
   is_hidden BOOLEAN DEFAULT false,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
   UNIQUE(system_id, group_name)
 );
@@ -78,9 +78,9 @@ CREATE TABLE IF NOT EXISTS fans (
   target_speed INTEGER,
   is_controllable BOOLEAN DEFAULT true,     -- Can PWM be controlled
   enabled BOOLEAN DEFAULT true,
-  last_command TIMESTAMP,                   -- Last control command sent
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_command TIMESTAMPTZ,                   -- Last control command sent
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
   FOREIGN KEY (primary_sensor_id) REFERENCES sensors(id) ON DELETE SET NULL,
   FOREIGN KEY (secondary_sensor_id) REFERENCES sensors(id) ON DELETE SET NULL,
@@ -97,8 +97,8 @@ CREATE TABLE IF NOT EXISTS fan_profiles (
   is_global BOOLEAN DEFAULT false,          -- Can be used across systems
   is_active BOOLEAN DEFAULT false,
   created_by VARCHAR(255),                  -- User who created the profile
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE
 );
 
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS fan_curve_points (
   temperature DECIMAL(8,2) NOT NULL,        -- Temperature threshold (°C)
   fan_speed INTEGER NOT NULL,               -- Fan speed percentage (0-100)
   point_order INTEGER NOT NULL,             -- Order of points in curve
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (profile_id) REFERENCES fan_profiles(id) ON DELETE CASCADE,
   UNIQUE(profile_id, temperature),
   UNIQUE(profile_id, point_order)
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS fan_profile_assignments (
   sensor_id INTEGER,                        -- Which sensor to monitor for this assignment (regular sensor DB ID)
   sensor_identifier VARCHAR(255),           -- Special identifier like "__highest__" or "__group__<name>"
   is_active BOOLEAN DEFAULT true,
-  assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  assigned_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE CASCADE,
   FOREIGN KEY (profile_id) REFERENCES fan_profiles(id) ON DELETE CASCADE,
   FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE SET NULL,
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS fan_configurations (
   fan_id INTEGER NOT NULL UNIQUE,
   sensor_id INTEGER,                        -- Regular sensor DB ID
   sensor_identifier VARCHAR(255),           -- Special identifier like "__highest__" or "__group__<name>"
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE CASCADE,
   FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE SET NULL
 );
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS monitoring_data (
   temperature DECIMAL(8,2),
   fan_speed INTEGER,
   fan_rpm INTEGER,
-  timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
   FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE SET NULL,
   FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE SET NULL
@@ -218,7 +218,7 @@ CREATE TABLE IF NOT EXISTS backend_settings (
   setting_key VARCHAR(255) UNIQUE NOT NULL,
   setting_value TEXT NOT NULL,
   description TEXT,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Trigger for backend_settings timestamp
@@ -231,6 +231,11 @@ CREATE TRIGGER update_backend_settings_timestamp
 -- Insert default controller interval setting (2000ms = 2 seconds)
 INSERT INTO backend_settings (setting_key, setting_value, description)
 VALUES ('controller_update_interval', '2000', 'Fan Profile Controller update interval in milliseconds')
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- Insert default graph history setting (24 hours)
+INSERT INTO backend_settings (setting_key, setting_value, description)
+VALUES ('graph_history_hours', '24', 'Historical data window for sparklines in hours')
 ON CONFLICT (setting_key) DO NOTHING;
 
 -- Create index for faster setting lookups
@@ -249,16 +254,16 @@ CREATE TABLE IF NOT EXISTS licenses (
   retention_days INTEGER NOT NULL DEFAULT 1,
   alert_limit INTEGER NOT NULL DEFAULT 2,
   api_access VARCHAR(20) NOT NULL DEFAULT 'none',
-  expires_at TIMESTAMP,
-  validated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  expires_at TIMESTAMPTZ,
+  validated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Current active license configuration (single row table)
 CREATE TABLE IF NOT EXISTS license_config (
   id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
   license_key TEXT,  -- JWT token can be 500+ chars
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes for license tables

@@ -1396,4 +1396,56 @@ router.get("/:id/sensor-visibility", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/settings - Get all backend settings
+router.get("/settings", async (req: Request, res: Response) => {
+  try {
+    const settings = await db.all("SELECT setting_key, setting_value, description FROM backend_settings");
+    res.json(settings);
+  } catch (error) {
+    log.error("Error fetching backend settings:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch backend settings" });
+  }
+});
+
+// GET /api/settings/:key - Get a specific setting
+router.get("/settings/:key", async (req: Request, res: Response) => {
+  try {
+    const { key } = req.params;
+    const setting = await db.get("SELECT setting_value FROM backend_settings WHERE setting_key = $1", [key]);
+    if (!setting) {
+      return res.status(404).json({ error: "Setting not found" });
+    }
+    res.json(setting);
+  } catch (error) {
+    log.error(`Error fetching setting ${req.params.key}:`, "systems", error);
+    res.status(500).json({ error: "Failed to fetch setting" });
+  }
+});
+
+// PUT /api/settings/:key - Update a specific setting
+router.put("/settings/:key", async (req: Request, res: Response) => {
+  try {
+    const { key } = req.params;
+    const { value } = req.body;
+
+    if (value === undefined) {
+      return res.status(400).json({ error: "Value is required" });
+    }
+
+    await db.run(
+      `INSERT INTO backend_settings (setting_key, setting_value, updated_at)
+       VALUES ($1, $2, CURRENT_TIMESTAMP)
+       ON CONFLICT (setting_key)
+       DO UPDATE SET setting_value = $2, updated_at = CURRENT_TIMESTAMP`,
+      [key, value.toString()]
+    );
+
+    log.info(`Backend setting updated: ${key}=${value}`, "systems");
+    res.json({ success: true, key, value });
+  } catch (error) {
+    log.error(`Error updating setting ${req.params.key}:`, "systems", error);
+    res.status(500).json({ error: "Failed to update setting" });
+  }
+});
+
 export default router;

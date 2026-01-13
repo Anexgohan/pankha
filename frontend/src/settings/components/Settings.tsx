@@ -59,6 +59,10 @@ const Settings: React.FC = () => {
   
   // Dynamic pricing from API
   const [pricing, setPricing] = useState<PricingData | null>(null);
+
+  // General Settings
+  const [graphHours, setGraphHours] = useState<number>(24);
+  const [isSavingSetting, setIsSavingSetting] = useState(false);
   
   useEffect(() => {
     const fetchPricing = async () => {
@@ -70,7 +74,36 @@ const Settings: React.FC = () => {
       }
     };
     fetchPricing();
+
+    // Fetch general settings
+    const fetchSettings = async () => {
+      try {
+        const { getSetting } = await import('../../services/api');
+        const setting = await getSetting('graph_history_hours');
+        if (setting && setting.setting_value) {
+          setGraphHours(parseInt(setting.setting_value, 10));
+        }
+      } catch (error) {
+        console.error('Failed to fetch settings:', error);
+      }
+    };
+    fetchSettings();
   }, []);
+
+  const handleUpdateGraphHours = async (val: number) => {
+    if (val < 1 || val > 720) return; // Limit: 1h to 30 days
+    setGraphHours(val);
+    
+    setIsSavingSetting(true);
+    try {
+      const { updateSetting } = await import('../../services/api');
+      await updateSetting('graph_history_hours', val);
+    } catch (error) {
+      console.error('Failed to save setting:', error);
+    } finally {
+      setIsSavingSetting(false);
+    }
+  };
 
   const handleLicenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,12 +221,31 @@ const Settings: React.FC = () => {
           <div className="settings-section">
             <h2>General Settings</h2>
             <p className="settings-info">
-              General settings will be added here in future updates.
+              Configure global dashboard preferences and display options.
             </p>
-            <ul className="settings-list">
-              <li>Theme: Controlled via header toggle</li>
-              <li>Controller Interval: Controlled via header selector</li>
-            </ul>
+            
+            <div className="settings-list">
+              <div className="setting-item">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Graph History Window</span>
+                  <span className="setting-description">
+                    How many hours of historical data to show in sparklines (Default: 24h)
+                  </span>
+                </div>
+                <div className="setting-control">
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="720"
+                    value={graphHours}
+                    onChange={(e) => handleUpdateGraphHours(parseInt(e.target.value, 10) || 1)}
+                    className="setting-input"
+                    disabled={isSavingSetting}
+                  />
+                  <span className="setting-unit">hours</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

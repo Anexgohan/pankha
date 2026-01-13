@@ -196,6 +196,63 @@
   margin-top: var(--spacing-xl);
 }
 
+/* General Settings UI */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  margin-top: var(--spacing-lg);
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-md);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  gap: var(--spacing-xl);
+}
+
+.setting-info-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.setting-label {
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.setting-description {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.setting-input {
+  width: 100px;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+.setting-unit {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  min-width: 40px;
+}
+
 .license-input-group {
   display: flex;
   gap: var(--spacing-md);
