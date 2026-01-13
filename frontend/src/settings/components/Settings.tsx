@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLicense } from '../../license';
+import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense } from '../../services/api';
 import '../styles/settings.css';
 
@@ -60,9 +61,24 @@ const Settings: React.FC = () => {
   // Dynamic pricing from API
   const [pricing, setPricing] = useState<PricingData | null>(null);
 
-  // General Settings
-  const [graphHours, setGraphHours] = useState<number>(24);
-  const [isSavingSetting, setIsSavingSetting] = useState(false);
+  // General Settings from Context
+  const { graphScale, updateGraphScale } = useDashboardSettings();
+  const [isCustomScale, setIsCustomScale] = useState(false);
+  const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
+  
+  // Update custom input when global scale changes (e.g. from preset)
+  useEffect(() => {
+    setCustomScaleInput(graphScale.toString());
+  }, [graphScale]);
+
+  const scalePresets = [
+    { label: '1h', value: 1 },
+    { label: '6h', value: 6 },
+    { label: '12h', value: 12 },
+    { label: '24h', value: 24 },
+    { label: '3d', value: 72 },
+    { label: '1w', value: 168 },
+  ];
   
   useEffect(() => {
     const fetchPricing = async () => {
@@ -74,34 +90,14 @@ const Settings: React.FC = () => {
       }
     };
     fetchPricing();
-
-    // Fetch general settings
-    const fetchSettings = async () => {
-      try {
-        const { getSetting } = await import('../../services/api');
-        const setting = await getSetting('graph_history_hours');
-        if (setting && setting.setting_value) {
-          setGraphHours(parseInt(setting.setting_value, 10));
-        }
-      } catch (error) {
-        console.error('Failed to fetch settings:', error);
-      }
-    };
-    fetchSettings();
   }, []);
 
-  const handleUpdateGraphHours = async (val: number) => {
-    if (val < 1 || val > 720) return; // Limit: 1h to 30 days
-    setGraphHours(val);
-    
-    setIsSavingSetting(true);
-    try {
-      const { updateSetting } = await import('../../services/api');
-      await updateSetting('graph_history_hours', val);
-    } catch (error) {
-      console.error('Failed to save setting:', error);
-    } finally {
-      setIsSavingSetting(false);
+  const handleCustomScaleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseInt(customScaleInput, 10);
+    if (!isNaN(val) && val >= 1 && val <= 720) {
+      updateGraphScale(val);
+      setIsCustomScale(false);
     }
   };
 
@@ -225,24 +221,55 @@ const Settings: React.FC = () => {
             </p>
             
             <div className="settings-list">
-              <div className="setting-item">
+              <div className="setting-item graph-scale-section">
                 <div className="setting-info-wrapper">
-                  <span className="setting-label">Graph History Window</span>
+                  <span className="setting-label">Graph Scale</span>
                   <span className="setting-description">
-                    How many hours of historical data to show in sparklines (Default: 24h)
+                    Adjust the historical data window for all dashboard sparklines.
                   </span>
                 </div>
-                <div className="setting-control">
-                  <input 
-                    type="number" 
-                    min="1" 
-                    max="720"
-                    value={graphHours}
-                    onChange={(e) => handleUpdateGraphHours(parseInt(e.target.value, 10) || 1)}
-                    className="setting-input"
-                    disabled={isSavingSetting}
-                  />
-                  <span className="setting-unit">hours</span>
+                
+                <div className="scale-control-wrapper">
+                  {!isCustomScale ? (
+                    <div className="scale-presets">
+                      {scalePresets.map((preset) => (
+                        <button
+                          key={preset.value}
+                          className={`scale-preset-btn ${graphScale === preset.value ? 'active' : ''}`}
+                          onClick={() => updateGraphScale(preset.value)}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      <button 
+                        className={`scale-preset-btn custom ${!scalePresets.some(p => p.value === graphScale) ? 'active' : ''}`}
+                        onClick={() => setIsCustomScale(true)}
+                      >
+                        {scalePresets.some(p => p.value === graphScale) ? 'Custom' : `${graphScale}h`}
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleCustomScaleSubmit} className="scale-custom-form">
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="720"
+                        autoFocus
+                        value={customScaleInput}
+                        onChange={(e) => setCustomScaleInput(e.target.value)}
+                        className="setting-input scale-input"
+                      />
+                      <span className="setting-unit">hours</span>
+                      <button type="submit" className="scale-apply-btn">Apply</button>
+                      <button 
+                        type="button" 
+                        className="scale-cancel-btn"
+                        onClick={() => setIsCustomScale(false)}
+                      >
+                        ✕
+                      </button>
+                    </form>
+                  )}
                 </div>
               </div>
             </div>

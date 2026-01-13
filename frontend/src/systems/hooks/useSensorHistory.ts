@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { getSensorHistory } from '../../services/api';
+import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import type { HistoryDataPoint, SensorHistory } from '../../types/api';
 
 /**
@@ -10,8 +11,9 @@ export const useSensorHistory = (systemId: number) => {
   const [history, setHistory] = useState<SensorHistory>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [globalHours, setGlobalHours] = useState<number>(24);
+  const { graphScale } = useDashboardSettings();
   const lastFetched = useRef<number>(0);
+  const lastScale = useRef<number>(graphScale);
 
   // Group flat history points by sensor/fan name for easy lookup
   const processHistory = (data: HistoryDataPoint[]) => {
@@ -45,16 +47,26 @@ export const useSensorHistory = (systemId: number) => {
       const { getSetting } = await import('../../services/api');
       const setting = await getSetting('graph_history_hours');
       if (setting && setting.setting_value) {
-        setGlobalHours(parseInt(setting.setting_value, 10));
+        // No local state needed, context handled it, but let's keep it defined if needed
+        // Actually, context already fetches it. We just need to ensure fetchHistory is ready.
       }
     } catch (err) {
       console.error('Failed to fetch global graph hours setting:', err);
     }
   }, []);
 
+  // React to graph scale changes
+  useEffect(() => {
+    if (graphScale !== lastScale.current) {
+      lastScale.current = graphScale;
+      // Trigger a refresh with the new scale
+      fetchHistory(graphScale, true);
+    }
+  }, [graphScale, systemId]);
+
   const fetchHistory = useCallback(async (hours?: number, refresh: boolean = false) => {
-    // Use provided hours or fallback to globalHours
-    const hoursToFetch = hours !== undefined ? hours : globalHours;
+    // Use provided hours or fallback to graphScale from context
+    const hoursToFetch = hours !== undefined ? hours : graphScale;
     
     // Only fetch if forced refresh or if we haven't fetched in the last 4 minutes 
     const now = Date.now();
@@ -77,12 +89,12 @@ export const useSensorHistory = (systemId: number) => {
     } finally {
       setLoading(false);
     }
-  }, [systemId, globalHours]); // Added globalHours to dependency
+  }, [systemId, graphScale]); // Added graphScale to dependency
 
   // Fetch global settings on mount
-  useState(() => {
+  useEffect(() => {
     fetchGlobalSetting();
-  });
+  }, [fetchGlobalSetting]);
 
   return {
     history,
