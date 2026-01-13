@@ -1,14 +1,16 @@
 import React from "react";
-import type { SensorReading } from "../../types/api";
+import type { SensorReading, HistoryDataPoint } from "../../types/api";
 import { InlineEdit } from "../../components/InlineEdit";
 import { getSensorDisplayName } from "../../utils/displayNames";
 import { formatTemperature } from "../../utils/formatters";
+import SensorSparkline from "./SensorSparkline";
 import "./SensorItem.css";
 
 interface SensorItemProps {
   sensor: SensorReading;
   systemId: number;  // Reserved for future use (history API calls)
   isHidden: boolean;
+  history?: HistoryDataPoint[];
   onToggleVisibility: (sensorId: string, sensorDbId?: number) => void;
   onLabelSave: (sensorDbId: number, newLabel: string) => Promise<void>;
   getTemperatureClass: (temp: number, maxTemp?: number, critTemp?: number) => string;
@@ -17,8 +19,9 @@ interface SensorItemProps {
 
 const SensorItem: React.FC<SensorItemProps> = ({
   sensor,
-  systemId: _systemId,  // Will be used for history API in Phase 3
+  systemId: _systemId,
   isHidden,
+  history = [],
   onToggleVisibility,
   onLabelSave,
   getTemperatureClass,
@@ -94,20 +97,7 @@ const SensorItem: React.FC<SensorItemProps> = ({
 
         {/* Row 3: Sparkline (FULL CARD WIDTH) */}
         <div className="sensor-sparkline-area">
-          <div className="sparkline-placeholder" aria-hidden="true">
-            <svg
-              className="sparkline-placeholder-svg"
-              viewBox="0 0 200 24"
-              preserveAspectRatio="none"
-            >
-              <path
-                className="sparkline-placeholder-path"
-                d="M0,12 Q25,8 50,12 T100,12 T150,12 T200,12"
-                fill="none"
-                strokeWidth="1.5"
-              />
-            </svg>
-          </div>
+          <SensorSparkline data={history} />
         </div>
       </div>
     </div>
@@ -122,6 +112,7 @@ export default React.memo(SensorItem, (prevProps, nextProps) => {
     prevProps.sensor.status === nextProps.sensor.status &&
     prevProps.sensor.label === nextProps.sensor.label &&
     prevProps.sensor.name === nextProps.sensor.name &&
-    prevProps.isHidden === nextProps.isHidden
+    prevProps.isHidden === nextProps.isHidden &&
+    prevProps.history === nextProps.history
   );
 });

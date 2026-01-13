@@ -78,6 +78,22 @@ export interface WebSocketMessage {
   timestamp: string;
 }
 
+export interface HistoryDataPoint {
+  timestamp: string;
+  temperature?: number;
+  fan_speed?: number;
+  fan_rpm?: number;
+  sensor_name?: string;
+  sensor_label?: string;
+  sensor_type?: string;
+  fan_name?: string;
+  fan_label?: string;
+}
+
+export interface SensorHistory {
+  [sensorName: string]: HistoryDataPoint[];
+}
+
 export interface SystemHealth {
   agent_id: string;
   status: string;

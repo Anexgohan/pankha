@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { SystemData, SystemOverview, SystemHealth } from "../types/api";
+import type { SystemData, SystemOverview, SystemHealth, HistoryDataPoint } from "../types/api";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -272,6 +272,24 @@ export const updateGroupVisibility = async (
   await api.put(`/api/systems/${systemId}/sensor-groups/${groupId}/visibility`, {
     is_hidden: isHidden,
   });
+};
+
+// Historical Data
+export const getSensorHistory = async (
+  systemId: number,
+  hours: number = 24
+): Promise<HistoryDataPoint[]> => {
+  const endTime = new Date();
+  const startTime = new Date();
+  startTime.setHours(startTime.getHours() - hours);
+
+  const response = await api.get(`/api/systems/${systemId}/history`, {
+    params: {
+      start_time: startTime.toISOString(),
+      end_time: endTime.toISOString(),
+    },
+  });
+  return response.data;
 };
 
 export default api;

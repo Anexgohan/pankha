@@ -317,6 +317,57 @@
   stroke: var(--temp-critical-border);
 }
 
+/* Actual Sparkline styling */
+.sensor-sparkline-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sparkline-path {
+  transition: stroke 0.3s ease;
+}
+
+.sparkline-fill {
+  transition: fill 0.3s ease;
+}
+
+/* Inherit colors from temperature classes for the dynamic graph */
+.sensor-card.temperature-normal .sensor-sparkline-area { color: var(--temp-normal-border); }
+.sensor-card.temperature-caution .sensor-sparkline-area { color: var(--temp-caution-border); }
+.sensor-card.temperature-warning .sensor-sparkline-area { color: var(--temp-warning-border); }
+.sensor-card.temperature-critical .sensor-sparkline-area { color: var(--temp-critical-border); }
+
+/* --- Sparkline Tooltip --- */
+.sparkline-container {
+  overflow: visible !important;
+}
+
+.sparkline-tooltip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  box-shadow: var(--shadow-lg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.tooltip-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.tooltip-time {
+  opacity: 0.6;
+  color: var(--text-secondary);
+}
+
 /* === RESPONSIVE === */
 @media (max-width: 480px) {
   .sensor-value-column {

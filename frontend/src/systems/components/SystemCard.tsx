@@ -35,6 +35,7 @@ import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorItem from "./SensorItem";
+import { useSensorHistory } from "../hooks/useSensorHistory";
 import { getOption, getValues, getLabel, getCleanLabel, interpolateTooltip, getDefault } from "../../utils/uiOptions";
 
 interface SystemCardProps {
@@ -94,6 +95,16 @@ const SystemCard: React.FC<SystemCardProps> = ({
     toggleGroupVisibility,
     isGroupHidden,
   } = useSensorVisibility();
+
+  // 24h Sensor History Hook (Lazy loaded on expansion)
+  const { history, fetchHistory } = useSensorHistory(system.id);
+
+  // Trigger history fetch when sensors section is expanded
+  useEffect(() => {
+    if (expandedSensors) {
+      fetchHistory();
+    }
+  }, [expandedSensors, fetchHistory]);
 
   // Load fan profiles, assignments, and configurations on mount
   useEffect(() => {
@@ -1079,6 +1090,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                   }}
                                   getTemperatureClass={getTemperatureClass}
                                   getSensorIcon={getSensorIcon}
+                                  history={history[sensor.id]}
                                 />
                               );
                             })}
