@@ -1,0 +1,330 @@
+/* ===================================
+   SensorItem v2 - High-Density Layout
+
+   STRUCTURE:
+   +--------+----------------------------------+
+   | RACK   |           CARD                   |
+   | (out)  | [Content]          [Value 80px]  |
+   |  [icon]| Name (edit)         48.0°C       |
+   |  [👁️]  | type: hardware_id      OK        |
+   |        | ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ |
+   |        | Sparkline (full card width)      |
+   +--------+----------------------------------+
+
+   - Rack is OUTSIDE the card (to the left)
+   - Sparkline spans full card width
+   - All colors from design tokens
+   =================================== */
+
+/* === WRAPPER (Rack + Card side by side) === */
+.sensor-item-wrapper {
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-xs);
+}
+
+/* === HIDDEN STATE === */
+.sensor-item-wrapper.sensor-hidden {
+  opacity: 0.5;
+}
+
+.sensor-item-wrapper.sensor-hidden:hover {
+  opacity: 0.7;
+}
+
+.sensor-item-wrapper.sensor-hidden .sensor-name-row {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+/* === RACK (Outside Card) ===
+   - Vertical stack of icons
+   - Grows leftward on overflow (flex-wrap: wrap-reverse)
+*/
+.sensor-rack {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap-reverse;
+  align-content: flex-end;
+  justify-content: flex-start;
+  gap: var(--spacing-xs);
+  min-width: 32px;
+  padding: var(--spacing-xs);
+}
+
+.rack-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+.rack-visibility {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.rack-visibility:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-primary);
+}
+
+.rack-visibility:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* === CARD (Main sensor display) === */
+.sensor-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border-left: 5px solid var(--border-color);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.2s ease;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sensor-card:hover {
+  transform: translateX(2px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Temperature-based card styling */
+.sensor-card.temperature-normal {
+  background-color: var(--temp-normal-bg);
+  border-left-color: var(--temp-normal-border);
+}
+
+.sensor-card.temperature-caution {
+  background-color: var(--temp-caution-bg);
+  border-left-color: var(--temp-caution-border);
+}
+
+.sensor-card.temperature-warning {
+  background-color: var(--temp-warning-bg);
+  border-left-color: var(--temp-warning-border);
+}
+
+.sensor-card.temperature-critical {
+  background-color: var(--temp-critical-bg);
+  border-left-color: var(--temp-critical-border);
+}
+
+/* Hidden card state */
+.sensor-item-wrapper.sensor-hidden .sensor-card {
+  background: var(--bg-tertiary);
+  border-left-color: var(--text-tertiary);
+}
+
+/* === MAIN ROW (Content + Value) === */
+.sensor-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* === CONTENT COLUMN === */
+.sensor-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Row 1: Sensor name (editable) */
+.sensor-name-row {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sensor-name-row .sensor-name-edit {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-md);
+  color: var(--text-primary);
+  line-height: var(--line-height-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* Row 2: Type: hardware_id */
+.sensor-type-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  min-height: 16px;
+  overflow: hidden;
+  cursor: default;
+}
+
+.sensor-type-label {
+  font-weight: var(--font-weight-semibold);
+  text-transform: capitalize;
+  flex-shrink: 0;
+  /* Inherits font-size from parent */
+}
+
+.sensor-hardware-id {
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Inherits font-size from parent */
+}
+
+/* === VALUE COLUMN (Fixed 80px) === */
+.sensor-value-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 80px;
+  min-width: 80px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+/* Temperature display */
+.sensor-temperature {
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-lg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.sensor-temperature.temperature-normal {
+  color: var(--temp-normal-text);
+}
+
+.sensor-temperature.temperature-caution {
+  color: var(--temp-caution-text);
+}
+
+.sensor-temperature.temperature-warning {
+  color: var(--temp-warning-text);
+}
+
+.sensor-temperature.temperature-critical {
+  color: var(--temp-critical-text);
+}
+
+/* Status badge */
+.sensor-status-badge {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 6px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.sensor-status-badge.status-ok {
+  background: var(--temp-normal-bg);
+  color: var(--temp-normal-text);
+  border: 1px solid var(--temp-normal-border);
+}
+
+.sensor-status-badge.status-caution {
+  background: var(--temp-caution-bg);
+  color: var(--temp-caution-text);
+  border: 1px solid var(--temp-caution-border);
+}
+
+.sensor-status-badge.status-warning {
+  background: var(--temp-warning-bg);
+  color: var(--temp-warning-text);
+  border: 1px solid var(--temp-warning-border);
+}
+
+.sensor-status-badge.status-critical {
+  background: var(--temp-critical-bg);
+  color: var(--temp-critical-text);
+  border: 1px solid var(--temp-critical-border);
+}
+
+/* === SPARKLINE (Full card width) === */
+.sensor-sparkline-area {
+  width: 100%;
+  margin-top: var(--spacing-xs);
+}
+
+.sparkline-placeholder {
+  width: 100%;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--solid-dimmed);
+  overflow: hidden;
+}
+
+.sparkline-placeholder-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sparkline-placeholder-path {
+  stroke: var(--text-tertiary);
+  opacity: 0.4;
+}
+
+/* Sparkline on temperature backgrounds */
+.sensor-card.temperature-normal .sparkline-placeholder-path {
+  stroke: var(--temp-normal-border);
+}
+
+.sensor-card.temperature-caution .sparkline-placeholder-path {
+  stroke: var(--temp-caution-border);
+}
+
+.sensor-card.temperature-warning .sparkline-placeholder-path {
+  stroke: var(--temp-warning-border);
+}
+
+.sensor-card.temperature-critical .sparkline-placeholder-path {
+  stroke: var(--temp-critical-border);
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 480px) {
+  .sensor-value-column {
+    width: 70px;
+    min-width: 70px;
+  }
+
+  .sensor-temperature {
+    font-size: var(--font-size-md);
+  }
+}

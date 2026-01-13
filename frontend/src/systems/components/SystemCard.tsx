@@ -26,7 +26,7 @@ import {
   setFanSensor,
   getFanConfigurations,
 } from "../../services/fanConfigurationsApi";
-import { getSensorLabel, getChipDisplayName } from "../../config/sensorLabels";
+import { getChipDisplayName } from "../../config/sensorLabels";
 import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getAgentStatusColor } from "../../utils/statusColors";
@@ -34,6 +34,7 @@ import { formatTemperature } from "../../utils/formatters";
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
+import SensorItem from "./SensorItem";
 import { getOption, getValues, getLabel, getCleanLabel, interpolateTooltip, getDefault } from "../../utils/uiOptions";
 
 interface SystemCardProps {
@@ -1064,94 +1065,21 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           <div className="sensor-group-items">
                             {chipSensors.map((sensor: SensorReading) => {
                               const isHidden =
-                                isSensorHidden(sensor.id) || sensor.isHidden;
+                                isSensorHidden(sensor.id) || !!sensor.isHidden;
                               return (
-                                <div
+                                <SensorItem
                                   key={sensor.id}
-                                  className={`sensor-item temperature-${getTemperatureClass(
-                                    sensor.temperature,
-                                    sensor.maxTemp,
-                                    sensor.critTemp
-                                  )} ${isHidden ? "sensor-hidden" : ""}`}
-                                >
-                                  <div className="sensor-info">
-                                    <div className="sensor-header">
-                                      <div className="sensor-name">
-                                        <InlineEdit
-                                          value={getSensorDisplayName(
-                                            sensor.id,
-                                            sensor.name,
-                                            sensor.label
-                                          )}
-                                          hardwareId={sensor.id}
-                                          onSave={async (newLabel) => {
-                                            if (!sensor.dbId) {
-                                              throw new Error(
-                                                "Sensor not registered in database"
-                                              );
-                                            }
-                                            await updateSensorLabel(
-                                              system.id,
-                                              sensor.dbId,
-                                              newLabel
-                                            );
-                                            onUpdate();
-                                          }}
-                                          className="sensor-name-edit"
-                                        />
-                                      </div>
-                                      <div className="sensor-actions">
-                                        <span className="sensor-icon">
-                                          {getSensorIcon(sensor.type)}
-                                        </span>
-                                        <button
-                                          className="visibility-toggle"
-                                          onClick={() =>
-                                            handleToggleSensorVisibility(
-                                              sensor.id,
-                                              sensor.dbId
-                                            )
-                                          }
-                                          title={
-                                            isHidden
-                                              ? "Show sensor"
-                                              : "Hide sensor"
-                                          }
-                                        >
-                                          {isHidden ? "👁️‍🗨️" : "👁️"}
-                                        </button>
-                                      </div>
-                                    </div>
-                                    <span className="sensor-type">
-                                      {getSensorLabel(
-                                        deriveSensorGroupId(sensor)
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="sensor-reading">
-                                    <div className="temperature-display">
-                                      <span
-                                        className={`temperature temperature-${getTemperatureClass(
-                                          sensor.temperature,
-                                          sensor.maxTemp,
-                                          sensor.critTemp
-                                        )}`}
-                                      >
-                                        {formatTemperature(sensor.temperature)}
-                                      </span>
-                                      {sensor.maxTemp && (
-                                        <span className="temp-limit">
-                                          Max: {sensor.maxTemp}°C
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span
-                                      className={`status-indicator ${sensor.status}`}
-                                    >
-                                      {sensor.status}
-                                    </span>
-                                  </div>
-                                </div>
+                                  sensor={sensor}
+                                  systemId={system.id}
+                                  isHidden={isHidden}
+                                  onToggleVisibility={handleToggleSensorVisibility}
+                                  onLabelSave={async (sensorDbId, newLabel) => {
+                                    await updateSensorLabel(system.id, sensorDbId, newLabel);
+                                    onUpdate();
+                                  }}
+                                  getTemperatureClass={getTemperatureClass}
+                                  getSensorIcon={getSensorIcon}
+                                />
                               );
                             })}
                           </div>
