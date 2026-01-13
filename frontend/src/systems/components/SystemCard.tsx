@@ -98,15 +98,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
     isGroupHidden,
   } = useSensorVisibility();
 
-  // 24h Sensor History Hook (Lazy loaded on expansion)
-  const { history, fetchHistory } = useSensorHistory(system.id);
+  // 24h Sensor History Hook with real-time WebSocket updates
+  const { history, setExpanded: setHistoryExpanded } = useSensorHistory(system.id, system.agent_id);
 
-  // Trigger history fetch when sensors section is expanded
+  // Track sensor section expansion for history updates
   useEffect(() => {
-    if (expandedSensors) {
-      fetchHistory();
-    }
-  }, [expandedSensors, fetchHistory]);
+    setHistoryExpanded(expandedSensors);
+  }, [expandedSensors, setHistoryExpanded]);
 
   // Load fan profiles, assignments, and configurations on mount
   useEffect(() => {

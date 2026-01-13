@@ -302,6 +302,26 @@
   box-shadow: none;
 }
 
+/* Disabled preset buttons (exceeds license tier limit) */
+.scale-preset-btn.disabled,
+.scale-preset-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: var(--text-tertiary);
+}
+
+.scale-preset-btn.disabled:hover,
+.scale-preset-btn:disabled:hover {
+  background: transparent;
+  color: var(--text-tertiary);
+}
+
+/* Tier limit note in description */
+.tier-limit-note {
+  color: var(--color-warning);
+  font-style: italic;
+}
+
 .scale-custom-form {
   display: flex;
   align-items: center;

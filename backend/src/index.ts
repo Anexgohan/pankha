@@ -11,6 +11,7 @@ import { DataAggregator } from './services/DataAggregator';
 import { CommandDispatcher } from './services/CommandDispatcher';
 import { WebSocketHub } from './services/WebSocketHub';
 import { FanProfileController } from './services/FanProfileController';
+import { DownsamplingService } from './services/DownsamplingService';
 
 // Import routes
 import systemsRouter from './routes/systems';
@@ -33,6 +34,7 @@ let services: {
   commandDispatcher: CommandDispatcher;
   webSocketHub: WebSocketHub;
   fanProfileController: FanProfileController;
+  downsamplingService: DownsamplingService;
 } | null = null;
 
 async function initializeServices() {
@@ -70,6 +72,13 @@ async function initializeServices() {
 
     // Start Fan Profile Controller (loads interval from database)
     await fanProfileController.start();
+    
+    // Start Downsampling Service (Tier 2/3 data compression, runs daily at 03:00 UTC)
+    const downsamplingService = new DownsamplingService(
+      db.getPool(),
+      licenseManager
+    );
+    downsamplingService.start();
 
     // Note: Agents connect TO the backend, not vice versa
     log.info(' WebSocket server ready - waiting for agent connections...', 'index');
@@ -81,7 +90,8 @@ async function initializeServices() {
       dataAggregator,
       commandDispatcher,
       webSocketHub,
-      fanProfileController
+      fanProfileController,
+      downsamplingService
     };
 
     log.info(' All services initialized successfully', 'index');
@@ -199,6 +209,7 @@ process.on('SIGINT', async () => {
   if (services) {
     try {
       services.fanProfileController.stop(); // Stop fan controller first
+      services.downsamplingService.stop(); // Stop downsampling scheduler
       services.commandDispatcher.cleanup();
       services.dataAggregator.cleanup();
       services.agentManager.cleanup();

@@ -67,14 +67,20 @@ const Settings: React.FC = () => {
   const [pricing, setPricing] = useState<PricingData | null>(null);
 
   // General Settings from Context
-  const { graphScale, updateGraphScale, timezone } = useDashboardSettings();
+  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone } = useDashboardSettings();
   const [isCustomScale, setIsCustomScale] = useState(false);
   const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
+  const [isCustomRetention, setIsCustomRetention] = useState(false);
+  const [customRetentionInput, setCustomRetentionInput] = useState(dataRetentionDays.toString());
   
-  // Update custom input when global scale changes (e.g. from preset)
+  // Update custom inputs when global values change (e.g. from preset)
   useEffect(() => {
     setCustomScaleInput(graphScale.toString());
   }, [graphScale]);
+  
+  useEffect(() => {
+    setCustomRetentionInput(dataRetentionDays.toString());
+  }, [dataRetentionDays]);
 
   const scalePresets = [
     { label: '1h', value: 1 },
@@ -84,6 +90,23 @@ const Settings: React.FC = () => {
     { label: '3d', value: 72 },
     { label: '1w', value: 168 },
   ];
+  
+  /**
+   * Data Retention Presets
+   * Options: 1d, 7d, 30d, 90d, 365d
+   * Presets above license.retentionDays are disabled (grayed out)
+   * The max limit comes from the SST via license API (not hardcoded)
+   */
+  const retentionPresets = [
+    { label: '1d', value: 1 },
+    { label: '7d', value: 7 },
+    { label: '30d', value: 30 },
+    { label: '90d', value: 90 },
+    { label: '365d', value: 365 },
+  ];
+  
+  // Max retention allowed by license tier (from SST via API)
+  const maxRetentionDays = license?.retentionDays || 7;
   
   useEffect(() => {
     const fetchPricing = async () => {
@@ -103,6 +126,16 @@ const Settings: React.FC = () => {
     if (!isNaN(val) && val >= GRAPH_SCALE_MIN_HOURS && val <= GRAPH_SCALE_MAX_HOURS) {
       updateGraphScale(val);
       setIsCustomScale(false);
+    }
+  };
+
+  const handleCustomRetentionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseInt(customRetentionInput, 10);
+    // Enforce license tier limit
+    if (!isNaN(val) && val >= 1 && val <= maxRetentionDays) {
+      updateDataRetention(val);
+      setIsCustomRetention(false);
     }
   };
 
@@ -270,6 +303,66 @@ const Settings: React.FC = () => {
                         type="button" 
                         className="scale-cancel-btn"
                         onClick={() => setIsCustomScale(false)}
+                      >
+                        ✕
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+              
+              {/* Data Retention Days Setting
+                  Configurable within license tier limit.
+                  Options above license.retentionDays are disabled (from SST via API) */}
+              <div className="setting-item graph-scale-section">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Data Retention</span>
+                  <span className="setting-description">
+                    Configure how many days of historical data to keep.
+                    {maxRetentionDays < 365 && (
+                      <span className="tier-limit-note"> (Your tier allows up to {maxRetentionDays} days)</span>
+                    )}
+                  </span>
+                </div>
+                
+                <div className="scale-control-wrapper">
+                  {!isCustomRetention ? (
+                    <div className="scale-presets">
+                      {retentionPresets.map((preset) => (
+                        <button
+                          key={preset.value}
+                          className={`scale-preset-btn ${dataRetentionDays === preset.value ? 'active' : ''} ${preset.value > maxRetentionDays ? 'disabled' : ''}`}
+                          onClick={() => preset.value <= maxRetentionDays && updateDataRetention(preset.value)}
+                          disabled={preset.value > maxRetentionDays}
+                          title={preset.value > maxRetentionDays ? `Requires ${preset.value > 90 ? 'Enterprise' : preset.value > 30 ? 'Pro+' : 'Pro'} tier` : undefined}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                      <button 
+                        className={`scale-preset-btn custom ${!retentionPresets.some(p => p.value === dataRetentionDays) ? 'active' : ''}`}
+                        onClick={() => setIsCustomRetention(true)}
+                      >
+                        {retentionPresets.some(p => p.value === dataRetentionDays) ? 'Custom' : `${dataRetentionDays}d`}
+                      </button>
+                    </div>
+                  ) : (
+                    <form onSubmit={handleCustomRetentionSubmit} className="scale-custom-form">
+                      <input
+                        type="number"
+                        min={1}
+                        max={maxRetentionDays}
+                        autoFocus
+                        value={customRetentionInput}
+                        onChange={(e) => setCustomRetentionInput(e.target.value)}
+                        className="setting-input scale-input"
+                      />
+                      <span className="setting-unit">days (max {maxRetentionDays})</span>
+                      <button type="submit" className="scale-apply-btn">Apply</button>
+                      <button 
+                        type="button" 
+                        className="scale-cancel-btn"
+                        onClick={() => setIsCustomRetention(false)}
                       >
                         ✕
                       </button>

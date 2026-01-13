@@ -6,6 +6,41 @@ import { AgentManager } from "./AgentManager";
 import { log } from "../utils/logger";
 // Removed AgentCommunication import to prevent circular dependency
 
+/**
+ * Parse aggregation interval from environment variable.
+ * Supports formats: "30s" (seconds), "1m" or "5m" (minutes), or legacy numeric minutes "5".
+ * @returns Interval in milliseconds
+ */
+function parseAggregationInterval(value: string): number {
+  const trimmed = value.trim().toLowerCase();
+  
+  if (trimmed.endsWith('s')) {
+    const seconds = parseInt(trimmed.slice(0, -1), 10);
+    if (isNaN(seconds) || seconds < 10) {
+      log.warn(`Invalid aggregation interval "${value}", minimum is 10s. Using 60s.`, "DataAggregator");
+      return 60 * 1000;
+    }
+    return seconds * 1000;
+  }
+  
+  if (trimmed.endsWith('m')) {
+    const minutes = parseInt(trimmed.slice(0, -1), 10);
+    if (isNaN(minutes) || minutes < 1) {
+      log.warn(`Invalid aggregation interval "${value}". Using 1m.`, "DataAggregator");
+      return 60 * 1000;
+    }
+    return minutes * 60 * 1000;
+  }
+  
+  // Legacy: assume numeric value is minutes
+  const minutes = parseInt(trimmed, 10);
+  if (isNaN(minutes) || minutes < 1) {
+    log.warn(`Invalid aggregation interval "${value}". Using 5m (legacy default).`, "DataAggregator");
+    return 5 * 60 * 1000;
+  }
+  return minutes * 60 * 1000;
+}
+
 // Data buffer for aggregation
 interface DataPoint {
   temperature?: number;
@@ -31,7 +66,7 @@ export class DataAggregator extends EventEmitter {
   // Data aggregation system - raw data to dashboard, aggregated averages to DB
   private dataBuffer: Map<number, SystemDataBuffer> = new Map(); // system_id -> buffer
   private aggregationInterval: NodeJS.Timeout | null = null;
-  private aggregationIntervalMinutes: number; // Configurable via DATA_AGGREGATION_INTERVAL_MINUTES env var
+  private aggregationIntervalMs: number; // Configurable via DATA_AGGREGATION_INTERVAL env var
 
   private constructor() {
     super();
@@ -43,17 +78,24 @@ export class DataAggregator extends EventEmitter {
       process.env.DATA_RETENTION_DAYS || "30",
       10
     );
-    this.aggregationIntervalMinutes = parseInt(
-      process.env.DATA_AGGREGATION_INTERVAL_MINUTES || "5",
-      10
-    );
+    
+    // Parse aggregation interval (supports "30s", "1m", "5m", or legacy "5" for minutes)
+    const intervalEnv = process.env.DATA_AGGREGATION_INTERVAL || 
+                        process.env.DATA_AGGREGATION_INTERVAL_MINUTES || 
+                        "1m";
+    this.aggregationIntervalMs = parseAggregationInterval(intervalEnv);
+
+    // Format interval for display
+    const intervalDisplay = this.aggregationIntervalMs >= 60000 
+      ? `${this.aggregationIntervalMs / 60000}m` 
+      : `${this.aggregationIntervalMs / 1000}s`;
 
     log.info(
       `[DataAggregator] Configuration:
   - Retention: ${this.dataRetentionDays} days
-  - Aggregation interval: ${this.aggregationIntervalMinutes} minutes
+  - Aggregation interval: ${intervalDisplay} (${this.aggregationIntervalMs}ms)
   - Raw data: Sent to dashboard in real-time
-  - Stored data: ${this.aggregationIntervalMinutes}-minute averages only`,
+  - Stored data: ${intervalDisplay} averages only`,
       "DataAggregator"
     );
 
@@ -325,14 +367,17 @@ export class DataAggregator extends EventEmitter {
    * Flushes buffered data points as averages to database
    */
   private startDataAggregation(): void {
-    const intervalMs = this.aggregationIntervalMinutes * 60 * 1000;
-
     this.aggregationInterval = setInterval(() => {
       this.flushAggregatedData();
-    }, intervalMs);
+    }, this.aggregationIntervalMs);
+
+    // Format interval for display
+    const intervalDisplay = this.aggregationIntervalMs >= 60000 
+      ? `${this.aggregationIntervalMs / 60000}m` 
+      : `${this.aggregationIntervalMs / 1000}s`;
 
     log.info(
-      `[DataAggregator] Started periodic aggregation: ${this.aggregationIntervalMinutes}-minute intervals`,
+      `[DataAggregator] Started periodic aggregation: ${intervalDisplay} intervals`,
       "DataAggregator"
     );
   }
