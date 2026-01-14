@@ -8,24 +8,33 @@ export class Database {
   private static instance: Database;
 
   private constructor() {
-    // Support for local development: if POSTGRES_HOST is set, construct DATABASE_URL
-    // This allows `npm run dev` to override just the hostname (localhost vs pankha-postgres)
-    let databaseUrl = process.env.DATABASE_URL;
+    // Priority: Construct URL from individual env vars with URL-encoding (supports special chars)
+    // Fallback: Use raw DATABASE_URL only if individual vars not available
+    let databaseUrl: string | undefined;
 
-    if (process.env.POSTGRES_HOST) {
-      // Local dev mode: construct URL from individual vars
-      const host = process.env.POSTGRES_HOST;
-      const port = process.env.POSTGRES_PORT || '5432';
-      const user = process.env.POSTGRES_USER || 'pankha_user';
-      const password = process.env.POSTGRES_PASSWORD || 'pankha_password';
-      const db = process.env.POSTGRES_DB || 'db_pankha';
-      databaseUrl = `postgresql://${user}:${password}@${host}:${port}/${db}`;
+    // Check if we have individual PostgreSQL environment variables
+    const host = process.env.POSTGRES_HOST;
+    const port = process.env.POSTGRES_PORT || '5432';
+    const user = process.env.POSTGRES_USER;
+    const password = process.env.POSTGRES_PASSWORD;
+    const db = process.env.POSTGRES_DB;
+
+    if (host && user && password && db) {
+      // Construct URL from individual vars with URL-encoding for special character support
+      // This handles passwords containing # @ % : and other reserved URL characters
+      const encodedUser = encodeURIComponent(user);
+      const encodedPassword = encodeURIComponent(password);
+      databaseUrl = `postgresql://${encodedUser}:${encodedPassword}@${host}:${port}/${db}`;
       log.info(`Using constructed DATABASE_URL with host: ${host}`, 'Database');
+    } else if (process.env.DATABASE_URL) {
+      // Fallback: use raw DATABASE_URL (user must ensure special chars are pre-encoded)
+      databaseUrl = process.env.DATABASE_URL;
+      log.info('Using raw DATABASE_URL from environment', 'Database');
     }
 
     if (!databaseUrl) {
       throw new Error(
-        'DATABASE_URL environment variable is required for PostgreSQL connection'
+        'Database connection requires either POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB or DATABASE_URL'
       );
     }
 

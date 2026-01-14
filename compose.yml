@@ -15,11 +15,8 @@ services:
       - "${PANKHA_PORT:-3000}:3000" # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
       - "${WS_PORT:-3002}:3002" # WebSocket server for frontend (host:container) (change left side only, set to your desired port, or set WS_PORT environment variable)
     environment:
+      # Timezone: set TIMEZONE in .env (list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
       - TZ=${TIMEZONE:-UTC}
-      - DATABASE_URL=${DATABASE_URL}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     env_file:
       - .env
     healthcheck:
