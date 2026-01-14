@@ -88,6 +88,17 @@ export interface HistoryDataPoint {
   sensor_type?: string;
   fan_name?: string;
   fan_label?: string;
+  /** Gap marker - present on point AFTER a gap (injected during processing) */
+  gapBefore?: GapInfo;
+}
+
+/** Gap metadata for visualization */
+export interface GapInfo {
+  startTime: string;    // ISO timestamp of last point before gap
+  endTime: string;      // ISO timestamp of first point after gap
+  durationMs: number;   // Gap duration in milliseconds
+  startValue: number;   // Y value at gap start (for constrained rect height)
+  endValue: number;     // Y value at gap end
 }
 
 export interface SensorHistory {

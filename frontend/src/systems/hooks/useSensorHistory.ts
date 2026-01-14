@@ -1,8 +1,85 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { getSensorHistory } from '../../services/api';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
-import type { HistoryDataPoint, SensorHistory, SensorReading } from '../../types/api';
+import type { HistoryDataPoint, SensorHistory, SensorReading, GapInfo } from '../../types/api';
 import WebSocketService from '../../services/websocket';
+
+// Gap detection thresholds by graph scale (in ms)
+// Used as fallback when data is too sparse to calculate adaptive threshold
+const SCALE_THRESHOLDS: Record<number, number> = {
+  1:   3 * 60 * 1000,    // 1h view → 3 min threshold
+  6:   5 * 60 * 1000,    // 6h view → 5 min threshold
+  24:  10 * 60 * 1000,   // 24h view → 10 min threshold
+  168: 30 * 60 * 1000,   // 7d view → 30 min threshold
+  720: 90 * 60 * 1000,   // 30d view → 90 min threshold
+};
+const MIN_GAP_THRESHOLD_MS = 3 * 60 * 1000; // Minimum 3 minutes to be considered a gap
+const GAP_THRESHOLD_MULTIPLIER = 3; // A gap is 3x the expected interval
+
+/**
+ * Detect gaps in sensor data and mark points that follow a gap.
+ * O(n) single pass algorithm.
+ * 
+ * @param points - Array of data points sorted by timestamp
+ * @param graphScale - Current graph scale in hours (for fallback threshold)
+ * @returns Points with gapBefore metadata where applicable
+ */
+function detectAndMarkGaps(
+  points: HistoryDataPoint[],
+  graphScale: number
+): HistoryDataPoint[] {
+  if (points.length < 2) return points;
+
+  // Calculate median interval from first 10 points for adaptive threshold
+  const intervals: number[] = [];
+  const sampleSize = Math.min(10, points.length - 1);
+  
+  for (let i = 1; i <= sampleSize; i++) {
+    const prevTime = new Date(points[i - 1].timestamp).getTime();
+    const currTime = new Date(points[i].timestamp).getTime();
+    intervals.push(currTime - prevTime);
+  }
+
+  // Sort and get median
+  intervals.sort((a, b) => a - b);
+  const medianInterval = intervals[Math.floor(intervals.length / 2)] || 60000;
+
+  // Calculate threshold: use adaptive if enough data, otherwise fallback to scale-based
+  const adaptiveThreshold = Math.max(
+    medianInterval * GAP_THRESHOLD_MULTIPLIER,
+    MIN_GAP_THRESHOLD_MS
+  );
+  const threshold = points.length > 10
+    ? adaptiveThreshold
+    : (SCALE_THRESHOLDS[graphScale] ?? MIN_GAP_THRESHOLD_MS);
+
+  // Single pass: mark gaps
+  const result: HistoryDataPoint[] = [points[0]];
+
+  for (let i = 1; i < points.length; i++) {
+    const prevPoint = points[i - 1];
+    const currPoint = points[i];
+    const prevTime = new Date(prevPoint.timestamp).getTime();
+    const currTime = new Date(currPoint.timestamp).getTime();
+    const delta = currTime - prevTime;
+
+    if (delta > threshold) {
+      // Gap detected - mark this point
+      const gapInfo: GapInfo = {
+        startTime: prevPoint.timestamp,
+        endTime: currPoint.timestamp,
+        durationMs: delta,
+        startValue: prevPoint.temperature ?? prevPoint.fan_speed ?? 0,
+        endValue: currPoint.temperature ?? currPoint.fan_speed ?? 0,
+      };
+      result.push({ ...currPoint, gapBefore: gapInfo });
+    } else {
+      result.push(currPoint);
+    }
+  }
+
+  return result;
+}
 
 /** API response shape for history endpoint */
 interface HistoryApiResponse {
@@ -203,7 +280,7 @@ export const useSensorHistory = (systemId: number, agentId?: string) => {
     }
   }, [graphScale, fetchHistory]);
 
-  // Merge DB history with live buffer
+  // Merge DB history with live buffer, then detect gaps
   // Live buffer takes precedence for recent data (last 15 min)
   const mergedHistory = useMemo(() => {
     const merged: SensorHistory = {};
@@ -216,12 +293,14 @@ export const useSensorHistory = (systemId: number, agentId?: string) => {
       const dbPoints = dbHistory[sensorName] || [];
       const livePoints = liveBuffer[sensorName] || [];
       
+      let combinedPoints: HistoryDataPoint[];
+      
       if (livePoints.length === 0) {
         // No live data, use DB only
-        merged[sensorName] = dbPoints;
+        combinedPoints = dbPoints;
       } else if (dbPoints.length === 0) {
         // No DB data, use live only
-        merged[sensorName] = livePoints;
+        combinedPoints = livePoints;
       } else {
         // Get the oldest live point timestamp to know where to cut DB data
         const oldestLiveTime = new Date(livePoints[0].timestamp).getTime();
@@ -232,12 +311,15 @@ export const useSensorHistory = (systemId: number, agentId?: string) => {
         );
         
         // Merge: DB points (older) + Live points (recent)
-        merged[sensorName] = [...filteredDbPoints, ...livePoints];
+        combinedPoints = [...filteredDbPoints, ...livePoints];
       }
+      
+      // Detect and mark gaps in the combined data
+      merged[sensorName] = detectAndMarkGaps(combinedPoints, graphScale);
     }
 
     return merged;
-  }, [dbHistory, liveBuffer]);
+  }, [dbHistory, liveBuffer, graphScale]);
 
   return {
     history: mergedHistory,
