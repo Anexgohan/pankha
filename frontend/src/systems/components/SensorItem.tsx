@@ -46,7 +46,7 @@ const SensorItem: React.FC<SensorItemProps> = ({
           title={isHidden ? "Show sensor" : "Hide sensor"}
           aria-label={isHidden ? "Show sensor" : "Hide sensor"}
         >
-          {isHidden ? "🚫" : "🟢"}
+          {isHidden ? "👁️‍🗨️" : "👁️"}
         </button>
       </div>
 
