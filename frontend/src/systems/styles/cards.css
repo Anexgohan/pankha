@@ -162,6 +162,15 @@
   font-size: var(--font-size-base);
 }
 
+/* Agent settings section (Fan Control, Emergency Temp, etc.) */
+.system-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-base);
+  margin-top: var(--spacing-md);
+}
+
 .info-row {
   display: flex;
   flex-wrap: wrap;

@@ -49,7 +49,7 @@
   justify-content: flex-start;
   gap: var(--spacing-xs);
   min-width: 32px;
-  padding: var(--spacing-xs);
+  padding-left: 4px;
 }
 
 .rack-icon {
@@ -58,8 +58,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.1rem;
-  background: var(--bg-tertiary);
+  font-size: var(--font-size-md);
+  background: transparent;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
@@ -70,10 +71,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.9rem;
+  font-size: var(--font-size-sm2);
   background: transparent;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-sm2);
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
   flex-shrink: 0;
