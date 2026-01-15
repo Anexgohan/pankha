@@ -4,6 +4,8 @@
 
 :root {
   /* Spacing Scale (8px base) */
+  --spacing-sss: 1px;
+  --spacing-xss: 2px;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 12px;

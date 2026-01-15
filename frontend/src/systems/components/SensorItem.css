@@ -47,9 +47,12 @@
   flex-wrap: wrap-reverse;
   align-content: flex-end;
   justify-content: flex-start;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-xss);
   min-width: 32px;
-  padding-left: 4px;
+  padding-left: 3px;
+  margin-left: -6px;
+  /* border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); */
 }
 
 .rack-icon {
@@ -65,6 +68,12 @@
   flex-shrink: 0;
 }
 
+.rack-icon:hover {
+  background: transparent;
+  border-color: var(--border-color);
+  transform: translateX(-2px);
+}
+
 .rack-visibility {
   width: 28px;
   height: 28px;
@@ -73,23 +82,24 @@
   justify-content: center;
   font-size: var(--font-size-sm2);
   background: transparent;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm2);
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
   padding: 0;
   color: var(--text-primary);
 }
 
 .rack-visibility:hover {
-  background: var(--bg-hover);
-  border-color: var(--color-primary);
+  background: transparent;
+  border-color: var(--border-color);
+  transform: translateX(-2px);
 }
 
 .rack-visibility:focus {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+  outline: transparent;
+  /* outline-offset: 1px; */
 }
 
 /* === CARD (Main sensor display) === */

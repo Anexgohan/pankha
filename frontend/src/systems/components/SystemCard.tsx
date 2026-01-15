@@ -297,14 +297,15 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const getSensorIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case "cpu":
-        return "🖥️";
+        return <img src="/icons/processor-01.png" width={20} height={20} title="Processor" alt="Processor" />;
       case "gpu":
-        return "📟";
+        // return <img src="/icons/vga-card-01.png" width={28} height={28} title="GPU" alt="GPU" />;
+        return <img src="/icons/video-card-01.png" width={20} height={20} title="GPU" alt="GPU" />;
       case "motherboard":
-        return "🔌";
+        return <img src="/icons/motherboard-01.png" width={20} height={20} title="Motherboard" alt="Motherboard" />;
       case "nvme":
       case "storage":
-        return "💾";
+        return <img src="/icons/hdd-01.png" width={20} height={20} title="Storage" alt="Storage" />;
       case "acpi":
         return "🌡️";
       default:
@@ -980,7 +981,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   : "Show hidden sensors"
               }
             >
-              {showHiddenSensors ? "👁️ Hide" : "👁️‍🗨️ Show"}
+              {showHiddenSensors ? "Hide" : "Show"}
             </button>
           )}
 
@@ -1053,7 +1054,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                     : "Hide group"
                                 }
                               >
-                                {isGroupHiddenState ? "👁️‍🗨️" : "👁️"}
+                                {/* {isGroupHiddenState ? "👁️🗨️" : "👁️"} */}
+                                {isGroupHiddenState ? (
+                                  <img src="/icons/toggle-off-01.png" width={20} height={20} title="Hidden" alt="Hidden" style={{ opacity: 0.75 }} />
+                                ) : (
+                                  <img src="/icons/toggle-on-01.png" width={20} height={20} title="Visible" alt="Visible" style={{ opacity: 0.90 }} />
+                                )}
                               </button>
                               <span className="sensor-count">
                                 {chipSensors.length} sensor

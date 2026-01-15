@@ -14,7 +14,7 @@ interface SensorItemProps {
   onToggleVisibility: (sensorId: string, sensorDbId?: number) => void;
   onLabelSave: (sensorDbId: number, newLabel: string) => Promise<void>;
   getTemperatureClass: (temp: number, maxTemp?: number, critTemp?: number) => string;
-  getSensorIcon: (type: string) => string;
+  getSensorIcon: (type: string) => React.ReactNode;
 }
 
 const SensorItem: React.FC<SensorItemProps> = ({
@@ -46,7 +46,12 @@ const SensorItem: React.FC<SensorItemProps> = ({
           title={isHidden ? "Show sensor" : "Hide sensor"}
           aria-label={isHidden ? "Show sensor" : "Hide sensor"}
         >
-          {isHidden ? "👁️‍🗨️" : "👁️"}
+          {/* {isHidden ? "🚫" : "🟢"} */}
+          {isHidden ? (
+            <img src="/icons/toggle-off-01.png" width={20} height={20} title="Hidden" alt="Hidden" style={{ opacity: 0.65 }} />
+          ) : (
+            <img src="/icons/toggle-on-01.png" width={20} height={20} title="Visible" alt="Visible" style={{ opacity: 0.75 }}/>
+          )}
         </button>
       </div>
 
