@@ -14,6 +14,7 @@
   box-shadow: var(--shadow);
   padding: var(--spacing-xl);
   transition: box-shadow 0.3s ease, background-color 0.3s ease;
+  position: relative; /* For absolute positioned delete button */
 }
 
 /* Stat Cards */
@@ -83,6 +84,10 @@
   justify-content: center;
 }
 
+.system-card {
+  padding: var(--spacing-lg);
+}
+
 .systems-grid .system-card {
   flex: 0 0 360px;
   max-width: 360px;
@@ -101,17 +106,53 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--spacing-md);
+  gap: var(--spacing-sm);
 }
 
 .title-left {
   display: flex;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--spacing-sm);
+  flex: 1;
+  min-width: 0; /* Enable flex child truncation */
+  overflow: hidden;
 }
 
 .system-title h3 {
   color: var(--text-primary);
   margin: 0;
+  flex: 1;
+  min-width: 0; /* Enable truncation */
+  overflow: hidden;
+  font-size: var(--font-size-lg);
+}
+
+/* Agent name truncation */
+.system-title h3 .agent-name-edit {
+  width: 100%;
+}
+
+.system-title h3 .agent-name-edit .inline-edit-value {
+  padding: var(--spacing-xs); /* Reduced padding for more name space */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* Status badge fixed width */
+.title-left .status-badge {
+  flex-shrink: 0;
+  min-width: 80px; /* Fits "Connecting" (widest value) */
+  text-align: center;
+}
+
+/* Delete button positioned at card top-right corner */
+.system-title .delete-button {
+  /* position: absolute; */
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  flex-shrink: 0;
 }
 
 .system-info {
