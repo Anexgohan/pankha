@@ -1,8 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import {
+  VolumeX,
+  Scale,
+  Rocket,
+  Settings,
+  Plus,
+  FileUp,
+  Copy,
+  Trash2,
+  Edit3,
+  Library,
+  Box,
+  LayoutGrid,
+  CheckSquare
+} from 'lucide-react';
+import {
   getFanProfiles,
   getFanProfileStats,
-  deleteFanProfile
+  deleteFanProfile,
+  downloadFanProfilesExport
 } from '../../services/fanProfilesApi';
 import type {
   FanProfile,
@@ -91,6 +107,18 @@ const FanProfileManager: React.FC = () => {
     }
   };
 
+  const handleExportSingle = async (profileId: number) => {
+    try {
+      await downloadFanProfilesExport({
+        profile_ids: [profileId],
+        include_system_profiles: true
+      });
+      toast.success('Profile exported successfully');
+    } catch (err) {
+      toast.error('Export failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  };
+
   const handleCloseEditor = () => {
     setShowEditor(false);
     setSelectedProfile(null);
@@ -104,11 +132,11 @@ const FanProfileManager: React.FC = () => {
 
   const getProfileTypeIcon = (type: string) => {
     switch (type) {
-      case 'silent': return '🔇';
-      case 'balanced': return '⚖️';
-      case 'performance': return '🚀';
-      case 'custom': return '⚙️';
-      default: return '📊';
+      case 'silent': return <VolumeX size={18} />;
+      case 'balanced': return <Scale size={18} />;
+      case 'performance': return <Rocket size={18} />;
+      case 'custom': return <Settings size={18} />;
+      default: return <Box size={18} />;
     }
   };
 
@@ -159,16 +187,19 @@ const FanProfileManager: React.FC = () => {
             onClick={() => setShowSelectionCheckboxes(!showSelectionCheckboxes)}
             className={`selection-toggle-button ${showSelectionCheckboxes ? 'active' : ''}`}
           >
-            {showSelectionCheckboxes ? '✅ Selection Mode' : '☑️ Select Profiles'}
+            {showSelectionCheckboxes ? <CheckSquare size={16} /> : <LayoutGrid size={16} />}
+            <span>{showSelectionCheckboxes ? 'Selection Mode' : 'Select Profiles'}</span>
           </button>
           <button
             onClick={() => setShowImportExport(!showImportExport)}
             className={`import-export-button ${showImportExport ? 'active' : ''}`}
           >
-            📁 Import & Export
+            <Library size={16} />
+            <span>Import & Export</span>
           </button>
           <button onClick={handleCreateProfile} className="create-profile-button">
-            ➕ Create New Profile
+            <Plus size={16} />
+            <span>Create New Profile</span>
           </button>
         </div>
       </div>
@@ -228,25 +259,32 @@ const FanProfileManager: React.FC = () => {
               </div>
               <div className="profile-actions">
                 <button
+                  onClick={() => handleExportSingle(profile.id)}
+                  className="action-button export-button"
+                  title="Export profile"
+                >
+                  <FileUp size={16} />
+                </button>
+                <button
                   onClick={() => handleEditProfile(profile)}
                   className="action-button edit-button"
                   title="Edit profile"
                 >
-                  ✏️
+                  <Edit3 size={16} />
                 </button>
                 <button
                   onClick={() => handleDuplicateProfile(profile)}
                   className="action-button duplicate-button"
                   title="Duplicate profile"
                 >
-                  📋
+                  <Copy size={16} />
                 </button>
                 <button
                   onClick={() => handleDeleteProfile(profile.id)}
                   className="action-button delete-button"
                   title="Delete profile"
                 >
-                  ❌
+                  <Trash2 size={16} />
                 </button>
               </div>
             </div>
@@ -295,7 +333,8 @@ const FanProfileManager: React.FC = () => {
             <h3>No Fan Profiles Found</h3>
             <p>Create your first fan profile to get started with automatic temperature-based fan control.</p>
             <button onClick={handleCreateProfile} className="create-first-profile-button">
-              ➕ Create Your First Profile
+              <Plus size={18} />
+              <span>Create Your First Profile</span>
             </button>
           </div>
         )}

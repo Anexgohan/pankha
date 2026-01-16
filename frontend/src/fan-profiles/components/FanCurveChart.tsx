@@ -552,29 +552,33 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
         )}
       </svg>
       
-      <div className="curve-info-strip">
-        <div className="range-strip">
-          <span className="strip-item">
-            <span className="item-label">TEMP:</span> {minTemp}-{maxTemp}°C
-          </span>
-          <span className="strip-item">
-            <span className="item-label">SPEED:</span> {minSpeed}-{maxSpeed}%
-          </span>
-          <span className="strip-item">
-            <span className="item-label">POINTS:</span> {sortedPoints.length}
-          </span>
-          <span className="strip-item">
-            <span className="item-label">LINKS:</span> {assignmentsCount}
-          </span>
-          <span className="strip-item active-range">
-            <span className="item-label">ACTIVE:</span> {Math.min(...sortedPoints.map(p => p.temperature))}°-{Math.max(...sortedPoints.map(p => p.temperature))}°
-          </span>
-        </div>
-        {interactive && (
-          <div className="curve-pro-tip">
-            Drag to adjust • Double-click to add • Right-click to remove
+      <div className="curve-info-strip-tactical">
+        <div className="range-box">
+          <div className="range-item">
+            <span className="range-label">TEMP:</span>
+            <span className="range-value">{minTemp}-{maxTemp}°C</span>
           </div>
-        )}
+          <div className="range-item">
+            <span className="range-label">SPEED:</span>
+            <span className="range-value">{minSpeed}-{maxSpeed}%</span>
+          </div>
+          <div className="range-item">
+            <span className="range-label">POINTS:</span>
+            <span className="range-value">{sortedPoints.length}</span>
+          </div>
+          <div className="range-item">
+            <span className="range-label">LINKS:</span>
+            <span className="range-value">{assignmentsCount}</span>
+          </div>
+          <div className="range-item">
+            <span className="range-label">ACTIVE:</span>
+            <span className="range-value">
+              {sortedPoints.length > 0 
+                ? `${Math.min(...sortedPoints.map(p => p.temperature))}°-${Math.max(...sortedPoints.map(p => p.temperature))}°`
+                : 'N/A'}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

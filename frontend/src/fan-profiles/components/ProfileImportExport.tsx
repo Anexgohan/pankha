@@ -6,10 +6,19 @@ import {
   loadDefaultProfiles
 } from '../../services/fanProfilesApi';
 import type {
-  ImportFanProfilesRequest,
   ImportResult,
   DefaultProfileInfo
 } from '../../services/fanProfilesApi';
+import {
+  FileDown,
+  RefreshCw,
+  FileJson,
+  CheckCircle2,
+  SkipForward,
+  AlertCircle,
+  X,
+  Plus
+} from 'lucide-react';
 import { getImportStatusColor } from '../../utils/statusColors';
 import { toast } from '../../utils/toast';
 
@@ -42,7 +51,6 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
     try {
       const defaults = await getDefaultProfiles();
       setDefaultProfiles(defaults);
-      // Pre-select profiles that don't exist yet
       const notExisting = defaults.filter(p => !p.exists_in_db).map(p => p.profile_name);
       setSelectedDefaults(new Set(notExisting));
     } catch (error) {
@@ -55,6 +63,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
     try {
       setIsExporting(true);
       await downloadFanProfilesExport({ include_system_profiles: true });
+      toast.success('All profiles exported successfully');
     } catch (error) {
       console.error('Export failed:', error);
       toast.error('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -65,11 +74,11 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
 
   const handleExportSelected = async () => {
     try {
-      const selectedProfileIds = Array.from(document.querySelectorAll('input[name="profile-select"]:checked'))
+      const selectedProfileIds = Array.from(document.querySelectorAll('.profile-select-checkbox:checked'))
         .map((checkbox) => parseInt((checkbox as HTMLInputElement).value));
 
       if (selectedProfileIds.length === 0) {
-        toast.error('Please select at least one profile to export');
+        toast.error('Please select at least one profile using checkboxes');
         return;
       }
 
@@ -78,6 +87,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
         profile_ids: selectedProfileIds,
         include_system_profiles: true
       });
+      toast.success(`${selectedProfileIds.length} profiles exported`);
     } catch (error) {
       console.error('Export failed:', error);
       toast.error('Export failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -96,6 +106,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       if (result.imported_count > 0) {
         onImportComplete();
       }
+      toast.success('System default profiles restored');
     } catch (error) {
       console.error('Restore defaults failed:', error);
       toast.error('Restore defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -121,6 +132,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       if (result.imported_count > 0) {
         onImportComplete();
       }
+      toast.success(`${result.imported_count} default profiles loaded`);
     } catch (error) {
       console.error('Load defaults failed:', error);
       toast.error('Load defaults failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
@@ -130,7 +142,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
   };
 
   const toggleDefaultSelection = (profileName: string) => {
-    setSelectedDefaults(prev => {
+    setSelectedDefaults((prev: Set<string>) => {
       const newSet = new Set(prev);
       if (newSet.has(profileName)) {
         newSet.delete(profileName);
@@ -150,302 +162,215 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       try {
         const content = e.target?.result as string;
         const data = JSON.parse(content);
-
-        // Validate the file format
         if (!data.format || data.format !== 'pankha-fan-profiles') {
-          throw new Error('Invalid file format. Expected Pankha fan profiles export.');
+          throw new Error('Invalid file format: Expected Pankha fan profiles export.');
         }
-
-        if (!data.profiles || !Array.isArray(data.profiles)) {
-          throw new Error('Invalid file format. Expected profiles array.');
-        }
-
         processImport(data.profiles);
       } catch (error) {
-        console.error('File processing error:', error);
-        toast.error('Failed to process file: ' + (error instanceof Error ? error.message : 'Invalid file format'));
+        toast.error('Failed to process file: ' + (error instanceof Error ? error.message : 'Invalid JSON format'));
       }
     };
     reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const processImport = async (profilesToImport: any[]) => {
     try {
       setImportResult(null);
-
-      const request: ImportFanProfilesRequest = {
+      const result = await importFanProfiles({
         profiles: profilesToImport,
         resolve_conflicts: resolveConflicts,
         make_global: makeGlobal
-      };
-
-      const result = await importFanProfiles(request);
+      });
       setImportResult(result);
-
       if (result.success && result.imported_count > 0) {
         onImportComplete();
       }
     } catch (error) {
-      console.error('Import failed:', error);
       toast.error('Import failed: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'imported': return '✅';
-      case 'skipped': return '⏭️';
-      case 'error': return '❌';
-      default: return '❓';
+      case 'imported': return <CheckCircle2 size={14} />;
+      case 'skipped': return <SkipForward size={14} />;
+      case 'error': return <AlertCircle size={14} />;
+      default: return null;
     }
   };
 
   return (
-    <div className="profile-import-export">
+    <div className="profile-import-export glass-panel">
       <div className="import-export-header">
-        <h3>Import & Export Profiles</h3>
-        <p>Share your fan profiles between systems or create backups</p>
+        <h3>Management Console</h3>
+        <p>System-wide profile orchestration and library synchronization</p>
       </div>
 
       <div className="import-export-actions">
-        <div className="action-row">
-          <button
-            onClick={handleExportAll}
-            disabled={isExporting}
-            className="export-button all-button"
-          >
-            {isExporting ? '⏳ Exporting...' : '📤 Export All Profiles'}
-          </button>
-          <button
-            onClick={handleRestoreAllDefaults}
-            disabled={isLoadingDefaults}
-            className="default-button restore-all-button"
-          >
-            {isLoadingDefaults ? '⏳ Loading...' : '🔄 Restore All Defaults'}
-          </button>
-          <button
-            onClick={() => setShowImportDialog(true)}
-            className="import-button"
-          >
-            📥 Import Profiles from File
-          </button>
+        <div className="management-grid">
+          {/* Section: Data Portability */}
+          <div className="management-section">
+            <h4 className="section-label">Data Portability</h4>
+            <div className="button-group">
+              <button
+                onClick={handleExportAll}
+                disabled={isExporting}
+                className="action-pill primary"
+              >
+                {isExporting ? <RefreshCw size={16} className="spin" /> : <FileDown size={16} />}
+                <span>{isExporting ? 'Exporting...' : 'Export All Profiles'}</span>
+              </button>
+              <button
+                onClick={handleExportSelected}
+                disabled={isExporting}
+                className="action-pill"
+              >
+                {isExporting ? <RefreshCw size={16} className="spin" /> : <Plus size={16} />}
+                <span>{isExporting ? 'Exporting...' : 'Export Selected'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section: Library Initialization */}
+          <div className="management-section">
+            <h4 className="section-label">Library Initialization</h4>
+            <div className="button-group">
+              <button
+                onClick={handleRestoreAllDefaults}
+                disabled={isLoadingDefaults}
+                className="action-pill highlight"
+              >
+                {isLoadingDefaults ? <RefreshCw size={16} className="spin" /> : <RefreshCw size={16} />}
+                <span>{isLoadingDefaults ? 'Loading...' : 'Restore All Defaults'}</span>
+              </button>
+              <button
+                onClick={() => setShowDefaultsDialog(true)}
+                className="action-pill"
+              >
+                <Plus size={16} />
+                <span>Load Default Profiles...</span>
+              </button>
+              <button
+                onClick={() => setShowImportDialog(true)}
+                className="action-pill"
+              >
+                <FileJson size={16} />
+                <span>Import From File...</span>
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="action-row">
-          <button
-            onClick={handleExportSelected}
-            disabled={isExporting}
-            className="export-button selected-button"
-          >
-            {isExporting ? '⏳ Exporting...' : '📤 Export Selected'}
-          </button>
-          <button
-            onClick={() => setShowDefaultsDialog(true)}
-            className="default-button load-defaults-button"
-          >
-            📋 Load Default Profiles
-          </button>
-        </div>
+        
         <p className="action-hint">
-          💡 Select profiles using checkboxes on the cards, then export selected. Use defaults buttons to restore factory profiles.
+          <b>Note:</b> Selection-based export requires choosing profiles via checkboxes on the library cards.
         </p>
       </div>
 
-      {/* Load Defaults Dialog */}
+      {/* Defaults Library Dialog */}
       {showDefaultsDialog && (
-        <div className="import-dialog-overlay">
-          <div className="import-dialog">
+        <div className="standard-dialog-overlay">
+          <div className="standard-dialog">
             <div className="dialog-header">
-              <h3>Load Default Profiles</h3>
-              <button
-                onClick={() => setShowDefaultsDialog(false)}
-                className="close-button"
-              >
-                ✕
-              </button>
+              <h3>System Defaults Library</h3>
+              <button onClick={() => setShowDefaultsDialog(false)} className="close-btn"><X size={18} /></button>
             </div>
-
             <div className="dialog-content">
-              <p className="dialog-description">
-                Select which default profiles to load. Profiles already in your library are marked.
-              </p>
-              
               <div className="defaults-list">
-                {defaultProfiles.map((profile) => (
-                  <div key={profile.profile_name} className="default-profile-item">
-                    <label className="default-profile-label">
+                {defaultProfiles.map((profile: DefaultProfileInfo) => (
+                  <div key={profile.profile_name} className="default-item">
+                    <label className="checkbox-wrap">
                       <input
                         type="checkbox"
                         checked={selectedDefaults.has(profile.profile_name)}
                         onChange={() => toggleDefaultSelection(profile.profile_name)}
                       />
-                      <span className="profile-info">
+                      <div className="item-meta">
                         <span className="profile-name">{profile.profile_name}</span>
-                        {profile.exists_in_db && (
-                          <span className="exists-badge">Already exists</span>
-                        )}
-                      </span>
+                        {profile.exists_in_db && <span className="status-tag">In Library</span>}
+                        {profile.description && <p className="desc">{profile.description}</p>}
+                      </div>
                     </label>
-                    {profile.description && (
-                      <p className="profile-description">{profile.description}</p>
-                    )}
                   </div>
                 ))}
               </div>
-
-              <div className="import-options">
-                <div className="option-group">
-                  <label>If profile already exists:</label>
-                  <select
-                    value={defaultResolveConflicts}
-                    onChange={(e) => setDefaultResolveConflicts(e.target.value as any)}
-                  >
-                    <option value="skip">Skip (don't import)</option>
-                    <option value="rename">Rename (add suffix)</option>
-                    <option value="overwrite">Overwrite (replace existing)</option>
-                  </select>
-                </div>
+              <div className="dialog-options">
+                <label>Conflict Resolution Strategy:</label>
+                <select value={defaultResolveConflicts} onChange={(e) => setDefaultResolveConflicts(e.target.value as any)}>
+                  <option value="skip">Keep Existing (Skip)</option>
+                  <option value="rename">Keep Both (Rename)</option>
+                  <option value="overwrite">Replace Existing (Overwrite)</option>
+                </select>
               </div>
             </div>
-
             <div className="dialog-footer">
-              <button
-                onClick={() => setShowDefaultsDialog(false)}
-                className="cancel-button"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLoadSelectedDefaults}
-                disabled={isLoadingDefaults || selectedDefaults.size === 0}
-                className="confirm-button"
-              >
-                {isLoadingDefaults ? '⏳ Loading...' : `Load ${selectedDefaults.size} Profile${selectedDefaults.size !== 1 ? 's' : ''}`}
+              <button onClick={() => setShowDefaultsDialog(false)} className="btn-cancel">Cancel</button>
+              <button onClick={handleLoadSelectedDefaults} disabled={isLoadingDefaults || selectedDefaults.size === 0} className="btn-confirm">
+                {isLoadingDefaults ? 'Initializing...' : `Load ${selectedDefaults.size} Profiles`}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Import from File Dialog */}
+      {/* File Import Dialog */}
       {showImportDialog && (
-        <div className="import-dialog-overlay">
-          <div className="import-dialog">
+        <div className="standard-dialog-overlay">
+          <div className="standard-dialog">
             <div className="dialog-header">
-              <h3>Import Fan Profiles</h3>
-              <button
-                onClick={() => setShowImportDialog(false)}
-                className="close-button"
-              >
-                ✕
-              </button>
+              <h3>Import Profile Set</h3>
+              <button onClick={() => setShowImportDialog(false)} className="close-btn"><X size={18} /></button>
             </div>
-
             <div className="dialog-content">
-              <div className="file-upload-section">
-                <label htmlFor="file-input" className="file-upload-label">
-                  📁 Choose Export File
-                </label>
-                <input
-                  ref={fileInputRef}
-                  id="file-input"
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileSelect}
-                  style={{ display: 'none' }}
-                />
-                <p className="file-upload-hint">
-                  Select a JSON file exported from Pankha
-                </p>
+              <div className="file-drop-zone" onClick={() => fileInputRef.current?.click()}>
+                <div className="drop-icon"><FileJson size={32} /></div>
+                <div className="drop-text">Click to browse for .json export files</div>
+                <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} style={{ display: 'none' }} />
               </div>
-
-              <div className="import-options">
-                <h4>Import Options</h4>
-
-                <div className="option-group">
-                  <label>If profile already exists:</label>
-                  <select
-                    value={resolveConflicts}
-                    onChange={(e) => setResolveConflicts(e.target.value as any)}
-                  >
-                    <option value="skip">Skip (don't import)</option>
-                    <option value="rename">Rename (add suffix)</option>
-                    <option value="overwrite">Overwrite (replace existing)</option>
+              <div className="dialog-options">
+                <div className="option-row">
+                  <label>Duplication Strategy:</label>
+                  <select value={resolveConflicts} onChange={(e) => setResolveConflicts(e.target.value as any)}>
+                    <option value="skip">Skip Internal Conflicts</option>
+                    <option value="rename">Automatic Renaming</option>
+                    <option value="overwrite">System Overwrite</option>
                   </select>
                 </div>
-
-                <div className="option-group checkbox-group">
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={makeGlobal}
-                      onChange={(e) => setMakeGlobal(e.target.checked)}
-                    />
-                    Make imported profiles globally available
-                  </label>
+                <div className="option-row checkbox">
+                  <input type="checkbox" id="global-import" checked={makeGlobal} onChange={(e) => setMakeGlobal(e.target.checked)} />
+                  <label htmlFor="global-import">Grant Global Access to Imported Profiles</label>
                 </div>
               </div>
             </div>
-
             <div className="dialog-footer">
-              <button
-                onClick={() => setShowImportDialog(false)}
-                className="cancel-button"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setShowImportDialog(false)} className="btn-cancel">Dismiss</button>
             </div>
           </div>
         </div>
       )}
 
       {importResult && (
-        <div className="import-result">
+        <div className="import-result-summary">
           <div className="result-header">
-            <h4>Import Results</h4>
-            <button
-              onClick={() => setImportResult(null)}
-              className="close-button"
-            >
-              ✕
-            </button>
+            <h4>Import Summary</h4>
+            <button onClick={() => setImportResult(null)} className="close-btn"><X size={18} /></button>
           </div>
-
-          <div className="result-summary">
-            <div className="summary-stats">
-              <span className="stat imported">
-                ✅ {importResult.imported_count} imported
-              </span>
-              <span className="stat skipped">
-                ⏭️ {importResult.skipped_count} skipped
-              </span>
-              <span className="stat error">
-                ❌ {importResult.error_count} errors
-              </span>
-            </div>
+          <div className="stats-row">
+            <div className="stat success"><span><CheckCircle2 size={14} /></span> {importResult.imported_count} Successful</div>
+            <div className="stat skip"><span><SkipForward size={14} /></span> {importResult.skipped_count} Skipped</div>
+            <div className="stat error"><span><AlertCircle size={14} /></span> {importResult.error_count} Faults</div>
           </div>
-
           {importResult.profiles.length > 0 && (
-            <div className="result-details">
-              <h5>Profile Details:</h5>
-              <div className="profile-results-list">
-                {importResult.profiles.map((profile, index) => (
-                  <div key={index} className="profile-result-item">
-                    <span
-                      className="status-icon"
-                      style={{ color: getImportStatusColor(profile.status) }}
-                    >
-                      {getStatusIcon(profile.status)}
-                    </span>
-                    <span className="profile-name">{profile.name}</span>
-                    {profile.message && (
-                      <span className="status-message">({profile.message})</span>
-                    )}
-                    {profile.new_id && (
-                      <span className="new-id">ID: {profile.new_id}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+            <div className="import-details-log">
+              {importResult.profiles.map((profile: any, index: number) => (
+                <div key={index} className="log-entry">
+                  <span className="status-bullet" style={{ color: getImportStatusColor(profile.status) }}>
+                    {getStatusIcon(profile.status)}
+                  </span>
+                  <span className="target-name">{profile.name}</span>
+                  {profile.message && <span className="log-msg"> — {profile.message}</span>}
+                </div>
+              ))}
             </div>
           )}
         </div>
