@@ -66,12 +66,15 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   flex-shrink: 0;
+  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .rack-icon:hover {
-  background: transparent;
-  border-color: var(--border-color);
-  transform: translateX(-2px);
+  background: var(--bg-hover);
+  border-color: var(--color-info);
+  transform: translateX(-4px) scale(1.05);
+  box-shadow: -2px 0 8px -2px var(--color-info);
+  z-index: 2;
 }
 
 .rack-visibility {
@@ -83,7 +86,7 @@
   font-size: var(--font-size-sm2);
   background: transparent;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   flex-shrink: 0;
@@ -92,9 +95,11 @@
 }
 
 .rack-visibility:hover {
-  background: transparent;
-  border-color: var(--border-color);
-  transform: translateX(-2px);
+  background: var(--bg-hover);
+  border-color: var(--color-info);
+  transform: translateX(-4px) scale(1.05);
+  box-shadow: -2px 0 8px -2px var(--color-info);
+  z-index: 2;
 }
 
 .rack-visibility:focus {
