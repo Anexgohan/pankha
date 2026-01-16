@@ -32,15 +32,14 @@ import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayName
 import { getAgentStatusColor } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen } from "../../utils/formatters";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
-import { 
-  Lock, 
-  Thermometer, 
-  Search, 
+import {
+  Lock,
+  Thermometer,
+  Search,
   Loader2,
   X,
   ChevronDown,
-  ChevronRight,
-  Fan
+  ChevronRight
 } from 'lucide-react';
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
@@ -1136,7 +1135,20 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     <div className="fan-info">
                       <div className="fan-title">
                         <span className="fan-icon">
-                          <Fan size={18} className="animate-fan-spin" />
+                          <img
+                            src="/icons/pankha-fan.svg"
+                            width={28}
+                            height={28}
+                            alt="Fan"
+                            className={fan.speed > 0 ? "animate-fan-spin" : ""}
+                            style={fan.speed > 0 ? {
+                              animationDuration: `${Math.max(0.3, 3 - (fan.speed * 0.027))}s`
+                              // animationDirection: "reverse"
+                              // - 0.3 — Minimum duration (fastest spin at 100%)
+                              // - 3 — Base duration (slower baseline)
+                              // - 0.027 — Multiplier (how much speed affects rotation)
+                            } : undefined}
+                          />
                         </span>
                         <div className="fan-name">
                           <InlineEdit
