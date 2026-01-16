@@ -2,6 +2,15 @@
    Pankha Design System - Sensors & Fans
    =================================== */
 
+/* Fan Animation Variables
+   --spin-duration is set per-element via inline style based on fan.speed
+   These define the calculation boundaries */
+:root {
+  --spin-duration-default: 2.5s;  /* Fallback if not set */
+  --spin-duration-min: 0.3s;      /* Fastest (100% speed) */
+  --spin-duration-max: 3s;        /* Slowest (near 0% speed) */
+}
+
 /* Section Headers */
 .system-section {
   margin-bottom: var(--spacing-lg);
@@ -317,7 +326,10 @@
 }
 
 .animate-fan-spin {
-  animation: fan-spin 2.5s linear infinite;
+  animation: fan-spin var(--spin-duration, var(--spin-duration-default)) linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
+  transform-origin: center center;
 }
 
 @keyframes fan-spin {
