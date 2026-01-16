@@ -66,7 +66,7 @@
   background: var(--bg-secondary);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg); /* Only bottom corners */
   box-shadow: var(--shadow-md);
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-sm);
   transition: all 0.3s ease;
   z-index: 10;
   position: relative;

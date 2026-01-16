@@ -2,38 +2,60 @@
 
 /* Settings uses the same layout as dashboard */
 .settings-container {
-  padding: var(--spacing-xl);
+  padding: var(--spacing-sm) var(--spacing-xl) var(--spacing-xl);
   width: 100%;
 }
 
 /* Reuse nav-tabs style from dashboard for internal tabs */
 .settings-tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
   margin-bottom: var(--spacing-xl);
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .settings-tab {
   background: transparent;
   border: none;
-  padding: var(--spacing-lg) var(--spacing-2xl);
+  padding: var(--spacing-md) var(--spacing-2xl);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: var(--font-weight-medium);
-  color: var(--text-secondary);
-  transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-tertiary);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
 .settings-tab:hover {
-  background: var(--bg-hover);
   color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .settings-tab.active {
   color: var(--color-info);
-  border-bottom-color: var(--color-info);
-  background: var(--bg-hover);
+}
+
+/* The Laser Underline for Settings */
+.settings-tab::after {
+  content: "";
+  position: absolute;
+  bottom: -1px; /* Align with container border-bottom */
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--color-info);
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  transform: translateX(-50%);
+  box-shadow: 0 0 10px var(--color-info);
+}
+
+.settings-tab.active::after {
+  width: 100%;
 }
 
 /* Content area reuses system-card style */
