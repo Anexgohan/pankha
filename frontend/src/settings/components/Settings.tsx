@@ -7,6 +7,7 @@ import { useLicense } from '../../license';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense } from '../../services/api';
 import { formatDate } from '../../utils/formatters';
+import ColorPicker from './ColorPicker';
 import '../styles/settings.css';
 
 // Graph scale configuration constants
@@ -85,7 +86,8 @@ const Settings: React.FC = () => {
     { name: 'Hazard Orange', color: '#FF9800' },
     { name: 'Neon Pulse', color: '#E91E63' },
     { name: 'Digital Violet', color: '#9C27B0' },
-    { name: 'Stealth Slate', color: '#607D8B' },
+    { name: 'Cosmic Lavender', color: '#867CFF' },
+    { name: 'Flash Pink', color: '#FF326E' },
   ];
   
   // Update custom inputs when global values change (e.g. from preset)
@@ -397,56 +399,24 @@ const Settings: React.FC = () => {
                 <div className="setting-item aesthetics-row">
                   <span className="setting-label">Accent Color</span>
                   <div className="tactical-accent-picker">
-                    <div className="accent-swatches">
-                      {tacticalPresets.map(preset => (
-                        <button
-                          key={preset.color}
-                          className={`accent-swatch ${accentColor === preset.color ? 'active' : ''}`}
-                          style={{ '--swatch-color': preset.color } as React.CSSProperties}
-                          onClick={() => updateAccentColor(preset.color)}
-                        />
-                      ))}
-                    </div>
-                    
-                    <div className="accent-custom">
-                      <div className="color-control-wrapper hex-only">
-                        <input 
-                          type="color" 
-                          className="color-input-stealth" 
-                          value={accentColor} 
-                          onChange={(e) => updateAccentColor(e.target.value)} 
-                        />
-                        <span className="color-hex-label">{accentColor.toUpperCase()}</span>
-                      </div>
-                    </div>
+                    <ColorPicker 
+                      color={accentColor} 
+                      onChange={updateAccentColor} 
+                      label="Accent Color" 
+                      presets={tacticalPresets}
+                    />
                   </div>
                 </div>
 
                 <div className="setting-item aesthetics-row">
                   <span className="setting-label">Hover Tint</span>
                   <div className="tactical-accent-picker">
-                    <div className="accent-swatches">
-                      {tacticalPresets.map(preset => (
-                        <button
-                          key={preset.color}
-                          className={`accent-swatch ${hoverTintColor === preset.color ? 'active' : ''}`}
-                          style={{ '--swatch-color': preset.color } as React.CSSProperties}
-                          onClick={() => updateHoverTintColor(preset.color)}
-                        />
-                      ))}
-                    </div>
-                    
-                    <div className="accent-custom">
-                      <div className="color-control-wrapper hex-only">
-                        <input 
-                          type="color" 
-                          className="color-input-stealth" 
-                          value={hoverTintColor} 
-                          onChange={(e) => updateHoverTintColor(e.target.value)} 
-                        />
-                        <span className="color-hex-label">{hoverTintColor.toUpperCase()}</span>
-                      </div>
-                    </div>
+                    <ColorPicker 
+                      color={hoverTintColor} 
+                      onChange={updateHoverTintColor} 
+                      label="Hover Tint" 
+                      presets={tacticalPresets}
+                    />
                   </div>
                 </div>
               </div>
