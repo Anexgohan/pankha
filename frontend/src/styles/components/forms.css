@@ -158,6 +158,9 @@
   position: relative;
   display: inline-flex;
   align-items: center;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  border-radius: var(--radius-sm);
+  padding: 2px;
 }
 
 /* The native select - Invisible but handles interaction and OS picker */
@@ -182,9 +185,11 @@
   /* Reusing original padding logic + room for arrow */
   padding-right: 24px !important; 
   text-align: left;
+  border-radius: inherit;
+  transition: inherit;
 }
 
-/* Restoring the Chevron Arrow using the exact text-primary color scale */
+/* Restoring the Chevron Arrow */
 .stealth-select-wrapper::after {
   content: "";
   position: absolute;
@@ -201,12 +206,27 @@
   -webkit-mask-size: contain;
   pointer-events: none;
   z-index: 1;
+  transition: all 0.2s ease;
 }
 
-/* Visual feedback states (linked through the invisible select) */
+.stealth-select-wrapper:hover::after {
+  opacity: 1;
+  background-color: var(--color-info);
+}
+
+/* Option E: Soft Focus (Minimalist) */
+.stealth-select-wrapper:hover:not(:has(.select-engine:disabled)) {
+  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
+  border-color: var(--color-info);
+}
+
+.stealth-select-wrapper::before {
+  display: none; /* Removed the extra bracket */
+}
+
+/* Ensure the display layer matches the wrapper's border */
 .select-engine:hover ~ .select-display {
   border-color: var(--color-info) !important;
-  background: var(--bg-hover) !important;
 }
 
 .select-engine:focus ~ .select-display {
@@ -217,4 +237,44 @@
 .select-engine:disabled ~ .select-display {
   opacity: 0.6 !important;
   background: var(--bg-secondary) !important;
+  transform: none !important;
+}
+
+/* ===================================
+   Checkbox Components
+   =================================== */
+
+.checkbox-container {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.checkbox-container:hover:not(:has(input:disabled)) {
+  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
+}
+
+/* Cleanup checkbox pseudo-elements */
+.checkbox-container::before,
+.checkbox-container::after {
+  display: none;
+}
+
+.checkbox-container input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-info);
+}
+
+.checkbox-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-medium);
 }

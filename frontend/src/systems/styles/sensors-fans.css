@@ -396,8 +396,8 @@
 }
 
 .fan-dropdown:hover:not(:disabled) {
-  background: var(--bg-hover);
-  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
+  border-color: var(--color-info);
 }
 
 .fan-dropdown:focus {
