@@ -289,11 +289,6 @@ const FanProfileManager: React.FC = () => {
               </div>
             </div>
 
-            {profile.description && (
-              <p className="profile-description">{profile.description}</p>
-            )}
-
-
             {profile.curve_points && profile.curve_points.length > 0 && (
               <div 
                 className="profile-curve-preview clickable-graph" 
@@ -309,6 +304,10 @@ const FanProfileManager: React.FC = () => {
                   tooltipOnly={true}
                 />
               </div>
+            )}
+
+            {profile.description && (
+              <p className="profile-description">{profile.description}</p>
             )}
 
             <div className="profile-badges">

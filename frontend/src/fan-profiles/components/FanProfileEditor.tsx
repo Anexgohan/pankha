@@ -238,54 +238,8 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
           <button onClick={onClose} className="close-button">×</button>
         </div>
 
-        <div className="editor-content">
-          {/* Step 1: Quick Start with Template */}
-          <div className="profile-builder-step">
-            <div className="step-header">
-              <h3>🚀 Quick Start</h3>
-              <p>Start from an existing profile template or create from scratch</p>
-            </div>
-
-            <div className="template-selector">
-              <div className="form-group">
-                <label htmlFor="templateSelect">Choose a Starting Template</label>
-                <select
-                  id="templateSelect"
-                  className="template-dropdown"
-                  value={selectedTemplateId}
-                  onChange={(e) => handleTemplateSelection(e.target.value)}
-                  disabled={!isCreating}
-                >
-                  <option value="">Default Balanced Curve (New)</option>
-                  {availableProfiles.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.profile_name} ({template.curve_points?.length || 0} points)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {selectedTemplateId && (() => {
-                const selectedTemplate = availableProfiles.find(p => p.id === parseInt(selectedTemplateId));
-                return selectedTemplate ? (
-                  <div className="template-info">
-                    <p>
-                      <strong>📋 Using template:</strong> {selectedTemplate.profile_name}
-                      {selectedTemplate.description && ` - ${selectedTemplate.description}`}
-                    </p>
-                  </div>
-                ) : null;
-              })()}
-            </div>
-          </div>
-
-          {/* Step 2: Interactive Chart Editor */}
-          <div className="profile-builder-step">
-            <div className="step-header">
-              <h3>🎯 Fine-tune Your Curve</h3>
-              <p>Drag points on the chart to customize the fan curve for your needs</p>
-            </div>
-
+        <div className="editor-body">
+          <div className="editor-main">
             <div className="chart-container">
               <FanCurveChart
                 curvePoints={sortedWithIndices.map((p, i) => ({
@@ -297,16 +251,14 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
                   created_at: ''
                 }))}
                 width={720}
-                height={450}
+                height={480}
                 showLabels={true}
                 interactive={true}
                 onPointChange={(sortedIndex, temperature, fanSpeed) => {
-                  // Map sorted index back to original unsorted index
                   const originalIndex = sortedWithIndices[sortedIndex].originalIndex;
                   handlePointChange(originalIndex, temperature, fanSpeed);
                 }}
                 onPointRemove={(sortedIndex) => {
-                  // Map sorted index back to original unsorted index
                   const originalIndex = sortedWithIndices[sortedIndex].originalIndex;
                   handleRemovePoint(originalIndex);
                 }}
@@ -331,22 +283,39 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
             </div>
           </div>
 
-          {/* Step 3: Profile Details */}
-          <div className="profile-builder-step">
-            <div className="step-header">
-              <h3>📝 Profile Details</h3>
-              <p>Give your profile a name and configure settings</p>
-            </div>
-            
-            <div className="profile-details">
+          <aside className="editor-sidebar">
+            {/* Quick Start Segment */}
+            <div className="sidebar-group">
+              <h3>🚀 Quick Start</h3>
               <div className="form-group">
-                <label htmlFor="profileName">Profile Name *</label>
+                <label htmlFor="templateSelect">Template</label>
+                <select
+                  id="templateSelect"
+                  className="template-dropdown"
+                  value={selectedTemplateId}
+                  onChange={(e) => handleTemplateSelection(e.target.value)}
+                >
+                  <option value="">Default Balanced</option>
+                  {availableProfiles.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.profile_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Profile Details Segment */}
+            <div className="sidebar-group fill">
+              <h3>📝 Configuration</h3>
+              <div className="form-group">
+                <label htmlFor="profileName">Profile Name</label>
                 <input
                   id="profileName"
                   type="text"
                   value={profileName}
                   onChange={(e) => setProfileName(e.target.value)}
-                  placeholder="My Custom Fan Profile"
+                  placeholder="Profile Name"
                   disabled={loading}
                 />
               </div>
@@ -359,23 +328,25 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
                     onChange={(e) => setIsGlobal(e.target.checked)}
                     disabled={loading}
                   />
-                  Make Global (available to all systems)
+                  Make Global
                 </label>
               </div>
 
               <div className="form-group">
-                <label htmlFor="description">Description (Optional)</label>
+                <label htmlFor="description">Description</label>
                 <textarea
                   id="description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe when to use this profile..."
-                  rows={2}
+                  placeholder="Optional description..."
+                  rows={10}
                   disabled={loading}
                 />
               </div>
             </div>
-          </div>
+
+            {/* Manual Points Info (Optional enhancement later) */}
+          </aside>
         </div>
 
         {error && (
