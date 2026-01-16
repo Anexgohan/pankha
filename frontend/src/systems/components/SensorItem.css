@@ -71,9 +71,9 @@
 
 .rack-icon:hover {
   background: var(--bg-hover);
-  border-color: var(--color-info);
+  border-color: var(--color-accent-dynamic);
   transform: translateX(-4px);
-  box-shadow: 0 0 15px -2px var(--color-info);
+  box-shadow: 0 0 15px -2px var(--color-accent-dynamic);
   z-index: 2;
 }
 
@@ -96,9 +96,9 @@
 
 .rack-visibility:hover {
   background: var(--bg-hover);
-  border-color: var(--color-info);
+  border-color: var(--color-accent-dynamic);
   transform: translateX(-4px);
-  box-shadow: 0 0 15px -2px var(--color-info);
+  box-shadow: 0 0 15px -2px var(--color-accent-dynamic);
   z-index: 2;
 }
 

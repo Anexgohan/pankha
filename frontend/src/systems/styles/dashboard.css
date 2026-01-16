@@ -101,7 +101,7 @@
 }
 
 .nav-tab.active {
-  color: var(--color-info);
+  color: var(--color-accent-dynamic);
 }
 
 /* The Laser Underline */
@@ -112,10 +112,10 @@
   left: 50%;
   width: 0;
   height: 2px;
-  background: var(--color-info);
+  background: var(--color-accent-dynamic);
   transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
   transform: translateX(-50%);
-  box-shadow: 0 0 10px var(--color-info);
+  box-shadow: 0 0 10px var(--color-accent-dynamic);
 }
 
 .nav-tab.active::after {

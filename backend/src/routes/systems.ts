@@ -1400,6 +1400,9 @@ router.get("/:id/sensor-visibility", async (req: Request, res: Response) => {
 const ALLOWED_SETTINGS = [
   'controller_update_interval',
   'graph_history_hours',
+  'data_retention_days',
+  'accent_color',
+  'hover_tint_color',
 ] as const;
 
 type AllowedSettingKey = typeof ALLOWED_SETTINGS[number];

@@ -194,8 +194,8 @@
 }
 
 .preset-card:hover {
-  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-tertiary));
-  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 8%, var(--bg-tertiary));
+  border-color: var(--color-accent-dynamic);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -319,7 +319,7 @@
   padding: var(--spacing-md);
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
-  border-left: 3px solid var(--color-info);
+  border-left: 3px solid var(--color-accent-dynamic);
 }
 
 .curve-instructions p {

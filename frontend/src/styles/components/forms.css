@@ -211,13 +211,13 @@
 
 .stealth-select-wrapper:hover::after {
   opacity: 1;
-  background-color: var(--color-info);
+  background-color: var(--color-accent-dynamic);
 }
 
 /* Option E: Soft Focus (Minimalist) */
 .stealth-select-wrapper:hover:not(:has(.select-engine:disabled)) {
-  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
-  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 8%, var(--bg-secondary));
+  border-color: var(--color-accent-dynamic);
 }
 
 .stealth-select-wrapper::before {
@@ -230,7 +230,7 @@
 }
 
 .select-engine:focus ~ .select-display {
-  border-color: var(--color-info) !important;
+  border-color: var(--color-accent-dynamic) !important;
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2) !important;
 }
 
@@ -256,7 +256,7 @@
 }
 
 .checkbox-container:hover:not(:has(input:disabled)) {
-  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 8%, var(--bg-secondary));
 }
 
 /* Cleanup checkbox pseudo-elements */
@@ -270,7 +270,7 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--color-info);
+  accent-color: var(--color-accent-dynamic);
 }
 
 .checkbox-label {

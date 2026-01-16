@@ -73,6 +73,21 @@ const Settings: React.FC = () => {
   const [isCustomRetention, setIsCustomRetention] = useState(false);
   const [customRetentionInput, setCustomRetentionInput] = useState(dataRetentionDays.toString());
   
+  // Appearance state
+  const { 
+    accentColor, updateAccentColor,
+    hoverTintColor, updateHoverTintColor
+  } = useDashboardSettings();
+
+  const tacticalPresets = [
+    { name: 'Cyber Blue', color: '#2196F3' },
+    { name: 'Toxic Green', color: '#4CAF50' },
+    { name: 'Hazard Orange', color: '#FF9800' },
+    { name: 'Neon Pulse', color: '#E91E63' },
+    { name: 'Digital Violet', color: '#9C27B0' },
+    { name: 'Stealth Slate', color: '#607D8B' },
+  ];
+  
   // Update custom inputs when global values change (e.g. from preset)
   useEffect(() => {
     setCustomScaleInput(graphScale.toString());
@@ -368,6 +383,71 @@ const Settings: React.FC = () => {
                       </button>
                     </form>
                   )}
+                </div>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Appearance</h3>
+              <p className="settings-info">
+                Personalize the dashboard color scheme and interaction feedback.
+              </p>
+              
+              <div className="settings-list aesthetics-compact-list">
+                <div className="setting-item aesthetics-row">
+                  <span className="setting-label">Accent Color</span>
+                  <div className="tactical-accent-picker">
+                    <div className="accent-swatches">
+                      {tacticalPresets.map(preset => (
+                        <button
+                          key={preset.color}
+                          className={`accent-swatch ${accentColor === preset.color ? 'active' : ''}`}
+                          style={{ '--swatch-color': preset.color } as React.CSSProperties}
+                          onClick={() => updateAccentColor(preset.color)}
+                        />
+                      ))}
+                    </div>
+                    
+                    <div className="accent-custom">
+                      <div className="color-control-wrapper hex-only">
+                        <input 
+                          type="color" 
+                          className="color-input-stealth" 
+                          value={accentColor} 
+                          onChange={(e) => updateAccentColor(e.target.value)} 
+                        />
+                        <span className="color-hex-label">{accentColor.toUpperCase()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="setting-item aesthetics-row">
+                  <span className="setting-label">Hover Tint</span>
+                  <div className="tactical-accent-picker">
+                    <div className="accent-swatches">
+                      {tacticalPresets.map(preset => (
+                        <button
+                          key={preset.color}
+                          className={`accent-swatch ${hoverTintColor === preset.color ? 'active' : ''}`}
+                          style={{ '--swatch-color': preset.color } as React.CSSProperties}
+                          onClick={() => updateHoverTintColor(preset.color)}
+                        />
+                      ))}
+                    </div>
+                    
+                    <div className="accent-custom">
+                      <div className="color-control-wrapper hex-only">
+                        <input 
+                          type="color" 
+                          className="color-input-stealth" 
+                          value={hoverTintColor} 
+                          onChange={(e) => updateHoverTintColor(e.target.value)} 
+                        />
+                        <span className="color-hex-label">{hoverTintColor.toUpperCase()}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -59,6 +59,10 @@
   --temp-critical-bg: #873714;
   --temp-critical-border: #c80f0f;
   --temp-critical-text: rgb(225, 15, 0);
+
+  /* Dynamic Aesthetics - Controlled by Settings JS */
+  --color-accent-dynamic: var(--color-info);
+  --color-hover-tint-dynamic: var(--color-info);
 }
 
 /* Light Theme Color Overrides */

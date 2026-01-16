@@ -29,14 +29,14 @@
 
 .stat-card {
   text-align: center;
-  border-top: 3px solid var(--color-info);
+  border-top: 3px solid var(--color-accent-dynamic);
   padding: var(--spacing-lg) var(--spacing-sm);
   transition: all 0.2s ease;
 }
 
 .stat-card:hover {
-  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
-  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 8%, var(--bg-secondary));
+  border-color: var(--color-accent-dynamic);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -98,8 +98,8 @@
 }
 
 .system-card:hover {
-  background: color-mix(in srgb, var(--color-info) 3%, var(--bg-secondary));
-  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 3%, var(--bg-secondary));
+  border-color: var(--color-accent-dynamic);
   box-shadow: var(--shadow-hover);
   transform: translateY(-2px);
 }
@@ -286,7 +286,7 @@
   display: block;
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
-  color: var(--color-info);
+  color: var(--color-accent-dynamic);
 }
 
 /* Profile Cards */
@@ -297,8 +297,8 @@
 }
 
 .profile-card:hover {
-  background: color-mix(in srgb, var(--color-info) 5%, var(--bg-secondary));
-  border-color: var(--color-info);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 5%, var(--bg-secondary));
+  border-color: var(--color-accent-dynamic);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
