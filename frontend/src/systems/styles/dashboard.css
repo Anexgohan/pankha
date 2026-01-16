@@ -88,7 +88,7 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: var(--font-weight-semibold);
-  color: var(--text-tertiary);
+  color: var(--text-primary);
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   position: relative;
   display: flex;

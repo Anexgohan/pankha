@@ -5,23 +5,28 @@
 
 :root {
   /* Backgrounds */
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2d2d2d;
-  --bg-tertiary: #404040;
-  --bg-hover: #404040;
-  --bg-active: #505050;
-  --bg-panels_01: #24242480;
-  --bg-panels_02: #242424f6;
+  --bg-primary: var(--neutral-50);
+  --bg-secondary: var(--neutral-100);
+  --bg-tertiary: var(--neutral-200);
+  --bg-hover: var(--neutral-300);
+  --bg-active: var(--neutral-400);
+  --bg-panels_01: rgba(36, 36, 36, 0.5);
+  --bg-panels_02: rgba(36, 36, 36, 0.96);
+
+  /* Tactical Backgrounds */
+  --bg-gradient-surface: var(--neutral-gradient-surface);
+  --bg-gradient-tactical: var(--neutral-gradient-tactical);
+  --bg-overlay-tactical: var(--neutral-gradient-overlay);
 
   /* Text Colors */
-  --text-primary: var(--neutral-800);
-  --text-secondary: var(--neutral-600);
+  --text-primary: var(--neutral-900);
+  --text-secondary: var(--neutral-700);
   --text-tertiary: var(--neutral-500);
 
   /* Border Colors */
-  --border-color: var(--neutral-100);
-  --border-color-dimmed: var(--neutral-100) / 0.50;
-  --border-light: var(--neutral-200);
+  --border-color: var(--neutral-200);
+  --border-color-dimmed: rgba(255, 255, 255, 0.1);
+  --border-light: var(--neutral-300);
 
   /* Shadows (using spacing tokens) */
   --shadow: var(--shadow-sm);
@@ -34,19 +39,24 @@
 
 [data-theme="light"] {
   /* Backgrounds */
-  --bg-primary: #dddddd;
-  --bg-secondary: #eeeeee;
-  --bg-tertiary: #f9f9f9;
-  --bg-hover: #f0f0f0;
-  --bg-active: #e0e0e0;
-  --bg-panels_01: #f3f3f380;
-  --bg-panels_02: #f3f3f3f6;
+  --bg-primary: var(--neutral-50);
+  --bg-secondary: var(--neutral-100);
+  --bg-tertiary: var(--neutral-200);
+  --bg-hover: var(--neutral-300);
+  --bg-active: var(--neutral-400);
+  --bg-panels_01: rgba(243, 243, 243, 0.5);
+  --bg-panels_02: rgba(243, 243, 243, 0.96);
+
+  /* Tactical Backgrounds */
+  --bg-gradient-surface: linear-gradient(180deg, var(--neutral-50) 0%, var(--neutral-100) 100%);
+  --bg-gradient-tactical: var(--neutral-gradient-tactical);
+  --bg-overlay-tactical: var(--neutral-gradient-overlay);
 
   /* Border Colors */
   --border-color: var(--neutral-200);
-  --border-color-dimmed: var(--neutral-200) / 0.25;
+  --border-color-dimmed: rgba(0, 0, 0, 0.05);
   --border-light: var(--neutral-300);
 
     /* Dims, Fades and Transparencies */
-  --solid-dimmed: #44444430;
+  --solid-dimmed: rgba(68, 68, 68, 0.15);
 }

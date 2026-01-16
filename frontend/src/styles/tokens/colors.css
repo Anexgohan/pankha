@@ -32,16 +32,21 @@
   --color-info-hover: #1976D2;
 
   /* Neutral Colors - Dark Theme (Default) */
-  --neutral-50: #2d2d2d;
-  --neutral-100: #404040;
-  --neutral-200: #505050;
+  --neutral-50: #1a1a1a;
+  --neutral-100: #242424;
+  --neutral-200: #2d2d2d;
   --neutral-300: #404040;
-  --neutral-400: #666666;
-  --neutral-500: #bbbbbb;
-  --neutral-600: #dddddd;
-  --neutral-700: #e4e4e4;
-  --neutral-800: #f5f5f5;
+  --neutral-400: #505050;
+  --neutral-500: #71717a;
+  --neutral-600: #a1a1aa;
+  --neutral-700: #d4d4d8;
+  --neutral-800: #f4f4f5;
   --neutral-900: #ffffff;
+
+  /* Tactical Gradients */
+  --neutral-gradient-surface: linear-gradient(180deg, var(--neutral-100) 0%, var(--neutral-50) 100%);
+  --neutral-gradient-overlay: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%);
+  --neutral-gradient-tactical: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
 
   /* Temperature Status Colors - Dark Theme (Default) */
   --temp-normal-bg: #32ff321a;
@@ -68,16 +73,20 @@
 /* Light Theme Color Overrides */
 [data-theme="light"] {
   /* Neutral Colors - Light Theme */
-  --neutral-50: #f5f5f5;
-  --neutral-100: #f9f9f9;
-  --neutral-200: #e0e0e0;
-  --neutral-300: #eeeeee;
-  --neutral-400: #cccccc;
-  --neutral-500: #999999;
-  --neutral-600: #666666;
-  --neutral-700: #333333;
-  --neutral-800: #1a1a1a;
-  --neutral-900: #000000;
+  --neutral-50: #ffffff;
+  --neutral-100: #f4f4f5;
+  --neutral-200: #e4e4e7;
+  --neutral-300: #d4d4d8;
+  --neutral-400: #a1a1aa;
+  --neutral-500: #71717a;
+  --neutral-600: #52525b;
+  --neutral-700: #3f3f46;
+  --neutral-800: #27272a;
+  --neutral-900: #09090b;
+
+  /* Tactical Gradients - Light Mode Overrides */
+  --neutral-gradient-overlay: linear-gradient(180deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0) 100%);
+  --neutral-gradient-tactical: linear-gradient(135deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.01) 100%);
 
   /* Temperature Status Colors - Light Theme */
   --temp-normal-bg: #E8F5E8;

@@ -33,13 +33,19 @@ import { getAgentStatusColor } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen } from "../../utils/formatters";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
 import {
-  Lock,
-  Thermometer,
-  Search,
   Loader2,
   X,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Globe,
+  Clock,
+  Zap,
+  ShieldCheck,
+  Activity,
+  Wind,
+  Thermometer,
+  Lock as LockIcon,
+  Search
 } from 'lucide-react';
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
@@ -47,7 +53,7 @@ import { PankhaFanIcon } from "../../components/icons/PankhaFanIcon";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorItem from "./SensorItem";
 import { useSensorHistory } from "../hooks/useSensorHistory";
-import { getOption, getValues, getLabel, getCleanLabel, interpolateTooltip, getDefault } from "../../utils/uiOptions";
+import { getOption, getValues, getLabel, getCleanLabel, getDefault } from "../../utils/uiOptions";
 
 interface SystemCardProps {
   system: SystemData;
@@ -637,6 +643,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
       <div className="system-header">
         <div className="system-title">
           <div className="title-left">
+            <span
+              className="status-badge"
+              style={{ backgroundColor: getAgentStatusColor(system.status) }}
+            >
+              {system.status}
+            </span>
+            {isReadOnly && (
+              <span className="read-only-badge" title={readOnlyTooltip}>
+                <LockIcon size={12} />
+              </span>
+            )}
             <h3>
               <InlineEdit
                 value={system.name}
@@ -649,17 +666,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 showHardwareId={false}
               />
             </h3>
-            <span
-              className="status-badge"
-              style={{ backgroundColor: getAgentStatusColor(system.status) }}
-            >
-              {system.status}
-            </span>
-            {isReadOnly && (
-              <span className="read-only-badge" title={readOnlyTooltip}>
-                <Lock size={12} />
-              </span>
-            )}
           </div>
           <button
             className="delete-button"
@@ -670,301 +676,234 @@ const SystemCard: React.FC<SystemCardProps> = ({
             {loading === "delete" ? (
               <Loader2 className="animate-spin" size={14} />
             ) : (
-              <X size={18} />
+              <X size={14} />
             )}
           </button>
         </div>
 
-        <div className="system-info">
-          <div className="info-row">
-            <div className="info-item">
-              <span className="label">IP:</span>
-              <span className="value">{system.ip_address || "Unknown"}</span>
-            </div>
-            <div className="info-item">
-              <span className="label">Last seen:</span>
-              <span className="value">{formatLastSeen(system.last_seen, timezone)}</span>
-            </div>
+        <div className="system-meta">
+          <div className="meta-item" title="IP Address">
+            <Globe size={14} />
+            <span>{system.ip_address || "Unknown"}</span>
           </div>
-          <div className="info-row">
-            <div className="info-item">
-              <span className="label">Agent Version:</span>
-              <span className="value">
-                {system.agent_version
-                  ? system.agent_version.startsWith("v")
-                    ? system.agent_version
-                    : `v${system.agent_version}`
-                  : "Unknown"}
-              </span>
-            </div>
+          <div className="meta-item" title="Last seen">
+            <Clock size={14} />
+            <span>{formatLastSeen(system.last_seen, timezone)}</span>
           </div>
-          {(averageTemperature ||
-            highestTemperature ||
-            averageFanRPM ||
-            highestFanRPM) && (
-            <div className="info-row">
-              {averageTemperature && (
-                <div className="info-item info-item-vertical">
-                  <span className="label">Avg °C:</span>
-                  <span
-                    className={`value temperature temperature-${getTemperatureClass(
-                      averageTemperature
-                    )}`}
-                  >
-                    {formatTemperature(averageTemperature, '0.0')}
-                  </span>
-                </div>
-              )}
-              {highestTemperature && (
-                <div className="info-item info-item-vertical">
-                  <span className="label">Peak °C:</span>
-                  <span
-                    className={`value temperature temperature-${getTemperatureClass(
-                      highestTemperature
-                    )}`}
-                  >
-                    {formatTemperature(highestTemperature, '0.0')}
-                  </span>
-                </div>
-              )}
-              {averageFanRPM !== null && system.current_fan_speeds && (
-                <div className="info-item info-item-vertical">
-                  <span className="label">Avg RPM:</span>
-                  <span
-                    className={`value temperature temperature-${getFanRPMClass(
-                      averageFanRPM,
-                      system.current_fan_speeds
-                    )}`}
-                  >
-                    {Math.round(averageFanRPM)} <span className="unit-small">RPM</span>
-                  </span>
-                </div>
-              )}
-              {highestFanRPM !== null && system.current_fan_speeds && (
-                <div className="info-item info-item-vertical">
-                  <span className="label">Peak RPM:</span>
-                  <span
-                    className={`value temperature temperature-${getFanRPMClass(
-                      highestFanRPM,
-                      system.current_fan_speeds
-                    )}`}
-                  >
-                    {highestFanRPM} <span className="unit-small">RPM</span>
-                  </span>
-                </div>
-              )}
+          <div className="meta-item" title="Agent Version">
+            <ShieldCheck size={14} />
+            <span>
+              {system.agent_version
+                ? system.agent_version.startsWith("v")
+                  ? system.agent_version
+                  : `v${system.agent_version}`
+                : "Unknown"}
+            </span>
+          </div>
+        </div>
+
+        {(averageTemperature ||
+          highestTemperature ||
+          averageFanRPM ||
+          highestFanRPM) && (
+        <div className="system-summary-stats">
+          {averageTemperature && (
+            <div className="summary-stat">
+              <div className="summary-stat-label">Avg Temp</div>
+              <div
+                className={`summary-stat-value temperature-${getTemperatureClass(
+                  averageTemperature
+                )}`}
+              >
+                {formatTemperature(averageTemperature, "0.0")}
+              </div>
+            </div>
+          )}
+          {highestTemperature && (
+            <div className="summary-stat">
+              <div className="summary-stat-label">Peak Temp</div>
+              <div
+                className={`summary-stat-value temperature-${getTemperatureClass(
+                  highestTemperature
+                )}`}
+              >
+                {formatTemperature(highestTemperature, "0.0")}
+              </div>
+            </div>
+          )}
+          {averageFanRPM !== null && system.current_fan_speeds && (
+            <div className="summary-stat">
+              <div className="summary-stat-label">Avg RPM</div>
+              <div
+                className={`summary-stat-value fan-${getFanRPMClass(
+                  averageFanRPM,
+                  system.current_fan_speeds
+                )}`}
+              >
+                {Math.round(averageFanRPM)}
+                <span className="unit">RPM</span>
+              </div>
+            </div>
+          )}
+          {highestFanRPM !== null && system.current_fan_speeds && (
+            <div className="summary-stat">
+              <div className="summary-stat-label">Peak RPM</div>
+              <div
+                className={`summary-stat-value fan-${getFanRPMClass(
+                  highestFanRPM,
+                  system.current_fan_speeds
+                )}`}
+              >
+                {highestFanRPM}
+                <span className="unit">RPM</span>
+              </div>
             </div>
           )}
         </div>
+        )}
 
         {system.status === "online" && (
-          <div className="system-settings">
-            {/* Row 1: Fan Control, Log Level */}
-            <div className="info-row">
-              <div className="info-item info-item-vertical">
-                <span className="label" title={isReadOnly ? readOnlyTooltip : getOption('fanControl').tooltip}>{getLabel('fanControl')}:</span>
-                <label
-                  className="checkbox-container"
-                  title={
-                    isReadOnly
-                      ? readOnlyTooltip
-                      : getOption('fanControl').tooltip
-                  }
-                >
+          <div className="system-command-center">
+            <div className="command-grid">
+              {/* Row 1: Fan Control, Log Level */}
+              <div className="command-item">
+                <div className="command-label-row">
+                  <Zap size={14} className="label-icon" />
+                  <span className="stat-label" title={isReadOnly ? readOnlyTooltip : getOption('fanControl').tooltip}>{getLabel('fanControl')}</span>
+                </div>
+                <label className="tactical-checkbox">
                   <input
                     type="checkbox"
                     checked={enableFanControl}
-                    onChange={(e) =>
-                      handleEnableFanControlChange(e.target.checked)
-                    }
+                    onChange={(e) => handleEnableFanControlChange(e.target.checked)}
                     disabled={loading === "enable-fan-control" || isReadOnly}
                   />
-                  <span className="checkbox-label">
-                    {enableFanControl ? "Enabled" : "Disabled"}
-                  </span>
-                  {loading === "enable-fan-control" && (
-                    <Loader2 className="animate-spin" size={14} />
-                  )}
+                  <span className="checkbox-custom"></span>
+                  <span className="checkbox-text">{enableFanControl ? "ENABLED" : "DISABLED"}</span>
+                  {loading === "enable-fan-control" && <Loader2 className="animate-spin" size={12} />}
                 </label>
               </div>
-              <div className="info-item info-item-vertical">
-                <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('logLevel').tooltip, { logLevel })}>{getLabel('logLevel')}:</span>
-                {/*
-                  Stealth-Overlay Pattern:
-                  .select-display renders the "Clean Label" for the closed state.
-                  .select-engine is the invisible native picker that shows "Full Labels" when clicked.
-                */}
+
+              <div className="command-item">
+                <div className="command-label-row">
+                  <Activity size={12} className="label-icon" />
+                  <span className="stat-label">{getLabel('logLevel')}</span>
+                </div>
                 <div className="stealth-select-wrapper">
-                  <div className="agent-interval-select select-display">
-                    {getCleanLabel('logLevel', logLevel)}
-                  </div>
+                  <div className="select-display">{getCleanLabel('logLevel', logLevel)}</div>
                   <select
-                    className="agent-interval-select select-engine"
+                    className="select-engine"
                     value={logLevel}
                     onChange={(e) => handleLogLevelChange(e.target.value)}
                     disabled={loading === "log-level" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('logLevel').tooltip, { logLevel })
-                    }
                   >
                     {(getValues('logLevel') as { value: string; label: string }[]).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
-                {loading === "log-level" && (
-                  <span className="loading-spinner">⏳</span>
-                )}
               </div>
-            </div>
 
-            {/* Row 2: Emergency Temp, Failsafe Speed */}
-            <div className="info-row">
-              <div className="info-item info-item-vertical">
-                <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('emergencyTemp').tooltip, { emergencyTemp })}>{getLabel('emergencyTemp')}:</span>
+              {/* Row 2: Emergency Temp, Failsafe Speed */}
+              <div className="command-item">
+                <div className="command-label-row">
+                  <Thermometer size={12} className="label-icon" />
+                  <span className="stat-label">{getLabel('emergencyTemp')}</span>
+                </div>
                 <div className="stealth-select-wrapper">
-                  <div className="agent-interval-select select-display">
-                    {getCleanLabel('emergencyTemp', emergencyTemp)}
-                  </div>
+                  <div className="select-display">{getCleanLabel('emergencyTemp', emergencyTemp)}</div>
                   <select
-                    className="agent-interval-select select-engine"
+                    className="select-engine"
                     value={emergencyTemp}
-                    onChange={(e) =>
-                      handleEmergencyTempChange(parseFloat(e.target.value))
-                    }
+                    onChange={(e) => handleEmergencyTempChange(parseFloat(e.target.value))}
                     disabled={loading === "emergency-temp" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('emergencyTemp').tooltip, { emergencyTemp })
-                    }
                   >
                     {(getValues('emergencyTemp') as { value: number; label: string }[]).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
-                {loading === "emergency-temp" && (
-                  <span className="loading-spinner">⏳</span>
-                )}
               </div>
-              <div className="info-item info-item-vertical">
-                <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('failsafeSpeed').tooltip, { failsafeSpeed })}>{getLabel('failsafeSpeed')}:</span>
+
+              <div className="command-item">
+                <div className="command-label-row">
+                  <Wind size={12} className="label-icon" />
+                  <span className="stat-label">{getLabel('failsafeSpeed')}</span>
+                </div>
                 <div className="stealth-select-wrapper">
-                  <div className="agent-interval-select select-display">
-                    {getCleanLabel('failsafeSpeed', failsafeSpeed)}
-                  </div>
+                  <div className="select-display">{getCleanLabel('failsafeSpeed', failsafeSpeed)}</div>
                   <select
-                    className="agent-interval-select select-engine"
+                    className="select-engine"
                     value={failsafeSpeed}
-                    onChange={(e) =>
-                      handleFailsafeSpeedChange(parseInt(e.target.value))
-                    }
+                    onChange={(e) => handleFailsafeSpeedChange(parseFloat(e.target.value))}
                     disabled={loading === "failsafe-speed" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('failsafeSpeed').tooltip, { failsafeSpeed })
-                    }
                   >
                     {(getValues('failsafeSpeed') as { value: number; label: string }[]).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
-                {loading === "failsafe-speed" && (
-                  <span className="loading-spinner">⏳</span>
-                )}
               </div>
-            </div>
 
-            {/* Row 3: Agent rate, Fan Step, Hysteresis */}
-            <div className="info-row">
-              <div className="info-item info-item-vertical">
-                <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('updateInterval').tooltip, { agentInterval })}>{getLabel('updateInterval')}:</span>
+              {/* Row 3: Agent Rate, Fan Step, Hysteresis */}
+              <div className="command-item">
+                <div className="command-label-row">
+                  <Activity size={12} className="label-icon" />
+                  <span className="stat-label">{getLabel('updateInterval')}</span>
+                </div>
                 <div className="stealth-select-wrapper">
-                  <div className="agent-interval-select select-display">
-                    {getCleanLabel('updateInterval', agentInterval)}
-                  </div>
+                  <div className="select-display">{getCleanLabel('updateInterval', agentInterval)}</div>
                   <select
-                    className="agent-interval-select select-engine"
+                    className="select-engine"
                     value={agentInterval}
-                    onChange={(e) =>
-                      handleAgentIntervalChange(parseFloat(e.target.value))
-                    }
+                    onChange={(e) => handleAgentIntervalChange(parseFloat(e.target.value))}
                     disabled={loading === "agent-interval" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('updateInterval').tooltip, { agentInterval })
-                    }
                   >
                     {(getValues('updateInterval') as { value: number; label: string }[]).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
-                {loading === "agent-interval" && (
-                  <span className="loading-spinner">⏳</span>
-                )}
               </div>
-              <div className="info-item info-item-vertical">
-                <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('fanStep').tooltip, { fanStep, agentInterval })}>{getLabel('fanStep')}:</span>
+
+              <div className="command-item">
+                <div className="command-label-row">
+                  <ChevronRight size={12} className="label-icon" />
+                  <span className="stat-label">{getLabel('fanStep')}</span>
+                </div>
                 <div className="stealth-select-wrapper">
-                  <div className="agent-interval-select select-display">
-                    {getCleanLabel('fanStep', fanStep)}
-                  </div>
+                  <div className="select-display">{getCleanLabel('fanStep', fanStep)}</div>
                   <select
-                    className="agent-interval-select select-engine"
+                    className="select-engine"
                     value={fanStep}
-                    onChange={(e) =>
-                      handleFanStepChange(parseInt(e.target.value))
-                    }
+                    onChange={(e) => handleFanStepChange(parseFloat(e.target.value))}
                     disabled={loading === "fan-step" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('fanStep').tooltip, { fanStep, agentInterval })
-                    }
                   >
                     {(getValues('fanStep') as { value: number; label: string }[]).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
-                {loading === "fan-step" && (
-                  <span className="loading-spinner">⏳</span>
-                )}
               </div>
-              <div className="info-item info-item-vertical">
-                <span className="label" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('hysteresis').tooltip, { hysteresis })}>{getLabel('hysteresis')}:</span>
+
+              <div className="command-item">
+                <div className="command-label-row">
+                  <Thermometer size={12} className="label-icon" />
+                  <span className="stat-label">{getLabel('hysteresis')}</span>
+                </div>
                 <div className="stealth-select-wrapper">
-                  <div className="agent-interval-select select-display">
-                    {getCleanLabel('hysteresis', hysteresis)}
-                  </div>
+                  <div className="select-display">{getCleanLabel('hysteresis', hysteresis)}</div>
                   <select
-                    className="agent-interval-select select-engine"
+                    className="select-engine"
                     value={hysteresis}
-                    onChange={(e) =>
-                      handleHysteresisChange(parseFloat(e.target.value))
-                    }
+                    onChange={(e) => handleHysteresisChange(parseFloat(e.target.value))}
                     disabled={loading === "hysteresis" || isReadOnly}
-                    title={
-                      isReadOnly
-                        ? readOnlyTooltip
-                        : interpolateTooltip(getOption('hysteresis').tooltip, { hysteresis })
-                    }
                   >
                     {(getValues('hysteresis') as { value: number; label: string }[]).map((opt) => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
                 </div>
-                {loading === "hysteresis" && (
-                  <span className="loading-spinner">⏳</span>
-                )}
               </div>
             </div>
           </div>
@@ -1008,7 +947,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               onClick={() => setIsBulkEditOpen(true)}
               title="Bulk edit fan settings"
             >
-              Bulk edit
+              Bulk Edit
             </button>
           )}
       </div>
