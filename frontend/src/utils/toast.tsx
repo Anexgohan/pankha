@@ -15,6 +15,7 @@
  */
 
 import { toast as sonnerToast } from 'sonner';
+import { Copy } from 'lucide-react';
 
 // Copy text to clipboard
 const copyToClipboard = async (text: string) => {
@@ -44,7 +45,7 @@ export const toast = {
     return sonnerToast.error(message, {
       ...options,
       action: {
-        label: '📋',
+        label: <Copy size={14} />,
         onClick: () => {
           copyToClipboard(message);
         },
@@ -57,7 +58,7 @@ export const toast = {
     return sonnerToast.success(message, {
       ...options,
       action: {
-        label: '📋',
+        label: <Copy size={14} />,
         onClick: () => {
           copyToClipboard(message);
         },
@@ -70,7 +71,7 @@ export const toast = {
     return sonnerToast.info(message, {
       ...options,
       action: {
-        label: '📋',
+        label: <Copy size={14} />,
         onClick: () => {
           copyToClipboard(message);
         },
@@ -83,7 +84,7 @@ export const toast = {
     return sonnerToast.warning(message, {
       ...options,
       action: {
-        label: '📋',
+        label: <Copy size={14} />,
         onClick: () => {
           copyToClipboard(message);
         },

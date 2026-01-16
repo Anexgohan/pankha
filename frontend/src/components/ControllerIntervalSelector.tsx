@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getControllerStatus, setControllerInterval } from '../services/api';
 import { toast } from '../utils/toast';
+import { Loader2 } from 'lucide-react';
 
 interface ControllerIntervalOption {
   value: number;
@@ -9,12 +10,12 @@ interface ControllerIntervalOption {
 }
 
 const controllerIntervalOptions: ControllerIntervalOption[] = [
-  { value: 500, label: 'Real-time (500ms)', icon: '⚡' },
-  { value: 1000, label: 'Fast (1s)', icon: '🏃' },
-  { value: 2000, label: 'Normal (2s)', icon: '⚖️' },
-  { value: 3000, label: 'Balanced (3s)', icon: '🐢' },
-  { value: 5000, label: 'Slow (5s)', icon: '🚶' },
-  { value: 10000, label: 'Very Slow (10s)', icon: '🐌' }
+  { value: 500, label: 'Real-time (500ms)', icon: 'zap' },
+  { value: 1000, label: 'Fast (1s)', icon: 'rocket' },
+  { value: 2000, label: 'Normal (2s)', icon: 'gauge' },
+  { value: 3000, label: 'Balanced (3s)', icon: 'coffee' },
+  { value: 5000, label: 'Slow (5s)', icon: 'clock' },
+  { value: 10000, label: 'Very Slow (10s)', icon: 'history' }
 ];
 
 const ControllerIntervalSelector: React.FC = () => {
@@ -68,11 +69,11 @@ const ControllerIntervalSelector: React.FC = () => {
       >
         {controllerIntervalOptions.map(option => (
           <option key={option.value} value={option.value}>
-            {option.icon} {option.label}
+            {option.label}
           </option>
         ))}
       </select>
-      {loading && <span className="loading-spinner">⏳</span>}
+      {loading && <Loader2 className="animate-spin" size={14} />}
     </div>
   );
 };

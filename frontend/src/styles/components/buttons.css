@@ -42,6 +42,10 @@ button:focus-visible {
   border: none;
   border-radius: var(--radius-sm);
   font-weight: var(--font-weight-medium);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
 }
 
 .emergency-button {
@@ -128,6 +132,19 @@ button:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--text-primary);
+}
+
+.theme-toggle svg {
+  width: 20px !important;
+  height: 20px !important;
+  color: var(--text-primary) !important;
+  stroke: currentColor !important;
+  stroke-width: 2px !important;
+  fill: none !important;
+  opacity: 1 !important;
+  display: block !important;
+  visibility: visible !important;
 }
 
 .theme-toggle:hover {

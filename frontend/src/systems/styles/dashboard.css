@@ -42,6 +42,9 @@
 
 .connection-status-indicator {
   font-weight: var(--font-weight-semibold);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
 }
 
 .connection-status-indicator.connected {

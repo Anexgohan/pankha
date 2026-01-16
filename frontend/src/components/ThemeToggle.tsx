@@ -1,15 +1,9 @@
 import React from 'react';
 import { useTheme } from '../contexts/ThemeContext';
+import { Sun, MoonStar, Monitor } from 'lucide-react';
 
 const ThemeToggle: React.FC = () => {
   const { theme, actualTheme, toggleTheme } = useTheme();
-
-  const getIcon = () => {
-    if (theme === 'system') {
-      return '🖥️';
-    }
-    return actualTheme === 'dark' ? '🌙' : '☀️';
-  };
 
   const getTitle = () => {
     if (theme === 'system') {
@@ -25,7 +19,15 @@ const ThemeToggle: React.FC = () => {
       title={getTitle()}
       aria-label={getTitle()}
     >
-      {getIcon()}
+      <div className="theme-icon-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {theme === 'system' ? (
+          <Monitor size={20} stroke="var(--text-primary)" strokeWidth={2} />
+        ) : actualTheme === 'dark' ? (
+          <MoonStar size={20} stroke="var(--text-primary)" strokeWidth={2} />
+        ) : (
+          <Sun size={20} stroke="var(--text-primary)" strokeWidth={2} />
+        )}
+      </div>
     </button>
   );
 };

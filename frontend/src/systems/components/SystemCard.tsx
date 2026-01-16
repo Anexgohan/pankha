@@ -32,6 +32,16 @@ import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayName
 import { getAgentStatusColor } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen } from "../../utils/formatters";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
+import { 
+  Lock, 
+  Thermometer, 
+  Search, 
+  Loader2,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Fan
+} from 'lucide-react';
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
 import { BulkEditPanel } from "./BulkEditPanel";
@@ -307,9 +317,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
       case "storage":
         return <img src="/icons/hdd-01.png" width={24} height={24} title="Storage" alt="Storage" />;
       case "acpi":
-        return "🌡️";
+        return <Thermometer size={20} />;
       default:
-        return "🔍";
+        return <Search size={20} />;
     }
   };
 
@@ -647,7 +657,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
             </span>
             {isReadOnly && (
               <span className="read-only-badge" title={readOnlyTooltip}>
-                🔒
+                <Lock size={12} />
               </span>
             )}
           </div>
@@ -657,7 +667,11 @@ const SystemCard: React.FC<SystemCardProps> = ({
             disabled={loading === "delete"}
             title="Delete system"
           >
-            {loading === "delete" ? "..." : "×"}
+            {loading === "delete" ? (
+              <Loader2 className="animate-spin" size={14} />
+            ) : (
+              <X size={18} />
+            )}
           </button>
         </div>
 
@@ -769,7 +783,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     {enableFanControl ? "Enabled" : "Disabled"}
                   </span>
                   {loading === "enable-fan-control" && (
-                    <span className="loading-spinner">⏳</span>
+                    <Loader2 className="animate-spin" size={14} />
                   )}
                 </label>
               </div>
@@ -1008,7 +1022,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
               onClick={() => onToggleSensors(!expandedSensors)}
             >
               <h4>Temperature Sensors</h4>
-              <span className="expand-icon">{expandedSensors ? "▼" : "▶"}</span>
+              <span className="expand-icon">
+                {expandedSensors ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </span>
             </div>
 
             {expandedSensors && (
@@ -1107,7 +1123,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
             onClick={() => onToggleFans(!expandedFans)}
           >
             <h4>Fans</h4>
-            <span className="expand-icon">{expandedFans ? "▼" : "▶"}</span>
+            <span className="expand-icon">
+              {expandedFans ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </span>
           </div>
 
           {expandedFans && (
@@ -1117,7 +1135,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <div className="fan-header">
                     <div className="fan-info">
                       <div className="fan-title">
-                        <span className="fan-icon">🌀</span>
+                        <span className="fan-icon">
+                          <Fan size={18} className="animate-fan-spin" />
+                        </span>
                         <div className="fan-name">
                           <InlineEdit
                             value={getFanDisplayName(
@@ -1231,7 +1251,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           value="__highest__"
                           title="Use the Highest Temperature on the system"
                         >
-                          🔥 Highest ({formatTemperature(highestTemperature, '0.0°C')})
+                          Highest ({formatTemperature(highestTemperature, '0.0°C')})
                         </option>
 
                         {/* Separator */}
@@ -1271,7 +1291,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                     value={`__group__${groupId}`}
                                     title="Selecting a group uses the Highest Temperature of that group"
                                   >
-                                    📊{" "}
                                     {getChipDisplayName(groupId, groupSensors)}{" "}
                                     ({formatTemperature(highestTemp)})
                                   </option>
@@ -1347,7 +1366,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         ))}
                       </select>
                       {loading === `fan-profile-${fan.id}` && (
-                        <span className="loading-spinner">⏳</span>
+                        <Loader2 className="animate-spin" size={14} />
                       )}
                     </div>
                   </div>

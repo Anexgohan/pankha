@@ -310,7 +310,23 @@
 }
 
 .fan-icon {
-  font-size: 1.2em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-info);
+}
+
+.animate-fan-spin {
+  animation: fan-spin 2.5s linear infinite;
+}
+
+@keyframes fan-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .fan-name {

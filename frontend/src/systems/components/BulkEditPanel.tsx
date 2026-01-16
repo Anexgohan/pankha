@@ -4,6 +4,12 @@ import type { FanProfile } from '../../services/fanProfilesApi';
 import { sortSensorGroupIds } from '../../utils/sensorUtils';
 import { formatTemperature } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
+import { 
+  X, 
+  CheckSquare, 
+  Square, 
+  Fan 
+} from 'lucide-react';
 import '../styles/bulk-edit-panel.css';
 
 interface BulkEditPanelProps {
@@ -142,7 +148,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
             onClick={onClose}
             aria-label="Close"
           >
-            ✕
+            <X size={20} />
           </button>
         </div>
 
@@ -162,7 +168,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
               >
                 <option value="">Don't change</option>
                 <option value="__highest__">
-                  🔥 Highest ({formatTemperature(highestTemperature, '0.0°C')})
+                  Highest ({formatTemperature(highestTemperature, '0.0°C')})
                 </option>
                 <option disabled>────────────────────</option>
 
@@ -189,7 +195,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                             value={`__group__${groupId}`}
                             title="Selecting a group uses the Highest Temperature of that group"
                           >
-                            📊 {getChipDisplayName(groupId)} ({formatTemperature(highestTemp)})
+                            {getChipDisplayName(groupId)} ({formatTemperature(highestTemp)})
                           </option>
                         );
                       })}
@@ -233,7 +239,11 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                 className="select-all-btn"
                 onClick={handleSelectAll}
               >
-                {selectedFanIds.size === fans.length ? '☑ Deselect All' : '☐ Select All'}
+                {selectedFanIds.size === fans.length ? (
+                  <><CheckSquare size={14} /> Deselect All</>
+                ) : (
+                  <><Square size={14} /> Select All</>
+                )}
               </button>
             </div>
 
@@ -254,7 +264,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                     />
                     <div className="fan-details">
                       <div className="fan-name">
-                        🌀 {getFanDisplayName(fan.id, fan.name, fan.label)}
+                        <Fan size={16} className={isSelected ? 'animate-fan-spin' : ''} /> {getFanDisplayName(fan.id, fan.name, fan.label)}
                       </div>
                       <div className="fan-id">{fan.id}</div>
                       <div className="fan-stats">

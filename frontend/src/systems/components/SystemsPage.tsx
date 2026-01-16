@@ -8,6 +8,16 @@ import ControllerIntervalSelector from '../../components/ControllerIntervalSelec
 import FanProfileManager from '../../fan-profiles/components/FanProfileManager';
 import Settings from '../../settings/components/Settings';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
+import { 
+  Activity, 
+  Loader2, 
+  Unplug, 
+  CircleAlert, 
+  ShieldAlert, 
+  Monitor, 
+  Wind, 
+  Settings2 
+} from 'lucide-react';
 
 type TabType = 'systems' | 'profiles' | 'settings';
 
@@ -118,7 +128,7 @@ const SystemsPage: React.FC = () => {
             {connectionState === 'connected' && (
               <>
                 <span className="connection-status-indicator connected">
-                  🟢 Live
+                  <Activity size={14} className="status-icon" /> Live
                 </span>
                 <span className="last-update">Real-time</span>
               </>
@@ -126,7 +136,7 @@ const SystemsPage: React.FC = () => {
             {connectionState === 'connecting' && (
               <>
                 <span className="connection-status-indicator connecting">
-                  🟡 Connecting...
+                  <Loader2 size={14} className="status-icon animate-spin" /> Connecting...
                 </span>
                 <span className="last-update">Please wait</span>
               </>
@@ -134,7 +144,7 @@ const SystemsPage: React.FC = () => {
             {connectionState === 'disconnected' && (
               <>
                 <span className="connection-status-indicator disconnected">
-                  🔴 Disconnected
+                  <Unplug size={14} className="status-icon" /> Disconnected
                 </span>
                 <button onClick={reconnect} className="reconnect-btn">
                   Reconnect
@@ -144,7 +154,7 @@ const SystemsPage: React.FC = () => {
             {connectionState === 'error' && (
               <>
                 <span className="connection-status-indicator error">
-                  ⚠️ Error
+                  <CircleAlert size={14} className="status-icon" /> Error
                 </span>
                 <button onClick={reconnect} className="reconnect-btn">
                   Retry
@@ -161,7 +171,7 @@ const SystemsPage: React.FC = () => {
             className="emergency-button"
             title="Emergency stop all fans"
           >
-            🚨 Emergency Stop
+            <ShieldAlert size={18} /> Emergency Stop
           </button>
         </div>
       </header>
@@ -172,19 +182,19 @@ const SystemsPage: React.FC = () => {
             className={`nav-tab ${activeTab === 'systems' ? 'active' : ''}`}
             onClick={() => setActiveTab('systems')}
           >
-            🖥️ Systems Monitor
+            <Monitor size={16} /> Systems Monitor
           </button>
           <button
             className={`nav-tab ${activeTab === 'profiles' ? 'active' : ''}`}
             onClick={() => setActiveTab('profiles')}
           >
-            📊 Fan Profiles
+            <Wind size={16} /> Fan Profiles
           </button>
           <button
             className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
-            ⚙️ Settings
+            <Settings2 size={16} /> Settings
           </button>
         </div>
       </nav>
