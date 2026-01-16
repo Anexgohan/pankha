@@ -224,7 +224,7 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
 
   if (!data || data.length < 2) {
     return (
-      <svg width="100%" height={height} className="sparkline-placeholder-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+      <svg width="100%" height="100%" className="sparkline-placeholder-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         <path className="sparkline-placeholder-path" d={`M0,${height/2} L${width},${height/2}`} fill="none" strokeWidth="1.5" />
       </svg>
     );
@@ -237,7 +237,7 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
       <svg
         ref={containerRef}
         width="100%"
-        height={height}
+        height="100%"
         viewBox={`0 0 ${width} ${height}`}
         preserveAspectRatio="none"
         className="sensor-sparkline-svg"
