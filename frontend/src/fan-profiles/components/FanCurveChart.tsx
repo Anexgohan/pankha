@@ -45,6 +45,7 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
     dragStartOrder: []
   });
   const [hoveredPoint, setHoveredPoint] = useState<number>(-1);
+  const [hoveredData, setHoveredData] = useState<{ temp: number; speed: number; x: number; y: number } | null>(null);
 
   const margin = { top: 20, right: 40, bottom: 40, left: 50 };
   const chartWidth = width - margin.left - margin.right;
@@ -105,28 +106,100 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
   }, [interactive, onPointChange, curvePoints]);
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    if (!dragState.isDragging || !interactive || !onPointChange) return;
-
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     const mouseX = event.clientX - rect.left - margin.left;
     const mouseY = event.clientY - rect.top - margin.top;
 
-    // Constrain to chart bounds
-    const clampedX = Math.max(0, Math.min(chartWidth, mouseX));
-    const clampedY = Math.max(0, Math.min(chartHeight, mouseY));
+    // Handle dragging
+    if (dragState.isDragging && interactive && onPointChange) {
+      // Constrain to chart bounds
+      const clampedX = Math.max(0, Math.min(chartWidth, mouseX));
+      const clampedY = Math.max(0, Math.min(chartHeight, mouseY));
 
-    // Convert back to temperature and fan speed
-    const newTemp = Math.round(inverseScaleX(clampedX));
-    const newSpeed = Math.round(inverseScaleY(clampedY));
+      // Convert back to temperature and fan speed
+      const newTemp = Math.round(inverseScaleX(clampedX));
+      const newSpeed = Math.round(inverseScaleY(clampedY));
 
-    // Constrain values to chart ranges (0-100°C temperature, 0-100% fan speed)
-    const constrainedTemp = Math.max(0, Math.min(100, newTemp));
-    const constrainedSpeed = Math.max(minSpeed, Math.min(maxSpeed, newSpeed));
+      // Constrain values to chart ranges (0-100°C temperature, 0-100% fan speed)
+      const constrainedTemp = Math.max(0, Math.min(100, newTemp));
+      const constrainedSpeed = Math.max(minSpeed, Math.min(maxSpeed, newSpeed));
 
-    onPointChange(dragState.pointIndex, constrainedTemp, constrainedSpeed);
-  }, [dragState, interactive, onPointChange, margin.left, margin.top, chartWidth, chartHeight, inverseScaleX, inverseScaleY, minSpeed, maxSpeed]);
+      onPointChange(dragState.pointIndex, constrainedTemp, constrainedSpeed);
+      return;
+    }
+
+    // Handle snapping tooltip (hover)
+    if (interactive || tooltipOnly) {
+      const isWithinBounds = mouseX >= 0 && mouseX <= chartWidth && 
+                            mouseY >= 0 && mouseY <= chartHeight;
+
+      if (!isWithinBounds) {
+        setHoveredPoint(-1);
+        setHoveredData(null);
+        return;
+      }
+
+      // 1. Find nearest point for highlight/actions
+      let minDistance = Infinity;
+      let nearestIndex = -1;
+
+      curvePoints.forEach((point, index) => {
+        const pointX = scaleX(point.temperature);
+        const distance = Math.abs(pointX - mouseX);
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestIndex = index;
+        }
+      });
+
+      // Show point highlight if mouse is very close to a point (within 5px)
+      if (nearestIndex !== -1 && minDistance < 5) {
+        setHoveredPoint(nearestIndex);
+        const point = curvePoints[nearestIndex];
+        setHoveredData({
+          temp: point.temperature,
+          speed: point.fan_speed,
+          x: scaleX(point.temperature),
+          y: scaleY(point.fan_speed)
+        });
+        return; // Skip interpolation if snapped to point
+      } else {
+        setHoveredPoint(-1);
+      }
+
+      // 2. Calculate interpolated value for the "line snap"
+      const currentTemp = inverseScaleX(mouseX);
+      let interpolatedSpeed = 0;
+
+      if (sortedPoints.length > 0) {
+        if (currentTemp <= sortedPoints[0].temperature) {
+          interpolatedSpeed = sortedPoints[0].fan_speed;
+        } else if (currentTemp >= sortedPoints[sortedPoints.length - 1].temperature) {
+          interpolatedSpeed = sortedPoints[sortedPoints.length - 1].fan_speed;
+        } else {
+          // Find the two points to interpolate between
+          for (let i = 0; i < sortedPoints.length - 1; i++) {
+            const p1 = sortedPoints[i];
+            const p2 = sortedPoints[i + 1];
+            if (currentTemp >= p1.temperature && currentTemp <= p2.temperature) {
+              const t = (currentTemp - p1.temperature) / (p2.temperature - p1.temperature);
+              interpolatedSpeed = p1.fan_speed + t * (p2.fan_speed - p1.fan_speed);
+              break;
+            }
+          }
+        }
+      }
+
+      setHoveredData({
+        temp: Math.round(currentTemp),
+        speed: Math.round(interpolatedSpeed),
+        x: mouseX,
+        y: scaleY(interpolatedSpeed)
+      });
+    }
+  }, [dragState, interactive, tooltipOnly, onPointChange, curvePoints, sortedPoints, margin.left, margin.top, chartWidth, chartHeight, scaleX, scaleY, inverseScaleX, inverseScaleY, minSpeed, maxSpeed]);
 
   const handleMouseUp = useCallback(() => {
     setDragState({
@@ -148,6 +221,7 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
       handleMouseUp();
     }
     setHoveredPoint(-1);
+    setHoveredData(null);
   }, [dragState.isDragging, handleMouseUp]);
 
   // Handle right-click to remove points
@@ -293,22 +367,49 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        style={{ cursor: dragState.isDragging ? 'grabbing' : 'default' }}
+        style={{ 
+          cursor: dragState.isDragging ? 'grabbing' : 'default',
+          overflow: 'visible' 
+        }}
       >
         <g transform={`translate(${margin.left},${margin.top})`}>
           {/* Grid lines */}
           {generateGridLines()}
           
-          {/* Curve line */}
-          <path
-            d={generatePath()}
-            fill="none"
-            stroke="#2196F3"
-            strokeWidth="2"
-            strokeLinejoin="round"
-            style={{ cursor: interactive ? 'crosshair' : 'default' }}
-            onDoubleClick={handleCurveDoubleClick}
-          />
+                {/* Curve line */}
+                <path
+                  d={generatePath()}
+                  fill="none"
+                  stroke="#2196F3"
+                  strokeWidth="2"
+                  strokeLinejoin="round"
+                  style={{ cursor: interactive ? 'crosshair' : 'default' }}
+                  onDoubleClick={handleCurveDoubleClick}
+                />
+
+                {/* Vertical Ruler & Interpolation Point */}
+                {(interactive || tooltipOnly) && hoveredData && (
+                  <g pointerEvents="none">
+                    <line
+                      x1={hoveredData.x}
+                      y1={0}
+                      x2={hoveredData.x}
+                      y2={chartHeight}
+                      stroke="rgba(33, 150, 243, 0.4)"
+                      strokeWidth="1"
+                      strokeDasharray="4,4"
+                    />
+                    <circle
+                      cx={hoveredData.x}
+                      cy={hoveredData.y}
+                      r={5}
+                      fill="#2196F3"
+                      stroke="white"
+                      strokeWidth="2"
+                      style={{ filter: 'drop-shadow(0 0 4px rgba(33, 150, 243, 0.6))' }}
+                    />
+                  </g>
+                )}
           
           {/* Curve points */}
           {sortedPoints.map((point, index) => {
@@ -326,8 +427,6 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
                     r={20}
                     fill="transparent"
                     style={{ cursor: interactive ? (isDragging ? 'grabbing' : 'grab') : 'pointer' }}
-                    onMouseEnter={() => setHoveredPoint(originalIndex)}
-                    onMouseLeave={() => setHoveredPoint(-1)}
                     onMouseDown={(e) => handleMouseDown(e, originalIndex)}
                     onContextMenu={(e) => handleRightClick(e, originalIndex)}
                   />
@@ -352,38 +451,33 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
             );
           })}
           
-          {/* Active Tooltip and Highlight (Rendered last to stay on top of all points/lines) */}
-          {(interactive || tooltipOnly) && hoveredPoint !== -1 && (() => {
-            const point = curvePoints[hoveredPoint];
-            
-            const pointX = scaleX(point.temperature);
-            const pointY = scaleY(point.fan_speed);
-            
-            // Smart tooltip positioning to avoid overflow
-            const hasRemoveHint = interactive && curvePoints.length > 2;
+          {/* Active Tooltip (Interpolated or Point-Specific) */}
+          {(interactive || tooltipOnly) && hoveredData && (() => {
+            const hasRemoveHint = interactive && hoveredPoint !== -1 && curvePoints.length > 2;
             const tooltipWidth = 100;
             const tooltipHeight = hasRemoveHint ? 40 : 28;
             
-            const tooltipY = pointY > tooltipHeight + 15 
-              ? pointY - tooltipHeight - 12 
-              : pointY + 20;
+            // Always position tooltip above the point/cursor, even if it leaves the SVG boundary
+            const tooltipY = hoveredData.y - tooltipHeight - 12;
             
             const tooltipX = Math.max(
               tooltipWidth / 2,
-              Math.min(chartWidth - tooltipWidth / 2, pointX)
+              Math.min(chartWidth - tooltipWidth / 2, hoveredData.x)
             );
             
             return (
               <g pointerEvents="none">
-                {/* Point highlight circle (The "glow") */}
-                <circle
-                  cx={pointX}
-                  cy={pointY}
-                  r={18}
-                  fill="rgba(33, 150, 243, 0.2)"
-                  stroke="rgba(33, 150, 243, 0.4)"
-                  strokeWidth="2"
-                />
+                {/* Point "Glow" - Show only when snapping to an actual point */}
+                {hoveredPoint !== -1 && (
+                  <circle
+                    cx={hoveredData.x}
+                    cy={hoveredData.y}
+                    r={18}
+                    fill="rgba(33, 150, 243, 0.2)"
+                    stroke="rgba(33, 150, 243, 0.4)"
+                    strokeWidth="2"
+                  />
+                )}
                 
                 {/* Tooltip Box */}
                 <rect
@@ -405,7 +499,7 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
                   fill="white"
                   fontWeight="600"
                 >
-                  {point.temperature}°C, {point.fan_speed}%
+                  {hoveredData.temp}°C, {hoveredData.speed}%
                 </text>
                 {hasRemoveHint && (
                   <text
