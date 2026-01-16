@@ -88,6 +88,19 @@
   color: #7b1fa2;
 }
 
+/* Profile Type Badges */
+.badge.type-custom {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.badge.type-template {
+  background: rgba(33, 150, 243, 0.1);
+  color: var(--color-primary);
+  border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
 /* Read-Only Badge (License Limit) */
 .read-only-badge {
   margin-left: var(--spacing-sm);

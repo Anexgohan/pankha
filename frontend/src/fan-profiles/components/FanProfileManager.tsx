@@ -223,8 +223,7 @@ const FanProfileManager: React.FC = () => {
                   {getProfileTypeIcon(profile.profile_type)}
                 </span>
                 <div className="profile-info">
-                  <h3>{profile.profile_name}</h3>
-                  <span className="profile-type">{profile.profile_type}</span>
+                  <h3 className="profile-name-text">{profile.profile_name}</h3>
                 </div>
               </div>
               <div className="profile-actions">
@@ -256,20 +255,6 @@ const FanProfileManager: React.FC = () => {
               <p className="profile-description">{profile.description}</p>
             )}
 
-            <div className="profile-details">
-              <div className="detail-item">
-                <span className="label">Curve Points:</span>
-                <span className="value">{profile.curve_points?.length || 0}</span>
-              </div>
-              <div className="detail-item">
-                <span className="label">Assignments:</span>
-                <span className="value">{profile.assignments?.length || 0}</span>
-              </div>
-              <div className="detail-item">
-                <span className="label">Global:</span>
-                <span className="value">{profile.is_global ? 'Yes' : 'No'}</span>
-              </div>
-            </div>
 
             {profile.curve_points && profile.curve_points.length > 0 && (
               <div className="profile-curve-preview">
@@ -278,11 +263,15 @@ const FanProfileManager: React.FC = () => {
                   width={420}
                   height={200}
                   showLabels={true}
+                  assignmentsCount={profile.assignments?.length || 0}
                 />
               </div>
             )}
 
             <div className="profile-badges">
+              <span className={`badge type-${profile.profile_type.toLowerCase()}`}>
+                {profile.profile_type}
+              </span>
               {profile.is_global && (
                 <span className="badge global">Global</span>
               )}

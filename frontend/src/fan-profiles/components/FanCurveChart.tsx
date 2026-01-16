@@ -11,6 +11,7 @@ interface FanCurveChartProps {
   onPointRemove?: (pointIndex: number) => void;
   onPointAdd?: (temperature: number, fanSpeed: number) => void;
   onDragEnd?: () => void;
+  assignmentsCount?: number;
 }
 
 interface DragState {
@@ -30,7 +31,8 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
   onPointChange,
   onPointRemove,
   onPointAdd,
-  onDragEnd
+  onDragEnd,
+  assignmentsCount = 0
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragState, setDragState] = useState<DragState>({
@@ -443,28 +445,27 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
         )}
       </svg>
       
-      <div className="curve-info">
-        <div className="curve-range">
-          <span className="range-item">
-            <strong>Temperature Range:</strong> {minTemp}°C - {maxTemp}°C
+      <div className="curve-info-strip">
+        <div className="range-strip">
+          <span className="strip-item">
+            <span className="item-label">TEMP:</span> {minTemp}-{maxTemp}°C
           </span>
-          <span className="range-item">
-            <strong>Fan Speed Range:</strong> {minSpeed}% - {maxSpeed}%
+          <span className="strip-item">
+            <span className="item-label">SPEED:</span> {minSpeed}-{maxSpeed}%
           </span>
-          {sortedPoints.length > 0 && (
-            <>
-              <span className="range-item">
-                <strong>Curve Points:</strong> {sortedPoints.length}
-              </span>
-              <span className="range-item">
-                <strong>Active Range:</strong> {Math.min(...sortedPoints.map(p => p.temperature))}°C - {Math.max(...sortedPoints.map(p => p.temperature))}°C
-              </span>
-            </>
-          )}
+          <span className="strip-item">
+            <span className="item-label">POINTS:</span> {sortedPoints.length}
+          </span>
+          <span className="strip-item">
+            <span className="item-label">LINKS:</span> {assignmentsCount}
+          </span>
+          <span className="strip-item active-range">
+            <span className="item-label">ACTIVE:</span> {Math.min(...sortedPoints.map(p => p.temperature))}°-{Math.max(...sortedPoints.map(p => p.temperature))}°
+          </span>
         </div>
         {interactive && (
-          <div className="curve-instructions">
-            <p>🎯 <strong>Pro Tip:</strong> Drag points to adjust • Double-click curve to add points • Right-click points to remove • Full 0-100°C range available</p>
+          <div className="curve-pro-tip">
+            Drag to adjust • Double-click to add • Right-click to remove
           </div>
         )}
       </div>

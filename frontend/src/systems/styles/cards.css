@@ -12,7 +12,7 @@
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
-  padding: var(--spacing-xl);
+  padding: var(--spacing-lg);
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   position: relative;
   border: 1px solid var(--border-color);
@@ -292,8 +292,8 @@
 /* Profile Cards */
 .profiles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: var(--spacing-xl);
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: var(--spacing-lg);
 }
 
 .profile-card:hover {
@@ -321,18 +321,25 @@
   font-size: var(--font-size-xl);
 }
 
-.profile-info h3 {
+.profile-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.profile-name-text {
   margin: 0;
   color: var(--color-primary);
   font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
 }
 
-.profile-type {
-  text-transform: capitalize;
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+.profile-type-badge {
+  display: none;
 }
+
 
 .profile-actions {
   display: flex;
@@ -341,34 +348,14 @@
 
 .profile-description {
   color: var(--text-secondary);
-  font-size: var(--font-size-base);
+  font-size: 14px;
   margin-bottom: var(--spacing-lg);
-  line-height: var(--line-height-normal);
+  line-height: 1.6;
+  font-weight: 400;
+  opacity: 0.85;
+  letter-spacing: 0.01em;
 }
 
-.profile-details {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
-}
-
-.detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.detail-item .label {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
-}
-
-.detail-item .value {
-  font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
-}
 
 /* Empty State Cards */
 .no-systems,
