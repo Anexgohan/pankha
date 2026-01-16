@@ -1,4 +1,14 @@
 import React from 'react';
+import { 
+  Monitor, 
+  CheckCircle, 
+  CircleOff, 
+  AlertTriangle, 
+  Activity, 
+  Wind, 
+  Thermometer, 
+  ThermometerSnowflake 
+} from 'lucide-react';
 import type { SystemOverview } from '../../types/api';
 import { formatTemperature } from '../../utils/formatters';
 
@@ -44,49 +54,73 @@ const OverviewStats: React.FC<OverviewStatsProps> = ({ overview }) => {
         className={`stat-card ${getLimitClass()}`}
         title={getLimitTooltip()}
       >
-        <div className="stat-value">{getSystemsDisplay()}</div>
-        <div className="stat-label">Total Systems</div>
+        <div className="stat-icon"><Monitor size={20} /></div>
+        <div className="stat-content">
+          <div className="stat-value">{getSystemsDisplay()}</div>
+          <div className="stat-label">Total Systems</div>
+        </div>
       </div>
 
       <div className="stat-card online">
-        <div className="stat-value">{overview.onlineSystems}</div>
-        <div className="stat-label">Online</div>
+        <div className="stat-icon"><CheckCircle size={20} /></div>
+        <div className="stat-content">
+          <div className="stat-value">{overview.onlineSystems}</div>
+          <div className="stat-label">Online</div>
+        </div>
       </div>
 
       <div className="stat-card offline">
-        <div className="stat-value">{overview.offlineSystems}</div>
-        <div className="stat-label">Offline</div>
+        <div className="stat-icon"><CircleOff size={20} /></div>
+        <div className="stat-content">
+          <div className="stat-value">{overview.offlineSystems}</div>
+          <div className="stat-label">Offline</div>
+        </div>
       </div>
 
       {overview.systemsWithErrors > 0 && (
-        <div className="stat-card error">
-          <div className="stat-value">{overview.systemsWithErrors}</div>
-          <div className="stat-label">Errors</div>
+        <div className="stat-card error-card pulsate">
+          <div className="stat-icon"><AlertTriangle size={20} /></div>
+          <div className="stat-content">
+            <div className="stat-value">{overview.systemsWithErrors}</div>
+            <div className="stat-label">Errors</div>
+          </div>
         </div>
       )}
 
-      <div className="stat-card">
-        <div className="stat-value">{overview.totalSensors}</div>
-        <div className="stat-label">Total Sensors</div>
-      </div>
-
-      <div className="stat-card">
-        <div className="stat-value">{overview.totalFans}</div>
-        <div className="stat-label">Total Fans</div>
-      </div>
-
-      <div className="stat-card temperature">
-        <div className="stat-value">
-          {formatTemperature(overview.avgTemperature)}
+      <div className="stat-card sensors">
+        <div className="stat-icon"><Activity size={20} /></div>
+        <div className="stat-content">
+          <div className="stat-value">{overview.totalSensors}</div>
+          <div className="stat-label">Sensors</div>
         </div>
-        <div className="stat-label">Avg Temperature</div>
       </div>
 
-      <div className="stat-card temperature">
-        <div className="stat-value">
-          {formatTemperature(overview.highestTemperature)}
+      <div className="stat-card fans">
+        <div className="stat-icon"><Wind size={20} /></div>
+        <div className="stat-content">
+          <div className="stat-value">{overview.totalFans}</div>
+          <div className="stat-label">Fans</div>
         </div>
-        <div className="stat-label">Highest Temperature</div>
+      </div>
+
+      <div className="stat-card temperature-avg">
+        <div className="stat-icon"><ThermometerSnowflake size={20} /></div>
+        <div className="stat-content">
+          <div className="stat-value">
+            {formatTemperature(overview.avgTemperature)}
+          </div>
+          <div className="stat-label">Avg Temp</div>
+        </div>
+      </div>
+
+      <div className="stat-card temperature-high">
+        <div className="stat-icon"><Thermometer size={20} /></div>
+        <div className="stat-content">
+          <div className="stat-value">
+            {formatTemperature(overview.highestTemperature)}
+          </div>
+          <div className="stat-label">Highest Temp</div>
+        </div>
       </div>
     </div>
   );
