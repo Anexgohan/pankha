@@ -257,13 +257,18 @@ const FanProfileManager: React.FC = () => {
 
 
             {profile.curve_points && profile.curve_points.length > 0 && (
-              <div className="profile-curve-preview">
+              <div 
+                className="profile-curve-preview clickable-graph" 
+                onClick={() => handleEditProfile(profile)}
+                title="Click to edit profile"
+              >
                 <FanCurveChart
                   curvePoints={profile.curve_points}
                   width={420}
                   height={200}
                   showLabels={true}
                   assignmentsCount={profile.assignments?.length || 0}
+                  tooltipOnly={true}
                 />
               </div>
             )}

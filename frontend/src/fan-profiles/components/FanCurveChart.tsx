@@ -12,6 +12,7 @@ interface FanCurveChartProps {
   onPointAdd?: (temperature: number, fanSpeed: number) => void;
   onDragEnd?: () => void;
   assignmentsCount?: number;
+  tooltipOnly?: boolean;
 }
 
 interface DragState {
@@ -32,7 +33,8 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
   onPointRemove,
   onPointAdd,
   onDragEnd,
-  assignmentsCount = 0
+  assignmentsCount = 0,
+  tooltipOnly = false
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const [dragState, setDragState] = useState<DragState>({
@@ -316,98 +318,109 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
             
             return (
               <g key={point.id || index}>
-                {/* Point highlight circle (appears on hover) */}
-                {interactive && isHovered && (
+                {/* Hit area for easier hovering - invisible but large */}
+                {(interactive || tooltipOnly) && (
                   <circle
                     cx={scaleX(point.temperature)}
                     cy={scaleY(point.fan_speed)}
-                    r={16}
-                    fill="rgba(33, 150, 243, 0.15)"
-                    stroke="rgba(33, 150, 243, 0.3)"
-                    strokeWidth="2"
+                    r={20}
+                    fill="transparent"
+                    style={{ cursor: interactive ? (isDragging ? 'grabbing' : 'grab') : 'pointer' }}
+                    onMouseEnter={() => setHoveredPoint(originalIndex)}
+                    onMouseLeave={() => setHoveredPoint(-1)}
+                    onMouseDown={(e) => handleMouseDown(e, originalIndex)}
+                    onContextMenu={(e) => handleRightClick(e, originalIndex)}
                   />
                 )}
                 
-                {/* Main point circle */}
+                {/* Visual point circle - smaller and cleaner */}
                 <circle
                   cx={scaleX(point.temperature)}
                   cy={scaleY(point.fan_speed)}
-                  r={interactive ? (isHovered || isDragging ? 12 : 8) : 6}
+                  r={interactive || tooltipOnly ? (isHovered || isDragging ? 10 : 7) : 6}
                   fill={isDragging ? "#1976D2" : isHovered ? "#42A5F5" : "#2196F3"}
                   stroke="white"
-                  strokeWidth={interactive ? "3" : "2"}
-                  className={interactive ? "curve-point interactive" : "curve-point"}
+                  strokeWidth={interactive || tooltipOnly ? "3" : "2"}
+                  className={(interactive || tooltipOnly) ? "curve-point interactive" : "curve-point"}
                   style={{ 
-                    cursor: interactive ? (isDragging ? 'grabbing' : 'grab') : 'default',
+                    pointerEvents: 'none',
                     filter: isDragging ? 'drop-shadow(0 4px 12px rgba(0,0,0,0.4))' : 'drop-shadow(0 2px 4px rgba(0,0,0,0.2))',
                     transition: isDragging ? 'none' : 'all 0.2s ease'
                   }}
-                  onMouseDown={(e) => handleMouseDown(e, originalIndex)}
-                  onContextMenu={(e) => handleRightClick(e, originalIndex)}
-                  onMouseEnter={() => setHoveredPoint(originalIndex)}
-                  onMouseLeave={() => setHoveredPoint(-1)}
                 />
-                
-                {/* Point value tooltip (appears on hover in interactive mode) */}
-                {interactive && isHovered && (() => {
-                  const pointX = scaleX(point.temperature);
-                  const pointY = scaleY(point.fan_speed);
-                  
-                  // Smart tooltip positioning to avoid overflow
-                  const hasRemoveHint = curvePoints.length > 2;
-                  const tooltipWidth = 90;
-                  const tooltipHeight = hasRemoveHint ? 40 : 28;
-                  
-                  // Position tooltip above point, but if too close to top, position below
-                  const tooltipY = pointY > tooltipHeight + 10 
-                    ? pointY - tooltipHeight - 5  // Above point
-                    : pointY + 20;                // Below point
-                  
-                  // Keep tooltip within horizontal bounds
-                  const tooltipX = Math.max(
-                    tooltipWidth / 2,
-                    Math.min(chartWidth - tooltipWidth / 2, pointX)
-                  );
-                  
-                  return (
-                    <g>
-                      <rect
-                        x={tooltipX - tooltipWidth / 2}
-                        y={tooltipY}
-                        width={tooltipWidth}
-                        height={tooltipHeight}
-                        fill="rgba(0, 0, 0, 0.85)"
-                        rx={6}
-                        stroke="rgba(255, 255, 255, 0.2)"
-                        strokeWidth="1"
-                      />
-                      <text
-                        x={tooltipX}
-                        y={tooltipY + 16}
-                        textAnchor="middle"
-                        fontSize="12"
-                        fill="white"
-                        fontWeight="600"
-                      >
-                        {point.temperature}°C, {point.fan_speed}%
-                      </text>
-                      {hasRemoveHint && (
-                        <text
-                          x={tooltipX}
-                          y={tooltipY + 32}
-                          textAnchor="middle"
-                          fontSize="9"
-                          fill="rgba(255, 255, 255, 0.8)"
-                        >
-                          Right-click to remove
-                        </text>
-                      )}
-                    </g>
-                  );
-                })()}
               </g>
             );
           })}
+          
+          {/* Active Tooltip and Highlight (Rendered last to stay on top of all points/lines) */}
+          {(interactive || tooltipOnly) && hoveredPoint !== -1 && (() => {
+            const point = curvePoints[hoveredPoint];
+            
+            const pointX = scaleX(point.temperature);
+            const pointY = scaleY(point.fan_speed);
+            
+            // Smart tooltip positioning to avoid overflow
+            const hasRemoveHint = interactive && curvePoints.length > 2;
+            const tooltipWidth = 100;
+            const tooltipHeight = hasRemoveHint ? 40 : 28;
+            
+            const tooltipY = pointY > tooltipHeight + 15 
+              ? pointY - tooltipHeight - 12 
+              : pointY + 20;
+            
+            const tooltipX = Math.max(
+              tooltipWidth / 2,
+              Math.min(chartWidth - tooltipWidth / 2, pointX)
+            );
+            
+            return (
+              <g pointerEvents="none">
+                {/* Point highlight circle (The "glow") */}
+                <circle
+                  cx={pointX}
+                  cy={pointY}
+                  r={18}
+                  fill="rgba(33, 150, 243, 0.2)"
+                  stroke="rgba(33, 150, 243, 0.4)"
+                  strokeWidth="2"
+                />
+                
+                {/* Tooltip Box */}
+                <rect
+                  x={tooltipX - tooltipWidth / 2}
+                  y={tooltipY}
+                  width={tooltipWidth}
+                  height={tooltipHeight}
+                  fill="rgba(0, 0, 0, 0.9)"
+                  rx={6}
+                  stroke="rgba(255, 255, 255, 0.3)"
+                  strokeWidth="1"
+                  filter="drop-shadow(0 4px 12px rgba(0,0,0,0.5))"
+                />
+                <text
+                  x={tooltipX}
+                  y={tooltipY + 16}
+                  textAnchor="middle"
+                  fontSize="12"
+                  fill="white"
+                  fontWeight="600"
+                >
+                  {point.temperature}°C, {point.fan_speed}%
+                </text>
+                {hasRemoveHint && (
+                  <text
+                    x={tooltipX}
+                    y={tooltipY + 32}
+                    textAnchor="middle"
+                    fontSize="9"
+                    fill="rgba(255, 255, 255, 0.7)"
+                  >
+                    Right-click to remove
+                  </text>
+                )}
+              </g>
+            );
+          })()}
           
           {/* Axis labels */}
           {generateAxisLabels()}
