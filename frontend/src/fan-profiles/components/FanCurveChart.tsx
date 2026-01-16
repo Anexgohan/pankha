@@ -451,71 +451,6 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
             );
           })}
           
-          {/* Active Tooltip (Interpolated or Point-Specific) */}
-          {(interactive || tooltipOnly) && hoveredData && (() => {
-            const hasRemoveHint = interactive && hoveredPoint !== -1 && curvePoints.length > 2;
-            const tooltipWidth = 100;
-            const tooltipHeight = hasRemoveHint ? 40 : 28;
-            
-            // Always position tooltip above the point/cursor, even if it leaves the SVG boundary
-            const tooltipY = hoveredData.y - tooltipHeight - 12;
-            
-            const tooltipX = Math.max(
-              tooltipWidth / 2,
-              Math.min(chartWidth - tooltipWidth / 2, hoveredData.x)
-            );
-            
-            return (
-              <g pointerEvents="none">
-                {/* Point "Glow" - Show only when snapping to an actual point */}
-                {hoveredPoint !== -1 && (
-                  <circle
-                    cx={hoveredData.x}
-                    cy={hoveredData.y}
-                    r={18}
-                    fill="rgba(33, 150, 243, 0.2)"
-                    stroke="rgba(33, 150, 243, 0.4)"
-                    strokeWidth="2"
-                  />
-                )}
-                
-                {/* Tooltip Box */}
-                <rect
-                  x={tooltipX - tooltipWidth / 2}
-                  y={tooltipY}
-                  width={tooltipWidth}
-                  height={tooltipHeight}
-                  fill="rgba(0, 0, 0, 0.9)"
-                  rx={6}
-                  stroke="rgba(255, 255, 255, 0.3)"
-                  strokeWidth="1"
-                  filter="drop-shadow(0 4px 12px rgba(0,0,0,0.5))"
-                />
-                <text
-                  x={tooltipX}
-                  y={tooltipY + 16}
-                  textAnchor="middle"
-                  fontSize="12"
-                  fill="white"
-                  fontWeight="600"
-                >
-                  {hoveredData.temp}°C, {hoveredData.speed}%
-                </text>
-                {hasRemoveHint && (
-                  <text
-                    x={tooltipX}
-                    y={tooltipY + 32}
-                    textAnchor="middle"
-                    fontSize="9"
-                    fill="rgba(255, 255, 255, 0.7)"
-                  >
-                    Right-click to remove
-                  </text>
-                )}
-              </g>
-            );
-          })()}
-          
           {/* Axis labels */}
           {generateAxisLabels()}
           
@@ -551,6 +486,49 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
           </>
         )}
       </svg>
+      
+      {/* Active Tooltip (Interpolated or Point-Specific) */}
+      {(interactive || tooltipOnly) && hoveredData && (() => {
+        const hasRemoveHint = interactive && hoveredPoint !== -1 && curvePoints.length > 2;
+        
+        // Tooltip position relative to .fan-curve-chart container
+        const tooltipTop = margin.top + hoveredData.y - 12;
+        const tooltipLeft = margin.left + hoveredData.x;
+        
+        return (
+          <div 
+            className="chart-tooltip"
+            style={{
+              position: 'absolute',
+              top: `${tooltipTop}px`,
+              left: `${tooltipLeft}px`,
+              transform: 'translate(-50%, -100%)',
+              pointerEvents: 'none',
+              zIndex: 100,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '2px',
+              padding: '6px 10px',
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+              borderRadius: '6px',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            <div style={{ fontSize: '12px', fontWeight: '600' }}>
+              {hoveredData.temp}°C, {hoveredData.speed}%
+            </div>
+            {hasRemoveHint && (
+              <div style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                Right-click to remove
+              </div>
+            )}
+          </div>
+        );
+      })()}
       
       <div className="curve-info-strip-tactical">
         <div className="range-box">

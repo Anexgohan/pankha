@@ -286,6 +286,7 @@
 /* Fan Curve Chart */
 .fan-curve-chart {
   width: 100%;
+  position: relative;
   user-select: none;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -370,7 +371,7 @@
   display: flex;
   flex-direction: column;
   transition: all 0.2s ease;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .profile-curve-preview.clickable-graph {
