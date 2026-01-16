@@ -16,11 +16,10 @@
   justify-content: space-between;
   align-items: center;
   background: var(--bg-secondary);
-  padding: var(--spacing-md);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  /* margin-bottom: var(--spacing-sm); */
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0; /* Only top corners */
+  transition: background-color 0.3s ease;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .dashboard-header h1 {
@@ -65,15 +64,17 @@
 /* Dashboard Navigation */
 .dashboard-nav {
   background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  margin-bottom: var(--spacing-sm);
-  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg); /* Only bottom corners */
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--spacing-lg);
+  transition: all 0.3s ease;
+  z-index: 10;
+  position: relative;
 }
 
 .nav-tabs {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
+  padding: 0 var(--spacing-md);
   align-items: center;
 }
 
@@ -82,31 +83,48 @@
   border: none;
   padding: var(--spacing-md) var(--spacing-2xl);
   cursor: pointer;
-  font-size: 16px;
-  font-weight: var(--font-weight-medium);
-  color: var(--text-secondary);
-  transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
+  font-size: 14px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-tertiary);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .nav-tab:hover {
-  background: var(--bg-hover);
   color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .nav-tab.active {
   color: var(--color-info);
-  border-bottom-color: var(--color-info);
-  background: var(--bg-hover);
 }
 
-.nav-tab:first-child {
-  border-top-left-radius: var(--radius-lg);
+/* The Laser Underline */
+.nav-tab::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  height: 2px;
+  background: var(--color-info);
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  transform: translateX(-50%);
+  box-shadow: 0 0 10px var(--color-info);
 }
 
+.nav-tab.active::after {
+  width: 100%;
+}
+
+.nav-tab:first-child,
 .nav-tab:last-child {
-  border-top-right-radius: var(--radius-lg);
+  border-radius: 0;
 }
 
 /* Dashboard Content */
