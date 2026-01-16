@@ -12,11 +12,12 @@
 .profile-manager-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: var(--spacing-3xl);
-  background: var(--bg-secondary);
-  padding: var(--spacing-xl);
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  background: var(--bg-tertiary);
+  padding: var(--spacing-lg) var(--spacing-xl);
   border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
   box-shadow: var(--shadow-sm);
 }
 
@@ -28,18 +29,34 @@
 }
 
 .selection-toggle-button,
-.import-export-button {
-  padding: var(--spacing-md) var(--spacing-lg);
+.import-export-button,
+.create-profile-button {
+  padding: var(--spacing-sm) var(--spacing-lg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.create-profile-button {
+  background: var(--color-success);
+  color: white;
+  border: none;
+}
+
+.create-profile-button:hover {
+  background: var(--color-success-hover, #45a049);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
 .selection-toggle-button:hover,
@@ -71,14 +88,16 @@
 }
 
 .header-title h2 {
-  margin: 0 0 var(--spacing-xs) 0;
-  color: var(--color-primary);
+  margin: 0;
+  font-size: 18px;
+  color: var(--text-primary);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .header-title p {
-  margin: 0;
-  color: var(--text-tertiary);
-  font-size: var(--font-size-base);
+  display: none; /* Simplify for tactical look */
 }
 
 .profile-stats {
@@ -175,9 +194,10 @@
 }
 
 .preset-card:hover {
-  border-color: var(--color-primary);
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-tertiary));
+  border-color: var(--color-info);
   transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .preset-card.active {

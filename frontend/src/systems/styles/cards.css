@@ -13,8 +13,9 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: var(--spacing-xl);
-  transition: box-shadow 0.3s ease, background-color 0.3s ease;
-  position: relative; /* For absolute positioned delete button */
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  position: relative;
+  border: 1px solid var(--border-color);
 }
 
 /* Stat Cards */
@@ -28,38 +29,41 @@
 
 .stat-card {
   text-align: center;
-  border-left: 4px solid var(--color-info);
-  /* padding-top: 4px;
-  padding-bottom: 12px;
-  padding-left: 4px;
-  padding-right: 4px; */
-  /* var(top) var(right) var(bottom) var(left) */
-  padding: var(--spacing-md) var(--spacing-xs) var(--spacing-lg) var(--spacing-xs);
+  border-top: 3px solid var(--color-info);
+  padding: var(--spacing-lg) var(--spacing-sm);
+  transition: all 0.2s ease;
+}
+
+.stat-card:hover {
+  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
+  border-color: var(--color-info);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .stat-card.online {
-  border-left-color: var(--color-success);
+  border-top-color: var(--color-success);
 }
 
 .stat-card.offline {
-  border-left-color: var(--text-tertiary);
+  border-top-color: var(--text-tertiary);
 }
 
 .stat-card.error {
-  border-left-color: var(--color-error);
+  border-top-color: var(--color-error);
 }
 
 .stat-card.temperature {
-  border-left-color: var(--color-warning);
+  border-top-color: var(--color-warning);
 }
 
 /* License limit indicators */
 .stat-card.at-limit {
-  border-left-color: #FFA000; /* Amber */
+  border-top-color: #FFA000; /* Amber */
 }
 
 .stat-card.over-limit {
-  border-left-color: var(--color-error);
+  border-top-color: var(--color-error);
   background: color-mix(in srgb, var(--color-error) 5%, var(--bg-secondary));
 }
 
@@ -94,7 +98,10 @@
 }
 
 .system-card:hover {
+  background: color-mix(in srgb, var(--color-info) 3%, var(--bg-secondary));
+  border-color: var(--color-info);
   box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
 }
 
 .system-header {
@@ -290,6 +297,8 @@
 }
 
 .profile-card:hover {
+  background: color-mix(in srgb, var(--color-info) 5%, var(--bg-secondary));
+  border-color: var(--color-info);
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
