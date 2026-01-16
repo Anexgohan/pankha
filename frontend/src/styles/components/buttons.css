@@ -138,9 +138,8 @@ button:focus-visible {
 .theme-toggle svg {
   width: 20px !important;
   height: 20px !important;
-  color: var(--text-primary) !important;
-  stroke: currentColor !important;
-  stroke-width: 2px !important;
+  stroke: var(--text-primary) !important;
+  stroke-width: 2.5px !important;
   fill: none !important;
   opacity: 1 !important;
   display: block !important;
