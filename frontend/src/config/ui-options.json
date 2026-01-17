@@ -68,7 +68,7 @@
     "failsafeSpeed": {
       "label": "Failsafe Speed",
       "description": "Fan speed when backend connection is lost.",
-      "tooltip": "\"Failsafe Speed\" is the Fan speed {failsafeSpeed}% set when backend connection is lost (Agent goes into failsafe mode).\nWarning: 0% allows fans to stop only overridden by \"Emergency Temperature\" Threshold.",
+      "tooltip": "\"Failsafe Speed\" is the Fan speed {failsafeSpeed}% set when backend connection is lost \nAgent implements failsafe mode until reconnection.\nWarning: 0% allows fans to stop only overridden by \"Emergency Temperature\" Threshold.",
       "unit": "%",
       "values": [
         { "value": 0, "label": "0% (allow stop)", "cleanLabel": "0%" },

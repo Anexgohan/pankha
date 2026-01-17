@@ -138,7 +138,7 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
     <div
       className={`inline-edit-container ${className}`}
       onDoubleClick={handleDoubleClick}
-      title={`Double-click to edit\nHardware ID: ${hardwareId}`}
+      title={`${value}\n\nDouble-click to edit\nHardware ID: ${hardwareId}`}
     >
       <span className="inline-edit-value">
         {value || placeholder}

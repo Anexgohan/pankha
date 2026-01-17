@@ -218,13 +218,15 @@
   min-width: 80px;
   text-align: center;
   padding: 4px 10px;
-  border-radius: 20px;
-  font-size: var(--font-size-base);
+  border-radius: 12px;
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold-xl);
-  text-transform: uppercase;
+  text-transform: capitalize;
   letter-spacing: 0.1em;
   color: var(--text-primary);
   background: var(--bg-tertiary);
+  padding-inline: 2px;
+  border-radius: 12px;
 }
 
 .delete-button {

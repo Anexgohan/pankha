@@ -158,7 +158,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
           <div className="bulk-edit-section">
             <h4 className="section-title">Master Controls</h4>
 
-            <div className="control-group">
+            <div className="control-group" title="The sensor used to control the speed of selected fans">
               <label htmlFor="bulk-sensor">Set Control Sensor:</label>
               <select
                 id="bulk-sensor"
@@ -213,7 +213,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
               </select>
             </div>
 
-            <div className="control-group">
+            <div className="control-group" title="The behavior curve or manual speed to apply to selected fans">
               <label htmlFor="bulk-profile">Set Fan Profile:</label>
               <select
                 id="bulk-profile"

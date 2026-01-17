@@ -10,7 +10,6 @@
   color: white;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  text-transform: uppercase;
   white-space: nowrap;
   text-align: center;
 }

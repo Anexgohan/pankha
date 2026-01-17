@@ -53,7 +53,7 @@ import { PankhaFanIcon } from "../../components/icons/PankhaFanIcon";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorItem from "./SensorItem";
 import { useSensorHistory } from "../hooks/useSensorHistory";
-import { getOption, getValues, getLabel, getCleanLabel, getDefault } from "../../utils/uiOptions";
+import { getOption, getValues, getLabel, getCleanLabel, getDefault, interpolateTooltip } from "../../utils/uiOptions";
 
 interface SystemCardProps {
   system: SystemData;
@@ -638,6 +638,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const readOnlyTooltip =
     "This system exceeds your license limit. Upgrade to control this agent. You can still view data.";
 
+  // Context for tooltip interpolation
+  const tooltipContext = {
+    logLevel,
+    emergencyTemp,
+    failsafeSpeed,
+    agentInterval,
+    fanStep,
+    hysteresis,
+    fanControl: enableFanControl ? "ENABLED" : "DISABLED"
+  };
+
   return (
     <div className={`system-card${isReadOnly ? " read-only" : ""}`}>
       <div className="system-header">
@@ -647,6 +658,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               <span
                 className="status-badge"
                 style={{ backgroundColor: getAgentStatusColor(system.status) }}
+                title={`Agent status is currently "${system.status.toUpperCase()}"`}
               >
                 {system.status}
               </span>
@@ -714,7 +726,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
           highestFanRPM) && (
         <div className="system-summary-stats">
           {averageTemperature && (
-            <div className="summary-stat">
+            <div className="summary-stat" title="Average temperature across all active sensors, excluding hidden sensors">
               <div className="summary-stat-label">Avg Temp</div>
               <div
                 className={`summary-stat-value temperature-${getTemperatureClass(
@@ -726,7 +738,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
             </div>
           )}
           {highestTemperature && (
-            <div className="summary-stat">
+            <div className="summary-stat" title="Highest temperature currently reported by any sensor, excluding hidden sensors">
               <div className="summary-stat-label">Peak Temp</div>
               <div
                 className={`summary-stat-value temperature-${getTemperatureClass(
@@ -738,7 +750,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
             </div>
           )}
           {averageFanRPM !== null && system.current_fan_speeds && (
-            <div className="summary-stat">
+            <div className="summary-stat" title="Average RPM across all connected fans">
               <div className="summary-stat-label">Avg RPM</div>
               <div
                 className={`summary-stat-value fan-${getFanRPMClass(
@@ -752,7 +764,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
             </div>
           )}
           {highestFanRPM !== null && system.current_fan_speeds && (
-            <div className="summary-stat">
+            <div className="summary-stat" title="Highest RPM currently reported by any fan">
               <div className="summary-stat-label">Peak RPM</div>
               <div
                 className={`summary-stat-value fan-${getFanRPMClass(
@@ -772,10 +784,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
           <div className="system-command-center">
             <div className="command-grid">
               {/* Row 1: Fan Control, Log Level */}
-              <div className="command-item">
+              <div className="command-item" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('fanControl').tooltip, tooltipContext)}>
                 <div className="command-label-row">
                   <Zap size={14} className="label-icon" />
-                  <span className="stat-label" title={isReadOnly ? readOnlyTooltip : getOption('fanControl').tooltip}>{getLabel('fanControl')}</span>
+                  <span className="stat-label">{getLabel('fanControl')}</span>
                 </div>
                 <label className="tactical-checkbox">
                   <input
@@ -790,7 +802,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 </label>
               </div>
 
-              <div className="command-item">
+              <div className="command-item" title={interpolateTooltip(getOption('logLevel').tooltip, tooltipContext)}>
                 <div className="command-label-row">
                   <Activity size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('logLevel')}</span>
@@ -811,7 +823,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               </div>
 
               {/* Row 2: Emergency Temp, Failsafe Speed */}
-              <div className="command-item">
+              <div className="command-item" title={interpolateTooltip(getOption('emergencyTemp').tooltip, tooltipContext)}>
                 <div className="command-label-row">
                   <Thermometer size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('emergencyTemp')}</span>
@@ -831,7 +843,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 </div>
               </div>
 
-              <div className="command-item">
+              <div className="command-item" title={interpolateTooltip(getOption('failsafeSpeed').tooltip, tooltipContext)}>
                 <div className="command-label-row">
                   <Wind size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('failsafeSpeed')}</span>
@@ -852,7 +864,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               </div>
 
               {/* Row 3: Agent Rate, Fan Step, Hysteresis */}
-              <div className="command-item">
+              <div className="command-item" title={interpolateTooltip(getOption('updateInterval').tooltip, tooltipContext)}>
                 <div className="command-label-row">
                   <Activity size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('updateInterval')}</span>
@@ -872,7 +884,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 </div>
               </div>
 
-              <div className="command-item">
+              <div className="command-item" title={interpolateTooltip(getOption('fanStep').tooltip, tooltipContext)}>
                 <div className="command-label-row">
                   <ChevronRight size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('fanStep')}</span>
@@ -892,7 +904,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 </div>
               </div>
 
-              <div className="command-item">
+              <div className="command-item" title={interpolateTooltip(getOption('hysteresis').tooltip, tooltipContext)}>
                 <div className="command-label-row">
                   <Thermometer size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('hysteresis')}</span>
@@ -917,13 +929,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
       </div>
 
       <div className="system-stats">
-        <div className="stat">
+        <div className="stat" title="Total number of sensors detected on this system">
           <span className="stat-number">
             {system.current_temperatures?.length || 0}
           </span>
           <span className="stat-label">Sensors</span>
         </div>
-        <div className="stat">
+        <div className="stat" title="Total number of fans detected on this system">
           <span className="stat-number">
             {system.current_fan_speeds?.length || 0}
           </span>
