@@ -129,19 +129,31 @@
 
 /* --- 3. SYSTEM CARD COMPONENT --- */
 .systems-grid {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 360px);
   gap: var(--spacing-md);
-  margin-bottom: var(--spacing-3xl);
   justify-content: center;
+  align-items: start;
+  margin: 0 auto var(--spacing-3xl);
+  width: 100%;
+  max-width: 100%; /* Fill up to dashboard container limit */
+}
+
+@media (max-width: 400px) {
+  .systems-grid {
+    grid-template-columns: 1fr;
+    padding: 0 var(--spacing-sm);
+  }
 }
 
 .system-card {
   padding: var(--spacing-lg);
-  flex: 0 0 360px;
+  width: 100%;
   max-width: 360px;
+  margin: 0 auto;
   transition: all 0.3s ease;
   background-image: var(--bg-overlay-tactical);
+  box-sizing: border-box;
 }
 
 .system-card:hover {
@@ -157,27 +169,33 @@
 
 .system-title {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
   margin-bottom: var(--spacing-md);
-  gap: var(--spacing-sm);
 }
 
-.title-left {
+.system-title-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.status-group {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.system-title-main {
+  width: 100%;
 }
 
 .system-title h3 {
   color: var(--text-primary);
   margin: 0;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
+  width: 100%;
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold-xl);
   letter-spacing: -0.02em;
@@ -188,7 +206,7 @@
 }
 
 .system-title h3 .agent-name-edit .inline-edit-value {
-  padding: var(--spacing-xs);
+  padding: 2px 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -213,20 +231,32 @@
   background: var(--bg-tertiary);
   border: 1px solid var(--border-light);
   color: var(--text-tertiary);
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s ease;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+  opacity: 0.6;
 }
 
-.delete-button:hover {
+.delete-button svg {
+  display: block;
+}
+
+.delete-button:hover:not(:disabled) {
+  opacity: 1;
   background: rgba(var(--color-critical-rgb), 0.1);
   color: var(--color-critical);
   border-color: var(--color-critical);
+  transform: rotate(90deg) scale(1.1);
+}
+
+.delete-button:active {
+  transform: scale(0.9);
 }
 
 /* 3.3 Meta Details */

@@ -642,18 +642,36 @@ const SystemCard: React.FC<SystemCardProps> = ({
     <div className={`system-card${isReadOnly ? " read-only" : ""}`}>
       <div className="system-header">
         <div className="system-title">
-          <div className="title-left">
-            <span
-              className="status-badge"
-              style={{ backgroundColor: getAgentStatusColor(system.status) }}
-            >
-              {system.status}
-            </span>
-            {isReadOnly && (
-              <span className="read-only-badge" title={readOnlyTooltip}>
-                <LockIcon size={12} />
+          <div className="system-title-top">
+            <div className="status-group">
+              <span
+                className="status-badge"
+                style={{ backgroundColor: getAgentStatusColor(system.status) }}
+              >
+                {system.status}
               </span>
-            )}
+              {isReadOnly && (
+                <span className="read-only-badge" title={readOnlyTooltip}>
+                  <LockIcon size={12} />
+                </span>
+              )}
+            </div>
+
+            <button
+              className="delete-button"
+              onClick={handleDeleteSystem}
+              disabled={loading === "delete"}
+              title="Delete system"
+            >
+              {loading === "delete" ? (
+                <Loader2 className="animate-spin" size={14} />
+              ) : (
+                <X size={14} />
+              )}
+            </button>
+          </div>
+
+          <div className="system-title-main">
             <h3>
               <InlineEdit
                 value={system.name}
@@ -667,18 +685,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
               />
             </h3>
           </div>
-          <button
-            className="delete-button"
-            onClick={handleDeleteSystem}
-            disabled={loading === "delete"}
-            title="Delete system"
-          >
-            {loading === "delete" ? (
-              <Loader2 className="animate-spin" size={14} />
-            ) : (
-              <X size={14} />
-            )}
-          </button>
         </div>
 
         <div className="system-meta">
