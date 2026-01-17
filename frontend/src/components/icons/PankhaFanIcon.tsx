@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 interface PankhaFanIconProps {
   size?: number;
@@ -11,14 +11,19 @@ interface PankhaFanIconProps {
  * Rendered inline to eliminate HTTP requests - bundled with JS.
  *
  * GPU-optimized for smooth rotation animation at scale (100+ clients).
- * Use with .animate-fan-spin class and --spin-duration CSS variable.
+ *
+ * Usage options:
+ * 1. CSS Animation: Use .animate-fan-spin class with --spin-duration CSS variable
+ * 2. Web Animations API: Pass ref and call element.animate() with playbackRate
+ *    for jerk-free speed transitions
  */
-export const PankhaFanIcon = React.memo(({
+export const PankhaFanIcon = React.memo(forwardRef<SVGSVGElement, PankhaFanIconProps>(({
   size = 28,
   className,
   style
-}: PankhaFanIconProps) => (
+}, ref) => (
   <svg
+    ref={ref}
     width={size}
     height={size}
     viewBox="0 0 1024 1024"
@@ -50,6 +55,6 @@ export const PankhaFanIcon = React.memo(({
       <path d="M599.539,587.061c5.631,11.936 80.147,71.126 166.875,99.406c91.015,29.678 194.56,28.228 205.968,29.250c20.971,1.88 -47.52,16.871 -77.276,16.909c-35.735,0.045 -96.462,3.336 -158.627,-10.706c-59.007,-13.328 -141.022,-41.049 -212.772,-87.119c0,0 63.101,-10.461 75.832,-47.74Z" fill="#6bbdff" />
     </g>
   </svg>
-));
+)));
 
 PankhaFanIcon.displayName = 'PankhaFanIcon';

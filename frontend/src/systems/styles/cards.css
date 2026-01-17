@@ -426,8 +426,8 @@
 .tactical-checkbox input:checked + .checkbox-custom::after {
   content: '';
   position: absolute;
-  left: 4px;
-  top: 1px;
+  left: 3px;
+  top: -2px;
   width: 5px;
   height: 9px;
   border: solid white;

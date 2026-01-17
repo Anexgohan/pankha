@@ -49,7 +49,7 @@ import {
 } from 'lucide-react';
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
-import { PankhaFanIcon } from "../../components/icons/PankhaFanIcon";
+import AnimatedFanIcon from "../../components/icons/AnimatedFanIcon";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorItem from "./SensorItem";
 import { useSensorHistory } from "../hooks/useSensorHistory";
@@ -1062,15 +1062,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     <div className="fan-info">
                       <div className="fan-title">
                         <span className="fan-icon">
-                          {/* Animation duration: 0.3s (100%) to 3s (0%)
-                              See --spin-duration-min/max in sensors-fans.css */}
-                          <PankhaFanIcon
-                            size={28}
-                            className={fan.speed > 0 ? "animate-fan-spin" : ""}
-                            style={fan.speed > 0 ? {
-                              '--spin-duration': `${Math.max(0.3, 3 - (fan.speed * 0.027))}s`
-                            } as React.CSSProperties : undefined}
-                          />
+                          {/* Uses Web Animations API for jerk-free speed changes */}
+                          <AnimatedFanIcon size={28} speed={fan.speed} />
                         </span>
                         <div className="fan-name">
                           <InlineEdit

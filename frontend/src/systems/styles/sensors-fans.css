@@ -288,6 +288,7 @@
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+  contain: layout style paint;  /* Performance: isolate layout recalculations */
 }
 
 .fan-item:hover {
@@ -323,6 +324,7 @@
   align-items: center;
   justify-content: center;
   color: var(--color-info);
+  contain: layout style;  /* Performance: isolate from siblings */
 }
 
 .animate-fan-spin {
@@ -338,6 +340,13 @@
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Accessibility: respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fan-spin {
+    animation: none;
   }
 }
 
