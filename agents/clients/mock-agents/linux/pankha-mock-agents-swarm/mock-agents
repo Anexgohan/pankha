@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""
+Pankha Mock Agents - CLI Entry Point
+
+Lightweight mock agent system for testing Pankha backend at scale.
+Runs multiple simulated agents in a single process.
+
+Usage:
+    mock-agents --help
+    mock-agents --build
+    mock-agents --start
+    mock-agents --stop
+    mock-agents --status
+    mock-agents --restart
+"""
+
+import sys
+from pathlib import Path
+
+# Add src/ to path
+sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+from cli import main
+
+if __name__ == "__main__":
+    main()
