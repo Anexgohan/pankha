@@ -8,6 +8,7 @@ import ControllerIntervalSelector from '../../components/ControllerIntervalSelec
 import FanProfileManager from '../../fan-profiles/components/FanProfileManager';
 import Settings from '../../settings/components/Settings';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
+import HeaderFan from '../../components/HeaderFan';
 import { 
   Activity, 
   Loader2, 
@@ -121,6 +122,7 @@ const SystemsPage: React.FC = () => {
       <header className="dashboard-header">
         <h1>
           Pankha Fan Control <span style={{ fontSize: 'var(--spacing-3xl)', opacity: 1.0, fontWeight: 'bold' }}>( पंखा )</span>
+          <HeaderFan />
         </h1>
         <div className="header-controls">
           {/* Connection Status Indicator */}
