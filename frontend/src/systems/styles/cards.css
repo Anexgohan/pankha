@@ -411,28 +411,28 @@
 .checkbox-custom {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   position: relative;
   transition: all 0.2s ease;
 }
 
 .tactical-checkbox input:checked + .checkbox-custom {
-  background: var(--color-accent-dynamic);
+  /* background: var(--color-accent-dynamic); */
   border-color: var(--color-accent-dynamic);
-  box-shadow: 0 0 10px var(--color-accent-dynamic);
+  /* box-shadow: 0 0 10px var(--color-accent-dynamic); */
 }
 
 .tactical-checkbox input:checked + .checkbox-custom::after {
   content: '';
   position: absolute;
-  left: 3px;
-  top: -2px;
-  width: 5px;
-  height: 9px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent-dynamic);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .checkbox-text {
@@ -443,9 +443,9 @@
   /* text-transform: uppercase; */
 }
 
-.tactical-checkbox input:checked ~ .checkbox-text {
+/* .tactical-checkbox input:checked ~ .checkbox-text {
   color: var(--color-accent-dynamic);
-}
+} */
 
 .stealth-select-wrapper {
   background: rgba(255, 255, 255, 0.03);
