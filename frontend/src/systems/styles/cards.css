@@ -110,8 +110,8 @@
 }
 
 /* Category Specific Colors */
-.stat-card.online { border-top-color: #4CAF50; }
-.stat-card.online .stat-icon { color: #4CAF50; }
+.stat-card.online { border-top-color: var(--temp-normal-text); }
+.stat-card.online .stat-icon { color: var(--temp-normal-text); }
 .stat-card.offline { border-top-color: var(--text-tertiary); }
 .stat-card.offline .stat-icon { color: var(--text-tertiary); }
 .stat-card.error-card { border-top-color: var(--color-error); background: rgba(255, 0, 0, 0.05); }
@@ -120,12 +120,29 @@
 .stat-card.sensors .stat-icon { color: #00BCD4; }
 .stat-card.fans { border-top-color: #9C27B0; }
 .stat-card.fans .stat-icon { color: #9C27B0; }
-.stat-card.temperature-avg { border-top-color: #8BC34A; }
-.stat-card.temperature-avg .stat-icon { color: #8BC34A; }
-.stat-card.temperature-high { border-top-color: #FF5722; }
-.stat-card.temperature-high .stat-icon { color: #FF5722; }
-.stat-card.at-limit { border-top-color: #FFA000; }
-.stat-card.over-limit { border-top-color: var(--color-error); }
+.stat-card.temperature-avg { border-top-color: var(--temp-normal-border); }
+.stat-card.temperature-avg .stat-icon { color: var(--temp-normal-text); }
+.stat-card.temperature-high { border-top-color: var(--temp-critical-border); }
+.stat-card.temperature-high .stat-icon { color: var(--temp-critical-text); }
+
+/* Value colors for overview stats */
+.stat-card .stat-value.temperature-normal { color: var(--temp-normal-text); }
+.stat-card .stat-value.temperature-caution { color: var(--temp-caution-text); }
+.stat-card .stat-value.temperature-warning { color: var(--temp-warning-text); }
+.stat-card .stat-value.temperature-critical { color: var(--temp-critical-text); }
+
+.stat-card.at-limit { border-top-color: var(--temp-warning-border); }
+.stat-card.at-limit .stat-icon { color: var(--temp-warning-text); }
+.stat-card.at-limit .stat-value { color: var(--temp-warning-text); }
+
+.stat-card.over-limit { border-top-color: var(--temp-critical-border); }
+.stat-card.over-limit .stat-icon { color: var(--temp-critical-text); }
+.stat-card.over-limit .stat-value { color: var(--temp-critical-text); }
+
+/* Value colors for overview categories */
+.stat-card.online .stat-value { color: var(--temp-normal-text); }
+.stat-card.offline .stat-value { color: var(--text-tertiary); }
+.stat-card.error-card .stat-value { color: var(--temp-critical-text); }
 
 /* --- 3. SYSTEM CARD COMPONENT --- */
 .systems-grid {
@@ -432,7 +449,7 @@
 
 .stealth-select-wrapper {
   background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 4px 8px;
   transition: all 0.2s ease;
@@ -446,7 +463,7 @@
 
 .stealth-select-wrapper:hover {
   background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-light);
 }
 
 .select-engine {

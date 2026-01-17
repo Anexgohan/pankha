@@ -28,33 +28,33 @@
 }
 
 .status-indicator.ok {
-  background-color: rgba(76, 175, 80, 0.2);
-  color: var(--color-success);
+  background-color: var(--temp-normal-bg);
+  color: var(--temp-normal-text);
+  border: 1px solid var(--temp-normal-border);
 }
 
 .status-indicator.caution {
-  background-color: color-mix(in srgb, var(--temp-caution-border) 10%, transparent);
-  color: #FFC107;
+  background-color: var(--temp-caution-bg);
+  color: var(--temp-caution-text);
+  border: 1px solid var(--temp-caution-border);
 }
 
 .status-indicator.warning {
-  background-color: color-mix(in srgb, var(--temp-warning-text) 25%, transparent);
-  color: var(--color-warning);
+  background-color: var(--temp-warning-bg);
+  color: var(--temp-warning-text);
+  border: 1px solid var(--temp-warning-border);
 }
 
-.status-indicator.critical {
-  background-color: #FFEBEE;
-  color: var(--color-error);
-}
-
-.status-indicator.error {
-  background-color: #FFEBEE;
-  color: var(--color-error);
+.status-indicator.critical, .status-indicator.error {
+  background-color: var(--temp-critical-bg);
+  color: var(--temp-critical-text);
+  border: 1px solid var(--temp-critical-border);
 }
 
 .status-indicator.stopped {
-  background-color: rgba(158, 158, 158, 0.2);
-  color: var(--text-secondary);
+  background-color: rgba(158, 158, 158, 0.1);
+  color: var(--text-tertiary);
+  border: 1px solid rgba(158, 158, 158, 0.2);
 }
 
 /* Profile Badges */
@@ -116,7 +116,7 @@
 
 /* Read-only card styling */
 .system-card.read-only {
-  border-left: 3px solid #FFA000;
+  border-left: 5px solid var(--temp-warning-border);
 }
 
 .system-card.read-only select:disabled,
