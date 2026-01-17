@@ -170,8 +170,10 @@
 .system-title {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: var(--spacing-md);
+  gap: 2px;
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: 0px;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .system-title-top {
@@ -327,10 +329,10 @@
   text-transform: uppercase;
 }
 
-.temperature-normal, .fan-normal { color: var(--color-success); }
-.temperature-caution, .fan-caution { color: var(--color-warning); }
-.temperature-warning, .fan-warning { color: var(--color-warning); }
-.temperature-critical, .fan-critical { color: var(--color-critical); }
+.summary-stat-value.temperature-normal, .summary-stat-value.fan-normal { color: var(--temp-normal-text); }
+.summary-stat-value.temperature-caution, .summary-stat-value.fan-caution { color: var(--temp-caution-text); }
+.summary-stat-value.temperature-warning, .summary-stat-value.fan-warning { color: var(--temp-warning-text); }
+.summary-stat-value.temperature-critical, .summary-stat-value.fan-critical { color: var(--temp-critical-text); }
 
 /* 3.5 Command Center (Compact Grid) */
 .system-command-center {

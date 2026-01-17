@@ -10,13 +10,13 @@
 export function getAgentStatusColor(status: string): string {
   switch (status) {
     case 'online':
-      return '#4CAF50';
+      return 'var(--temp-normal-text)';
     case 'offline':
-      return '#9E9E9E';
+      return 'var(--text-tertiary)';
     case 'error':
-      return '#F44336';
+      return 'var(--temp-critical-text)';
     default:
-      return '#FF9800';
+      return 'var(--temp-warning-text)';
   }
 }
 
@@ -47,4 +47,45 @@ export function getStatusColor(
   fallback = 'var(--text-tertiary)'
 ): string {
   return colorMap[status] ?? fallback;
+}
+
+/**
+ * Get status class for a temperature value.
+ */
+export function getTemperatureClass(
+  temp: number,
+  critTemp?: number
+): string {
+  if (critTemp && temp >= critTemp) return "critical";
+  if (temp >= 70) return "warning";
+  if (temp >= 60) return "caution";
+  return "normal";
+}
+
+/**
+ * Get status class for a fan RPM value based on its percentage of max capacity.
+ */
+export function getFanRPMClass(
+  rpm: number,
+  allFans: { name: string; rpm: number; min_rpm?: number; max_rpm?: number }[]
+): string {
+  if (rpm === 0) return "normal";
+
+  // Find the global min/max RPM across all fans to determine percentile
+  // This helps visualize which fans are working harder relative to the whole system
+  const validFans = allFans.filter(f => f.rpm > 0);
+  if (validFans.length === 0) return "normal";
+
+  const maxRPM = Math.max(...validFans.map(f => f.rpm));
+  const minRPM = Math.min(...validFans.map(f => f.rpm));
+  
+  if (maxRPM === minRPM) return "normal";
+  
+  const range = maxRPM - minRPM;
+  const percentile = (rpm - minRPM) / range;
+
+  if (percentile >= 0.85) return "critical"; // Highest RPM (red)
+  if (percentile >= 0.7) return "warning"; // High RPM (orange)
+  if (percentile >= 0.4) return "caution"; // Medium RPM (yellow)
+  return "normal"; // Low RPM (green)
 }

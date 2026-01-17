@@ -29,7 +29,7 @@ import {
 import { getChipDisplayName } from "../../config/sensorLabels";
 import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
-import { getAgentStatusColor } from "../../utils/statusColors";
+import { getAgentStatusColor, getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen } from "../../utils/formatters";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
 import {
@@ -277,37 +277,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
     } catch (error) {
       console.error("Failed to sync group visibility to backend:", error);
     }
-  };
-
-  const getTemperatureClass = (
-    temp: number,
-    _maxTemp?: number,
-    critTemp?: number
-  ) => {
-    if (critTemp && temp >= critTemp) return "critical";
-    if (temp >= 70) return "warning";
-    if (temp >= 60) return "caution";
-    return "normal";
-  };
-
-  const getFanRPMClass = (rpm: number, allFans: FanReading[]) => {
-    // Calculate min/max from current fan data
-    const rpms = allFans.map((f) => f.rpm).filter((r) => r > 0);
-    if (rpms.length === 0) return "normal";
-
-    const minRPM = Math.min(...rpms);
-    const maxRPM = Math.max(...rpms);
-    const range = maxRPM - minRPM;
-
-    // Green to red gradient: lowest RPM = green, highest RPM = red
-    if (range === 0) return "normal";
-
-    const percentile = (rpm - minRPM) / range;
-
-    if (percentile >= 0.85) return "critical"; // Highest RPM (red)
-    if (percentile >= 0.7) return "warning"; // High RPM (orange)
-    if (percentile >= 0.4) return "caution"; // Medium RPM (yellow)
-    return "normal"; // Low RPM (green)
   };
 
   const getSensorIcon = (type: string) => {
