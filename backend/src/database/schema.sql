@@ -166,6 +166,7 @@ CREATE INDEX IF NOT EXISTS idx_sensors_type ON sensors(sensor_type);
 CREATE INDEX IF NOT EXISTS idx_fans_system_id ON fans(system_id);
 CREATE INDEX IF NOT EXISTS idx_monitoring_data_system_id ON monitoring_data(system_id);
 CREATE INDEX IF NOT EXISTS idx_monitoring_data_timestamp ON monitoring_data(timestamp);
+CREATE INDEX IF NOT EXISTS idx_monitoring_data_system_timestamp ON monitoring_data(system_id, "timestamp" DESC);
 CREATE INDEX IF NOT EXISTS idx_fan_profiles_system_id ON fan_profiles(system_id);
 CREATE INDEX IF NOT EXISTS idx_fan_profiles_global ON fan_profiles(is_global);
 CREATE INDEX IF NOT EXISTS idx_fan_curve_points_profile_id ON fan_curve_points(profile_id);

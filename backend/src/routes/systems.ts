@@ -717,9 +717,15 @@ router.get("/:id/history", async (req: Request, res: Response) => {
       limit = 1000,
     } = req.query;
 
-    const system = await db.get("SELECT id FROM systems WHERE id = $1", [
-      systemId,
-    ]);
+    const system = await db.get(`
+      SELECT 
+        id, 
+        (SELECT COUNT(*) FROM sensors WHERE system_id = $1) as sensor_count,
+        (SELECT COUNT(*) FROM fans WHERE system_id = $1) as fan_count
+      FROM systems 
+      WHERE id = $1
+    `, [systemId]);
+
     if (!system) {
       return res.status(404).json({ error: "System not found" });
     }
@@ -747,24 +753,40 @@ router.get("/:id/history", async (req: Request, res: Response) => {
       ? (fan_ids as string).split(",").map((id) => parseInt(id))
       : undefined;
 
+    // Calculate dynamic limit based on counts and requested time window
+    // Formula: (sensors + fans) * (hours * 1-min-resolution) * safety-factor
+    const hours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+    const sensorCount = parseInt(system.sensor_count || "0");
+    const fanCount = parseInt(system.fan_count || "0");
+    const totalEntities = Math.max(1, sensorCount + fanCount);
+    
+    // Dynamic limit: (entities) * (points per hour) * safety multiplier
+    // For 24h, 22 entities: 22 * 60 * 24 * 1.5 = 47,520
+    const calculatedLimit = Math.min(50000, Math.max(limit ? parseInt(limit as string) : 1000, 
+      Math.ceil(totalEntities * (hours * 60) * 1.5)
+    ));
+
     const historyData = await dataAggregator.getHistoricalData(
       systemId,
       startTime,
       endTime,
       sensorIdArray,
-      fanIdArray
+      fanIdArray,
+      calculatedLimit,
+      "DESC" // Fetch latest first
     );
 
-    // Limit results
-    const limitedData = historyData.slice(0, parseInt(limit as string));
+    // Reverse results to preserve chronological order [oldest -> newest] for the frontend
+    historyData.reverse();
 
     res.json({
       system_id: systemId,
       start_time: startTime.toISOString(),
       end_time: endTime.toISOString(),
-      data_points: limitedData.length,
-      total_available: historyData.length,
-      data: limitedData,
+      data_points: historyData.length,
+      limit_applied: calculatedLimit,
+      total_available: historyData.length >= calculatedLimit ? "unknown (limited)" : historyData.length,
+      data: historyData,
     });
   } catch (error) {
     log.error("Error fetching historical data:", "systems", error);

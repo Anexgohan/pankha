@@ -709,7 +709,7 @@ export class DataAggregator extends EventEmitter {
         agentVersion: system.agent_version || "unknown",
         systemName: system.name,
         status: "online",
-        lastUpdate: new Date(),
+        lastUpdate: new Date(dataPacket.timestamp || Date.now()),
         sensors: sensors,
         fans: fans,
         systemHealth: {
@@ -794,7 +794,9 @@ export class DataAggregator extends EventEmitter {
     startTime: Date,
     endTime: Date,
     sensorIds?: number[],
-    fanIds?: number[]
+    fanIds?: number[],
+    limit?: number,
+    sortOrder: "ASC" | "DESC" = "ASC"
   ): Promise<any[]> {
     let sql = `
       SELECT 
@@ -833,7 +835,13 @@ export class DataAggregator extends EventEmitter {
       params.push(...fanIds);
     }
 
-    sql += " ORDER BY md.timestamp ASC";
+
+    sql += ` ORDER BY md.timestamp ${sortOrder}`;
+
+    if (limit && limit > 0) {
+      sql += ` LIMIT $${paramIndex++}`;
+      params.push(limit);
+    }
 
     return await this.db.all(sql, params);
   }
