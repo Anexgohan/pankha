@@ -144,7 +144,7 @@ export class LicenseValidator {
           tier: 'free',
           expiresAt: null,
           activatedAt: null,
-          error: 'License system not configured. Contact support@pankha.dev',
+          error: 'License system not configured. Contact support@pankha.app',
         };
       }
 

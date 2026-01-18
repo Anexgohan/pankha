@@ -16,7 +16,7 @@ export function Branding() {
   return (
     <div className="branding">
       <span>Powered by </span>
-      <a href="https://pankha.dev" target="_blank" rel="noopener noreferrer">
+      <a href="https://pankha.app" target="_blank" rel="noopener noreferrer">
         Pankha
       </a>
     </div>
