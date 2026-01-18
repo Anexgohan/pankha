@@ -1,4 +1,4 @@
-# Pankha (पंखा)   <img src="documentation/public/images/animation/pankha_fan_256x256_5-fins.webp" width="40" style="vertical-align: sub;">   Open Source Fan Control System
+# Pankha (पंखा)   <img src="documentation/public/images/animation/pankha_fan_256x256_5-fins.webp"   width="32" style="vertical-align: sub;">   Open Source Fan Control System
 
 ![Docker Pulls](https://img.shields.io/docker/pulls/anexgohan/pankha)
 ![GitHub Discussions](https://img.shields.io/github/discussions/Anexgohan/pankha)
