@@ -33,22 +33,49 @@ interface PricingData {
   enterprise: TierPricing;
 }
 
-// Dodo Payments checkout URLs - direct product links
-// TEST MODE: https://test.checkout.dodopayments.com/buy/{product_id}
-// LIVE MODE: https://checkout.dodopayments.com/buy/{product_id}
-const CHECKOUT_BASE = 'https://test.checkout.dodopayments.com/buy'; // Test mode
-// const CHECKOUT_BASE = 'https://checkout.dodopayments.com/buy'; // Live mode - uncomment for production
+// Dodo Payments configuration - Environment aware
+const IS_LIVE = false; // Set to true for production
+
+const CHECKOUT_BASE = IS_LIVE 
+  ? 'https://checkout.dodopayments.com/buy' 
+  : 'https://test.checkout.dodopayments.com/buy';
+
+const PRODUCT_IDS = IS_LIVE ? {
+  // LIVE MODE IDs (Update these from your Dodo Dashboard once you go live)
+  pro: {
+    monthly: 'pdt_live_pro_monthly_placeholder',
+    yearly: 'pdt_live_pro_yearly_placeholder',
+    lifetime: 'pdt_live_pro_lifetime_placeholder',
+  },
+  enterprise: {
+    monthly: 'pdt_live_ent_monthly_placeholder',
+    yearly: 'pdt_live_ent_yearly_placeholder',
+    lifetime: 'pdt_live_ent_lifetime_placeholder',
+  },
+} : {
+  // TEST MODE IDs (Currently active)
+  pro: {
+    monthly: 'pdt_0NV3sqzBkKRDNGHgkyOT4',
+    yearly: 'pdt_0NV8gT4no4UJnP34pVgnl',
+    lifetime: 'pdt_0NV8jwCkXAYkXJYyFrPQb',
+  },
+  enterprise: {
+    monthly: 'pdt_0NV3tEaaHxETmRVdeJ0Ei',
+    yearly: 'pdt_0NV8l5b1st3Cwv9PBbTLL',
+    lifetime: 'pdt_0NV8gqfMxnRCmhzbWUzyR',
+  },
+};
 
 const CHECKOUT_URLS = {
   pro: {
-    monthly: `${CHECKOUT_BASE}/pdt_0NV3sqzBkKRDNGHgkyOT4`,
-    yearly: `${CHECKOUT_BASE}/pdt_0NV8gT4no4UJnP34pVgnl`,
-    lifetime: `${CHECKOUT_BASE}/pdt_0NV8jwCkXAYkXJYyFrPQb`,
+    monthly: `${CHECKOUT_BASE}/${PRODUCT_IDS.pro.monthly}`,
+    yearly: `${CHECKOUT_BASE}/${PRODUCT_IDS.pro.yearly}`,
+    lifetime: `${CHECKOUT_BASE}/${PRODUCT_IDS.pro.lifetime}`,
   },
   enterprise: {
-    monthly: `${CHECKOUT_BASE}/pdt_0NV3tEaaHxETmRVdeJ0Ei`,
-    yearly: `${CHECKOUT_BASE}/pdt_0NV8l5b1st3Cwv9PBbTLL`,
-    lifetime: `${CHECKOUT_BASE}/pdt_0NV8gqfMxnRCmhzbWUzyR`,
+    monthly: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.monthly}`,
+    yearly: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.yearly}`,
+    lifetime: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.lifetime}`,
   },
 } as const;
 
