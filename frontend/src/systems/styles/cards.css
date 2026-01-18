@@ -207,6 +207,13 @@
   flex-shrink: 0;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
 .system-title-main {
   width: 100%;
 }

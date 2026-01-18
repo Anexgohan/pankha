@@ -631,25 +631,27 @@ const SystemCard: React.FC<SystemCardProps> = ({
               >
                 {system.status}
               </span>
-              {isReadOnly && (
-                <span className="read-only-badge" title={readOnlyTooltip}>
-                  <LockIcon size={12} />
-                </span>
-              )}
             </div>
 
-            <button
-              className="delete-button"
-              onClick={handleDeleteSystem}
-              disabled={loading === "delete"}
-              title="Delete system"
-            >
-              {loading === "delete" ? (
-                <Loader2 className="animate-spin" size={14} />
-              ) : (
-                <X size={14} />
+            <div className="header-actions">
+              {isReadOnly && (
+                <span className="read-only-badge" title={readOnlyTooltip}>
+                  <LockIcon size={14} />
+                </span>
               )}
-            </button>
+              <button
+                className="delete-button"
+                onClick={handleDeleteSystem}
+                disabled={loading === "delete"}
+                title="Delete system"
+              >
+                {loading === "delete" ? (
+                  <Loader2 className="animate-spin" size={14} />
+                ) : (
+                  <X size={14} />
+                )}
+              </button>
+            </div>
           </div>
 
           <div className="system-title-main">
@@ -932,7 +934,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
             <button
               className="system-stats-button"
               onClick={() => setIsBulkEditOpen(true)}
-              title="Bulk edit fan settings"
+              title={isReadOnly ? readOnlyTooltip : "Bulk edit fan settings"}
+              disabled={isReadOnly}
             >
               Bulk Edit
             </button>

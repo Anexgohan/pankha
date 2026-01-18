@@ -67,4 +67,9 @@ export interface AggregatedSystemData {
   hysteresis_temp?: number;
   emergency_temp?: number;
   log_level?: string;
+
+  // License limit fields
+  // NOTE: These are computed per-update based on agent registration order
+  read_only?: boolean;
+  access_status?: 'active' | 'over_limit';
 }

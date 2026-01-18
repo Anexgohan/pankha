@@ -834,6 +834,14 @@ export class WebSocketHub extends EventEmitter {
         };
       });
 
+      // Add license limit status (read_only)
+      const readOnlyStatus = await this.agentManager.getAgentsReadOnlyStatus();
+      for (const system of enhancedSystems) {
+        const isReadOnly = readOnlyStatus.get(system.agent_id) || false;
+        (system as any).read_only = isReadOnly;
+        (system as any).access_status = isReadOnly ? 'over_limit' : 'active';
+      }
+
       // Send full state to client
       this.sendToClient(clientId, "fullState", enhancedSystems);
       log.info(

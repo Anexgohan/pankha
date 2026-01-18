@@ -102,25 +102,33 @@
 
 /* Read-Only Badge (License Limit) */
 .read-only-badge {
-  margin-left: var(--spacing-sm);
-  font-size: var(--font-size-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
   cursor: help;
-  opacity: 0.9;
-  animation: pulse-lock 2s ease-in-out infinite;
+  opacity: 0.6;
 }
 
-@keyframes pulse-lock {
-  0%, 100% { opacity: 0.7; }
-  50% { opacity: 1; }
+.read-only-badge:hover {
+  opacity: 1;
+  color: var(--text-secondary);
 }
 
 /* Read-only card styling */
-.system-card.read-only {
-  border-left: 5px solid var(--temp-warning-border);
+.system-card.read-only input:disabled,
+.system-card.read-only button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-.system-card.read-only select:disabled,
-.system-card.read-only input:disabled {
+/* For stealth-select dropdowns, only dim the display layer, not the hidden select-engine */
+.system-card.read-only .stealth-select-wrapper {
   opacity: 0.5;
   cursor: not-allowed;
 }
