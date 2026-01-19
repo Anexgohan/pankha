@@ -17,10 +17,13 @@ import {
   ShieldAlert, 
   Monitor, 
   Wind, 
-  Settings2 
+  Settings2,
+  ChevronRight,
+  Command
 } from 'lucide-react';
+import DeploymentPage from '../../deployment/components/DeploymentPage';
 
-type TabType = 'systems' | 'profiles' | 'settings';
+type TabType = 'systems' | 'profiles' | 'deployment' | 'settings';
 
 const SystemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
@@ -193,6 +196,12 @@ const SystemsPage: React.FC = () => {
             <Wind size={16} /> Fan Profiles
           </button>
           <button
+            className={`nav-tab ${activeTab === 'deployment' ? 'active' : ''}`}
+            onClick={() => setActiveTab('deployment')}
+          >
+            <Command size={16} /> Deployment
+          </button>
+          <button
             className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
           >
@@ -209,10 +218,20 @@ const SystemsPage: React.FC = () => {
         {activeTab === 'systems' && (
           <div className="systems-grid">
             {systems.length === 0 ? (
-              <div className="no-systems">
-                <h3>No Systems Found</h3>
-                <p>No fan control systems are currently registered.</p>
-                <p>Add systems using the API or wait for agents to register automatically.</p>
+              <div className="no-systems-redirect-card">
+                <div className="card-header">
+                  <ShieldAlert size={24} className="alert-icon" />
+                  <h3>CRITICAL: NO ACTIVE NODES DETECTED</h3>
+                </div>
+                <div className="card-content">
+                  <p>Pankha is currently a ghost ship. To populate this dashboard, you need to deploy the agent to your target machines.</p>
+                  <button 
+                    className="btn btn-primary redirect-btn"
+                    onClick={() => setActiveTab('deployment')}
+                  >
+                    GO TO DEPLOYMENT TAB <ChevronRight size={16} />
+                  </button>
+                </div>
               </div>
             ) : (
               systems.map(system => (
@@ -235,6 +254,10 @@ const SystemsPage: React.FC = () => {
           <div className="fan-profiles-section">
             <FanProfileManager />
           </div>
+        )}
+
+        {activeTab === 'deployment' && (
+          <DeploymentPage latestVersion={latestVersion} />
         )}
 
         {activeTab === 'settings' && (
