@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { 
+import React, { useState, useMemo, useEffect } from 'react';
+import {
   Download,
   ExternalLink,
   Copy,
@@ -15,20 +15,23 @@ import {
   Command,
   ChevronDown,
   ChevronRight,
-  History
+  History,
+  FolderDown,
+  Monitor
 } from 'lucide-react';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
 import { toast } from '../../utils/toast';
-import { uiOptions, getDefault } from '../../utils/uiOptions';
+import { uiOptions, getDefault, getOption, interpolateTooltip } from '../../utils/uiOptions';
+import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL } from '../../services/api';
 import '../styles/deployment.css';
 
 interface DeploymentPageProps {
   latestVersion: string | null;
 }
 
-type Arch = 'x86_64' | 'ARM64';
 type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 type Failsafe = '30' | '50' | '100';
+type PathMode = 'standard' | 'portable';
 
 interface TerminalBlockProps {
   title: string;
@@ -36,15 +39,17 @@ interface TerminalBlockProps {
   copiedType: 'curl' | 'wget' | null;
   command: string;
   onCopy: (tool: 'curl' | 'wget') => void;
+  isLoading?: boolean;
 }
 
-const TerminalBlock: React.FC<TerminalBlockProps> = ({ title, tool, copiedType, command, onCopy }) => (
+const TerminalBlock: React.FC<TerminalBlockProps> = ({ title, tool, copiedType, command, onCopy, isLoading }) => (
   <div className="terminal-instance">
     <div className="terminal-instance-header">
       <span className="terminal-title-text">{title}</span>
-      <button 
-        className={`terminal-copy-action ${copiedType === tool ? 'success' : ''}`} 
+      <button
+        className={`terminal-copy-action ${copiedType === tool ? 'success' : ''}`}
         onClick={() => onCopy(tool)}
+        disabled={isLoading || !command}
       >
         {copiedType === tool ? <Check size={14} /> : <Copy size={14} />}
         {copiedType === tool ? 'COPIED' : 'COPY'}
@@ -61,20 +66,23 @@ const TerminalBlock: React.FC<TerminalBlockProps> = ({ title, tool, copiedType, 
       </div>
       <div className="terminal-body">
         <span className="command-prompt">#</span>
-        <code className="command-line">{command}</code>
+        <code className="command-line">
+          {isLoading ? 'Generating secure token...' : (command || 'Configure settings to generate command')}
+        </code>
       </div>
     </div>
   </div>
 );
 
-const MetricCard: React.FC<{ 
-  label: string; 
-  value: string | number; 
-  icon: React.ReactNode; 
+const MetricCard: React.FC<{
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
   borderLeftColor?: string;
   iconStyle?: React.CSSProperties;
-}> = React.memo(({ label, value, icon, borderLeftColor, iconStyle }) => (
-  <div className="fleet-metric-card" style={{ borderLeftColor }}>
+  tooltip?: string;
+}> = React.memo(({ label, value, icon, borderLeftColor, iconStyle, tooltip }) => (
+  <div className="fleet-metric-card" style={{ borderLeftColor }} title={tooltip}>
     <div className="metric-icon" style={iconStyle}>
       {icon}
     </div>
@@ -85,8 +93,8 @@ const MetricCard: React.FC<{
   </div>
 ));
 
-const InstallerSection: React.FC<{ 
-  latestVersion: string | null; 
+const InstallerSection: React.FC<{
+  latestVersion: string | null;
   githubRepo: string;
 }> = React.memo(({ latestVersion, githubRepo }) => (
   <section className="deployment-section">
@@ -98,15 +106,15 @@ const InstallerSection: React.FC<{
           <span className="version-tag">{latestVersion || 'Detecting'}</span>
         </h4>
         <p>Native Windows service with Tray App. Supports Windows 10/11 x86_64. Self-contained .NET 8.0 execution.</p>
-        <a 
-          href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`} 
+        <a
+          href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`}
           className="btn-primary-tactical"
           download
         >
           <Download size={16} /> Get Latest Release
         </a>
       </div>
-      
+
       <div className="installer-card">
         <h4>
           <Settings2 size={18} /> Linux Setup
@@ -122,10 +130,10 @@ const InstallerSection: React.FC<{
                 Use script-based installation below for current deployments.
             </p>
         </div>
-        <a 
-          href={`${githubRepo}/blob/main/documentation/private/agents/clients/linux/rust/setup-guide.md`} 
-          target="_blank" 
-          rel="noopener noreferrer" 
+        <a
+          href={`${githubRepo}/blob/main/documentation/private/agents/clients/linux/rust/setup-guide.md`}
+          target="_blank"
+          rel="noopener noreferrer"
           className="btn-outline-tactical"
         >
           <Server size={16} /> DOCUMENTATION
@@ -136,14 +144,13 @@ const InstallerSection: React.FC<{
 ));
 
 const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
-const INSTALL_SCRIPT_URL = 'https://raw.githubusercontent.com/Anexgohan/pankha/main/install.sh';
 
 const ActionButton: React.FC<{ githubRepo: string }> = React.memo(({ githubRepo }) => (
   <div className="deployment-action-bar">
-    <a 
-      href={`${githubRepo}/releases`} 
-      target="_blank" 
-      rel="noopener noreferrer" 
+    <a
+      href={`${githubRepo}/releases`}
+      target="_blank"
+      rel="noopener noreferrer"
       className="btn-action-full"
     >
       <History size={16} /> VIEW ALL RELEASES & CHANGELOG <ExternalLink size={14} />
@@ -185,95 +192,135 @@ const MaintenanceSection: React.FC<{
   onToggle: () => void;
   systems: any[];
   latestVersion: string | null;
-  onApplyUpdate: (tool: 'curl' | 'wget') => void;
-}> = React.memo(({ isExpanded, onToggle, systems, latestVersion, onApplyUpdate }) => (
-  <section className={`deployment-section maintenance-panel ${!isExpanded ? 'collapsed' : ''}`}>
-    <div className="maintenance-header-toggle" onClick={onToggle}>
-      <h3>
-        <Activity size={20} /> Fleet Maintenance
-        {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-      </h3>
-      <span className="maintenance-stats">
-        {systems.length} System{systems.length !== 1 ? 's' : ''} Connected
-      </span>
-    </div>
+  updatingAgents: Set<number>;
+  onApplyUpdate: (systemId: number) => void;
+}> = React.memo(({ isExpanded, onToggle, systems, latestVersion, updatingAgents, onApplyUpdate }) => {
+  const outdatedCount = useMemo(() => {
+    if (!latestVersion) return 0;
+    const cleanLatest = latestVersion.replace('v', '');
+    return systems.filter(s => s.agent_version && !s.agent_version.includes(cleanLatest)).length;
+  }, [systems, latestVersion]);
 
-    {isExpanded && (
-      <div className="maintenance-content">
-        <div className="maintenance-table-wrapper">
-          <table className="maintenance-table">
-            <thead>
-              <tr>
-                <th>Hostname</th>
-                <th>Agent ID</th>
-                <th>Version</th>
-                <th>Health</th>
-                <th>Status</th>
-                <th>Maintenance</th>
-              </tr>
-            </thead>
-            <tbody>
-              {systems.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--spacing-2xl) 0', color: 'var(--text-tertiary)' }}>
-                    NO REMOTE NODES DISCOVERED
-                  </td>
-                </tr>
-              ) : (
-                systems.map(system => {
-                  const isOutdated = latestVersion && system.agent_version && 
-                                    !system.agent_version.includes(latestVersion.replace('v', ''));
-                  const isOnline = system.status === 'online';
-                  return (
-                    <tr key={system.id}>
-                      <td>{system.name}</td>
-                      <td>{system.agent_id}</td>
-                      <td>{system.agent_version || 'v0.0.0'}</td>
-                      <td>
-                        <span className={`status-tag ${isOnline ? 'online' : 'offline'}`} style={{ 
-                          background: isOnline ? 'color-mix(in srgb, var(--color-success), transparent 90%)' : 'color-mix(in srgb, var(--color-error), transparent 90%)',
-                          color: isOnline ? 'var(--color-success)' : 'var(--color-error)',
-                          border: `1px solid color-mix(in srgb, ${isOnline ? 'var(--color-success)' : 'var(--color-error)'}, transparent 80%)`
-                        }}>
-                          {isOnline ? 'Online' : 'Offline'}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`status-tag ${isOutdated ? 'outdated' : 'current'}`}>
-                          {isOutdated ? 'Outdated' : 'Current'}
-                        </span>
-                      </td>
-                      <td>
-                        <button 
-                          className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
-                          onClick={() => onApplyUpdate('curl')}
-                        >
-                          {isOutdated ? 'Apply Update' : 'Reinstall'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+  return (
+    <section className={`deployment-section maintenance-panel ${!isExpanded ? 'collapsed' : ''}`}>
+      <div className="maintenance-header-toggle" onClick={onToggle}>
+        <h3>
+          <Activity size={20} /> Fleet Maintenance
+          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+          {outdatedCount > 0 && (
+            <span className="header-badge pulse">
+              {outdatedCount} UPDATE{outdatedCount !== 1 ? 'S' : ''} AVAILABLE
+            </span>
+          )}
+        </h3>
+        <span className="maintenance-stats">
+          {systems.length} System{systems.length !== 1 ? 's' : ''} Connected
+        </span>
       </div>
-    )}
-  </section>
-));
+
+      {isExpanded && (
+        <div className="maintenance-content">
+          <div className="maintenance-table-wrapper">
+            <table className="maintenance-table">
+              <thead>
+                <tr>
+                  <th>Hostname</th>
+                  <th>Agent ID</th>
+                  <th>Version</th>
+                  <th>Status</th>
+                  <th>Maintenance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {systems.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: 'var(--spacing-2xl) 0', color: 'var(--text-tertiary)' }}>
+                      NO REMOTE NODES DISCOVERED
+                    </td>
+                  </tr>
+                ) : (
+                  systems.map(system => {
+                    const cleanLatest = latestVersion ? latestVersion.replace('v', '') : '';
+                    const isOutdated = latestVersion && system.agent_version &&
+                                      !system.agent_version.includes(cleanLatest);
+                    const isUpdating = updatingAgents.has(system.id);
+                    const isOnline = system.status === 'online';
+
+                    // Determine status display
+                    const statusLabel = isUpdating ? 'UPDATING' : (isOnline ? 'ONLINE' : 'OFFLINE');
+                    const statusClass = isUpdating ? 'updating' : (isOnline ? 'online' : 'offline');
+
+                    return (
+                      <tr key={system.id}>
+                        <td className="hostname-cell">
+                          <div className="hostname-wrapper">
+                            <Monitor size={14} style={{ color: 'var(--text-tertiary)' }} />
+                            {system.name}
+                          </div>
+                        </td>
+                        <td className="agent-id-cell"><code>{system.agent_id}</code></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
+                            <span>{system.agent_version || 'v0.0.0'}</span>
+                            {isOutdated && !isUpdating && (
+                              <span className="update-badge" title={`Update to ${latestVersion} available`}>
+                                NEW {latestVersion}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`status-tag-v2 ${statusClass}`}>
+                            <span className="status-dot" />
+                            {statusLabel}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
+                            onClick={() => onApplyUpdate(system.id)}
+                            disabled={!isOnline || isUpdating}
+                          >
+                            {isUpdating ? 'Updating...' : (isOutdated ? 'Apply Update' : 'Reinstall')}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+});
 
 export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion }) => {
   const { systems } = useWebSocketData();
-  const [arch, setArch] = useState<Arch>('x86_64');
   const [logLevel, setLogLevel] = useState<LogLevel>(getDefault('logLevel'));
   const [failsafe, setFailsafe] = useState<Failsafe>(String(getDefault('failsafeSpeed')) as Failsafe);
+  const [pathMode, setPathMode] = useState<PathMode>('standard');
   const [emergency, setEmergency] = useState(String(getDefault('emergencyTemp')));
   const [agentRate, setAgentRate] = useState(String(getDefault('updateInterval')));
   const [fanStep, setFanStep] = useState(String(getDefault('fanStep')));
   const [hysteresis, setHysteresis] = useState(String(getDefault('hysteresis')));
   const [copiedType, setCopiedType] = useState<'curl' | 'wget' | null>(null);
   const [isMaintenanceExpanded, setIsMaintenanceExpanded] = useState(true);
+  const [deploymentToken, setDeploymentToken] = useState<string | null>(null);
+  const [isLoadingToken, setIsLoadingToken] = useState(false);
+  const [updatingAgents, setUpdatingAgents] = useState<Set<number>>(new Set());
+
+  // Tooltip context for interpolation (uses current form values)
+  const tooltipContext = useMemo(() => ({
+    logLevel,
+    emergencyTemp: emergency,
+    failsafeSpeed: failsafe,
+    agentInterval: agentRate,
+    fanStep,
+    hysteresis
+  }), [logLevel, emergency, failsafe, agentRate, fanStep, hysteresis]);
 
   // Fleet Statistics Calculations
   const fleetStats = useMemo(() => {
@@ -288,16 +335,98 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
     return { total, online, outdated };
   }, [systems, latestVersion]);
 
-  const generateCommand = (tool: 'curl' | 'wget') => {
-    const flags = `--arch ${arch} --log ${logLevel} --failsafe ${failsafe} --emergency ${emergency} --rate ${agentRate} --step ${fanStep} --hysteresis ${hysteresis}`;
-    if (tool === 'curl') {
-      return `curl -sSL ${INSTALL_SCRIPT_URL} | bash -s -- ${flags}`;
+  // Handle token generation when config changes (debounced)
+  useEffect(() => {
+    const refreshToken = async () => {
+      setIsLoadingToken(true);
+      try {
+        const config = {
+          log_level: logLevel,
+          failsafe_speed: parseInt(failsafe),
+          emergency_temp: parseFloat(emergency),
+          update_interval: parseFloat(agentRate),
+          fan_step: parseInt(fanStep),
+          hysteresis: parseFloat(hysteresis),
+          path_mode: pathMode
+        };
+        const response = await createDeploymentTemplate(config);
+        setDeploymentToken(response.token);
+      } catch (error) {
+        console.error('Failed to generate deployment token', error);
+        toast.error('Token generation failed');
+      } finally {
+        setIsLoadingToken(false);
+      }
+    };
+
+    const timer = setTimeout(refreshToken, 500); // Debounce 500ms
+    return () => clearTimeout(timer);
+  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode]);
+
+  // Clear updating state when agent reconnects
+  useEffect(() => {
+    if (updatingAgents.size > 0) {
+      systems.forEach(system => {
+        if (updatingAgents.has(system.id) && system.status === 'online') {
+          // Agent reconnected, clear updating state after brief delay
+          setTimeout(() => {
+            setUpdatingAgents(current => {
+              const updated = new Set(current);
+              updated.delete(system.id);
+              return updated;
+            });
+          }, 3000);
+        }
+      });
     }
-    return `wget -qO- ${INSTALL_SCRIPT_URL} | bash -s -- ${flags}`;
+  }, [systems, updatingAgents]);
+
+  const generateCommand = (tool: 'curl' | 'wget') => {
+    if (!deploymentToken) return '';
+
+    // Determine backend URL for the install script
+    let baseUrl = API_BASE_URL;
+    if (!baseUrl || !baseUrl.startsWith('http')) {
+      const host = window.location.host;
+      const protocol = window.location.protocol;
+      // If on Vite dev port, guess the backend port
+      if (host.includes(':5173')) {
+        const guessedPort = API_BASE_URL?.match(/:(\d+)/)?.[1] || '3000';
+        baseUrl = `${protocol}//${host.split(':')[0]}:${guessedPort}`;
+      } else {
+        baseUrl = `${protocol}//${host}`;
+      }
+    }
+
+    const url = `${baseUrl}/api/deploy/linux?token=${deploymentToken}`;
+
+    if (tool === 'curl') {
+      return `curl -sSL "${url}" | bash`;
+    }
+    return `wget -qO- "${url}" | bash`;
+  };
+
+  const handleRemoteUpdate = async (systemId: number) => {
+    try {
+      setUpdatingAgents(prev => new Set(prev).add(systemId));
+      await selfUpdateAgent(systemId);
+      toast.success('Update command sent to agent');
+    } catch (error: any) {
+      console.error('Failed to trigger remote update', error);
+      toast.error(error?.response?.data?.error || 'Failed to send update command');
+      // Clear updating state on error
+      setUpdatingAgents(prev => {
+        const next = new Set(prev);
+        next.delete(systemId);
+        return next;
+      });
+    }
   };
 
   const copyToClipboard = async (tool: 'curl' | 'wget') => {
     const command = generateCommand(tool);
+    if (!command) return;
+
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(command);
@@ -307,7 +436,7 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
       setCopiedType(tool);
       toast.success(`${tool.toUpperCase()} command copied to clipboard`);
       setTimeout(() => setCopiedType(null), 2000);
-    } catch (err) {
+    } catch {
       // Fallback for non-secure contexts (HTTP over IP)
       try {
         const textarea = document.createElement('textarea');
@@ -325,7 +454,7 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
         } else {
           toast.error('Failed to copy to clipboard');
         }
-      } catch (fallbackErr) {
+      } catch {
         toast.error('Failed to copy to clipboard');
       }
     }
@@ -336,11 +465,11 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
     <div className="deployment-page">
       <div className="deployment-section-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-          <div style={{ 
-            color: 'var(--color-accent-dynamic)', 
-            background: 'color-mix(in srgb, var(--color-accent-dynamic), transparent 92%)', 
-            padding: 'var(--spacing-sm)', 
-            borderRadius: 'var(--radius-md)', 
+          <div style={{
+            color: 'var(--color-accent-dynamic)',
+            background: 'color-mix(in srgb, var(--color-accent-dynamic), transparent 92%)',
+            padding: 'var(--spacing-sm)',
+            borderRadius: 'var(--radius-md)',
             display: 'flex',
             border: '1px solid color-mix(in srgb, var(--color-accent-dynamic), transparent 85%)'
           }}>
@@ -355,23 +484,30 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
 
       {/* Fleet Overview Metrics */}
       <div className="fleet-metrics-row">
-        <MetricCard label="Total Agents" value={fleetStats.total} icon={<Server size={20} />} />
-        <MetricCard 
-          label="Online Now" 
-          value={fleetStats.online} 
-          icon={<Activity size={20} />} 
+        <MetricCard
+          label="Total Agents"
+          value={fleetStats.total}
+          icon={<Server size={20} />}
+          tooltip="Total number of registered agents across all systems"
+        />
+        <MetricCard
+          label="Online Now"
+          value={fleetStats.online}
+          icon={<Activity size={20} />}
           borderLeftColor="var(--color-success)"
           iconStyle={{ color: 'var(--color-success)', background: 'rgba(76, 175, 80, 0.1)' }}
+          tooltip="Agents currently connected and reporting data"
         />
-        <MetricCard 
-          label="Outdated" 
-          value={fleetStats.outdated} 
-          icon={<ShieldAlert size={20} />} 
+        <MetricCard
+          label="Outdated"
+          value={fleetStats.outdated}
+          icon={<ShieldAlert size={20} />}
           borderLeftColor={fleetStats.outdated > 0 ? 'var(--color-warning)' : 'var(--border-color)'}
-          iconStyle={{ 
-            color: fleetStats.outdated > 0 ? 'var(--color-warning)' : 'var(--text-tertiary)', 
-            background: fleetStats.outdated > 0 ? 'rgba(255, 152, 0, 0.1)' : 'var(--bg-hover)' 
+          iconStyle={{
+            color: fleetStats.outdated > 0 ? 'var(--color-warning)' : 'var(--text-tertiary)',
+            background: fleetStats.outdated > 0 ? 'rgba(255, 152, 0, 0.1)' : 'var(--bg-hover)'
           }}
+          tooltip="Agents running older versions than the latest release"
         />
       </div>
 
@@ -383,35 +519,42 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
         {/* Rapid Deployment Section */}
         <section className="deployment-section builder-panel">
           <h3><Rocket size={20} /> Deployment AIO</h3>
-          
+
           <div className="builder-ui">
-            {/* Architecture Selector - Top Bar */}
+            {/* Installation Mode Selector - Top Bar */}
             <div className="builder-top-bar">
-              <div className="builder-group arch-group">
-                <span className="builder-label">Architecture</span>
-                <div className="toggle-presets arch-toggles">
-                  {(['x86_64', 'ARM64'] as Arch[]).map(a => (
-                    <button 
-                      key={a} 
-                      className={`toggle-item ${arch === a ? 'active' : ''}`}
-                      onClick={() => setArch(a)}
-                    >
-                      {a}
-                    </button>
-                  ))}
+              <div className="builder-group path-group" title="Choose where the agent will be installed. Standard uses system paths, Portable installs to current directory.">
+                <span className="builder-label">Installation Mode</span>
+                <div className="toggle-presets path-toggles">
+                  <button
+                    className={`toggle-item ${pathMode === 'standard' ? 'active' : ''}`}
+                    onClick={() => setPathMode('standard')}
+                    title="Install to /opt/pankha-agent/ with logs in /var/log/pankha-agent/"
+                  >
+                    <Server size={14} />
+                    Standard (/opt/)
+                  </button>
+                  <button
+                    className={`toggle-item ${pathMode === 'portable' ? 'active' : ''}`}
+                    onClick={() => setPathMode('portable')}
+                    title="Install to current working directory with logs in same folder"
+                  >
+                    <FolderDown size={14} />
+                    Portable (CWD)
+                  </button>
                 </div>
               </div>
             </div>
 
             <div className="builder-main-grid">
-              {/* Row 1: Log Level | Emergency °C | Failsafe Speed */}
-              <div className="builder-group">
+              {/* Row 1: Log Level | Emergency C | Failsafe Speed */}
+              <div className="builder-group" title={interpolateTooltip(getOption('logLevel').tooltip, tooltipContext)}>
                 <span className="builder-label">{uiOptions.options.logLevel.label}</span>
                 <div className="toggle-presets">
                   {uiOptions.options.logLevel.values.map(opt => (
-                    <button 
-                      key={String(opt.value)} 
-                      className={`toggle-item ${logLevel === opt.value ? 'active' : ''}`} 
+                    <button
+                      key={String(opt.value)}
+                      className={`toggle-item ${logLevel === opt.value ? 'active' : ''}`}
                       onClick={() => setLogLevel(opt.value as LogLevel)}
                     >
                       {opt.cleanLabel || opt.label}
@@ -420,13 +563,13 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
                 </div>
               </div>
 
-              <div className="builder-group">
+              <div className="builder-group" title={interpolateTooltip(getOption('emergencyTemp').tooltip, tooltipContext)}>
                 <span className="builder-label">{uiOptions.options.emergencyTemp.label}</span>
                 <div className="toggle-presets">
                   {uiOptions.options.emergencyTemp.values.map(opt => (
-                    <button 
-                      key={String(opt.value)} 
-                      className={`toggle-item ${emergency === String(opt.value) ? 'active' : ''}`} 
+                    <button
+                      key={String(opt.value)}
+                      className={`toggle-item ${emergency === String(opt.value) ? 'active' : ''}`}
                       onClick={() => setEmergency(String(opt.value))}
                     >
                       {opt.cleanLabel || opt.label}
@@ -435,13 +578,13 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
                 </div>
               </div>
 
-              <div className="builder-group">
+              <div className="builder-group" title={interpolateTooltip(getOption('failsafeSpeed').tooltip, tooltipContext)}>
                 <span className="builder-label">{uiOptions.options.failsafeSpeed.label}</span>
                 <div className="toggle-presets">
                   {uiOptions.options.failsafeSpeed.values.map(opt => (
-                    <button 
-                      key={String(opt.value)} 
-                      className={`toggle-item ${failsafe === String(opt.value) ? 'active' : ''}`} 
+                    <button
+                      key={String(opt.value)}
+                      className={`toggle-item ${failsafe === String(opt.value) ? 'active' : ''}`}
                       onClick={() => setFailsafe(String(opt.value) as Failsafe)}
                     >
                       {opt.cleanLabel || opt.label}
@@ -451,13 +594,13 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
               </div>
 
               {/* Row 2: Agent rate | Fan Step | Hysteresis */}
-              <div className="builder-group">
+              <div className="builder-group" title={interpolateTooltip(getOption('updateInterval').tooltip, tooltipContext)}>
                 <span className="builder-label">{uiOptions.options.updateInterval.label}</span>
                 <div className="toggle-presets">
                   {uiOptions.options.updateInterval.values.map(opt => (
-                    <button 
-                      key={String(opt.value)} 
-                      className={`toggle-item ${agentRate === String(opt.value) ? 'active' : ''}`} 
+                    <button
+                      key={String(opt.value)}
+                      className={`toggle-item ${agentRate === String(opt.value) ? 'active' : ''}`}
                       onClick={() => setAgentRate(String(opt.value))}
                     >
                       {opt.cleanLabel || opt.label}
@@ -466,13 +609,13 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
                 </div>
               </div>
 
-              <div className="builder-group">
+              <div className="builder-group" title={interpolateTooltip(getOption('fanStep').tooltip, tooltipContext)}>
                 <span className="builder-label">{uiOptions.options.fanStep.label}</span>
                 <div className="toggle-presets">
                   {uiOptions.options.fanStep.values.map(opt => (
-                    <button 
-                      key={String(opt.value)} 
-                      className={`toggle-item ${fanStep === String(opt.value) ? 'active' : ''}`} 
+                    <button
+                      key={String(opt.value)}
+                      className={`toggle-item ${fanStep === String(opt.value) ? 'active' : ''}`}
                       onClick={() => setFanStep(String(opt.value))}
                     >
                       {opt.cleanLabel || opt.label}
@@ -481,13 +624,13 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
                 </div>
               </div>
 
-              <div className="builder-group">
+              <div className="builder-group" title={interpolateTooltip(getOption('hysteresis').tooltip, tooltipContext)}>
                 <span className="builder-label">{uiOptions.options.hysteresis.label}</span>
                 <div className="toggle-presets">
                   {uiOptions.options.hysteresis.values.map(opt => (
-                    <button 
-                      key={String(opt.value)} 
-                      className={`toggle-item ${hysteresis === String(opt.value) ? 'active' : ''}`} 
+                    <button
+                      key={String(opt.value)}
+                      className={`toggle-item ${hysteresis === String(opt.value) ? 'active' : ''}`}
                       onClick={() => setHysteresis(String(opt.value))}
                     >
                       {opt.cleanLabel || opt.label}
@@ -502,31 +645,34 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
             </div>
 
             <div className="terminal-stack">
-              <TerminalBlock 
-                title="CURL" 
-                tool="curl" 
+              <TerminalBlock
+                title="CURL"
+                tool="curl"
                 copiedType={copiedType}
                 command={generateCommand('curl')}
                 onCopy={copyToClipboard}
+                isLoading={isLoadingToken}
               />
               <div className="terminal-spacer" />
-              <TerminalBlock 
-                title="WGET" 
-                tool="wget" 
+              <TerminalBlock
+                title="WGET"
+                tool="wget"
                 copiedType={copiedType}
                 command={generateCommand('wget')}
                 onCopy={copyToClipboard}
+                isLoading={isLoadingToken}
               />
             </div>
           </div>
         </section>
 
-        <MaintenanceSection 
+        <MaintenanceSection
           isExpanded={isMaintenanceExpanded}
           onToggle={() => setIsMaintenanceExpanded(!isMaintenanceExpanded)}
           systems={systems}
           latestVersion={latestVersion}
-          onApplyUpdate={copyToClipboard}
+          updatingAgents={updatingAgents}
+          onApplyUpdate={handleRemoteUpdate}
         />
 
         {/* Resources Section */}

@@ -18,6 +18,7 @@ import systemsRouter from './routes/systems';
 import discoveryRouter from './routes/discovery';
 import fanProfilesRouter from './routes/fanProfiles';
 import fanConfigurationsRouter from './routes/fanConfigurations';
+import deployRouter from './routes/deploy';
 import { licenseRouter, licenseManager } from './license';
 import { log } from './utils/logger';
 
@@ -140,6 +141,7 @@ app.use('/api/systems', systemsRouter);
 app.use('/api/discovery', discoveryRouter);
 app.use('/api/fan-profiles', fanProfilesRouter);
 app.use('/api/fan-configurations', fanConfigurationsRouter);
+app.use('/api/deploy', deployRouter);
 app.use('/api/license', licenseRouter);
 
 // System overview endpoint

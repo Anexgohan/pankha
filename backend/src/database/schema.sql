@@ -270,3 +270,18 @@ CREATE TABLE IF NOT EXISTS license_config (
 -- Indexes for license tables
 CREATE INDEX IF NOT EXISTS idx_licenses_key ON licenses(license_key);
 CREATE INDEX IF NOT EXISTS idx_licenses_tier ON licenses(tier);
+
+-- ============================================
+-- Deployment Templates (Token-Based Install)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS deployment_templates (
+  token VARCHAR(16) PRIMARY KEY,           -- Short token (6 chars hex)
+  config JSONB NOT NULL,                   -- Agent config (log_level, failsafe, etc.)
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  expires_at TIMESTAMPTZ NOT NULL,         -- Token expiration (24h default)
+  used_count INTEGER DEFAULT 0             -- Track usage for analytics
+);
+
+-- Index for token lookups with expiry check
+CREATE INDEX IF NOT EXISTS idx_deployment_templates_expires ON deployment_templates(expires_at);

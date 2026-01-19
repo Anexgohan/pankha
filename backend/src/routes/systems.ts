@@ -1094,6 +1094,52 @@ router.put("/:id/enable-fan-control", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/systems/:id/update - Trigger remote self-update
+router.post("/:id/update", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+
+    const system = await db.get("SELECT agent_id, name FROM systems WHERE id = $1", [
+      systemId,
+    ]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+
+    // Check if agent is online
+    const agentStatus = agentManager.getAgentStatus(system.agent_id);
+    if (!agentStatus || agentStatus.status !== 'online') {
+      return res.status(400).json({
+        error: "Agent is not online",
+        agent_status: agentStatus?.status || 'unknown'
+      });
+    }
+
+    // Send selfUpdate command to agent via WebSocket
+    const result = await commandDispatcher.sendCommand(
+      system.agent_id,
+      "selfUpdate",
+      {},
+      "normal"
+    );
+
+    log.info(`Remote update command sent to agent ${system.agent_id} (${system.name})`, "systems");
+
+    res.json({
+      message: "Update command sent to agent",
+      agent_id: system.agent_id,
+      system_name: system.name,
+      result,
+    });
+  } catch (error) {
+    log.error("Error triggering remote update:", "systems", error);
+    res.status(500).json({
+      error:
+        error instanceof Error ? error.message : "Failed to trigger remote update",
+    });
+  }
+});
+
 // PUT /api/systems/:id/sensors/:sensorId/label - Update sensor label
 router.put(
   "/:id/sensors/:sensorId/label",

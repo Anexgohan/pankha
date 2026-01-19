@@ -764,3 +764,146 @@
 [data-theme="light"] .installer-card::after {
   background: radial-gradient(circle at top right, color-mix(in srgb, var(--color-accent-dynamic), transparent 90%) 0%, transparent 70%);
 }
+
+/* ============================================
+   Token-Based Deployment & Fleet UI Styles
+   ============================================ */
+
+/* Header Badge (X UPDATES AVAILABLE) */
+.header-badge {
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 90%);
+  border: 1px solid color-mix(in srgb, var(--color-accent-dynamic), transparent 85%);
+  color: var(--color-accent-dynamic);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-left: var(--spacing-md);
+  font-family: var(--font-mono);
+}
+
+.header-badge.pulse {
+  animation: badge-pulse 2s infinite;
+}
+
+@keyframes badge-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dynamic), transparent 60%); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent-dynamic), transparent 100%); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dynamic), transparent 100%); }
+}
+
+/* Update Badge (NEW vX.X.X) in Version column */
+.update-badge {
+  background: var(--color-accent-dynamic);
+  color: white;
+  font-size: 8px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-left: var(--spacing-xs);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+/* Status Tag V2 (Merged Health + Status) */
+.status-tag-v2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-family: var(--font-mono);
+  border: 1px solid transparent;
+}
+
+.status-tag-v2.online {
+  background: color-mix(in srgb, var(--color-success), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-success), transparent 85%);
+  color: var(--color-success);
+}
+
+.status-tag-v2.offline {
+  background: color-mix(in srgb, var(--color-error), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-error), transparent 85%);
+  color: var(--color-error);
+}
+
+.status-tag-v2.updating {
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-accent-dynamic), transparent 85%);
+  color: var(--color-accent-dynamic);
+}
+
+.status-tag-v2 .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-tag-v2.online .status-dot {
+  animation: dot-pulse 2s infinite;
+}
+
+.status-tag-v2.updating .status-dot {
+  animation: dot-pulse 0.8s infinite;
+}
+
+@keyframes dot-pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* Table Cell Styles */
+.hostname-cell {
+  font-weight: var(--font-weight-medium);
+}
+
+.hostname-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.agent-id-cell code {
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+/* Disabled button states */
+.btn-table-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Installation Mode Toggle */
+.path-group {
+  width: auto;
+}
+
+.path-toggles {
+  display: flex;
+  gap: var(--spacing-sm);
+  max-width: 320px;
+}
+
+.path-toggles .toggle-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  min-width: 140px;
+  justify-content: center;
+}

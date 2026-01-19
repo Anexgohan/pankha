@@ -92,7 +92,8 @@ export interface FanControlCommand {
     | "setLogLevel"
     | "setFailsafeSpeed"
     | "setEnableFanControl"
-    | "setAgentName";
+    | "setAgentName"
+    | "selfUpdate";
   payload: {
     fanId?: string;
     speed?: number;

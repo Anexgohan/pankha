@@ -111,10 +111,10 @@ const Settings: React.FC = () => {
     { name: 'Cyber Blue', color: '#2196F3' },
     { name: 'Toxic Green', color: '#4CAF50' },
     { name: 'Hazard Orange', color: '#FF9800' },
-    { name: 'Neon Pulse', color: '#E91E63' },
+    { name: 'Bold Saffron', color: '#F0741E' },
     { name: 'Digital Violet', color: '#9C27B0' },
     { name: 'Cosmic Lavender', color: '#867CFF' },
-    { name: 'Flash Pink', color: '#FF326E' },
+    { name: 'Flash Pink', color: '#E91E63' },
   ];
   
   // Update custom inputs when global values change (e.g. from preset)

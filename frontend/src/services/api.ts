@@ -312,4 +312,33 @@ export const getSensorHistory = async (
   return response.data.data;
 };
 
+// Deployment - Token-based Linux installation
+export interface DeploymentConfig {
+  log_level: string;
+  failsafe_speed: number;
+  emergency_temp: number;
+  update_interval: number;
+  fan_step: number;
+  hysteresis: number;
+  path_mode: 'standard' | 'portable';
+}
+
+export interface DeploymentTemplate {
+  token: string;
+  expires_at: string;
+}
+
+export const createDeploymentTemplate = async (
+  config: DeploymentConfig
+): Promise<DeploymentTemplate> => {
+  const response = await api.post("/api/deploy/templates", { config });
+  return response.data;
+};
+
+// Agent Self-Update
+export const selfUpdateAgent = async (systemId: number) => {
+  const response = await api.post(`/api/systems/${systemId}/update`);
+  return response.data;
+};
+
 
