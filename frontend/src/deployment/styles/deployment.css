@@ -382,36 +382,46 @@
 /* Reusing Scale Preset Button look for toggles */
 .toggle-presets {
   display: flex;
-  background: var(--bg-tertiary);
-  padding: 3px;
-  border-radius: var(--radius-md);
-  gap: 2px;
-  border: 1px solid var(--border-color);
+  flex-wrap: wrap;
+  background: transparent;
+  border: none;
+  padding: 0;
+  gap: 0;
 }
 
 .toggle-item {
-  background: transparent;
-  border: none;
-  padding: 6px var(--spacing-lg);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-  border-radius: 4px;
+  padding: 6px 14px;
   cursor: pointer;
   transition: all 0.2s ease;
-  flex: 1;
+  flex: 0 0 auto;
   font-family: var(--font-mono);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: -1px;
+  margin-bottom: -1px;
+  border-radius: 4px; /* Locked-in Option A Cell Rounding */
+  position: relative;
+  z-index: 1;
 }
 
 .toggle-item:hover {
+  z-index: 2;
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .toggle-item.active {
+  z-index: 3;
   background: var(--color-accent-dynamic);
   color: white;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
+  border-color: var(--color-accent-dynamic);
 }
 
 .terminal-stack {
