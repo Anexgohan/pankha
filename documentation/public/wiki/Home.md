@@ -30,5 +30,3 @@ Pankha is an open-source, distributed fan control system designed for self-hoste
 2.  **[Linux Agent](Agents-Linux)**: Deploy agents to your Linux machines.
 3.  **[Windows Agent](Agents-Windows)**: Deploy agents to your Windows machines.
 4.  **[Server Configuration](Server-Configuration)**: Customize your setup.
-
-<!-- Backport test v2 - 2026-01-21 - safe to remove -->

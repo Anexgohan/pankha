@@ -1,0 +1,14 @@
+# CODEOWNERS - Require owner approval for protected files
+# PRs modifying these files need @Anexgohan's approval
+
+# Protected files (synced with special handling)
+README.md @Anexgohan
+compose.yml @Anexgohan
+.env @Anexgohan
+example.env @Anexgohan
+.mailmap @Anexgohan
+LICENSE @Anexgohan
+LICENSE-COMMERCIAL.md @Anexgohan
+
+# Workflow files
+.github/ @Anexgohan
