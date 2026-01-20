@@ -69,9 +69,9 @@ const SystemsPage: React.FC = () => {
             const stable = releases.find((r: any) => !r.prerelease);
             if (stable) setLatestVersion(stable.tag_name);
 
-            // Find latest unstable (if it's newer than stable or we have no stable)
+            // Find latest unstable
             const unstable = releases.find((r: any) => r.prerelease);
-            if (unstable && (!stable || new Date(unstable.created_at) > new Date(stable.created_at))) {
+            if (unstable) {
               setUnstableVersion(unstable.tag_name);
             } else {
               setUnstableVersion(null);

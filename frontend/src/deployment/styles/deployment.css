@@ -163,6 +163,27 @@
   padding: 2px 8px;
   border-radius: 4px;
   font-family: var(--font-mono);
+  font-weight: var(--font-weight-bold);
+  border: 1px solid var(--border-color);
+}
+
+.version-tags-row {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+  margin-left: auto;
+}
+
+.version-tag.stable {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success), transparent 94%);
+  border-color: color-mix(in srgb, var(--color-success), transparent 85%);
+}
+
+.version-tag.unstable {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning), transparent 94%);
+  border-color: color-mix(in srgb, var(--color-warning), transparent 85%);
 }
 
 .installer-card p {
@@ -185,7 +206,7 @@
   justify-content: center;
   gap: var(--spacing-sm);
   background: var(--color-accent-dynamic);
-  color: white;
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-md);
   padding: var(--spacing-md) var(--spacing-xl);
@@ -202,7 +223,10 @@
 .btn-primary-tactical:hover {
   background: var(--color-hover-tint-dynamic);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
+  background: var(--color-success); /* Green for Stable Ready */
+  border-color: var(--color-success);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 .btn-outline-tactical {
@@ -210,7 +234,7 @@
     align-items: center;
     justify-content: center;
     gap: var(--spacing-sm);
-    background: transparent;
+    background: var(--color-accent-dynamic);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -225,9 +249,10 @@
 }
 
 .btn-outline-tactical:hover {
-    background: var(--bg-hover);
-    border-color: var(--color-accent-dynamic);
-    color: var(--color-accent-dynamic);
+    background: var(--color-success); /* Green for Stable Ready */
+    border-color: var(--color-success);
+    color: var(--text-primary);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 .coming-soon-badge {
@@ -427,7 +452,7 @@
 .toggle-item.active {
   z-index: 3;
   background: var(--color-accent-dynamic);
-  color: white;
+  color: var(--text-primary);
   border-color: var(--color-accent-dynamic);
 }
 
@@ -491,7 +516,7 @@
 .terminal-copy-action.success {
   background: var(--color-success);
   border-color: var(--color-success);
-  color: white;
+  color: var(--text-primary);
 }
 
 /* Fleet Maintenance Collapsible */
@@ -710,12 +735,14 @@
 .btn-table-action.update-needed {
   background: var(--color-accent-dynamic);
   border-color: var(--color-accent-dynamic);
-  color: white;
+  color: var(--text-primary);
 }
 
 .btn-table-action.update-needed:hover {
-  background: var(--color-hover-tint-dynamic);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent-dynamic), transparent 60%);
+  background: var(--color-success); /* Green for Stable Ready */
+  border-color: var(--color-success);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 /* Resource Grid */
@@ -911,15 +938,16 @@
 .btn-prep-action.current {
   background: var(--color-success); /* Green for Stable Ready */
   border-color: var(--color-success);
-  color: white;
+  color: var(--text-primary);
   cursor: default;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 .btn-prep-action.unstable.current {
-  background: var(--color-accent-dynamic); /* Blue for Unstable Ready */
-  border-color: var(--color-accent-dynamic);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
+  background: var(--color-success); /* Green for Stable Ready */
+  border-color: var(--color-success);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 .btn-prep-action.current svg {
@@ -1061,7 +1089,7 @@
 /* Update Badge (NEW vX.X.X) in Version column */
 .update-badge {
     background: var(--color-accent-dynamic);
-    color: white;
+    color: var(--text-primary);
     font-size: 9px;
     font-weight: var(--font-weight-bold);
     padding: 1px 6px;

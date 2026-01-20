@@ -1,6 +1,6 @@
 [package]
 name = "pankha-agent"
-version = "0.2.2-dev"
+version = "1.0.0"
 edition = "2021"
 authors = ["Pankha Development Team"]
 description = "Cross-platform hardware monitoring and fan control agent for Pankha"

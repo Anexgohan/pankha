@@ -90,15 +90,20 @@ const MetricCard: React.FC<{
 
 const InstallerSection: React.FC<{
   latestVersion: string | null;
+  unstableVersion: string | null;
   githubRepo: string;
-}> = React.memo(({ latestVersion, githubRepo }) => (
+}> = React.memo(({ latestVersion, unstableVersion, githubRepo }) => (
   <section className="deployment-section">
     <h3><Download size={20} /> Official Installers</h3>
     <div className="download-options">
       <div className="installer-card">
         <h4>
           <Binary size={18} /> Windows Agent
-          <span className="version-tag">{latestVersion || 'Detecting'}</span>
+          <div className="version-tags-row">
+            {latestVersion && <span className="version-tag stable">S {latestVersion}</span>}
+            {unstableVersion && <span className="version-tag unstable">U {unstableVersion}</span>}
+            {!latestVersion && !unstableVersion && <span className="version-tag">Detecting</span>}
+          </div>
         </h4>
         <p>Native Windows service with Tray App. Supports Windows 10/11 x86_64. Self-contained .NET 8.0 execution.</p>
         <div className="card-actions-row">
@@ -124,7 +129,10 @@ const InstallerSection: React.FC<{
       <div className="installer-card">
         <h4>
           <Settings2 size={18} /> Linux Setup
-          <span className="version-tag">STABLE</span>
+          <div className="version-tags-row">
+            <span className="version-tag stable">STABLE</span>
+            {unstableVersion && <span className="version-tag unstable">PRE-RELEASE</span>}
+          </div>
         </h4>
         <p>Systemd service with Rust-based hardware monitoring. Supports Debian, Ubuntu, Proxmox, and RPI.</p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
@@ -206,8 +214,11 @@ const MaintenanceSection: React.FC<{
   isStaging: boolean;
 }> = React.memo(({ isExpanded, onToggle, systems, stableVersion, unstableVersion, updatingAgents, onApplyUpdate, hubStatus, onStageUpdate, isStaging }) => {
   const outdatedCount = useMemo(() => {
-    // Identify if any agent matches NEITHER the hub version NOR the latest stable
-    const targetVersion = hubStatus?.version?.replace('v', '') || stableVersion?.replace('v', '');
+    // Priority: Hub version > Latest Stable
+    const hubVer = hubStatus?.version?.replace('v', '');
+    const stableVer = stableVersion?.replace('v', '');
+    const targetVersion = hubVer || stableVer;
+    
     if (!targetVersion) return 0;
     return systems.filter(s => s.agent_version && !s.agent_version.includes(targetVersion)).length;
   }, [systems, stableVersion, hubStatus]);
@@ -627,7 +638,11 @@ export const DeploymentPage: React.FC<{
       </div>
 
       <div className="deployment-content-grid">
-        <InstallerSection latestVersion={latestVersion} githubRepo={GITHUB_REPO} />
+        <InstallerSection 
+          latestVersion={latestVersion} 
+          unstableVersion={unstableVersion || null}
+          githubRepo={GITHUB_REPO} 
+        />
 
         <ActionButton githubRepo={GITHUB_REPO} />
 
