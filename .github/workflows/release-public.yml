@@ -215,8 +215,8 @@ jobs:
           # Get pre-release flag from dispatch or auto-detect from version
           IS_PRERELEASE="${{ github.event.client_payload.is_prerelease || github.event.inputs.is_prerelease || 'auto' }}"
           if [ "$IS_PRERELEASE" = "auto" ]; then
-            # Auto-detect from version string (alpha, beta, prerelease, pre-release, rc)
-            if echo "$VERSION" | grep -qiE '-(alpha|beta|prerelease|pre-release|rc)(\.|$)'; then
+            # Auto-detect from version string (alpha, beta, rc, dev, preview, etc.)
+            if echo "$VERSION" | grep -qiE '-(alpha|beta|rc|pre|preview|dev|canary|nightly|experimental|insiders)'; then
               IS_PRERELEASE="true"
             else
               IS_PRERELEASE="false"
