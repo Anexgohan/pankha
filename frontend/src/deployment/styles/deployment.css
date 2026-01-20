@@ -172,6 +172,13 @@
   line-height: var(--line-height-relaxed);
 }
 
+.card-actions-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
 .btn-primary-tactical {
   display: flex;
   align-items: center;
@@ -1013,6 +1020,34 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+}
+
+.platform-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.platform-icon.windows {
+  background: rgba(0, 120, 212, 0.1);
+}
+
+.platform-icon.linux {
+  background: rgba(240, 173, 78, 0.1);
+}
+
+.platform-icon img {
+  display: block;
+}
+
+.btn-table-action.windows-download {
+  border-style: solid;
 }
 
 .agent-id-cell code {

@@ -105,6 +105,23 @@
   color: var(--color-success);
 }
 
+.connection-status-indicator.connected .status-icon {
+  transform-origin: center;
+  display: inline-block;
+  color: var(--color-success);
+}
+
+.connection-status-indicator.connected .status-icon polyline {
+  stroke-dasharray: 50;
+  stroke-dashoffset: 0;
+  animation: connection-flow 2.5s linear infinite;
+}
+
+@keyframes connection-flow {
+  0% { stroke-dashoffset: 0; }
+  100% { stroke-dashoffset: 100; }
+}
+
 .connection-status-indicator.polling {
   color: var(--color-warning, #f59e0b);
 }

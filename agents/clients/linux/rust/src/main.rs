@@ -1961,10 +1961,10 @@ impl WebSocketClient {
             // Normalize versions for comparison (strip 'v' prefix if present)
             let target_clean = target.trim_start_matches('v');
             if target_clean == current_version {
-                info!("Already on target version {}, skipping update", current_version);
-                return Ok(());
+                info!("Target version matches current (v{}), proceeding with reinstall/overwrite", current_version);
+            } else {
+                info!("🚀 Updating from v{} to {}", current_version, target);
             }
-            info!("🚀 Updating from v{} to {}", current_version, target);
         } else {
             info!("🚀 Starting self-update (no version specified, forcing reinstall)");
         }

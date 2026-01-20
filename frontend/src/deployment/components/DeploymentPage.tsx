@@ -16,8 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   History,
-  FolderDown,
-  Monitor
+  FolderDown
 } from 'lucide-react';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
 import { toast } from '../../utils/toast';
@@ -102,13 +101,24 @@ const InstallerSection: React.FC<{
           <span className="version-tag">{latestVersion || 'Detecting'}</span>
         </h4>
         <p>Native Windows service with Tray App. Supports Windows 10/11 x86_64. Self-contained .NET 8.0 execution.</p>
-        <a
-          href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`}
-          className="btn-primary-tactical"
-          download
-        >
-          <Download size={16} /> Get Latest Release
-        </a>
+        <div className="card-actions-row">
+          <a
+            href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`}
+            className="btn-primary-tactical"
+            style={{ flex: 1 }}
+            download
+          >
+            <Download size={16} /> Get Latest Release
+          </a>
+          <a
+            href={`${githubRepo}/wiki/Agents-Windows`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-outline-tactical"
+          >
+            <Server size={16} /> DOCUMENTATION
+          </a>
+        </div>
       </div>
 
       <div className="installer-card">
@@ -127,7 +137,7 @@ const InstallerSection: React.FC<{
             </p>
         </div>
         <a
-          href={`${githubRepo}/blob/main/documentation/private/agents/clients/linux/rust/setup-guide.md`}
+          href={`${githubRepo}/wiki/Agents-Linux`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-outline-tactical"
@@ -165,7 +175,7 @@ const ResourcesSection: React.FC<{ githubRepo: string }> = React.memo(({ githubR
         </div>
         <ArrowRight size={16} className="link-arrow" />
       </a>
-      <a href={`${githubRepo}/blob/main/documentation/private/agents/clients/linux/rust/setup-guide.md`} target="_blank" rel="noopener noreferrer" className="resource-link">
+      <a href={`${githubRepo}/wiki/Agents-Linux`} target="_blank" rel="noopener noreferrer" className="resource-link">
         <div className="link-label">
           <Settings2 size={18} />
           <span>Linux Service Guide</span>
@@ -296,12 +306,23 @@ const MaintenanceSection: React.FC<{
                     const statusLabel = isUpdating ? 'UPDATING' : (isOnline ? 'ONLINE' : 'OFFLINE');
                     const statusClass = isUpdating ? 'updating' : (isOnline ? 'online' : 'offline');
 
+                    const isWindows = system.agent_id.toLowerCase().startsWith('windows-');
+                    const platformIcon = isWindows ? (
+                      <div className="platform-icon windows" title="Windows Agent">
+                        <img src="/icons/windows_01.svg" alt="Windows" width="14" height="14" />
+                      </div>
+                    ) : (
+                      <div className="platform-icon linux" title="Linux Agent">
+                        <img src="/icons/linux_01.svg" alt="Linux" width="14" height="14" />
+                      </div>
+                    );
+
                     return (
                       <tr key={system.id}>
                         <td className="hostname-cell">
                           <div className="hostname-wrapper">
-                            <Monitor size={14} style={{ color: 'var(--text-tertiary)' }} />
-                            {system.name}
+                            {platformIcon}
+                            <span className="hostname-text">{system.name}</span>
                           </div>
                         </td>
                         <td className="agent-id-cell"><code>{system.agent_id}</code></td>
@@ -321,16 +342,28 @@ const MaintenanceSection: React.FC<{
                             {statusLabel}
                           </span>
                         </td>
-                        <td>
-                          <button
-                            className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
-                            onClick={() => onApplyUpdate(system.id)}
-                            disabled={!isOnline || isUpdating || !hubStatus?.version}
-                            title={!hubStatus?.version ? 'Download a version to local server first' : ''}
-                          >
-                            {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
-                          </button>
-                        </td>
+                          <td>
+                            {isWindows ? (
+                              <a 
+                                href={`${GITHUB_REPO}/releases/latest/download/pankha-agent-windows_x64.msi`}
+                                className={`btn-table-action windows-download ${isOutdated ? 'update-needed' : ''}`}
+                                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                download
+                              >
+                                <Download size={14} />
+                                {isOutdated ? 'Download MSI' : 'Get MSI'}
+                              </a>
+                            ) : (
+                              <button
+                                className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
+                                onClick={() => onApplyUpdate(system.id)}
+                                disabled={!isOnline || isUpdating || !hubStatus?.version}
+                                title={!hubStatus?.version ? 'Download a version to local server first' : (!isOnline ? 'Agent is offline' : '')}
+                              >
+                                {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
+                              </button>
+                            )}
+                          </td>
                       </tr>
                     );
                   })

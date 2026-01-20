@@ -10,7 +10,6 @@ import Settings from '../../settings/components/Settings';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
 import HeaderFan from '../../components/HeaderFan';
 import { 
-  Activity, 
   Loader2, 
   Unplug, 
   CircleAlert, 
@@ -146,7 +145,19 @@ const SystemsPage: React.FC = () => {
             {connectionState === 'connected' && (
               <>
                 <span className="connection-status-indicator connected">
-                  <Activity size={14} className="status-icon" /> Live
+                  <svg 
+                    width="20" 
+                    height="20" 
+                    viewBox="0 0 24 24" 
+                    fill="none" 
+                    stroke="currentColor" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round" 
+                    className="status-icon"
+                  >
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg> Live
                 </span>
                 <span className="last-update">Real-time</span>
               </>
