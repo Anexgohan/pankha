@@ -495,3 +495,5 @@ This project is licensed under the AGPL-3.0 License ![License](https://img.shiel
 ---
 
 **Made with ❤️ for the self-hosting community**
+
+<!-- Backport script test - 2026-01-21 - safe to remove -->
