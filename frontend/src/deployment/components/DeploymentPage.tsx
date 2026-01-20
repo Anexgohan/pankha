@@ -325,8 +325,8 @@ const MaintenanceSection: React.FC<{
                           <button
                             className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
                             onClick={() => onApplyUpdate(system.id)}
-                            disabled={!isOnline || isUpdating || (isOutdated && hubStatus?.version !== stableVersion)}
-                            title={isOutdated && hubStatus?.version !== stableVersion ? `Download ${stableVersion} to server first` : ''}
+                            disabled={!isOnline || isUpdating || !hubStatus?.version}
+                            title={!hubStatus?.version ? 'Download a version to local server first' : ''}
                           >
                             {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
                           </button>

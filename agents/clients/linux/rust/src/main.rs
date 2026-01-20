@@ -3386,30 +3386,42 @@ async fn main() -> Result<()> {
                     let old_binary = current_exe.with_extension("old");
                     
                     if update_marker.exists() && old_binary.exists() {
-                        // We have both marker and .old - this means we crashed after update
-                        eprintln!("⚠️ Detected failed update (marker + .old exist). Attempting rollback...");
+                        // Read marker content to see if we've already tried booting this binary
+                        let marker_content = std::fs::read_to_string(&update_marker).unwrap_or_default();
                         
-                        // Rollback: swap .old back to current
-                        match std::fs::rename(&old_binary, &current_exe) {
-                            Ok(_) => {
-                                eprintln!("✅ Rollback successful. Restarting with previous version...");
-                                let _ = std::fs::remove_file(&update_marker);
-                                
-                                // Re-exec into restored binary
-                                use std::os::unix::process::CommandExt;
-                                let mut cmd = std::process::Command::new(&current_exe);
-                                cmd.arg("--daemon-child");
-                                if let Some(level) = args.log_level.as_ref() {
-                                    cmd.arg("--log-level").arg(level);
+                        if !marker_content.contains("booted=true") {
+                            // This is the FIRST boot of the new binary. 
+                            // We mark it as booted and continue normally.
+                            // If we crash and restart, the next boot will find "booted=true" and rollback.
+                            let _ = std::fs::write(&update_marker, format!("{}\nbooted=true", marker_content));
+                            debug!("🚀 First boot of new version. Proceeding to verification...");
+                        } else {
+                            // This is at least the SECOND boot attempts - we likely crashed or failed to register.
+                            // We have both marker and .old - this means we crashed after update
+                            eprintln!("⚠️ Detected failed update (booted once and restarted). Attempting rollback...");
+                            
+                            // Rollback: swap .old back to current
+                            match std::fs::rename(&old_binary, &current_exe) {
+                                Ok(_) => {
+                                    eprintln!("✅ Rollback successful. Restarting with previous version...");
+                                    let _ = std::fs::remove_file(&update_marker);
+                                    
+                                    // Re-exec into restored binary
+                                    use std::os::unix::process::CommandExt;
+                                    let mut cmd = std::process::Command::new(&current_exe);
+                                    cmd.arg("--daemon-child");
+                                    if let Some(level) = args.log_level.as_ref() {
+                                        cmd.arg("--log-level").arg(level);
+                                    }
+                                    let _ = cmd.exec();
+                                    // If exec failed, exit and let systemd restart us
+                                    std::process::exit(1);
                                 }
-                                let _ = cmd.exec();
-                                // If exec failed, exit and let systemd restart us
-                                std::process::exit(1);
-                            }
-                            Err(e) => {
-                                eprintln!("❌ Rollback failed: {}. Continuing with current binary...", e);
-                                // Clean up marker to prevent rollback loop
-                                let _ = std::fs::remove_file(&update_marker);
+                                Err(e) => {
+                                    eprintln!("❌ Rollback failed: {}. Continuing with current binary...", e);
+                                    // Clean up marker to prevent rollback loop
+                                    let _ = std::fs::remove_file(&update_marker);
+                                }
                             }
                         }
                     }
