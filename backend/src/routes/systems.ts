@@ -6,6 +6,7 @@ import { DataAggregator } from "../services/DataAggregator";
 import { FanProfileController } from "../services/FanProfileController";
 import { WebSocketHub } from "../services/WebSocketHub";
 import { licenseManager } from "../license/LicenseManager";
+import UpdateDownloadService from "../services/UpdateDownloadService";
 import { log } from "../utils/logger";
 import {
   validFanSteps,
@@ -1115,11 +1116,15 @@ router.post("/:id/update", async (req: Request, res: Response) => {
       });
     }
 
-    // Send selfUpdate command to agent via WebSocket
+    // Get hub status for version info
+    const updateService = UpdateDownloadService.getInstance();
+    const hubStatus = updateService.getLocalStatus();
+
+    // Send selfUpdate command to agent via WebSocket with version
     const result = await commandDispatcher.sendCommand(
       system.agent_id,
       "selfUpdate",
-      {},
+      { version: hubStatus.version },
       "normal"
     );
 

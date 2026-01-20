@@ -1445,6 +1445,28 @@ impl WebSocketClient {
                 "registered" => {
                     info!("Agent successfully registered with backend");
 
+                    // Cleanup after successful update (if applicable)
+                    if let Ok(current_exe) = std::env::current_exe() {
+                        if let Some(exe_dir) = current_exe.parent() {
+                            let update_marker = exe_dir.join(".update_pending");
+                            let old_binary = current_exe.with_extension("old");
+                            
+                            if update_marker.exists() {
+                                info!("Update verified successful, cleaning up...");
+                                if let Err(e) = std::fs::remove_file(&update_marker) {
+                                    warn!("Failed to remove update marker: {}", e);
+                                }
+                                if old_binary.exists() {
+                                    if let Err(e) = std::fs::remove_file(&old_binary) {
+                                        warn!("Failed to remove old binary: {}", e);
+                                    } else {
+                                        info!("Old binary removed, update complete");
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Apply configuration from registration response
                     if let Some(config) = message.get("configuration") {
                         info!("Applying configuration from server");
@@ -1637,11 +1659,14 @@ impl WebSocketClient {
                 }
             }
             "selfUpdate" => {
+                // Extract version from payload for comparison
+                let target_version = payload.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
+                
                 // Trigger update in background to allow sending response first
                 let client_clone = Arc::new(self.clone_for_update()); 
                 tokio::spawn(async move {
                     tokio::time::sleep(Duration::from_secs(1)).await; // Brief delay for response delivery
-                    if let Err(e) = client_clone.self_update().await {
+                    if let Err(e) = client_clone.self_update(target_version).await {
                         error!("Self-update failed: {}", e);
                     }
                 });
@@ -1920,7 +1945,30 @@ impl WebSocketClient {
     }
 
     /// Perform self-update from local Pankha server
-    async fn self_update(&self) -> Result<()> {
+    /// 
+    /// Flow:
+    /// 1. Version check - skip if already on target version
+    /// 2. Download new binary from Hub
+    /// 3. Sanity check - verify size and execution
+    /// 4. Atomic swap with .old backup
+    /// 5. Write .update_pending marker
+    /// 6. Re-exec or systemctl restart
+    async fn self_update(&self, target_version: Option<String>) -> Result<()> {
+        let current_version = env!("CARGO_PKG_VERSION");
+        
+        // Version check: skip if already on target version
+        if let Some(ref target) = target_version {
+            // Normalize versions for comparison (strip 'v' prefix if present)
+            let target_clean = target.trim_start_matches('v');
+            if target_clean == current_version {
+                info!("Already on target version {}, skipping update", current_version);
+                return Ok(());
+            }
+            info!("🚀 Updating from v{} to {}", current_version, target);
+        } else {
+            info!("🚀 Starting self-update (no version specified, forcing reinstall)");
+        }
+
         let arch = std::env::consts::ARCH;
         let server_url = self.config.read().await.backend.server_url.clone();
         
@@ -1929,10 +1977,14 @@ impl WebSocketClient {
         let download_url = format!("{}/api/deploy/binaries/{}", base_url, arch);
         
         let current_exe = std::env::current_exe()?;
+        let exe_dir = current_exe.parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .to_path_buf();
         let new_exe = current_exe.with_extension("new");
         let old_exe = current_exe.with_extension("old");
+        let update_marker = exe_dir.join(".update_pending");
 
-        info!("🚀 Starting self-update to {} from {}", arch, download_url);
+        info!("Downloading {} binary from {}", arch, download_url);
 
         // Download using curl (standard on most Linux distros)
         let status = std::process::Command::new("curl")
@@ -1951,18 +2003,57 @@ impl WebSocketClient {
             std::fs::set_permissions(&new_exe, std::fs::Permissions::from_mode(0o755))?;
         }
 
+        // Sanity check: verify binary size (should be at least 1MB for a Rust binary)
+        let binary_size = std::fs::metadata(&new_exe)?.len();
+        if binary_size < 1_000_000 {
+            std::fs::remove_file(&new_exe)?;
+            return Err(anyhow::anyhow!(
+                "Downloaded binary is suspiciously small ({} bytes) - likely incomplete or corrupted",
+                binary_size
+            ));
+        }
+        debug!("Binary size check passed: {} bytes", binary_size);
+
+        // Sanity check: verify binary can execute
+        let version_check = std::process::Command::new(&new_exe)
+            .arg("--version")
+            .output();
+        
+        match version_check {
+            Ok(output) if output.status.success() => {
+                let version_output = String::from_utf8_lossy(&output.stdout);
+                debug!("Binary execution check passed: {}", version_output.trim());
+            }
+            Ok(output) => {
+                std::fs::remove_file(&new_exe)?;
+                return Err(anyhow::anyhow!(
+                    "Downloaded binary failed to execute: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ));
+            }
+            Err(e) => {
+                std::fs::remove_file(&new_exe)?;
+                return Err(anyhow::anyhow!("Downloaded binary failed execution test: {}", e));
+            }
+        }
+
         // Atomic swap
         if old_exe.exists() {
             let _ = std::fs::remove_file(&old_exe);
         }
         
-        info!("Applying hardware update: Swapping binaries...");
+        info!("Applying update: Swapping binaries...");
         std::fs::rename(&current_exe, &old_exe).context("Failed to backup current binary")?;
         
         if let Err(e) = std::fs::rename(&new_exe, &current_exe) {
             error!("❌ Failed to swap binaries: {}. Attempting rollback...", e);
             let _ = std::fs::rename(&old_exe, &current_exe);
             return Err(e.into());
+        }
+
+        // Write update marker (for rollback detection on next startup)
+        if let Err(e) = std::fs::write(&update_marker, format!("from={}\nto={}", current_version, target_version.as_deref().unwrap_or("unknown"))) {
+            warn!("Failed to write update marker: {} (continuing anyway)", e);
         }
 
         info!("✅ Update applied successfully. Restarting service...");
@@ -1986,7 +2077,6 @@ impl WebSocketClient {
                 let mut cmd = std::process::Command::new(&current_exe);
                 
                 // If we were a daemon child, keep being one
-                // Note: We don't need to pass all flags, just the runtime ones
                 cmd.arg("--daemon-child");
                 
                 // Inherit log level if it was set explicitly
@@ -3282,10 +3372,50 @@ async fn main() -> Result<()> {
     // Store reload handle in the global static for signal handler access
     let _ = RELOAD_HANDLE.set(reload_handle);
 
-    // If we're a daemon child, save our PID and continue
+    // If we're a daemon child, save our PID and check for failed update
     if args.daemon_child {
         ensure_directories()?;
         save_pid(process::id())?;
+        
+        // Check for failed update and rollback if needed
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(current_exe) = std::env::current_exe() {
+                if let Some(exe_dir) = current_exe.parent() {
+                    let update_marker = exe_dir.join(".update_pending");
+                    let old_binary = current_exe.with_extension("old");
+                    
+                    if update_marker.exists() && old_binary.exists() {
+                        // We have both marker and .old - this means we crashed after update
+                        eprintln!("⚠️ Detected failed update (marker + .old exist). Attempting rollback...");
+                        
+                        // Rollback: swap .old back to current
+                        match std::fs::rename(&old_binary, &current_exe) {
+                            Ok(_) => {
+                                eprintln!("✅ Rollback successful. Restarting with previous version...");
+                                let _ = std::fs::remove_file(&update_marker);
+                                
+                                // Re-exec into restored binary
+                                use std::os::unix::process::CommandExt;
+                                let mut cmd = std::process::Command::new(&current_exe);
+                                cmd.arg("--daemon-child");
+                                if let Some(level) = args.log_level.as_ref() {
+                                    cmd.arg("--log-level").arg(level);
+                                }
+                                let _ = cmd.exec();
+                                // If exec failed, exit and let systemd restart us
+                                std::process::exit(1);
+                            }
+                            Err(e) => {
+                                eprintln!("❌ Rollback failed: {}. Continuing with current binary...", e);
+                                // Clean up marker to prevent rollback loop
+                                let _ = std::fs::remove_file(&update_marker);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Show config if requested

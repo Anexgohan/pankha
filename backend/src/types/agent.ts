@@ -112,6 +112,7 @@ export interface FanControlCommand {
     failsafeSpeed?: number; // For setFailsafeSpeed command (0-100%)
     enabled?: boolean; // For setEnableFanControl command
     name?: string; // For setAgentName command
+    version?: string | null; // For selfUpdate command (hub version, e.g., "v0.3.2")
   };
   timestamp: number;
   priority: "low" | "normal" | "high" | "emergency";
