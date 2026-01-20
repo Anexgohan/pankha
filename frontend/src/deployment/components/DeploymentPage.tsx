@@ -22,7 +22,7 @@ import {
 import { useWebSocketData } from '../../hooks/useWebSocketData';
 import { toast } from '../../utils/toast';
 import { uiOptions, getDefault, getOption, interpolateTooltip } from '../../utils/uiOptions';
-import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL } from '../../services/api';
+import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL, getHubStatus, stageUpdateToHub, type HubStatus } from '../../services/api';
 import '../styles/deployment.css';
 
 interface DeploymentPageProps {
@@ -194,7 +194,10 @@ const MaintenanceSection: React.FC<{
   latestVersion: string | null;
   updatingAgents: Set<number>;
   onApplyUpdate: (systemId: number) => void;
-}> = React.memo(({ isExpanded, onToggle, systems, latestVersion, updatingAgents, onApplyUpdate }) => {
+  hubStatus: HubStatus | null;
+  onStageUpdate: () => void;
+  isStaging: boolean;
+}> = React.memo(({ isExpanded, onToggle, systems, latestVersion, updatingAgents, onApplyUpdate, hubStatus, onStageUpdate, isStaging }) => {
   const outdatedCount = useMemo(() => {
     if (!latestVersion) return 0;
     const cleanLatest = latestVersion.replace('v', '');
@@ -213,6 +216,31 @@ const MaintenanceSection: React.FC<{
             </span>
           )}
         </h3>
+
+        {/* Local Prep Widget */}
+        <div className="local-prep-widget" onClick={(e) => e.stopPropagation()}>
+          <div className="prep-status">
+            <Server size={14} />
+            <span className="prep-label">Local Prep:</span>
+            {hubStatus?.version ? (
+              <span className="prep-version success">{hubStatus.version} Ready</span>
+            ) : (
+              <span className="prep-version empty">No local cache</span>
+            )}
+          </div>
+          
+          {latestVersion && hubStatus?.version !== latestVersion && (
+            <button 
+              className={`btn-prep-action ${isStaging ? 'loading' : ''}`}
+              onClick={onStageUpdate}
+              disabled={isStaging}
+            >
+              <Download size={12} />
+              {isStaging ? 'Downloading...' : `Download ${latestVersion} to Server`}
+            </button>
+          )}
+        </div>
+
         <span className="maintenance-stats">
           {systems.length} System{systems.length !== 1 ? 's' : ''} Connected
         </span>
@@ -279,9 +307,10 @@ const MaintenanceSection: React.FC<{
                           <button
                             className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
                             onClick={() => onApplyUpdate(system.id)}
-                            disabled={!isOnline || isUpdating}
+                            disabled={!isOnline || isUpdating || (isOutdated && hubStatus?.version !== latestVersion)}
+                            title={isOutdated && hubStatus?.version !== latestVersion ? `Download ${latestVersion} to server first` : ''}
                           >
-                            {isUpdating ? 'Updating...' : (isOutdated ? 'Apply Update' : 'Reinstall')}
+                            {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
                           </button>
                         </td>
                       </tr>
@@ -311,6 +340,8 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
   const [deploymentToken, setDeploymentToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
   const [updatingAgents, setUpdatingAgents] = useState<Set<number>>(new Set());
+  const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
+  const [isStaging, setIsStaging] = useState(false);
 
   // Tooltip context for interpolation (uses current form values)
   const tooltipContext = useMemo(() => ({
@@ -334,6 +365,37 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
 
     return { total, online, outdated };
   }, [systems, latestVersion]);
+
+  // Fetch hub status on load and after actions
+  const refreshHubStatus = async () => {
+    try {
+      const status = await getHubStatus();
+      setHubStatus(status);
+    } catch (error) {
+      console.error('Failed to fetch hub status', error);
+    }
+  };
+
+  useEffect(() => {
+    refreshHubStatus();
+    // Poll hub status every 10s while on this page
+    const interval = setInterval(refreshHubStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleStageUpdate = async () => {
+    if (!latestVersion) return;
+    setIsStaging(true);
+    try {
+      await stageUpdateToHub(latestVersion);
+      toast.success(`Version ${latestVersion} is now ready on local server`);
+      await refreshHubStatus();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to download to server');
+    } finally {
+      setIsStaging(false);
+    }
+  };
 
   // Handle token generation when config changes (debounced)
   useEffect(() => {
@@ -673,6 +735,9 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
           latestVersion={latestVersion}
           updatingAgents={updatingAgents}
           onApplyUpdate={handleRemoteUpdate}
+          hubStatus={hubStatus}
+          onStageUpdate={handleStageUpdate}
+          isStaging={isStaging}
         />
 
         {/* Resources Section */}

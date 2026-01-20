@@ -26,6 +26,8 @@ services:
       retries: 3
     depends_on:
       - pankha-postgres
+    volumes:
+      - ./backend/docker-data/updates:/app/backend/data/updates
     restart: unless-stopped
 
   pankha-postgres:

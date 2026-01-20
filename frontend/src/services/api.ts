@@ -341,4 +341,24 @@ export const selfUpdateAgent = async (systemId: number) => {
   return response.data;
 };
 
+// Local Hub Update Management
+export interface HubStatus {
+  version: string | null;
+  timestamp: string | null;
+  files: {
+    x86_64: boolean;
+    aarch64: boolean;
+  };
+}
+
+export const getHubStatus = async (): Promise<HubStatus> => {
+  const response = await api.get("/api/deploy/hub/status");
+  return response.data;
+};
+
+export const stageUpdateToHub = async (version: string): Promise<{ message: string; version: string }> => {
+  const response = await api.post("/api/deploy/hub/stage", { version });
+  return response.data;
+};
+
 

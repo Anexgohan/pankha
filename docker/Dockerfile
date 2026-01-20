@@ -36,7 +36,7 @@ ENV PANKHA_VERSION=$VERSION
 # Runtime dependencies and directory setup
 RUN apk add --no-cache nginx curl && \
     ln -sf /dev/stderr /var/log/nginx/error.log && \
-    mkdir -p /app/data /frontend/src/config
+    mkdir -p /app/data /app/backend/data/updates /frontend/src/config
 
 WORKDIR /app
 

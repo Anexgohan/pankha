@@ -1636,6 +1636,17 @@ impl WebSocketClient {
                     (false, Some("Missing or invalid name".to_string()), serde_json::json!({}))
                 }
             }
+            "selfUpdate" => {
+                // Trigger update in background to allow sending response first
+                let client_clone = Arc::new(self.clone_for_update()); 
+                tokio::spawn(async move {
+                    tokio::time::sleep(Duration::from_secs(1)).await; // Brief delay for response delivery
+                    if let Err(e) = client_clone.self_update().await {
+                        error!("Self-update failed: {}", e);
+                    }
+                });
+                (true, None, serde_json::json!({"message": "Update initiated"}))
+            }
             "ping" => (true, None, serde_json::json!({"pong": true})),
             _ => {
                 warn!("Unknown command: {}", command_type);
@@ -1896,6 +1907,91 @@ impl WebSocketClient {
 
     pub async fn stop(&self) {
         *self.running.write().await = false;
+    }
+
+    /// Clone relevant parts of client for background update task
+    fn clone_for_update(&self) -> Self {
+        Self {
+            config: Arc::clone(&self.config),
+            hardware_monitor: Arc::clone(&self.hardware_monitor),
+            running: Arc::clone(&self.running),
+            failsafe_active: Arc::clone(&self.failsafe_active),
+        }
+    }
+
+    /// Perform self-update from local Pankha server
+    async fn self_update(&self) -> Result<()> {
+        let arch = std::env::consts::ARCH;
+        let server_url = self.config.read().await.backend.server_url.clone();
+        
+        // Convert ws://host:port/websocket to http://host:port
+        let base_url = server_url.replace("ws://", "http://").replace("/websocket", "");
+        let download_url = format!("{}/api/deploy/binaries/{}", base_url, arch);
+        
+        let current_exe = std::env::current_exe()?;
+        let new_exe = current_exe.with_extension("new");
+        let old_exe = current_exe.with_extension("old");
+
+        info!("🚀 Starting self-update to {} from {}", arch, download_url);
+
+        // Download using curl (standard on most Linux distros)
+        let status = std::process::Command::new("curl")
+            .args(["-L", "-o", new_exe.to_str().unwrap(), &download_url])
+            .status()
+            .context("Failed to execute curl - ensure it is installed")?;
+
+        if !status.success() {
+            return Err(anyhow::anyhow!("Download failed with status: {}", status));
+        }
+
+        // Set executable permissions
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&new_exe, std::fs::Permissions::from_mode(0o755))?;
+        }
+
+        // Atomic swap
+        if old_exe.exists() {
+            let _ = std::fs::remove_file(&old_exe);
+        }
+        
+        info!("Applying hardware update: Swapping binaries...");
+        std::fs::rename(&current_exe, &old_exe).context("Failed to backup current binary")?;
+        
+        if let Err(e) = std::fs::rename(&new_exe, &current_exe) {
+            error!("❌ Failed to swap binaries: {}. Attempting rollback...", e);
+            let _ = std::fs::rename(&old_exe, &current_exe);
+            return Err(e.into());
+        }
+
+        info!("✅ Update applied successfully. Restarting service...");
+
+        // Restart service
+        #[cfg(target_os = "linux")]
+        {
+            if is_systemd_service_active() {
+                // If managed by systemd, trigger a restart
+                let _ = std::process::Command::new("systemctl")
+                    .args(["restart", "pankha-agent"])
+                    .spawn();
+            } else {
+                // If running manually, try to re-exec or just exit and let supervisor handled it
+                // For now, spawn new instance and exit
+                let _ = std::process::Command::new(&current_exe)
+                    .arg("--start")
+                    .spawn();
+                std::process::exit(0);
+            }
+        }
+        
+        // For non-linux or if exit didn't happen
+        #[cfg(not(target_os = "linux"))]
+        {
+             std::process::exit(0);
+        }
+
+        Ok(())
     }
 }
 

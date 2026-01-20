@@ -799,23 +799,90 @@
 }
 
 @keyframes badge-pulse {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dynamic), transparent 60%); }
-  70% { transform: scale(1.05); box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent-dynamic), transparent 100%); }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dynamic), transparent 100%); }
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dynamic), transparent 60%); }
+  70% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--color-accent-dynamic), transparent 100%); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dynamic), transparent 100%); }
 }
 
-/* Update Badge (NEW vX.X.X) in Version column */
-.update-badge {
+/* Local Prep Widget */
+.local-prep-widget {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xl);
+  padding: 4px var(--spacing-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  margin: 0 var(--spacing-xl);
+  height: 32px;
+}
+
+.prep-status {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.prep-status svg {
+  color: var(--text-tertiary);
+}
+
+.prep-label {
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.prep-version {
+  font-weight: var(--font-weight-bold);
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.prep-version.success {
+  background: color-mix(in srgb, var(--color-success), transparent 90%);
+  color: var(--color-success);
+}
+
+.prep-version.empty {
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.btn-prep-action {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
   background: var(--color-accent-dynamic);
   color: white;
-  font-size: 8px;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-family: var(--font-primary);
+  font-size: 10px;
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
-  padding: 2px 5px;
-  border-radius: 3px;
-  margin-left: var(--spacing-xs);
-  vertical-align: middle;
+  cursor: pointer;
+  transition: all 0.2s ease;
   white-space: nowrap;
+}
+
+.btn-prep-action:hover:not(:disabled) {
+  background: var(--color-hover-tint-dynamic);
+  transform: translateY(-1px);
+}
+
+.btn-prep-action:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-prep-action.loading {
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
 }
 
 /* Status Tag V2 (Merged Health + Status) */
@@ -889,6 +956,19 @@
   border-radius: 3px;
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+/* Update Badge (NEW vX.X.X) in Version column */
+.update-badge {
+    background: var(--color-accent-dynamic);
+    color: white;
+    font-size: 9px;
+    font-weight: var(--font-weight-bold);
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-family: var(--font-mono);
 }
 
 /* Disabled button states */

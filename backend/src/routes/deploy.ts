@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { log } from '../utils/logger';
 import Database from '../database/database';
 import crypto from 'crypto';
+import fs from 'fs';
+import UpdateDownloadService from '../services/UpdateDownloadService';
 
 const router = Router();
 const db = Database.getInstance();
@@ -62,21 +64,20 @@ router.get('/linux', async (req, res) => {
     const config = result[0].config;
     await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
 
-    // Extract host and determine backend URL
-    // In Docker: nginx exposes port 3000 with /websocket path proxied to WS server
+// Extract host and determine backend URL
     const host = req.headers.host || 'localhost:3000';
     const protocol = req.headers['x-forwarded-proto'] || 'http';
     const hostOnly = host.split(':')[0];
     const port = host.split(':')[1] || '3000';
 
-    // Backend URL for HTTP API calls (used during install for potential future features)
     const backendUrl = `${protocol}://${host}`;
-
-    // WebSocket URL: Use same port as HTTP with /websocket path (nginx proxy)
     const wsUrl = `ws://${hostOnly}:${port}/websocket`;
 
+    // Local binary distribution URL (hub-and-spoke model)
+    const localBinaryBase = `${backendUrl}/api/deploy/binaries`;
+
     // Generate install script
-    const script = generateInstallScript(config, backendUrl, wsUrl);
+    const script = generateInstallScript(config, backendUrl, wsUrl, localBinaryBase);
 
     res.setHeader('Content-Type', 'text/x-shellscript');
     res.send(script);
@@ -86,7 +87,57 @@ router.get('/linux', async (req, res) => {
   }
 });
 
-function generateInstallScript(config: any, backendUrl: string, wsUrl: string): string {
+/**
+ * GET /api/deploy/hub/status
+ * Returns current status of locally cached binaries
+ */
+router.get('/hub/status', (req, res) => {
+  const updateService = UpdateDownloadService.getInstance();
+  res.json(updateService.getLocalStatus());
+});
+
+/**
+ * POST /api/deploy/hub/stage
+ * Triggers manual download of a specific version to the local server
+ */
+router.post('/hub/stage', async (req, res) => {
+  try {
+    const { version } = req.body;
+    if (!version) {
+      return res.status(400).json({ error: 'Version is required' });
+    }
+
+    const updateService = UpdateDownloadService.getInstance();
+    const success = await updateService.downloadVersion(version);
+
+    if (success) {
+      res.json({ message: 'Download to server complete', version });
+    } else {
+      res.status(500).json({ error: 'Failed to download to server' });
+    }
+  } catch (error) {
+    log.error('Failed to stage update:', 'deploy', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * GET /api/deploy/binaries/:arch
+ * Serves the locally cached agent binary
+ */
+router.get('/binaries/:arch', (req, res) => {
+  const { arch } = req.params;
+  const updateService = UpdateDownloadService.getInstance();
+  const filePath = updateService.getBinaryPath(arch);
+
+  if (!filePath || !fs.existsSync(filePath)) {
+    return res.status(404).send('Binary not found on server');
+  }
+
+  res.download(filePath, `pankha-agent-linux_${arch}`);
+});
+
+function generateInstallScript(config: any, backendUrl: string, wsUrl: string, localBinaryBase: string): string {
   const {
     path_mode,
     log_level,
@@ -156,16 +207,16 @@ BINARY_URL=""
 echo "[3/5] Detecting architecture: $ARCH"
 
 if [ "$ARCH" = "x86_64" ]; then
-    BINARY_URL="https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64"
+    BINARY_URL="${localBinaryBase}/x86_64"
 elif [ "$ARCH" = "aarch64" ]; then
-    BINARY_URL="https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_aarch64"
+    BINARY_URL="${localBinaryBase}/aarch64"
 else
     echo "ERROR: Unsupported architecture: $ARCH"
     echo "Supported: x86_64, aarch64"
     exit 1
 fi
 
-echo "      Downloading from: $BINARY_URL"
+echo "      Downloading from local server: $BINARY_URL"
 echo ""
 
 # Download binary
