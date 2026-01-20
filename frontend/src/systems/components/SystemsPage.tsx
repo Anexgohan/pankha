@@ -29,6 +29,7 @@ const SystemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
   const [overview, setOverview] = useState<any>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [unstableVersion, setUnstableVersion] = useState<string | null>(null);
   // Persistent dropdown states across re-renders
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
@@ -57,22 +58,34 @@ const SystemsPage: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch latest version from GitHub API
+  // Fetch versions from GitHub API
   React.useEffect(() => {
-    const fetchLatestVersion = async () => {
+    const fetchVersions = async () => {
       try {
-        const response = await fetch('https://api.github.com/repos/Anexgohan/pankha/releases/latest');
+        const response = await fetch('https://api.github.com/repos/Anexgohan/pankha/releases');
         if (response.ok) {
-          const data = await response.json();
-          setLatestVersion(data.tag_name);
+          const releases = await response.json();
+          if (releases.length > 0) {
+            // Find latest stable
+            const stable = releases.find((r: any) => !r.prerelease);
+            if (stable) setLatestVersion(stable.tag_name);
+
+            // Find latest unstable (if it's newer than stable or we have no stable)
+            const unstable = releases.find((r: any) => r.prerelease);
+            if (unstable && (!stable || new Date(unstable.created_at) > new Date(stable.created_at))) {
+              setUnstableVersion(unstable.tag_name);
+            } else {
+              setUnstableVersion(null);
+            }
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch latest version:', err);
+        console.error('Failed to fetch versions:', err);
       }
     };
-    fetchLatestVersion();
+    fetchVersions();
     // Re-fetch every 10 minutes
-    const interval = setInterval(fetchLatestVersion, 600000);
+    const interval = setInterval(fetchVersions, 600000);
     return () => clearInterval(interval);
   }, []);
 
@@ -257,7 +270,10 @@ const SystemsPage: React.FC = () => {
         )}
 
         {activeTab === 'deployment' && (
-          <DeploymentPage latestVersion={latestVersion} />
+          <DeploymentPage 
+            latestVersion={latestVersion} 
+            unstableVersion={unstableVersion}
+          />
         )}
 
         {activeTab === 'settings' && (

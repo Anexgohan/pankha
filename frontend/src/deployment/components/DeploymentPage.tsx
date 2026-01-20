@@ -25,10 +25,6 @@ import { uiOptions, getDefault, getOption, interpolateTooltip } from '../../util
 import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL, getHubStatus, stageUpdateToHub, type HubStatus } from '../../services/api';
 import '../styles/deployment.css';
 
-interface DeploymentPageProps {
-  latestVersion: string | null;
-}
-
 type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 type Failsafe = '30' | '50' | '100';
 type PathMode = 'standard' | 'portable';
@@ -191,23 +187,25 @@ const MaintenanceSection: React.FC<{
   isExpanded: boolean;
   onToggle: () => void;
   systems: any[];
-  latestVersion: string | null;
+  stableVersion: string | null;
+  unstableVersion: string | null;
   updatingAgents: Set<number>;
   onApplyUpdate: (systemId: number) => void;
   hubStatus: HubStatus | null;
-  onStageUpdate: () => void;
+  onStageUpdate: (version: string) => void;
   isStaging: boolean;
-}> = React.memo(({ isExpanded, onToggle, systems, latestVersion, updatingAgents, onApplyUpdate, hubStatus, onStageUpdate, isStaging }) => {
+}> = React.memo(({ isExpanded, onToggle, systems, stableVersion, unstableVersion, updatingAgents, onApplyUpdate, hubStatus, onStageUpdate, isStaging }) => {
   const outdatedCount = useMemo(() => {
-    if (!latestVersion) return 0;
-    const cleanLatest = latestVersion.replace('v', '');
-    return systems.filter(s => s.agent_version && !s.agent_version.includes(cleanLatest)).length;
-  }, [systems, latestVersion]);
+    // Identify if any agent matches NEITHER the hub version NOR the latest stable
+    const targetVersion = hubStatus?.version?.replace('v', '') || stableVersion?.replace('v', '');
+    if (!targetVersion) return 0;
+    return systems.filter(s => s.agent_version && !s.agent_version.includes(targetVersion)).length;
+  }, [systems, stableVersion, hubStatus]);
 
   return (
     <section className={`deployment-section maintenance-panel ${!isExpanded ? 'collapsed' : ''}`}>
-      <div className="maintenance-header-toggle" onClick={onToggle}>
-        <h3>
+      <div className="maintenance-header-toggle">
+        <h3 onClick={onToggle} className="clickable-title">
           <Activity size={20} /> Fleet Maintenance
           {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
           {outdatedCount > 0 && (
@@ -221,24 +219,43 @@ const MaintenanceSection: React.FC<{
         <div className="local-prep-widget" onClick={(e) => e.stopPropagation()}>
           <div className="prep-status">
             <Server size={14} />
-            <span className="prep-label">Local Prep:</span>
+            <span className="prep-label">Hub:</span>
             {hubStatus?.version ? (
               <span className="prep-version success">{hubStatus.version} Ready</span>
             ) : (
-              <span className="prep-version empty">No local cache</span>
+              <span className="prep-version empty">No Cache</span>
             )}
           </div>
           
-          {latestVersion && hubStatus?.version !== latestVersion && (
-            <button 
-              className={`btn-prep-action ${isStaging ? 'loading' : ''}`}
-              onClick={onStageUpdate}
-              disabled={isStaging}
-            >
-              <Download size={12} />
-              {isStaging ? 'Downloading...' : `Download ${latestVersion} to Server`}
-            </button>
-          )}
+          <div className="prep-actions-group">
+            {stableVersion && (
+              <button 
+                className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === stableVersion ? 'current' : ''}`}
+                onClick={() => onStageUpdate(stableVersion)}
+                disabled={isStaging || hubStatus?.version === stableVersion}
+                title={hubStatus?.version === stableVersion 
+                  ? `Stable Version ${stableVersion} is Ready to Deploy.` 
+                  : `Download Stable Version ${stableVersion} \nSafe & Reliable.`}
+              >
+                <Download size={12} />
+                <span>Stable {stableVersion}</span>
+              </button>
+            )}
+            
+            {unstableVersion && (
+              <button 
+                className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === unstableVersion ? 'current' : ''}`}
+                onClick={() => onStageUpdate(unstableVersion)}
+                disabled={isStaging || hubStatus?.version === unstableVersion}
+                title={hubStatus?.version === unstableVersion 
+                  ? `Experimental Version ${unstableVersion} is Ready to Deploy.` 
+                  : `Download Experimental Version ${unstableVersion} \nNewest Features & Fixes, may have bugs.`}
+              >
+                <Activity size={12} />
+                <span>Unstable {unstableVersion}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         <span className="maintenance-stats">
@@ -268,9 +285,10 @@ const MaintenanceSection: React.FC<{
                   </tr>
                 ) : (
                   systems.map(system => {
-                    const cleanLatest = latestVersion ? latestVersion.replace('v', '') : '';
-                    const isOutdated = latestVersion && system.agent_version &&
-                                      !system.agent_version.includes(cleanLatest);
+                    const targetVersion = hubStatus?.version || stableVersion;
+                    const cleanTarget = targetVersion ? targetVersion.replace('v', '') : '';
+                    const isOutdated = targetVersion && system.agent_version && 
+                                      !system.agent_version.includes(cleanTarget);
                     const isUpdating = updatingAgents.has(system.id);
                     const isOnline = system.status === 'online';
 
@@ -289,10 +307,10 @@ const MaintenanceSection: React.FC<{
                         <td className="agent-id-cell"><code>{system.agent_id}</code></td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                            <span>{system.agent_version || 'v0.0.0'}</span>
+                            <span>v{system.agent_version || '0.0.0'}</span>
                             {isOutdated && !isUpdating && (
-                              <span className="update-badge" title={`Update to ${latestVersion} available`}>
-                                NEW {latestVersion}
+                              <span className="update-badge" title={`Update to ${targetVersion} available`}>
+                                NEW {targetVersion}
                               </span>
                             )}
                           </div>
@@ -307,8 +325,8 @@ const MaintenanceSection: React.FC<{
                           <button
                             className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
                             onClick={() => onApplyUpdate(system.id)}
-                            disabled={!isOnline || isUpdating || (isOutdated && hubStatus?.version !== latestVersion)}
-                            title={isOutdated && hubStatus?.version !== latestVersion ? `Download ${latestVersion} to server first` : ''}
+                            disabled={!isOnline || isUpdating || (isOutdated && hubStatus?.version !== stableVersion)}
+                            title={isOutdated && hubStatus?.version !== stableVersion ? `Download ${stableVersion} to server first` : ''}
                           >
                             {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
                           </button>
@@ -326,7 +344,10 @@ const MaintenanceSection: React.FC<{
   );
 });
 
-export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion }) => {
+export const DeploymentPage: React.FC<{ 
+  latestVersion: string | null;
+  unstableVersion?: string | null;
+}> = ({ latestVersion, unstableVersion }) => {
   const { systems } = useWebSocketData();
   const [logLevel, setLogLevel] = useState<LogLevel>(getDefault('logLevel'));
   const [failsafe, setFailsafe] = useState<Failsafe>(String(getDefault('failsafeSpeed')) as Failsafe);
@@ -383,12 +404,11 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
     return () => clearInterval(interval);
   }, []);
 
-  const handleStageUpdate = async () => {
-    if (!latestVersion) return;
+  const handleStageUpdate = async (version: string) => {
     setIsStaging(true);
     try {
-      await stageUpdateToHub(latestVersion);
-      toast.success(`Version ${latestVersion} is now ready on local server`);
+      await stageUpdateToHub(version);
+      toast.success(`Version ${version} is now ready on local server`);
       await refreshHubStatus();
     } catch (error: any) {
       toast.error(error?.response?.data?.error || 'Failed to download to server');
@@ -732,7 +752,8 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({ latestVersion })
           isExpanded={isMaintenanceExpanded}
           onToggle={() => setIsMaintenanceExpanded(!isMaintenanceExpanded)}
           systems={systems}
-          latestVersion={latestVersion}
+          stableVersion={latestVersion}
+          unstableVersion={unstableVersion || null}
           updatingAgents={updatingAgents}
           onApplyUpdate={handleRemoteUpdate}
           hubStatus={hubStatus}

@@ -496,21 +496,24 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  cursor: pointer;
   padding: var(--spacing-sm) 0;
   user-select: none;
 }
 
-.maintenance-header-toggle h3 {
+.maintenance-header-toggle h3.clickable-title {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
   margin: 0;
   transition: color 0.2s ease;
+  cursor: pointer;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
 }
 
-.maintenance-header-toggle:hover h3 {
+.maintenance-header-toggle h3.clickable-title:hover {
   color: var(--color-accent-dynamic);
+  background: var(--bg-hover);
 }
 
 .maintenance-stats {
@@ -804,17 +807,16 @@
   100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent-dynamic), transparent 100%); }
 }
 
-/* Local Prep Widget */
+/* Local Hub/Prep Widget */
 .local-prep-widget {
   display: flex;
   align-items: center;
   gap: var(--spacing-xl);
-  padding: 4px var(--spacing-md);
-  background: var(--bg-tertiary);
+  padding: var(--spacing-md) var(--spacing-xl);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   margin: 0 var(--spacing-xl);
-  height: 32px;
 }
 
 .prep-status {
@@ -852,37 +854,100 @@
   font-style: italic;
 }
 
+.prep-actions-group {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
 .btn-prep-action {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--spacing-sm);
-  background: var(--color-accent-dynamic);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 12px;
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 85%);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--color-accent-dynamic), transparent 60%);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md) var(--spacing-xl);
   font-family: var(--font-primary);
-  font-size: 10px;
   font-weight: var(--font-weight-bold);
-  text-transform: uppercase;
+  font-size: var(--font-size-xs);
   cursor: pointer;
-  transition: all 0.2s ease;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   white-space: nowrap;
 }
 
-.btn-prep-action:hover:not(:disabled) {
-  background: var(--color-hover-tint-dynamic);
-  transform: translateY(-1px);
+.btn-prep-action.unstable {
+  background: color-mix(in srgb, var(--color-warning), transparent 94%);
+  border-color: color-mix(in srgb, var(--color-warning), transparent 80%);
 }
 
-.btn-prep-action:disabled {
-  opacity: 0.6;
+.btn-prep-action svg {
+  opacity: 0.8;
+}
+
+.btn-prep-action:hover:not(:disabled):not(.current) {
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 85%);
+  border-color: var(--color-accent-dynamic);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-prep-action.unstable:hover:not(:disabled):not(.current) {
+  background: color-mix(in srgb, var(--color-warning), transparent 85%);
+  border-color: var(--color-warning);
+}
+
+.btn-prep-action.current {
+  background: var(--color-success); /* Green for Stable Ready */
+  border-color: var(--color-success);
+  color: white;
+  cursor: default;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
+}
+
+.btn-prep-action.unstable.current {
+  background: var(--color-accent-dynamic); /* Blue for Unstable Ready */
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
+}
+
+.btn-prep-action.current svg {
+  opacity: 1;
+}
+
+.btn-prep-action:disabled:not(.current) {
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .btn-prep-action.loading {
   background: var(--bg-hover);
   color: var(--text-tertiary);
+  cursor: wait;
+}
+
+.btn-prep-action.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    90deg, 
+    transparent, 
+    rgba(255, 255, 255, 0.05), 
+    transparent
+  );
+  animation: loading-shimmer 1.5s infinite;
+}
+
+@keyframes loading-shimmer {
+  to { transform: translateX(50%); }
 }
 
 /* Status Tag V2 (Merged Health + Status) */

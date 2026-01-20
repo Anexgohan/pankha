@@ -1972,14 +1972,34 @@ impl WebSocketClient {
         {
             if is_systemd_service_active() {
                 // If managed by systemd, trigger a restart
+                info!("Triggering systemd restart for pankha-agent...");
                 let _ = std::process::Command::new("systemctl")
                     .args(["restart", "pankha-agent"])
                     .spawn();
             } else {
-                // If running manually, try to re-exec or just exit and let supervisor handled it
-                // For now, spawn new instance and exit
+                // Manual restart path: use re-exec to prevent PID race conditions
+                // re-exec replaces the current process image while keeping the same PID
+                use std::os::unix::process::CommandExt;
+                
+                info!("Manual restart: Re-executing binary to apply update (PID {})", std::process::id());
+                
+                let mut cmd = std::process::Command::new(&current_exe);
+                
+                // If we were a daemon child, keep being one
+                // Note: We don't need to pass all flags, just the runtime ones
+                cmd.arg("--daemon-child");
+                
+                // Inherit log level if it was set explicitly
+                let config = self.config.read().await;
+                cmd.arg("--log-level").arg(&config.agent.log_level);
+                drop(config);
+
+                let err = cmd.exec();
+                
+                // If exec returns, it failed
+                error!("❌ Manual re-exec failed: {}. Falling back to spawn/exit...", err);
                 let _ = std::process::Command::new(&current_exe)
-                    .arg("--start")
+                    .arg("--daemon-child")
                     .spawn();
                 std::process::exit(0);
             }
