@@ -5,14 +5,18 @@
 @media (max-width: 768px) {
   /* Dashboard */
   .dashboard {
-    padding: var(--spacing-lg);
+    padding: var(--spacing-md) var(--spacing-sm); /* Tightened horizontal padding */
   }
 
   .dashboard-header {
     flex-direction: column;
     gap: var(--spacing-lg);
     align-items: stretch;
-    padding: var(--spacing-md);
+    padding: var(--spacing-md) 0; /* Remove horizontal padding since container has it */
+  }
+
+  .dashboard-container {
+    padding: var(--spacing-sm); /* Flatten dashboard container padding */
   }
 
   .dashboard-header h1 {
@@ -119,14 +123,26 @@
   }
 
   .overview-stats {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); /* Optimized for 320px screens */
+    gap: var(--spacing-sm);
   }
 
   .profiles-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
+  }
+
+  .profile-card {
+    max-width: 100% !important;
+    margin: 0 !important;
   }
 
   /* System Cards */
+  .system-card {
+    margin: var(--spacing-sm) 0; /* Vertical margin only, horizontal fills parent */
+    padding: var(--spacing-md);  /* Tighter internal padding */
+    max-width: 100% !important;   /* Allow card to fill viewport width */
+  }
+
   .system-info {
     flex-direction: column;
     align-items: flex-start;
@@ -140,27 +156,115 @@
     gap: var(--spacing-md);
   }
 
-  /* Profile Manager */
+  /* Fan Profiles */
+  .fan-profiles-section {
+    padding: 0 !important; /* Remove section padding, container handles it */
+    background: transparent; /* Seamless look on mobile */
+    box-shadow: none;
+  }
+
+  .fan-profile-manager {
+    padding: var(--spacing-md) 0; /* Only vertical padding */
+  }
+
   .profile-manager-header {
     flex-direction: column;
-    gap: var(--spacing-lg);
+    gap: var(--spacing-md);
+    align-items: stretch;
+    padding: var(--spacing-md);
+  }
+
+  .profile-stats {
+    grid-template-columns: repeat(2, 1fr); /* 2x2 grid instead of 4 rows */
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-xl);
+  }
+
+  .profile-stats .stat-card {
+    padding: var(--spacing-md);
+  }
+
+  .profile-stats .stat-value {
+    font-size: var(--font-size-xl);
+  }
+
+  .profile-stats .stat-label {
+    font-size: 10px;
+  }
+
+  /* Profile Card Refinement */
+  .profile-curve-preview {
+    margin-bottom: var(--spacing-md);
+  }
+
+  .range-box {
+    padding: var(--spacing-md);
+    gap: var(--spacing-xs);
+    justify-content: space-around;
+  }
+
+  .range-label {
+    font-size: 9px;
+  }
+
+  .range-value {
+    font-size: 12px;
+  }
+
+  .chart-controls {
+    flex-direction: column;
+    gap: var(--spacing-md);
     align-items: stretch;
   }
 
-  /* Curve Editor */
+  .curve-info {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--spacing-xs);
+  }
+
+  .fan-curve-chart svg {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Editor Overlay Stacking */
+  .fan-profile-editor {
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .editor-body {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .editor-sidebar {
+    width: 100% !important;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    order: 2; /* Sidebar below the chart */
+  }
+
+  .editor-main {
+    padding: var(--spacing-md);
+    order: 1;
+  }
+
   .curve-editor {
     grid-template-columns: 1fr;
+  }
+
+  .curve-chart, .chart-container {
+    min-height: 250px;
   }
 
   /* Form Rows */
   .form-row {
     grid-template-columns: 1fr;
-  }
-
-  /* Profile Editor */
-  .fan-profile-editor {
-    margin: var(--spacing-md);
-    width: calc(100% - calc(var(--spacing-md) * 2));
   }
 
   /* Preset Cards */
@@ -174,20 +278,34 @@
     gap: var(--spacing-lg);
   }
 
-  /* Chart Controls */
-  .chart-controls {
-    flex-direction: column;
-    align-items: stretch;
+  /* Deployment Page */
+  .deployment-page {
+    padding: 0 var(--spacing-sm) var(--spacing-lg); /* Tighten horizontal margins */
+    gap: var(--spacing-lg);
   }
 
-  /* Curve Info */
-  .curve-info {
-    justify-content: center;
+  .fleet-metric-card {
+    padding: var(--spacing-md);
+    gap: var(--spacing-md);
+  }
+
+  .deployment-section {
+    padding: var(--spacing-md) !important;
+    border-radius: var(--radius-md);
+  }
+
+  .deployment-content-grid {
+    gap: var(--spacing-lg);
   }
 
   /* Settings Page */
   .settings-container {
-    padding: var(--spacing-sm);
+    padding: var(--spacing-md) var(--spacing-sm); /* Unified horizontal padding */
+  }
+
+  .settings-content {
+    padding: var(--spacing-md); /* Significant reduction from XL to allow room for children */
+    border-radius: var(--radius-md); /* Slightly smaller radius for mobile */
   }
 
   .settings-content {
@@ -304,5 +422,33 @@
   .btn-export-all {
     width: 100%;
     justify-content: center;
+  }
+
+  /* Subscription Page */
+  .pricing-cards {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-xl);
+  }
+
+  .license-limits {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-md);
+  }
+
+  .license-info {
+    padding: var(--spacing-md);
+  }
+
+  .license-input-group {
+    flex-direction: column;
+  }
+
+  /* About Page */
+  .about-info {
+    margin-bottom: var(--spacing-md);
+  }
+
+  .about-links a {
+    padding: var(--spacing-md);
   }
 }

@@ -362,14 +362,17 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
     <div className="fan-curve-chart">
       <svg 
         ref={svgRef}
-        width={width} 
-        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        width="100%" 
+        height="auto"
+        preserveAspectRatio="xMidYMid meet"
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         style={{ 
           cursor: dragState.isDragging ? 'grabbing' : 'default',
-          overflow: 'visible' 
+          overflow: 'visible',
+          display: 'block'
         }}
       >
         <g transform={`translate(${margin.left},${margin.top})`}>

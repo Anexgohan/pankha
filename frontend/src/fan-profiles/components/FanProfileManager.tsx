@@ -297,7 +297,6 @@ const FanProfileManager: React.FC = () => {
               >
                 <FanCurveChart
                   curvePoints={profile.curve_points}
-                  width={420}
                   height={200}
                   showLabels={true}
                   assignmentsCount={profile.assignments?.length || 0}
