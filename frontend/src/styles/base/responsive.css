@@ -12,10 +12,105 @@
     flex-direction: column;
     gap: var(--spacing-lg);
     align-items: stretch;
+    padding: var(--spacing-md);
+  }
+
+  .dashboard-header h1 {
+    font-size: var(--font-size-xl);
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .brand-subtitle {
+     font-size: var(--font-size-xl); /* Match h1 size on mobile */
   }
 
   .header-controls {
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr auto auto; /* Selector (Fill) | Emergency (Icon) | Theme (Icon) */
+    gap: var(--spacing-sm); /* Tighter gap */
+    width: 100%;
+    justify-items: center;
+    align-items: end; /* Align to bottom */
+  }
+  
+  /* Full width items */
+  .connection-status {
+    grid-column: 1 / -1;
+    width: 100%;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin-bottom: var(--spacing-xs);
+    order: 0;
+  }
+
+  /* Specific Items */
+  .controller-interval-selector {
+    grid-column: 1; /* First column */
+    width: 100%;
+    justify-self: stretch;
+    order: 1;
+  }
+
+  /* Row 2 Items: Emergency Icon + Theme Icon */
+  .emergency-button {
+    grid-column: 2; /* Middle column */
+    width: 42px !important; /* Force square */
+    height: 42px;
+    padding: 0 !important; /* Remove padding to center icon */
+    justify-content: center;
+    margin-top: 0;
+    order: 2;
+    min-width: 0 !important;
+  }
+
+  .emergency-button .btn-label {
+    display: none; /* Hide text on mobile */
+  }
+
+  .theme-toggle {
+    grid-column: 3; /* Right column */
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-secondary);
+    align-self: end;
+    order: 3;
+  }
+
+  .theme-toggle:hover {
+      background: var(--bg-hover);
+      border-color: var(--color-info);
+  }
+
+  /* Dashboard Navigation */
+  .dashboard-nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  
+  .dashboard-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-tabs {
+    width: max-content; /* Force scroll trigger */
+    padding: 0 var(--spacing-sm);
+  }
+
+  .nav-tab {
+    padding: var(--spacing-md) var(--spacing-lg);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   /* Grids */

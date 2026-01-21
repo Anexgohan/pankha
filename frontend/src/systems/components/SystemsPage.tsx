@@ -136,7 +136,7 @@ const SystemsPage: React.FC = () => {
     <div className="dashboard">
       <header className="dashboard-header">
         <h1>
-          Pankha Fan Control <span style={{ fontSize: 'var(--spacing-3xl)', opacity: 1.0, fontWeight: 'bold' }}>( पंखा )</span>
+          Pankha Fan Control <span className="brand-subtitle">( पंखा )</span>
           <HeaderFan />
         </h1>
         <div className="header-controls">
@@ -200,7 +200,7 @@ const SystemsPage: React.FC = () => {
             className="emergency-button"
             title="Emergency stop all fans"
           >
-            <ShieldAlert size={18} /> Emergency Stop
+            <ShieldAlert size={18} /> <span className="btn-label">Emergency Stop</span>
           </button>
         </div>
       </header>

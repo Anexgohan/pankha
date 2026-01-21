@@ -74,6 +74,13 @@
   gap: var(--spacing-sm);
 }
 
+.brand-subtitle {
+  font-size: var(--spacing-3xl);
+  opacity: 1.0;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
 .header-fan-container {
   display: inline-flex;
   align-items: center;
