@@ -4,7 +4,9 @@
 # Protected files (synced with special handling)
 README.md @Anexgohan
 compose.yml @Anexgohan
+compose-public.yml @Anexgohan
 .env @Anexgohan
+.env.public @Anexgohan
 example.env @Anexgohan
 .mailmap @Anexgohan
 LICENSE @Anexgohan
