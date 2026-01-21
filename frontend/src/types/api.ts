@@ -4,6 +4,7 @@ export interface SystemData {
   name: string;
   agent_id: string;
   agent_version?: string;
+  platform?: string; // "linux", "windows", "macos"
   ip_address?: string;
   api_endpoint: string;
   websocket_endpoint: string;

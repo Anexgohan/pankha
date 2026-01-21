@@ -317,7 +317,7 @@ const MaintenanceSection: React.FC<{
                     const statusLabel = isUpdating ? 'UPDATING' : (isOnline ? 'ONLINE' : 'OFFLINE');
                     const statusClass = isUpdating ? 'updating' : (isOnline ? 'online' : 'offline');
 
-                    const isWindows = system.agent_id.toLowerCase().startsWith('windows-');
+                    const isWindows = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-');
                     const platformIcon = isWindows ? (
                       <div className="platform-icon windows" title="Windows Agent">
                         <img src="/icons/windows_01.svg" alt="Windows" width="14" height="14" />

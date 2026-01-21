@@ -306,23 +306,25 @@ const DiagnosticsTab: React.FC = () => {
                       </span>
                     </td>
                     <td className="actions-cell">
-                      {status && (
-                        <span className={`action-feedback ${status.type}`}>{status.message}</span>
-                      )}
-                      <button
-                        className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
-                        onClick={() => handleCopyToClipboard(system.id)}
-                        disabled={!isOnline || status?.type === 'loading'}
-                      >
-                        Copy
-                      </button>
-                      <button
-                        className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
-                        onClick={() => handleDownloadAsFile(system.id, system.name)}
-                        disabled={!isOnline || status?.type === 'loading'}
-                      >
-                        Download
-                      </button>
+                      <div className="actions-wrapper">
+                        {status && (
+                          <span className={`action-feedback ${status.type}`}>{status.message}</span>
+                        )}
+                        <button
+                          className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
+                          onClick={() => handleCopyToClipboard(system.id)}
+                          disabled={!isOnline || status?.type === 'loading'}
+                        >
+                          Copy
+                        </button>
+                        <button
+                          className={`btn-table-action primary ${status?.type === 'loading' ? 'loading' : ''}`}
+                          onClick={() => handleDownloadAsFile(system.id, system.name)}
+                          disabled={!isOnline || status?.type === 'loading'}
+                        >
+                          Download
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
