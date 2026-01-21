@@ -6,7 +6,7 @@ import React, { useState, useEffect } from 'react';
 import { useLicense } from '../../license';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
-import { formatDate } from '../../utils/formatters';
+import { formatDate, formatFriendlyDate } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
 import ColorPicker from './ColorPicker';
 import '../styles/settings.css';
@@ -243,6 +243,87 @@ const DiagnosticsTab: React.FC = () => {
     );
   };
 
+  /* Helper to check if system is windows */
+  const isSystemWindows = (system: SystemInfo) => 
+    system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-');
+
+  /* Group systems by platform */
+  const windowsSystems = systems.filter(isSystemWindows);
+  const linuxSystems = systems.filter(s => !isSystemWindows(s));
+
+  const renderDiagnosticsTable = (title: string, tableSystems: SystemInfo[], iconSrc: string) => (
+    <div className="diagnostics-table-wrapper">
+      <div className="table-header-row">
+        <img src={iconSrc} alt={title} width="16" height="16" style={{ opacity: 0.7 }} />
+        <h3 className="table-title">{title} <span className="count-badge">{tableSystems.length}</span></h3>
+      </div>
+      <table className="diagnostics-table">
+        <thead>
+          <tr>
+            <th style={{ width: '50%' }}>System</th>
+            <th style={{ width: '20%' }}>Status</th>
+            <th style={{ width: '30%', textAlign: 'right' }}>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tableSystems.length > 0 ? (
+            tableSystems.map(system => {
+              const isOnline = system.real_time_status === 'online';
+              const status = actionStatus[system.id];
+              const statusLabel = isOnline ? 'ONLINE' : 'OFFLINE';
+              const statusClass = isOnline ? 'online' : 'offline';
+
+              return (
+                <tr key={system.id}>
+                  <td className="hostname-cell">
+                    <div className="hostname-wrapper">
+                      {getPlatformIcon(system)}
+                      <div className="system-identity">
+                        <span className="hostname-text">{system.name}</span>
+                        <code className="agent-id-subtext">{system.agent_id}</code>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span className={`status-tag-v2 ${statusClass}`}>
+                      <span className="status-dot" />
+                      {statusLabel}
+                    </span>
+                  </td>
+                  <td className="actions-cell">
+                    <div className="actions-wrapper">
+                      {status && (
+                        <span className={`action-feedback ${status.type}`}>{status.message}</span>
+                      )}
+                      <button
+                        className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
+                        onClick={() => handleCopyToClipboard(system.id)}
+                        disabled={!isOnline || status?.type === 'loading'}
+                      >
+                        Copy
+                      </button>
+                      <button
+                        className={`btn-table-action primary ${status?.type === 'loading' ? 'loading' : ''}`}
+                        onClick={() => handleDownloadAsFile(system.id, system.name)}
+                        disabled={!isOnline || status?.type === 'loading'}
+                      >
+                        Download
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
+          ) : (
+             <tr>
+               <td colSpan={3} className="empty-table-cell">No {title.toLowerCase()} agents found.</td>
+             </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+
   return (
     <div className="settings-section">
       <div className="diagnostics-header">
@@ -273,64 +354,9 @@ const DiagnosticsTab: React.FC = () => {
           No agents connected.
         </div>
       ) : (
-        <div className="diagnostics-table-wrapper">
-          <table className="diagnostics-table">
-            <thead>
-              <tr>
-                <th>Hostname</th>
-                <th>Agent ID</th>
-                <th>Status</th>
-                <th>Export</th>
-              </tr>
-            </thead>
-            <tbody>
-              {systems.map(system => {
-                const isOnline = system.real_time_status === 'online';
-                const status = actionStatus[system.id];
-                const statusLabel = isOnline ? 'ONLINE' : 'OFFLINE';
-                const statusClass = isOnline ? 'online' : 'offline';
-
-                return (
-                  <tr key={system.id}>
-                    <td className="hostname-cell">
-                      <div className="hostname-wrapper">
-                        {getPlatformIcon(system)}
-                        <span className="hostname-text">{system.name}</span>
-                      </div>
-                    </td>
-                    <td className="agent-id-cell"><code>{system.agent_id}</code></td>
-                    <td>
-                      <span className={`status-tag-v2 ${statusClass}`}>
-                        <span className="status-dot" />
-                        {statusLabel}
-                      </span>
-                    </td>
-                    <td className="actions-cell">
-                      <div className="actions-wrapper">
-                        {status && (
-                          <span className={`action-feedback ${status.type}`}>{status.message}</span>
-                        )}
-                        <button
-                          className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
-                          onClick={() => handleCopyToClipboard(system.id)}
-                          disabled={!isOnline || status?.type === 'loading'}
-                        >
-                          Copy
-                        </button>
-                        <button
-                          className={`btn-table-action primary ${status?.type === 'loading' ? 'loading' : ''}`}
-                          onClick={() => handleDownloadAsFile(system.id, system.name)}
-                          disabled={!isOnline || status?.type === 'loading'}
-                        >
-                          Download
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="diagnostics-split-view">
+          {renderDiagnosticsTable('LINUX Agents', linuxSystems, '/icons/linux_01.svg')}
+          {renderDiagnosticsTable('WINDOWS Agents', windowsSystems, '/icons/windows_01.svg')}
         </div>
       )}
     </div>
@@ -961,14 +987,22 @@ const Settings: React.FC = () => {
                     {license.activatedAt && (
                       <div className="limit-item">
                         <span className="limit-label">Activated</span>
-                        <span className="limit-value">{formatDate(license.activatedAt, timezone)}</span>
+                        <div className="limit-value-group">
+                          <span className="limit-value">{formatDate(license.activatedAt, timezone)}</span>
+                          <span className="limit-subtext-date">{formatFriendlyDate(license.activatedAt, timezone)}</span>
+                        </div>
                       </div>
                     )}
                     <div className="limit-item">
                       <span className="limit-label">Expires</span>
-                      <span className="limit-value">
-                        {license.expiresAt ? formatDate(license.expiresAt, timezone) : 'Lifetime'}
-                      </span>
+                      <div className="limit-value-group">
+                        <span className="limit-value">
+                          {license.expiresAt ? formatDate(license.expiresAt, timezone) : 'Lifetime'}
+                        </span>
+                        {license.expiresAt && (
+                          <span className="limit-subtext-date">{formatFriendlyDate(license.expiresAt, timezone)}</span>
+                        )}
+                      </div>
                     </div>
                     {(() => {
                       const remaining = formatRemaining(license.expiresAt);

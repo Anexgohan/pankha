@@ -52,7 +52,7 @@ export function formatLastSeen(lastSeen?: string, timezone: string = 'UTC'): str
  * @returns Formatted date string
  */
 export function formatDate(dateStr: string, timezone: string = 'UTC'): string {
-  return new Date(dateStr).toLocaleDateString([], { timeZone: timezone });
+  return new Date(dateStr).toLocaleDateString('en-ZA', { timeZone: timezone });
 }
 
 /**
@@ -62,4 +62,36 @@ export function formatDate(dateStr: string, timezone: string = 'UTC'): string {
  */
 export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
+}
+
+/**
+ * Format date in friendly verbose format: "Jan 19th, 2026"
+ * @param dateStr - ISO date string
+ * @param timezone - Server timezone
+ */
+export function formatFriendlyDate(dateStr: string, timezone: string = 'UTC'): string {
+  const date = new Date(dateStr);
+  const formatter = new Intl.DateTimeFormat('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric',
+    timeZone: timezone 
+  });
+  
+  // Get parts to inject ordinal
+  const parts = formatter.formatToParts(date);
+  const day = parts.find(p => p.type === 'day')?.value;
+  const month = parts.find(p => p.type === 'month')?.value;
+  const year = parts.find(p => p.type === 'year')?.value;
+
+  if (!day || !month || !year) return formatter.format(date);
+
+  // Add ordinal suffix
+  const dayNum = parseInt(day);
+  let suffix = 'th';
+  if (dayNum % 10 === 1 && dayNum !== 11) suffix = 'st';
+  else if (dayNum % 10 === 2 && dayNum !== 12) suffix = 'nd';
+  else if (dayNum % 10 === 3 && dayNum !== 13) suffix = 'rd';
+
+  return `${month} ${day}${suffix}, ${year}`;
 }

@@ -530,6 +530,8 @@
   align-items: center;
   padding: var(--spacing-sm) 0;
   user-select: none;
+  flex-wrap: wrap; /* Allow wrapping */
+  gap: var(--spacing-md);
 }
 
 .maintenance-header-toggle h3.clickable-title {
@@ -541,6 +543,32 @@
   cursor: pointer;
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
+  white-space: nowrap; /* Prevent title wrap */
+}
+
+@media (max-width: 768px) {
+  .maintenance-header-toggle {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .maintenance-header-toggle h3.clickable-title {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Force the widget to stack below */
+  .local-prep-widget {
+    width: 100%;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: stretch !important; /* Override default center */
+    gap: var(--spacing-md) !important;
+  }
+
+  .prep-actions-group {
+    flex-direction: column;
+  }
 }
 
 .maintenance-header-toggle h3.clickable-title:hover {

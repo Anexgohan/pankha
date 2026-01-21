@@ -155,6 +155,14 @@
   padding: var(--spacing-md);
   text-align: center;
   border-left: 3px solid var(--color-info);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: default;
+}
+
+.limit-item:hover {
+  transform: translateY(-2px);
+  background: var(--bg-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Remaining time urgency colors */
@@ -186,6 +194,20 @@
   color: var(--text-primary);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+}
+
+.limit-value-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.limit-subtext-date {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.02em;
 }
 
 /* Remove license button */
@@ -1158,14 +1180,19 @@
 
 .diagnostics-stats {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-tertiary);
-  background: rgba(255, 255, 255, 0.04);
-  padding: 4px 12px;
-  border-radius: 99px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 6px 14px;
+  border-radius: 4px; /* Tactical squared-off look */
+  border: 1px solid var(--border-color);
   text-transform: uppercase;
   letter-spacing: 0.1em;
+  font-weight: var(--font-weight-medium);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  display: inline-flex;
+  align-items: center;
+  height: fit-content;
 }
 
 .diagnostics-title-row {
@@ -1217,20 +1244,73 @@
   letter-spacing: 0.05em;
 }
 
-.diagnostics-table-wrapper {
+
+.diagnostics-split-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-lg);
   margin-top: var(--spacing-md);
+}
+
+@media (max-width: 1400px) {
+  .diagnostics-split-view {
+    grid-template-columns: 1fr;
+  }
+}
+
+.table-header-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table-title {
+  margin: 0;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-family: var(--font-primary);
+  font-weight: var(--font-weight-bold); /* 700 */
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5); /* Subtle depth */
+}
+
+/* Ensure icons in title are aligned and colored if masked (using filter/opacity) */
+.table-title img {
+  opacity: 1 !important; /* Force full visibility */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.count-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  padding: 2px 6px;
+  border-radius: 99px;
+  font-size: 10px;
+}
+
+.diagnostics-table-wrapper {
+  margin-top: 0; /* Reset margin since grid handles gap */
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-tertiary);
   overflow: hidden;
   overflow-x: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .diagnostics-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 800px;
+  /* Min width removed to allow squishing in split view */
 }
 
 .diagnostics-table th {
@@ -1273,22 +1353,49 @@
 .diagnostics-table .hostname-wrapper {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
+}
+
+.system-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .diagnostics-table .hostname-text {
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-bold);
   color: var(--text-primary);
+  font-size: var(--font-size-base);
 }
 
-.diagnostics-table .agent-id-cell code {
-  font-size: var(--font-size-xs);
+.agent-id-subtext {
+  font-family: var(--font-mono);
+  font-size: 10px; /* XS monospace */
   color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+}
+
+@media (max-width: 768px) {
+  .diagnostics-table .actions-wrapper {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  
+  .diagnostics-table td, 
+  .diagnostics-table th {
+    padding: var(--spacing-sm);
+  }
+
+  .limit-value {
+    font-size: var(--font-size-base);
+  }
 }
 
 .diagnostics-table .actions-wrapper {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--spacing-sm);
 }
 
