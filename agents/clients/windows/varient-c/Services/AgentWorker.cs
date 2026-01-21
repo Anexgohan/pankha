@@ -55,8 +55,8 @@ public class AgentWorker : BackgroundService
             try 
             {
                 _logger.LogInformation("Generating hardware-info.json dump...");
-                var dump = await _hardwareMonitor.DumpFullHardwareInfoAsync();
-                var json = Newtonsoft.Json.JsonConvert.SerializeObject(dump, Newtonsoft.Json.Formatting.Indented);
+                var dumpRoot = await _hardwareMonitor.DumpFullHardwareInfoAsync();
+                var json = Newtonsoft.Json.JsonConvert.SerializeObject(dumpRoot, Newtonsoft.Json.Formatting.Indented);
                 var dumpPath = Path.Combine(Pankha.WindowsAgent.Platform.PathResolver.InstallPath, "hardware-info.json");
                 await File.WriteAllTextAsync(dumpPath, json);
                 _logger.LogInformation("Saved hardware dump to {Path}", dumpPath);

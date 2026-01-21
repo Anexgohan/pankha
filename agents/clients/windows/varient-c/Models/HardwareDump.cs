@@ -1,11 +1,27 @@
 namespace Pankha.WindowsAgent.Models;
 
+public class HardwareDumpRoot
+{
+    public HardwareDumpMetadata Metadata { get; set; } = new();
+    public List<HardwareDumpItem> Hardware { get; set; } = new();
+}
+
+public class HardwareDumpMetadata
+{
+    public string AgentVersion { get; set; } = "";
+    public string OSVersion { get; set; } = "";
+    public bool IsElevated { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+    public string? Motherboard { get; set; }
+}
+
 public class HardwareDumpItem
 {
     public string Name { get; set; } = "";
     public string Identifier { get; set; } = "";
     public string Type { get; set; } = "";
     public string? Parent { get; set; }  // Parent hardware identifier
+    public string? TechnicalId { get; set; } // Raw chip ID or PCI ID (e.g. REV_01, 0x1234)
     public List<HardwareDumpSensor> Sensors { get; set; } = new();
     public List<HardwareDumpItem> SubHardware { get; set; } = new();
 }
@@ -20,6 +36,11 @@ public class HardwareDumpSensor
     public string Max { get; set; } = "";
     public bool IsMonitored { get; set; }
     
+    /// <summary>
+    /// Whether the sensor/header is actually plugged in or reporting (Open Circuit detection)
+    /// </summary>
+    public bool? IsConnected { get; set; }
+
     /// <summary>
     /// Control interface info. Populated for Fan and Control type sensors.
     /// null if sensor is read-only (e.g., Temperature sensors).
@@ -65,4 +86,9 @@ public class ControlInfo
     /// Valid range for control values [min, max]
     /// </summary>
     public int[] Range { get; set; } = [0, 100];
+
+    /// <summary>
+    /// Current control mode (e.g., Software, Default)
+    /// </summary>
+    public string? Mode { get; set; }
 }

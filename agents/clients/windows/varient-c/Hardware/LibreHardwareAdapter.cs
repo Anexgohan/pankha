@@ -772,21 +772,33 @@ public class LibreHardwareAdapter : IHardwareMonitor
         return false;
     }
 
-    public async Task<List<HardwareDumpItem>> DumpFullHardwareInfoAsync()
+    public async Task<HardwareDumpRoot> DumpFullHardwareInfoAsync()
     {
         await UpdateAsync();
 
-        var result = new List<HardwareDumpItem>();
+        var dump = new HardwareDumpRoot();
+        
+        // Populate Metadata
+        dump.Metadata.Timestamp = DateTime.UtcNow;
+        dump.Metadata.OSVersion = Environment.OSVersion.ToString();
+        dump.Metadata.IsElevated = System.Security.Principal.WindowsIdentity.GetCurrent().Owner?
+            .IsWellKnown(System.Security.Principal.WellKnownSidType.BuiltinAdministratorsSid) ?? false;
+        
+        dump.Metadata.AgentVersion = Pankha.WindowsAgent.Platform.VersionHelper.GetVersion();
 
         lock (_hardwareLock)
         {
             foreach (var hardware in _computer.Hardware)
             {
-                result.Add(MapToDumpItem(hardware));
+                if (hardware.HardwareType == HardwareType.Motherboard)
+                {
+                    dump.Metadata.Motherboard = hardware.Name;
+                }
+                dump.Hardware.Add(MapToDumpItem(hardware));
             }
         }
 
-        return result;
+        return dump;
     }
 
     private HardwareDumpItem MapToDumpItem(IHardware hardware, string? parentId = null)
@@ -809,6 +821,12 @@ public class LibreHardwareAdapter : IHardwareMonitor
                               s.SensorType == SensorType.Fan || 
                               s.SensorType == SensorType.Control
             };
+
+            // Connectivity heuristic: If it's a Fan and RPM is 0, check if we can distinguish "Open"
+            if (s.SensorType == SensorType.Fan)
+            {
+                dumpSensor.IsConnected = s.Value.HasValue && s.Value.Value > 0;
+            }
             
             // Extract control info for Fan and Control type sensors
             if (s.SensorType == SensorType.Control || s.SensorType == SensorType.Fan)
@@ -828,6 +846,11 @@ public class LibreHardwareAdapter : IHardwareMonitor
             Identifier = hardware.Identifier.ToString(),
             Type = hardware.HardwareType.ToString(),
             Parent = parentId,
+            // Try to extract a more technical ID (PCI ID, Chip name etc)
+            TechnicalId = hardware.Identifier.ToString()
+                .Replace("/motherboard", "SMBIOS")
+                .Split('/')
+                .LastOrDefault(),
             Sensors = sensors
         };
 
@@ -838,14 +861,15 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
         return item;
     }
-    
+
     private ControlInfo BuildControlInfo(ISensor sensor, IHardware hardware)
     {
         var controlInfo = new ControlInfo
         {
             CurrentPercent = sensor.SensorType == SensorType.Control ? sensor.Value : null,
             CanWrite = sensor.Control != null,
-            Range = [0, 100]
+            Range = [0, 100],
+            Mode = sensor.Control?.ControlMode.ToString()
         };
         
         // Detect control method based on hardware type
