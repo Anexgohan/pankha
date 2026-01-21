@@ -402,6 +402,12 @@
   color: var(--text-secondary);
 }
 
+.tooltip-date {
+  opacity: 0.5;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
 /* === RESPONSIVE === */
 @media (max-width: 480px) {
   .sensor-value-column {

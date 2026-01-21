@@ -384,6 +384,11 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
               timeZone: timezone
             })}
           </span>
+          <span className="tooltip-date">
+            {new Date(activePoint.timestamp).toLocaleDateString('en-CA', {
+              timeZone: timezone
+            })}
+          </span>
         </div>
       )}
 
