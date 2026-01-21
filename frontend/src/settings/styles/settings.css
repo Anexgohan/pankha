@@ -312,15 +312,15 @@
 }
 
 .scale-preset-btn.active {
-  background: var(--color-info);
-  color: white;
-  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+  background: var(--color-accent-dynamic);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
 }
 
 .scale-preset-btn.custom.active {
   background: var(--bg-hover);
-  border: 1px dashed var(--color-info);
-  color: var(--color-info);
+  border: 1px dashed var(--color-accent-dynamic);
+  color: var(--color-accent-dynamic);
   box-shadow: none;
 }
 
@@ -1175,23 +1175,31 @@
 }
 
 .btn-export-all {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
-  padding: 6px 14px;
-  font-family: var(--font-mono);
-  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  background: var(--color-accent-dynamic);
+  border: 1px solid var(--color-accent-dynamic);
+  color: var(--text-primary);
+  padding: 8px 16px;
+  font-family: var(--font-primary);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
   text-transform: uppercase;
-  border-radius: 3px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
-  letter-spacing: 0.05em;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  letter-spacing: 0.15em;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent-dynamic), transparent 80%);
+  line-height: 1;
 }
 
 .btn-export-all:hover:not(:disabled) {
-  border-color: var(--color-accent-dynamic);
-  color: var(--color-accent-dynamic);
-  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 95%);
+  transform: translateY(-1px);
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 .btn-export-all:disabled {
