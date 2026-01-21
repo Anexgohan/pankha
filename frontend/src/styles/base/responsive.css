@@ -184,4 +184,125 @@
   .curve-info {
     justify-content: center;
   }
+
+  /* Settings Page */
+  .settings-container {
+    padding: var(--spacing-sm);
+  }
+
+  .settings-content {
+    padding: var(--spacing-lg); /* Reduce inner padding from xl to lg */
+  }
+
+  .settings-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .settings-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-tab {
+    padding: var(--spacing-md) var(--spacing-lg);
+    flex-shrink: 0;
+  }
+
+  .setting-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  .scale-control-wrapper {
+    width: 100%;
+    margin-top: var(--spacing-xs);
+  }
+
+  /* Fix for cutting out Graph Scale / Data Retention buttons */
+  .scale-presets {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    display: flex;
+    justify-content: flex-start; /* Start from left on scroll */
+    padding: 2px;
+  }
+
+  .scale-presets::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scale-preset-btn {
+    padding: var(--spacing-sm) var(--spacing-lg);
+    min-width: unset;
+    flex-shrink: 0; /* Don't squash buttons, force scroll */
+    font-size: 12px;
+  }
+
+  .aesthetics-compact-list {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .aesthetics-row {
+    flex-direction: column; /* Stack label and picker */
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md) !important;
+  }
+
+  /* Center and flip the color picker dropdown on mobile to avoid bottom cutoff */
+  .picker-dropdown {
+    left: 50% !important;
+    right: auto !important;
+    bottom: calc(100% + 12px) !important; /* Open upwards */
+    top: auto !important;
+    transform: translateX(-50%) !important;
+    width: 280px;
+    max-width: calc(100vw - 40px);
+    z-index: 1001;
+  }
+
+  /* Add extra breathing room at the bottom of settings to prevent clipping */
+  .settings-container {
+    padding: var(--spacing-sm);
+    padding-bottom: 120px; 
+  }
+
+  .license-limits {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-sm);
+  }
+
+  .limit-item {
+    padding: var(--spacing-sm);
+  }
+
+  .limit-value {
+    font-size: var(--font-size-lg);
+  }
+
+  /* Fix for Diagnostics Header stacking */
+  .diagnostics-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  .diagnostics-title-row {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: var(--spacing-sm);
+  }
+
+  .btn-export-all {
+    width: 100%;
+    justify-content: center;
+  }
 }
