@@ -370,7 +370,7 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
           style={{
             position: 'absolute',
             left: `${(activePoint.x / width) * 100}%`,
-            top: '-32px',
+            top: '-48px',
             transform: 'translateX(-50%)',
             pointerEvents: 'none',
             zIndex: 10
