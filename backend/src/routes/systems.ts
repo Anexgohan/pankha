@@ -433,6 +433,45 @@ router.get("/:id/status", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/systems/:id/diagnostics - Get hardware diagnostics from agent
+router.get("/:id/diagnostics", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+
+    const system = await db.get("SELECT agent_id, name FROM systems WHERE id = $1", [
+      systemId,
+    ]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+
+    const agentStatus = agentManager.getAgentStatus(system.agent_id);
+    if (!agentStatus || agentStatus.status !== "online") {
+      return res.status(503).json({ 
+        error: "Agent is offline",
+        agent_id: system.agent_id,
+        system_name: system.name,
+      });
+    }
+
+    log.info(`Fetching diagnostics for system ${systemId} (${system.agent_id})`, "systems");
+    
+    const result = await commandDispatcher.getDiagnostics(system.agent_id);
+    
+    res.json({
+      system_id: systemId,
+      agent_id: system.agent_id,
+      system_name: system.name,
+      diagnostics: result,
+    });
+  } catch (error) {
+    log.error("Error fetching diagnostics:", "systems", error);
+    res.status(500).json({ 
+      error: error instanceof Error ? error.message : "Failed to fetch diagnostics" 
+    });
+  }
+});
+
 // GET /api/systems/:id/sensors - Current temperature readings
 router.get("/:id/sensors", async (req: Request, res: Response) => {
   try {

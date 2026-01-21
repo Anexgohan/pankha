@@ -118,6 +118,7 @@ pub struct HardwareDumpItem {
 }
 
 /// Individual sensor with value and control info
+/// Field order matches Windows HardwareDumpSensor for consistent JSON output
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct HardwareDumpSensor {
@@ -134,6 +135,7 @@ pub struct HardwareDumpSensor {
 }
 
 /// Control interface details for fan/pwm sensors
+/// Field order matches Windows ControlInfo for consistent JSON output
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct HardwareDumpControlInfo {
@@ -274,6 +276,9 @@ pub trait HardwareMonitor: Send + Sync {
 
     /// Check if last sensor discovery was from cache (for logging)
     async fn last_discovery_from_cache(&self) -> bool;
+
+    /// Generate hardware diagnostic dump (hardware-info.json)
+    async fn dump_hardware_info(&self) -> Result<HardwareDumpRoot>;
 }
 
 // ============================================================================
@@ -1318,6 +1323,11 @@ impl HardwareMonitor for LinuxHardwareMonitor {
     async fn last_discovery_from_cache(&self) -> bool {
         *self.last_discovery_from_cache.read().await
     }
+
+    async fn dump_hardware_info(&self) -> Result<HardwareDumpRoot> {
+        // Delegate to the inherent impl method
+        LinuxHardwareMonitor::dump_hardware_info(self).await
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -1393,6 +1403,10 @@ impl HardwareMonitor for WindowsHardwareMonitor {
 
     async fn last_discovery_from_cache(&self) -> bool {
         false // Windows stub always returns false
+    }
+
+    async fn dump_hardware_info(&self) -> Result<HardwareDumpRoot> {
+        Err(anyhow::anyhow!("Windows hardware dump not yet implemented in Rust agent"))
     }
 }
 
@@ -1791,6 +1805,7 @@ impl WebSocketClient {
                 "agentId": config.agent.id,
                 "name": config.agent.name,
                 "agent_version": env!("CARGO_PKG_VERSION"),
+                "platform": std::env::consts::OS, // "linux", "macos", "windows", etc.
                 "update_interval": config.agent.update_interval as u64, // Send in seconds to match frontend/backend format
                 "fan_step_percent": config.hardware.fan_step_percent,
                 "hysteresis_temp": config.hardware.hysteresis_temp,
@@ -2103,6 +2118,19 @@ impl WebSocketClient {
                 (true, None, serde_json::json!({"message": "Update initiated"}))
             }
             "ping" => (true, None, serde_json::json!({"pong": true})),
+            "getDiagnostics" => {
+                // Generate fresh hardware dump and return as response
+                info!("Generating fresh hardware diagnostics for remote request");
+                match self.hardware_monitor.dump_hardware_info().await {
+                    Ok(dump) => {
+                        match serde_json::to_value(&dump) {
+                            Ok(json_value) => (true, None, json_value),
+                            Err(e) => (false, Some(format!("Failed to serialize diagnostics: {}", e)), serde_json::json!({})),
+                        }
+                    }
+                    Err(e) => (false, Some(format!("Failed to generate diagnostics: {}", e)), serde_json::json!({})),
+                }
+            }
             _ => {
                 warn!("Unknown command: {}", command_type);
                 (false, Some(format!("Unknown command: {}", command_type)), serde_json::json!({}))

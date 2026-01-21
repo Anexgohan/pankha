@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS systems (
   websocket_endpoint VARCHAR(500),
   auth_token VARCHAR(255),
   agent_version VARCHAR(50),
+  platform VARCHAR(20),                   -- 'linux', 'windows', 'macos'
   status VARCHAR(50) CHECK(status IN ('online', 'offline', 'error', 'installing')) DEFAULT 'offline',
   last_seen TIMESTAMPTZ,
   last_data_received TIMESTAMPTZ,

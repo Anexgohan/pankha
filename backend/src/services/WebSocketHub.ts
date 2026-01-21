@@ -526,6 +526,7 @@ export class WebSocketHub extends EventEmitter {
         agentId: agentId,
         name: registrationData.name || agentId,
         version: registrationData.agent_version || "1.0.0-websocket",
+        platform: registrationData.platform || "unknown", // "linux", "windows", "macos"
         apiEndpoint: `http://${client?.metadata.ip || "unknown"}:8080`, // Mock endpoint
         websocketEndpoint: `ws://${client?.metadata.ip || "unknown"}:8081`, // Mock endpoint
         authToken: registrationData.auth_token || "websocket-agent-token",

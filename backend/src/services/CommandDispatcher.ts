@@ -432,6 +432,15 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
+   * Get hardware diagnostics from an agent
+   * Agent generates fresh hardware-info.json and returns it
+   */
+  public async getDiagnostics(agentId: string): Promise<any> {
+    log.info(`Requesting diagnostics from agent ${agentId}`, "CommandDispatcher");
+    return this.sendCommand(agentId, "getDiagnostics", {}, "normal");
+  }
+
+  /**
    * Add command to queue
    */
   private addToQueue(

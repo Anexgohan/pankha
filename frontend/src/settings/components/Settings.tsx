@@ -5,8 +5,9 @@
 import React, { useState, useEffect } from 'react';
 import { useLicense } from '../../license';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
-import { setLicense, getPricing, deleteLicense } from '../../services/api';
+import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
 import { formatDate } from '../../utils/formatters';
+import { toast } from '../../utils/toast';
 import ColorPicker from './ColorPicker';
 import '../styles/settings.css';
 
@@ -14,7 +15,7 @@ import '../styles/settings.css';
 const GRAPH_SCALE_MIN_HOURS = 1;
 const GRAPH_SCALE_MAX_HOURS = 720; // 30 days
 
-type SettingsTab = 'general' | 'license' | 'about';
+type SettingsTab = 'general' | 'license' | 'diagnostics' | 'about';
 
 interface TierPricing {
   name: string;
@@ -78,6 +79,262 @@ const CHECKOUT_URLS = {
     lifetime: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.lifetime}`,
   },
 } as const;
+
+// Diagnostics Tab Component
+interface SystemInfo {
+  id: number;
+  name: string;
+  agent_id: string;
+  status: string;
+  real_time_status?: string;
+  agent_version?: string;
+  platform?: string;
+}
+
+const DiagnosticsTab: React.FC = () => {
+  const [systems, setSystems] = useState<SystemInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actionStatus, setActionStatus] = useState<{ [key: number]: { type: 'loading' | 'success' | 'error'; message: string } }>({});
+
+  useEffect(() => {
+    const fetchSystems = async () => {
+      try {
+        const data = await getSystems();
+        setSystems(data as unknown as SystemInfo[]);
+      } catch (error) {
+        console.error('Failed to fetch systems:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSystems();
+  }, []);
+
+  const handleCopyToClipboard = async (systemId: number) => {
+    setActionStatus(prev => ({ ...prev, [systemId]: { type: 'loading', message: 'Fetching...' } }));
+    
+    try {
+      const response = await getDiagnostics(systemId);
+      const jsonString = JSON.stringify(response.diagnostics, null, 2);
+      
+      // Try modern clipboard API first, fallback for HTTP contexts
+      let copied = false;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(jsonString);
+          copied = true;
+        } catch {
+          copied = false;
+        }
+      }
+      
+      // Fallback for non-secure contexts (HTTP)
+      if (!copied) {
+        const textarea = document.createElement('textarea');
+        textarea.value = jsonString;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        copied = document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      
+      if (copied) {
+        setActionStatus(prev => ({ ...prev, [systemId]: { type: 'success', message: 'Copied!' } }));
+        toast.success('Diagnostics copied to clipboard');
+      } else {
+        throw new Error('Copy failed');
+      }
+      
+      setTimeout(() => setActionStatus(prev => {
+        const newStatus = { ...prev };
+        delete newStatus[systemId];
+        return newStatus;
+      }), 2000);
+    } catch {
+      setActionStatus(prev => ({ ...prev, [systemId]: { type: 'error', message: 'Failed' } }));
+      toast.error('Failed to copy diagnostics');
+      setTimeout(() => setActionStatus(prev => {
+        const newStatus = { ...prev };
+        delete newStatus[systemId];
+        return newStatus;
+      }), 3000);
+    }
+  };
+
+  const handleDownloadAsFile = async (systemId: number, systemName: string) => {
+    setActionStatus(prev => ({ ...prev, [systemId]: { type: 'loading', message: 'Fetching...' } }));
+    
+    try {
+      const response = await getDiagnostics(systemId);
+      const jsonString = JSON.stringify(response.diagnostics, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${systemName.replace(/[^a-z0-9]/gi, '-').toLowerCase()}-hardware-info.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setActionStatus(prev => ({ ...prev, [systemId]: { type: 'success', message: 'Downloaded!' } }));
+      toast.success(`Downloaded ${systemName} diagnostics`);
+      setTimeout(() => setActionStatus(prev => {
+        const newStatus = { ...prev };
+        delete newStatus[systemId];
+        return newStatus;
+      }), 2000);
+    } catch {
+      setActionStatus(prev => ({ ...prev, [systemId]: { type: 'error', message: 'Failed' } }));
+      toast.error('Failed to download diagnostics');
+      setTimeout(() => setActionStatus(prev => {
+        const newStatus = { ...prev };
+        delete newStatus[systemId];
+        return newStatus;
+      }), 3000);
+    }
+  };
+
+  const onlineCount = systems.filter(s => s.real_time_status === 'online').length;
+  const [isExportingAll, setIsExportingAll] = useState(false);
+
+  const handleExportAll = async () => {
+    const onlineSystems = systems.filter(s => s.real_time_status === 'online');
+    if (onlineSystems.length === 0) return;
+
+    setIsExportingAll(true);
+    const results: { [name: string]: unknown } = {};
+    
+    for (const system of onlineSystems) {
+      try {
+        const response = await getDiagnostics(system.id);
+        results[system.name] = response.diagnostics;
+      } catch {
+        results[system.name] = { error: 'Failed to fetch diagnostics' };
+      }
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const jsonString = JSON.stringify(results, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `all-diagnostics-${timestamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(`Exported ${onlineSystems.length} agent diagnostics`);
+    setIsExportingAll(false);
+  };
+
+  const getPlatformIcon = (system: SystemInfo) => {
+    const isWindows = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-');
+    return isWindows ? (
+      <div className="platform-icon windows" title="Windows Agent">
+        <img src="/icons/windows_01.svg" alt="Windows" width="14" height="14" />
+      </div>
+    ) : (
+      <div className="platform-icon linux" title="Linux Agent">
+        <img src="/icons/linux_01.svg" alt="Linux" width="14" height="14" />
+      </div>
+    );
+  };
+
+  return (
+    <div className="settings-section">
+      <div className="diagnostics-header">
+        <div className="diagnostics-title-row">
+          <h2>Diagnostics</h2>
+          <span className="diagnostics-stats">
+            {systems.length} System{systems.length !== 1 ? 's' : ''} • {onlineCount} Online
+          </span>
+        </div>
+        {onlineCount > 0 && (
+          <button
+            className="btn-export-all"
+            onClick={handleExportAll}
+            disabled={isExportingAll}
+          >
+            {isExportingAll ? 'Exporting...' : 'Export All'}
+          </button>
+        )}
+      </div>
+      <p className="settings-info">
+        Export hardware diagnostic data from connected agents for support and troubleshooting.
+      </p>
+
+      {loading ? (
+        <p>Loading systems...</p>
+      ) : systems.length === 0 ? (
+        <div className="diagnostics-empty">
+          No agents connected.
+        </div>
+      ) : (
+        <div className="diagnostics-table-wrapper">
+          <table className="diagnostics-table">
+            <thead>
+              <tr>
+                <th>Hostname</th>
+                <th>Agent ID</th>
+                <th>Status</th>
+                <th>Export</th>
+              </tr>
+            </thead>
+            <tbody>
+              {systems.map(system => {
+                const isOnline = system.real_time_status === 'online';
+                const status = actionStatus[system.id];
+                const statusLabel = isOnline ? 'ONLINE' : 'OFFLINE';
+                const statusClass = isOnline ? 'online' : 'offline';
+
+                return (
+                  <tr key={system.id}>
+                    <td className="hostname-cell">
+                      <div className="hostname-wrapper">
+                        {getPlatformIcon(system)}
+                        <span className="hostname-text">{system.name}</span>
+                      </div>
+                    </td>
+                    <td className="agent-id-cell"><code>{system.agent_id}</code></td>
+                    <td>
+                      <span className={`status-tag-v2 ${statusClass}`}>
+                        <span className="status-dot" />
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="actions-cell">
+                      {status && (
+                        <span className={`action-feedback ${status.type}`}>{status.message}</span>
+                      )}
+                      <button
+                        className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
+                        onClick={() => handleCopyToClipboard(system.id)}
+                        disabled={!isOnline || status?.type === 'loading'}
+                      >
+                        Copy
+                      </button>
+                      <button
+                        className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
+                        onClick={() => handleDownloadAsFile(system.id, system.name)}
+                        disabled={!isOnline || status?.type === 'loading'}
+                      >
+                        Download
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -284,6 +541,12 @@ const Settings: React.FC = () => {
           onClick={() => setActiveTab('license')}
         >
           Subscription
+        </button>
+        <button
+          className={`settings-tab ${activeTab === 'diagnostics' ? 'active' : ''}`}
+          onClick={() => setActiveTab('diagnostics')}
+        >
+          Diagnostics
         </button>
         <button
           className={`settings-tab ${activeTab === 'about' ? 'active' : ''}`}
@@ -757,6 +1020,11 @@ const Settings: React.FC = () => {
               <p>Failed to load license info</p>
             )}
           </div>
+        )}
+
+        {/* Diagnostics Tab */}
+        {activeTab === 'diagnostics' && (
+          <DiagnosticsTab />
         )}
 
         {/* About Tab */}

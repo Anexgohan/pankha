@@ -3,6 +3,7 @@ export interface AgentConfig {
   agentId: string;
   name: string;
   version: string;
+  platform?: string; // "linux", "windows", "macos"
   apiEndpoint: string; // 'http://192.168.1.100:8080'
   websocketEndpoint: string; // 'ws://192.168.1.100:8081'
   authToken: string;
@@ -93,7 +94,8 @@ export interface FanControlCommand {
     | "setFailsafeSpeed"
     | "setEnableFanControl"
     | "setAgentName"
-    | "selfUpdate";
+    | "selfUpdate"
+    | "getDiagnostics";
   payload: {
     fanId?: string;
     speed?: number;

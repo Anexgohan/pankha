@@ -28,6 +28,9 @@ public class RegisterData
     [JsonProperty("agent_version")]
     public string AgentVersion { get; set; } = "1.0.0-windows";
 
+    [JsonProperty("platform")]
+    public string Platform { get; set; } = "windows";
+
     [JsonProperty("update_interval")]
     public double UpdateInterval { get; set; } // milliseconds
 

@@ -361,4 +361,16 @@ export const stageUpdateToHub = async (version: string): Promise<{ message: stri
   return response.data;
 };
 
+// Hardware Diagnostics
+export interface DiagnosticsResponse {
+  system_id: number;
+  agent_id: string;
+  system_name: string;
+  diagnostics: any; // Raw hardware-info.json content
+}
+
+export const getDiagnostics = async (systemId: number): Promise<DiagnosticsResponse> => {
+  const response = await api.get(`/api/systems/${systemId}/diagnostics`);
+  return response.data;
+};
 

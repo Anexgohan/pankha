@@ -71,6 +71,9 @@ public class CommandHandler
                 case "ping":
                     return CreateSuccessResponse(commandId, new { pong = true });
 
+                case "getDiagnostics":
+                    return await HandleGetDiagnosticsAsync(commandId);
+
                 default:
                     return CreateErrorResponse(commandId, $"Unknown command type: {commandType}");
             }
@@ -280,6 +283,28 @@ public class CommandHandler
         _logger.Information("✏️ Agent Name changed: {Old} → {New}", oldName, trimmedName);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { name = trimmedName }));
+    }
+
+    private async Task<CommandResponse> HandleGetDiagnosticsAsync(string commandId)
+    {
+        _logger.Information("Generating fresh hardware diagnostics for remote request");
+
+        try
+        {
+            // Generate fresh hardware dump
+            var dumpRoot = await _hardwareMonitor.DumpFullHardwareInfoAsync();
+            
+            // Convert to dictionary for response
+            var json = JsonConvert.SerializeObject(dumpRoot);
+            var diagnosticsData = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+
+            return CreateSuccessResponse(commandId, diagnosticsData ?? new Dictionary<string, object>());
+        }
+        catch (Exception ex)
+        {
+            _logger.Error(ex, "Failed to generate diagnostics");
+            return CreateErrorResponse(commandId, $"Failed to generate diagnostics: {ex.Message}");
+        }
     }
 
     private T GetPayloadValue<T>(Dictionary<string, object> payload, string key)

@@ -57,8 +57,8 @@ export class AgentManager extends EventEmitter {
       const sql = `
         INSERT INTO systems (
           name, agent_id, ip_address, api_endpoint, websocket_endpoint,
-          auth_token, agent_version, status, capabilities, last_seen
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'online', $8, CURRENT_TIMESTAMP)
+          auth_token, agent_version, platform, status, capabilities, last_seen
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'online', $9, CURRENT_TIMESTAMP)
         ON CONFLICT (agent_id) DO UPDATE SET
           name = EXCLUDED.name,
           ip_address = EXCLUDED.ip_address,
@@ -66,6 +66,7 @@ export class AgentManager extends EventEmitter {
           websocket_endpoint = EXCLUDED.websocket_endpoint,
           auth_token = EXCLUDED.auth_token,
           agent_version = EXCLUDED.agent_version,
+          platform = EXCLUDED.platform,
           status = 'online',
           capabilities = EXCLUDED.capabilities,
           last_seen = CURRENT_TIMESTAMP
@@ -81,6 +82,7 @@ export class AgentManager extends EventEmitter {
         agentConfig.websocketEndpoint,
         agentConfig.authToken,
         agentConfig.version,
+        agentConfig.platform || 'unknown',
         JSON.stringify(agentConfig.capabilities),
       ]);
 
@@ -281,6 +283,7 @@ export class AgentManager extends EventEmitter {
           agentId: system.agent_id,
           name: system.name,
           version: system.agent_version || "1.0.0",
+          platform: system.platform || "unknown",
           apiEndpoint: system.api_endpoint,
           websocketEndpoint: system.websocket_endpoint,
           authToken: system.auth_token,

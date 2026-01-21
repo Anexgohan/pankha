@@ -1143,3 +1143,183 @@
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* Diagnostics Tab - Fleet Maintenance Style */
+.diagnostics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.diagnostics-header h2 {
+  margin: 0;
+}
+
+.diagnostics-stats {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px 12px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.diagnostics-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.btn-export-all {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.05em;
+}
+
+.btn-export-all:hover:not(:disabled) {
+  border-color: var(--color-accent-dynamic);
+  color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 95%);
+}
+
+.btn-export-all:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.diagnostics-empty {
+  text-align: center;
+  padding: var(--spacing-2xl) 0;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.05em;
+}
+
+.diagnostics-table-wrapper {
+  margin-top: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  overflow-x: auto;
+}
+
+.diagnostics-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+
+.diagnostics-table th {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 2px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: var(--font-size-base);
+}
+
+.diagnostics-table td {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-bottom: 1px solid var(--border-color-dimmed);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.diagnostics-table tr:last-child td {
+  border-bottom: none;
+}
+
+.diagnostics-table tr:hover td {
+  background: rgba(255, 255, 255, 0.01);
+  color: var(--text-primary);
+}
+
+.diagnostics-table .hostname-cell {
+  font-family: var(--font-primary);
+}
+
+.diagnostics-table .hostname-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.diagnostics-table .hostname-text {
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.diagnostics-table .agent-id-cell code {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.diagnostics-table .actions-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Diagnostics table action buttons - matching deployment.css btn-table-action */
+.diagnostics-table .btn-table-action {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 4px 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.diagnostics-table .btn-table-action:hover:not(:disabled) {
+  border-color: var(--color-accent-dynamic);
+  color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 95%);
+}
+
+.diagnostics-table .btn-table-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.action-feedback {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.action-feedback.loading {
+  color: var(--color-info);
+}
+
+.action-feedback.success {
+  color: var(--color-success);
+}
+
+.action-feedback.error {
+  color: var(--color-error);
+}
