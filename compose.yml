@@ -25,9 +25,10 @@ services:
       timeout: 10s
       retries: 3
     depends_on:
-      - pankha-postgres
+      pankha-postgres:
+        condition: service_healthy
     volumes:
-      - ./backend/docker-data/updates:/app/backend/data/updates
+      - ./docker-data/updates:/app/backend/data/updates
     restart: unless-stopped
 
   pankha-postgres:
@@ -61,9 +62,14 @@ services:
       - .env
     volumes:
       - ./docker-data/backend/database/postgres_data:/var/lib/postgresql/data
-      # - ./docker-data/backend/src/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pankha_user} -d ${POSTGRES_DB:-db_pankha}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
 volumes:
