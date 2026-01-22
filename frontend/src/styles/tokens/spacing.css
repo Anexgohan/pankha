@@ -16,6 +16,13 @@
   --spacing-4xl: 40px;
   --spacing-5xl: 60px;
 
+  /* Spacing for mobile */
+  --spacing-mobile-xs: 4px;
+  --spacing-mobile-sm: 8px;
+  --spacing-mobile-md: 12px;
+  --spacing-mobile-lg: 16px;
+  --spacing-mobile-xl: 20px;
+
   /* Border Radius */
   --radius-sm: 4px;
   --radius-md: 6px;

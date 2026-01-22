@@ -230,16 +230,17 @@
 
   /* Editor Overlay Stacking */
   .fan-profile-editor-overlay {
-    padding: 0 !important; /* Allow true full-screen */
+    padding: var(--spacing-sm) !important; /* Restore breathing room */
   }
 
   .fan-profile-editor {
-    margin: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    max-height: 100vh !important;
-    border-radius: 0 !important;
-    border: none !important;
+    margin: 0 auto !important;
+    width: 95vw !important;
+    height: 95vh !important;
+    max-height: 95vh !important;
+    border-radius: var(--radius-lg) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-2xl);
   }
 
   .editor-header {

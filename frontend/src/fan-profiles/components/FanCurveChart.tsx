@@ -45,7 +45,14 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
     dragStartOrder: []
   });
   const [hoveredPoint, setHoveredPoint] = useState<number>(-1);
-  const [hoveredData, setHoveredData] = useState<{ temp: number; speed: number; x: number; y: number } | null>(null);
+  const [hoveredData, setHoveredData] = useState<{ 
+    temp: number; 
+    speed: number; 
+    x: number; 
+    y: number;
+    clientX: number;
+    clientY: number;
+  } | null>(null);
 
   const margin = { top: 20, right: 40, bottom: 40, left: 50 };
   const chartWidth = width - margin.left - margin.right;
@@ -78,17 +85,35 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
   const scaleX = (temp: number) => ((temp - minTemp) / tempSpan) * chartWidth;
   const scaleY = (speed: number) => chartHeight - ((speed - minSpeed) / speedRange) * chartHeight;
 
-  // Inverse scale functions (for converting mouse coordinates back to values)
+  // Inverse scale functions (for converting coordinates back to values)
   const inverseScaleX = (x: number) => (x / chartWidth) * tempSpan + minTemp;
   const inverseScaleY = (y: number) => maxSpeed - (y / chartHeight) * speedRange;
+
+  // Helper to get coordinates relative to SVG's internal coordinate system
+  const getSVGCoords = useCallback((clientX: number, clientY: number) => {
+    const svg = svgRef.current;
+    if (!svg) return { x: 0, y: 0 };
+    
+    // Create an SVG point and transform it using the SVG's screen CTM
+    const point = svg.createSVGPoint();
+    point.x = clientX;
+    point.y = clientY;
+    const ctm = svg.getScreenCTM();
+    if (!ctm) return { x: 0, y: 0 };
+    
+    const svgPoint = point.matrixTransform(ctm.inverse());
+    return {
+      x: svgPoint.x - margin.left,
+      y: svgPoint.y - margin.top
+    };
+  }, [margin.left, margin.top]);
 
   // Drag event handlers
   const handleMouseDown = useCallback((event: React.MouseEvent, pointIndex: number) => {
     if (!interactive || !onPointChange) return;
 
     event.preventDefault();
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    const { x, y } = getSVGCoords(event.clientX, event.clientY);
 
     // Capture the current sorted order to maintain it during drag
     const currentPointsWithIndex = curvePoints.map((point, originalIndex) => ({ ...point, originalIndex }));
@@ -99,107 +124,108 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
     setDragState({
       isDragging: true,
       pointIndex,
-      startX: event.clientX - rect.left,
-      startY: event.clientY - rect.top,
+      startX: x,
+      startY: y,
       dragStartOrder: currentOrder
     });
-  }, [interactive, onPointChange, curvePoints]);
+  }, [interactive, onPointChange, curvePoints, getSVGCoords]);
+
+  // Shared logic for updating tooltip and point highlighting
+  const updateHoverInfo = useCallback((clientX: number, clientY: number) => {
+    if (!(interactive || tooltipOnly)) return;
+
+    const { x: mouseX, y: mouseY } = getSVGCoords(clientX, clientY);
+
+    // Handle snapping tooltip (hover)
+    const isWithinBounds = mouseX >= 0 && mouseX <= chartWidth && 
+                          mouseY >= 0 && mouseY <= chartHeight;
+
+    if (!isWithinBounds) {
+      setHoveredPoint(-1);
+      setHoveredData(null);
+      return;
+    }
+
+    // 1. Find nearest point for highlight/actions
+    let minDistance = Infinity;
+    let nearestIndex = -1;
+
+    curvePoints.forEach((point, index) => {
+      const pointX = scaleX(point.temperature);
+      const distance = Math.abs(pointX - mouseX);
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestIndex = index;
+      }
+    });
+
+    // Show point highlight if mouse/touch is very close to a point (within 5px)
+    if (nearestIndex !== -1 && minDistance < 5) {
+      setHoveredPoint(nearestIndex);
+      const point = curvePoints[nearestIndex];
+      setHoveredData({
+        temp: point.temperature,
+        speed: point.fan_speed,
+        x: scaleX(point.temperature),
+        y: scaleY(point.fan_speed),
+        clientX,
+        clientY
+      });
+      return; // Skip interpolation if snapped to point
+    } else {
+      setHoveredPoint(-1);
+    }
+
+    // 2. Calculate interpolated value for the "line snap"
+    const currentTemp = inverseScaleX(mouseX);
+    let interpolatedSpeed = 0;
+
+    if (sortedPoints.length > 0) {
+      if (currentTemp <= sortedPoints[0].temperature) {
+        interpolatedSpeed = sortedPoints[0].fan_speed;
+      } else if (currentTemp >= sortedPoints[sortedPoints.length - 1].temperature) {
+        interpolatedSpeed = sortedPoints[sortedPoints.length - 1].fan_speed;
+      } else {
+        // Find the two points to interpolate between
+        for (let i = 0; i < sortedPoints.length - 1; i++) {
+          const p1 = sortedPoints[i];
+          const p2 = sortedPoints[i + 1];
+          if (currentTemp >= p1.temperature && currentTemp <= p2.temperature) {
+            const t = (currentTemp - p1.temperature) / (p2.temperature - p1.temperature);
+            interpolatedSpeed = p1.fan_speed + t * (p2.fan_speed - p1.fan_speed);
+            break;
+          }
+        }
+      }
+    }
+
+    setHoveredData({
+      temp: Math.round(currentTemp),
+      speed: Math.round(interpolatedSpeed),
+      x: mouseX,
+      y: scaleY(interpolatedSpeed),
+      clientX,
+      clientY
+    });
+  }, [interactive, tooltipOnly, getSVGCoords, chartWidth, chartHeight, curvePoints, scaleX, scaleY, sortedPoints, inverseScaleX]);
 
   const handleMouseMove = useCallback((event: React.MouseEvent) => {
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const mouseX = event.clientX - rect.left - margin.left;
-    const mouseY = event.clientY - rect.top - margin.top;
-
     // Handle dragging
     if (dragState.isDragging && interactive && onPointChange) {
-      // Constrain to chart bounds
+      const { x: mouseX, y: mouseY } = getSVGCoords(event.clientX, event.clientY);
       const clampedX = Math.max(0, Math.min(chartWidth, mouseX));
       const clampedY = Math.max(0, Math.min(chartHeight, mouseY));
-
-      // Convert back to temperature and fan speed
       const newTemp = Math.round(inverseScaleX(clampedX));
       const newSpeed = Math.round(inverseScaleY(clampedY));
-
-      // Constrain values to chart ranges (0-100°C temperature, 0-100% fan speed)
       const constrainedTemp = Math.max(0, Math.min(100, newTemp));
       const constrainedSpeed = Math.max(minSpeed, Math.min(maxSpeed, newSpeed));
-
       onPointChange(dragState.pointIndex, constrainedTemp, constrainedSpeed);
       return;
     }
 
-    // Handle snapping tooltip (hover)
-    if (interactive || tooltipOnly) {
-      const isWithinBounds = mouseX >= 0 && mouseX <= chartWidth && 
-                            mouseY >= 0 && mouseY <= chartHeight;
-
-      if (!isWithinBounds) {
-        setHoveredPoint(-1);
-        setHoveredData(null);
-        return;
-      }
-
-      // 1. Find nearest point for highlight/actions
-      let minDistance = Infinity;
-      let nearestIndex = -1;
-
-      curvePoints.forEach((point, index) => {
-        const pointX = scaleX(point.temperature);
-        const distance = Math.abs(pointX - mouseX);
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestIndex = index;
-        }
-      });
-
-      // Show point highlight if mouse is very close to a point (within 5px)
-      if (nearestIndex !== -1 && minDistance < 5) {
-        setHoveredPoint(nearestIndex);
-        const point = curvePoints[nearestIndex];
-        setHoveredData({
-          temp: point.temperature,
-          speed: point.fan_speed,
-          x: scaleX(point.temperature),
-          y: scaleY(point.fan_speed)
-        });
-        return; // Skip interpolation if snapped to point
-      } else {
-        setHoveredPoint(-1);
-      }
-
-      // 2. Calculate interpolated value for the "line snap"
-      const currentTemp = inverseScaleX(mouseX);
-      let interpolatedSpeed = 0;
-
-      if (sortedPoints.length > 0) {
-        if (currentTemp <= sortedPoints[0].temperature) {
-          interpolatedSpeed = sortedPoints[0].fan_speed;
-        } else if (currentTemp >= sortedPoints[sortedPoints.length - 1].temperature) {
-          interpolatedSpeed = sortedPoints[sortedPoints.length - 1].fan_speed;
-        } else {
-          // Find the two points to interpolate between
-          for (let i = 0; i < sortedPoints.length - 1; i++) {
-            const p1 = sortedPoints[i];
-            const p2 = sortedPoints[i + 1];
-            if (currentTemp >= p1.temperature && currentTemp <= p2.temperature) {
-              const t = (currentTemp - p1.temperature) / (p2.temperature - p1.temperature);
-              interpolatedSpeed = p1.fan_speed + t * (p2.fan_speed - p1.fan_speed);
-              break;
-            }
-          }
-        }
-      }
-
-      setHoveredData({
-        temp: Math.round(currentTemp),
-        speed: Math.round(interpolatedSpeed),
-        x: mouseX,
-        y: scaleY(interpolatedSpeed)
-      });
-    }
-  }, [dragState, interactive, tooltipOnly, onPointChange, curvePoints, sortedPoints, margin.left, margin.top, chartWidth, chartHeight, scaleX, scaleY, inverseScaleX, inverseScaleY, minSpeed, maxSpeed]);
+    // Handle tooltips
+    updateHoverInfo(event.clientX, event.clientY);
+  }, [dragState.isDragging, interactive, onPointChange, getSVGCoords, chartWidth, chartHeight, inverseScaleX, inverseScaleY, minSpeed, maxSpeed, updateHoverInfo]);
 
   const handleMouseUp = useCallback(() => {
     setDragState({
@@ -215,6 +241,64 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
       onDragEnd();
     }
   }, [onDragEnd]);
+
+  const handleTouchStart = useCallback((event: React.TouchEvent, pointIndex: number) => {
+    if (!interactive || !onPointChange) {
+      // For preview charts, show tooltip on touch start
+      if (tooltipOnly || !interactive) {
+        updateHoverInfo(event.touches[0].clientX, event.touches[0].clientY);
+      }
+      return;
+    }
+
+    const touch = event.touches[0];
+    const { x, y } = getSVGCoords(touch.clientX, touch.clientY);
+
+    const currentPointsWithIndex = curvePoints.map((point, originalIndex) => ({ ...point, originalIndex }));
+    const currentOrder = currentPointsWithIndex
+      .sort((a, b) => a.temperature - b.temperature)
+      .map(p => p.originalIndex);
+
+    setDragState({
+      isDragging: true,
+      pointIndex,
+      startX: x,
+      startY: y,
+      dragStartOrder: currentOrder
+    });
+    
+    // Also show tooltip for the touched point
+    updateHoverInfo(touch.clientX, touch.clientY);
+  }, [interactive, onPointChange, curvePoints, getSVGCoords, updateHoverInfo]);
+
+  const handleTouchMove = useCallback((event: React.TouchEvent) => {
+    const touch = event.touches[0];
+    
+    // Handle dragging
+    if (dragState.isDragging && interactive && onPointChange) {
+      const { x: mouseX, y: mouseY } = getSVGCoords(touch.clientX, touch.clientY);
+      const clampedX = Math.max(0, Math.min(chartWidth, mouseX));
+      const clampedY = Math.max(0, Math.min(chartHeight, mouseY));
+      const newTemp = Math.round(inverseScaleX(clampedX));
+      const newSpeed = Math.round(inverseScaleY(clampedY));
+      const constrainedTemp = Math.max(0, Math.min(100, newTemp));
+      const constrainedSpeed = Math.max(minSpeed, Math.min(maxSpeed, newSpeed));
+      onPointChange(dragState.pointIndex, constrainedTemp, constrainedSpeed);
+      
+      // Update tooltip info while dragging
+      updateHoverInfo(touch.clientX, touch.clientY);
+      return;
+    }
+
+    // Show tooltip for non-dragging touch moves (scrubbing)
+    if (interactive || tooltipOnly) {
+      updateHoverInfo(touch.clientX, touch.clientY);
+    }
+  }, [dragState.isDragging, interactive, onPointChange, chartWidth, chartHeight, inverseScaleX, inverseScaleY, minSpeed, maxSpeed, getSVGCoords, updateHoverInfo, tooltipOnly]);
+
+  const handleTouchEnd = useCallback(() => {
+    handleMouseUp();
+  }, [handleMouseUp]);
 
   const handleMouseLeave = useCallback(() => {
     if (dragState.isDragging) {
@@ -369,10 +453,13 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{ 
           cursor: dragState.isDragging ? 'grabbing' : 'default',
           overflow: 'visible',
-          display: 'block'
+          display: 'block',
+          touchAction: interactive ? 'none' : 'pan-y'
         }}
       >
         <g transform={`translate(${margin.left},${margin.top})`}>
@@ -431,6 +518,7 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
                     fill="transparent"
                     style={{ cursor: interactive ? (isDragging ? 'grabbing' : 'grab') : 'pointer' }}
                     onMouseDown={(e) => handleMouseDown(e, originalIndex)}
+                    onTouchStart={(e) => handleTouchStart(e, originalIndex)}
                     onContextMenu={(e) => handleRightClick(e, originalIndex)}
                   />
                 )}
@@ -491,12 +579,20 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
       </svg>
       
       {/* Active Tooltip (Interpolated or Point-Specific) */}
-      {(interactive || tooltipOnly) && hoveredData && (() => {
+      {(interactive || tooltipOnly) && hoveredData && svgRef.current && (() => {
         const hasRemoveHint = interactive && hoveredPoint !== -1 && curvePoints.length > 2;
         
-        // Tooltip position relative to .fan-curve-chart container
-        const tooltipTop = margin.top + hoveredData.y - 12;
-        const tooltipLeft = margin.left + hoveredData.x;
+        // Use getBoundingClientRect to find the exact screen position of the SVG
+        const rect = svgRef.current.getBoundingClientRect();
+        const containerRect = svgRef.current.parentElement?.getBoundingClientRect();
+        
+        if (!containerRect) return null;
+
+        // Tooltip position relative to the nearest .fan-curve-chart container
+        // We use the raw clientX/Y from the event and subtract the container's top/left
+        // This is the ONLY reliable way to overlay HTML on SVG when viewBox scaling is active.
+        const tooltipTop = hoveredData.clientY - containerRect.top - 12;
+        const tooltipLeft = hoveredData.clientX - containerRect.left;
         
         return (
           <div 
