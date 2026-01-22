@@ -30,8 +30,9 @@
 
 /* --- 2. OVERVIEW STATS (DASHBOARD TOP) --- */
 .overview-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--spacing-md);
   margin-bottom: var(--spacing-xl);
   perspective: 1000px;
@@ -41,108 +42,107 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  padding: var(--spacing-md) var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-lg);
   background: var(--bg-secondary);
-  background-image: var(--bg-gradient-surface);
+  background-image: var(--bg-overlay-tactical);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  border-top: 2px solid var(--color-accent-dynamic);
-  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
   transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
   overflow: hidden;
   text-align: left;
+  min-width: 160px;
+  flex: 1;
+  position: relative;
 }
 
 .stat-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  border-color: rgba(255, 255, 255, 0.1);
-  border-top-color: var(--color-accent-dynamic);
-  background: rgba(var(--bg-secondary-rgb), 0.6);
+  transform: translateY(-2px);
+  border-color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 3%, var(--bg-secondary));
   box-shadow: 
-    0 10px 20px -10px rgba(0, 0, 0, 0.5),
-    0 0 15px -5px color-mix(in srgb, var(--color-accent-dynamic) 30%, transparent);
+    0 10px 25px -10px rgba(0, 0, 0, 0.6),
+    0 0 15px -5px color-mix(in srgb, var(--color-accent-dynamic) 40%, transparent);
 }
 
-.stat-card::before {
+.stat-card::after {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 40px;
-  background: linear-gradient(180deg, 
-    color-mix(in srgb, var(--color-accent-dynamic) 10%, transparent), 
-    transparent
-  );
-  opacity: 0;
+  height: 2px;
+  background: var(--stat-accent-color, var(--color-accent-dynamic));
+  box-shadow: 0 0 8px var(--stat-accent-color, var(--color-accent-dynamic));
+  opacity: 0.8;
   transition: opacity 0.3s ease;
-  pointer-events: none;
 }
 
-.stat-card:hover::before { opacity: 1; }
+.stat-card:hover::after {
+  opacity: 1;
+}
 
 .stat-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--color-accent-dynamic);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--stat-accent-color, var(--color-accent-dynamic));
   transition: all 0.3s ease;
   flex-shrink: 0;
 }
 
 .stat-card:hover .stat-icon {
   transform: scale(1.1);
-  background: color-mix(in srgb, var(--color-accent-dynamic) 15%, transparent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent-dynamic) 20%, transparent);
+  background: color-mix(in srgb, var(--stat-accent-color, var(--color-accent-dynamic)) 10%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--stat-accent-color, var(--color-accent-dynamic)) 15%, transparent);
 }
 
-.stat-content { display: flex; flex-direction: column; gap: 2px; }
-.stat-value { font-size: var(--font-size-xl); font-weight: var(--font-weight-bold-xl); color: var(--text-primary); line-height: 1; letter-spacing: -0.02em; }
+.stat-content { display: flex; flex-direction: column; gap: 0; }
+.stat-value { 
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xl); 
+  font-weight: var(--font-weight-bold-xl); 
+  color: var(--text-primary); 
+  line-height: 1.1; 
+  letter-spacing: -0.01em; 
+}
 .stat-label { 
   color: var(--text-tertiary); 
-  font-size: var(--font-size-base); 
-  font-weight: 500; 
-  letter-spacing: 0.05em; 
+  font-size: 11px; 
+  font-weight: 700; 
+  letter-spacing: 0.04em; 
+  text-transform: uppercase;
 }
 
-/* Category Specific Colors */
-.stat-card.online { border-top-color: var(--temp-normal-text); }
-.stat-card.online .stat-icon { color: var(--temp-normal-text); }
-.stat-card.offline { border-top-color: var(--text-tertiary); }
-.stat-card.offline .stat-icon { color: var(--text-tertiary); }
-.stat-card.error-card { border-top-color: var(--color-error); background: rgba(255, 0, 0, 0.05); }
-.stat-card.error-card .stat-icon { color: var(--color-error); }
-.stat-card.sensors { border-top-color: #00BCD4; }
-.stat-card.sensors .stat-icon { color: #00BCD4; }
-.stat-card.fans { border-top-color: #9C27B0; }
-.stat-card.fans .stat-icon { color: #9C27B0; }
-.stat-card.temperature-avg { border-top-color: var(--temp-normal-border); }
-.stat-card.temperature-avg .stat-icon { color: var(--temp-normal-text); }
-.stat-card.temperature-high { border-top-color: var(--temp-critical-border); }
-.stat-card.temperature-high .stat-icon { color: var(--temp-critical-text); }
+/* Category Colors via CSS Variables */
+.stat-card.online { --stat-accent-color: var(--temp-normal-text); }
+.stat-card.offline { --stat-accent-color: var(--text-tertiary); }
+.stat-card.error-card { --stat-accent-color: var(--color-error); }
+.stat-card.sensors { --stat-accent-color: #00BCD4; }
+.stat-card.fans { --stat-accent-color: #9C27B0; }
+.stat-card.temperature-avg { --stat-accent-color: var(--temp-normal-border); }
+.stat-card.temperature-high { --stat-accent-color: var(--temp-critical-border); }
 
-/* Value colors for overview stats */
-.stat-card .stat-value.temperature-normal { color: var(--temp-normal-text); }
-.stat-card .stat-value.temperature-caution { color: var(--temp-caution-text); }
-.stat-card .stat-value.temperature-warning { color: var(--temp-warning-text); }
-.stat-card .stat-value.temperature-critical { color: var(--temp-critical-text); }
-
-.stat-card.at-limit { border-top-color: var(--temp-warning-border); }
-.stat-card.at-limit .stat-icon { color: var(--temp-warning-text); }
-.stat-card.at-limit .stat-value { color: var(--temp-warning-text); }
-
-.stat-card.over-limit { border-top-color: var(--temp-critical-border); }
-.stat-card.over-limit .stat-icon { color: var(--temp-critical-text); }
-.stat-card.over-limit .stat-value { color: var(--temp-critical-text); }
+.stat-card.at-limit { --stat-accent-color: var(--temp-warning-border); }
+.stat-card.over-limit { --stat-accent-color: var(--temp-critical-border); }
 
 /* Value colors for overview categories */
 .stat-card.online .stat-value { color: var(--temp-normal-text); }
 .stat-card.offline .stat-value { color: var(--text-tertiary); }
 .stat-card.error-card .stat-value { color: var(--temp-critical-text); }
+
+.stat-card.at-limit .stat-value { color: var(--temp-warning-text); }
+.stat-card.over-limit .stat-value { color: var(--temp-critical-text); }
+
+/* Dynamic Status Colors for Values */
+.stat-value.temperature-normal { color: var(--temp-normal-text); }
+.stat-value.temperature-caution { color: var(--temp-caution-text); }
+.stat-value.temperature-warning { color: var(--temp-warning-text); }
+.stat-value.temperature-critical { color: var(--temp-critical-text); }
 
 /* --- 3. SYSTEM CARD COMPONENT --- */
 .systems-grid {
@@ -620,5 +620,4 @@
 /* --- 6. RESPONSIVE ADJUSTMENTS --- */
 @media (max-width: 600px) {
   .system-summary-stats { grid-template-columns: repeat(2, 1fr); }
-  .command-grid { grid-template-columns: 1fr; }
 }
