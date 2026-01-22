@@ -141,6 +141,9 @@
     margin: var(--spacing-sm) 0; /* Vertical margin only, horizontal fills parent */
     padding: var(--spacing-md);  /* Tighter internal padding */
     max-width: 100% !important;   /* Allow card to fill viewport width */
+    width: 100%;
+    overflow: hidden;             /* Prevent internal content from expanding card */
+    box-sizing: border-box;
   }
 
   .system-info {
@@ -149,11 +152,85 @@
     gap: var(--spacing-sm);
   }
 
-  /* Fan Controls */
+  /* Fan Controls - Mobile Overflow Fix */
+  .system-section {
+    overflow: hidden;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .fans-list {
+    overflow: hidden;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .fan-item {
+    max-width: 100%;
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .fan-header {
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .fan-info {
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .fan-title {
+    overflow: hidden;
+  }
+
+  .fan-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .speed-display {
+    flex-shrink: 0;
+  }
+
   .fan-controls {
     flex-direction: column;
     align-items: stretch;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .fan-control-row {
+    flex-wrap: nowrap;
+    max-width: 100%;
+    width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+  }
+
+  .control-label {
+    min-width: 80px;
+    max-width: 80px;
+    font-size: 11px;
+    flex-shrink: 0;
+  }
+
+  .fan-dropdown {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12px;
+    box-sizing: border-box;
   }
 
   /* Fan Profiles */

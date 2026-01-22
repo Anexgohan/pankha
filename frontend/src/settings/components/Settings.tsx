@@ -15,7 +15,11 @@ import {
   BookOpen, 
   MessageSquare, 
   ShieldCheck, 
-  Wind
+  Wind,
+  Bug,
+  Lightbulb,
+  HelpCircle,
+  Upload
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -204,6 +208,81 @@ const DiagnosticsTab: React.FC = () => {
     }
   };
 
+  // GitHub Issue URL builder with pre-filled template
+  const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
+
+  const handleReportIssue = async (system: SystemInfo) => {
+    const isOnline = system.real_time_status === 'online';
+    const platform = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-') ? 'Windows' : 'Linux';
+    
+    // Build issue body template
+    const issueTitle = encodeURIComponent(`[Hardware Support] ${system.name}`);
+    const issueBody = encodeURIComponent(
+`## System Information
+- **Name:** ${system.name}
+- **Agent ID:** \`${system.agent_id}\`
+- **Platform:** ${platform}
+- **Agent Version:** ${system.agent_version || 'Unknown'}
+- **Status:** ${isOnline ? 'Online' : 'Offline'}
+
+## Issue Description
+<!-- Describe what's not working -->
+
+
+## Hardware Diagnostics
+<!-- Paste the JSON below (already copied to your clipboard if agent was online) -->
+\`\`\`json
+<PASTE HERE>
+\`\`\`
+
+## Expected Behavior
+<!-- What did you expect to happen? -->
+
+`);
+
+    // If online, fetch diagnostics and copy to clipboard
+    if (isOnline) {
+      try {
+        const response = await getDiagnostics(system.id);
+        const jsonString = JSON.stringify(response.diagnostics, null, 2);
+        
+        // Copy to clipboard
+        let copied = false;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          try {
+            await navigator.clipboard.writeText(jsonString);
+            copied = true;
+          } catch {
+            copied = false;
+          }
+        }
+        
+        if (!copied) {
+          const textarea = document.createElement('textarea');
+          textarea.value = jsonString;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          copied = document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+        
+        if (copied) {
+          toast.success('Diagnostics copied! Paste into the GitHub issue.');
+        }
+      } catch {
+        toast.warning('Could not copy diagnostics. Please download and attach manually.');
+      }
+    } else {
+      toast.info('Agent offline - please describe your hardware in the issue.');
+    }
+    
+    // Open GitHub issue in new tab
+    const issueUrl = `${GITHUB_REPO}/issues/new?title=${issueTitle}&labels=hardware-support&body=${issueBody}`;
+    window.open(issueUrl, '_blank', 'noopener,noreferrer');
+  };
+
   const onlineCount = systems.filter(s => s.real_time_status === 'online').length;
   const [isExportingAll, setIsExportingAll] = useState(false);
 
@@ -238,6 +317,87 @@ const DiagnosticsTab: React.FC = () => {
     setIsExportingAll(false);
   };
 
+  // Report with all diagnostics - copies all and opens GitHub issue
+  const [isReportingWithDiagnostics, setIsReportingWithDiagnostics] = useState(false);
+
+  const handleReportWithDiagnostics = async () => {
+    const onlineSystems = systems.filter(s => s.real_time_status === 'online');
+    
+    if (onlineSystems.length === 0) {
+      toast.warning('No online agents to export diagnostics from.');
+      return;
+    }
+
+    setIsReportingWithDiagnostics(true);
+    const results: { [name: string]: unknown } = {};
+    
+    for (const system of onlineSystems) {
+      try {
+        const response = await getDiagnostics(system.id);
+        results[system.name] = response.diagnostics;
+      } catch {
+        results[system.name] = { error: 'Failed to fetch diagnostics' };
+      }
+    }
+
+    const jsonString = JSON.stringify(results, null, 2);
+    
+    // Copy to clipboard
+    let copied = false;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(jsonString);
+        copied = true;
+      } catch {
+        copied = false;
+      }
+    }
+    
+    if (!copied) {
+      const textarea = document.createElement('textarea');
+      textarea.value = jsonString;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      copied = document.execCommand('copy');
+      document.body.removeChild(textarea);
+    }
+    
+    if (copied) {
+      toast.success(`Diagnostics from ${onlineSystems.length} agents copied! Paste into the issue.`);
+    } else {
+      toast.warning('Could not copy to clipboard. Use Export All and attach the file.');
+    }
+
+    // Build issue template
+    const issueTitle = encodeURIComponent(`[Bug Report] Fleet Issue - ${onlineSystems.length} Agents`);
+    const issueBody = encodeURIComponent(
+`## Fleet Information
+- **Total Agents:** ${systems.length}
+- **Online Agents:** ${onlineSystems.length}
+- **Agents Included:** ${onlineSystems.map(s => s.name).join(', ')}
+
+## Issue Description
+<!-- Describe what's not working -->
+
+
+## Hardware Diagnostics (All Agents)
+<!-- Paste the JSON below (already copied to your clipboard) -->
+\`\`\`json
+<PASTE HERE>
+\`\`\`
+
+## Expected Behavior
+<!-- What did you expect to happen? -->
+
+`);
+
+    const issueUrl = `${GITHUB_REPO}/issues/new?title=${issueTitle}&labels=bug&body=${issueBody}`;
+    window.open(issueUrl, '_blank', 'noopener,noreferrer');
+    setIsReportingWithDiagnostics(false);
+  };
+
   const getPlatformIcon = (system: SystemInfo) => {
     const isWindows = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-');
     return isWindows ? (
@@ -268,9 +428,10 @@ const DiagnosticsTab: React.FC = () => {
       <table className="diagnostics-table">
         <thead>
           <tr>
-            <th style={{ width: '50%' }}>System</th>
-            <th style={{ width: '20%' }}>Status</th>
+            <th style={{ width: '40%' }}>System</th>
+            <th style={{ width: '15%' }}>Status</th>
             <th style={{ width: '30%', textAlign: 'right' }}>Actions</th>
+            <th style={{ width: '15%', textAlign: 'center' }}>Report</th>
           </tr>
         </thead>
         <tbody>
@@ -307,6 +468,7 @@ const DiagnosticsTab: React.FC = () => {
                         className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
                         onClick={() => handleCopyToClipboard(system.id)}
                         disabled={!isOnline || status?.type === 'loading'}
+                        title="Copy diagnostics to clipboard"
                       >
                         Copy
                       </button>
@@ -314,17 +476,28 @@ const DiagnosticsTab: React.FC = () => {
                         className={`btn-table-action primary ${status?.type === 'loading' ? 'loading' : ''}`}
                         onClick={() => handleDownloadAsFile(system.id, system.name)}
                         disabled={!isOnline || status?.type === 'loading'}
+                        title="Download diagnostics as JSON file"
                       >
                         Download
                       </button>
                     </div>
                   </td>
+                  <td className="report-cell">
+                    <button
+                      className="btn-table-action report"
+                      onClick={() => handleReportIssue(system)}
+                      title="Report issue on GitHub (copies diagnostics to clipboard)"
+                    >
+                      <Bug size={12} />
+                      Report
+                    </button>
+                  </td>
                 </tr>
               );
             })
           ) : (
-             <tr>
-               <td colSpan={3} className="empty-table-cell">No {title.toLowerCase()} agents found.</td>
+           <tr>
+               <td colSpan={4} className="empty-table-cell">No {title.toLowerCase()} agents found.</td>
              </tr>
           )}
         </tbody>
@@ -354,6 +527,57 @@ const DiagnosticsTab: React.FC = () => {
       <p className="settings-info">
         Export hardware diagnostic data from connected agents for support and troubleshooting.
       </p>
+
+      {/* GitHub Help Section */}
+      <div className="diagnostics-help-section">
+        <div className="help-section-header">
+          <HelpCircle size={16} />
+          <span>Need Help?</span>
+        </div>
+        
+        <div className="help-actions">
+          <a
+            href={`${GITHUB_REPO}/issues/new?template=bug_report.md&labels=bug`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="help-action-btn bug"
+          >
+            <Bug size={14} />
+            Report Bug
+          </a>
+          <a
+            href={`${GITHUB_REPO}/issues/new?template=feature_request.md&labels=enhancement`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="help-action-btn feature"
+          >
+            <Lightbulb size={14} />
+            Feature Request
+          </a>
+          <a
+            href={`${GITHUB_REPO}/wiki`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="help-action-btn docs"
+          >
+            <BookOpen size={14} />
+            Documentation
+          </a>
+          <button
+            onClick={handleReportWithDiagnostics}
+            className="help-action-btn diagnostics"
+            disabled={isReportingWithDiagnostics || onlineCount === 0}
+            title={onlineCount === 0 ? 'No online agents' : 'Copies all diagnostics and opens GitHub issue'}
+          >
+            <Upload size={14} />
+            {isReportingWithDiagnostics ? 'Exporting...' : 'Report + Diagnostics'}
+          </button>
+        </div>
+
+        <p className="help-tip">
+          <strong>Tip : </strong> <br />Download diagnostics from an online agent and attach to your GitHub issue for faster support.
+        </p>
+      </div>
 
       {loading ? (
         <p>Loading systems...</p>
