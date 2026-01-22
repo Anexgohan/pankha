@@ -722,7 +722,7 @@
   padding: var(--spacing-md) var(--spacing-xl);
   border-radius: var(--radius-md);
   font-weight: var(--font-weight-medium);
-  transition: background-color 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .upgrade-link:hover {
@@ -757,7 +757,7 @@
   color: var(--text-primary);
   text-decoration: none;
   border-radius: var(--radius-md);
-  transition: background-color 0.2s ease, border-color 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, border-left-color 0.2s ease;
   border-left: 3px solid transparent;
 }
 
@@ -789,7 +789,8 @@
   border: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  will-change: transform, box-shadow;
 }
 
 .pricing-card:hover {

@@ -10,19 +10,12 @@ import { formatDate, formatFriendlyDate } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
 import ColorPicker from './ColorPicker';
 import { 
-  Info, 
   Github, 
   ExternalLink, 
   BookOpen, 
   MessageSquare, 
-  Code2, 
-  Cpu, 
-  Globe, 
   ShieldCheck, 
-  Terminal,
-  Wind,
-  Layers,
-  Heart
+  Wind
 } from 'lucide-react';
 import '../styles/settings.css';
 

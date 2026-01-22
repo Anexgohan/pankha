@@ -582,8 +582,7 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
       {(interactive || tooltipOnly) && hoveredData && svgRef.current && (() => {
         const hasRemoveHint = interactive && hoveredPoint !== -1 && curvePoints.length > 2;
         
-        // Use getBoundingClientRect to find the exact screen position of the SVG
-        const rect = svgRef.current.getBoundingClientRect();
+        // Use parent container for positioning (SVG rect unused after tooltip refactor)
         const containerRect = svgRef.current.parentElement?.getBoundingClientRect();
         
         if (!containerRect) return null;

@@ -49,7 +49,11 @@
   align-items: center;
   gap: var(--spacing-lg);
   border-left: 3px solid var(--color-accent-dynamic);
-  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), 
+              border-color 0.3s cubic-bezier(0.2, 0, 0, 1), 
+              background-color 0.3s cubic-bezier(0.2, 0, 0, 1), 
+              box-shadow 0.3s cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform, box-shadow;
 }
 
 .fleet-metric-card:hover {
@@ -102,7 +106,8 @@
   padding: var(--spacing-xl);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow);
-  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  transition: border-color 0.3s cubic-bezier(0.2, 0, 0, 1), 
+              box-shadow 0.3s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .deployment-section:hover {
@@ -140,7 +145,11 @@
   gap: var(--spacing-md);
   position: relative;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), 
+              border-color 0.3s cubic-bezier(0.2, 0, 0, 1), 
+              background-color 0.3s cubic-bezier(0.2, 0, 0, 1), 
+              box-shadow 0.3s cubic-bezier(0.2, 0, 0, 1);
+  will-change: transform, box-shadow;
 }
 
 .installer-card:hover {
@@ -536,7 +545,7 @@
 
 /* Fleet Maintenance Collapsible */
 .maintenance-panel {
-  transition: all 0.3s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
 .maintenance-header-toggle {
@@ -554,7 +563,7 @@
   align-items: center;
   gap: var(--spacing-md);
   margin: 0;
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease;
   cursor: pointer;
   padding: var(--spacing-xs) var(--spacing-sm);
   border-radius: var(--radius-md);
