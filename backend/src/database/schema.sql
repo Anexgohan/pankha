@@ -2,23 +2,6 @@
 -- PostgreSQL Database Schema for Multi-System Fan Control
 
 -- ============================================
--- MIGRATIONS: Add missing columns to existing tables
--- These run safely on every startup (idempotent)
--- ============================================
-
--- Migration: Add platform column to systems table (added v0.3.5)
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'systems' AND column_name = 'platform'
-  ) THEN
-    ALTER TABLE systems ADD COLUMN platform VARCHAR(20) DEFAULT 'unknown';
-    RAISE NOTICE 'Migration: Added platform column to systems table';
-  END IF;
-END $$;
-
--- ============================================
 -- SCHEMA DEFINITIONS
 -- ============================================
 
@@ -307,3 +290,21 @@ CREATE TABLE IF NOT EXISTS deployment_templates (
 
 -- Index for token lookups with expiry check
 CREATE INDEX IF NOT EXISTS idx_deployment_templates_expires ON deployment_templates(expires_at);
+
+-- ============================================
+-- MIGRATIONS: Add missing columns to existing tables
+-- These run AFTER all CREATE TABLE statements
+-- Safe to run multiple times (idempotent)
+-- ============================================
+
+-- Migration v0.3.5: Add platform column to systems table
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'systems' AND column_name = 'platform'
+  ) THEN
+    ALTER TABLE systems ADD COLUMN platform VARCHAR(20) DEFAULT 'unknown';
+    RAISE NOTICE 'Migration v0.3.5: Added platform column to systems table';
+  END IF;
+END $$;
