@@ -5,18 +5,18 @@
 @media (max-width: 768px) {
   /* Dashboard */
   .dashboard {
-    padding: var(--spacing-md) var(--spacing-sm); /* Tightened horizontal padding */
+    padding: var(--spacing-md) 0 !important; /* Remove horizontal padding from outer dashboard */
   }
 
   .dashboard-header {
     flex-direction: column;
     gap: var(--spacing-lg);
     align-items: stretch;
-    padding: var(--spacing-md) 0; /* Remove horizontal padding since container has it */
+    padding: var(--spacing-md) var(--spacing-sm) !important; /* Header keeps tiny side breathing room */
   }
 
   .dashboard-container {
-    padding: var(--spacing-sm); /* Flatten dashboard container padding */
+    padding: var(--spacing-sm) 0 !important; /* Horizontal space managed by children */
   }
 
   .dashboard-header h1 {
@@ -229,17 +229,27 @@
   }
 
   /* Editor Overlay Stacking */
+  .fan-profile-editor-overlay {
+    padding: 0 !important; /* Allow true full-screen */
+  }
+
   .fan-profile-editor {
-    margin: 0;
-    width: 100vw;
-    height: 100vh;
-    max-height: 100vh;
-    border-radius: 0;
+    margin: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    border: none !important;
+  }
+
+  .editor-header {
+    padding: var(--spacing-sm) var(--spacing-md) !important;
   }
 
   .editor-body {
     flex-direction: column;
     overflow-y: auto;
+    flex: 1;
   }
 
   .editor-sidebar {
@@ -247,11 +257,16 @@
     border-left: none;
     border-top: 1px solid var(--border-color);
     order: 2; /* Sidebar below the chart */
+    padding: var(--spacing-md) !important;
   }
 
   .editor-main {
-    padding: var(--spacing-md);
+    padding: var(--spacing-md) !important;
     order: 1;
+  }
+
+  .editor-footer {
+    padding: var(--spacing-md) !important;
   }
 
   .curve-editor {
@@ -280,18 +295,32 @@
 
   /* Deployment Page */
   .deployment-page {
-    padding: 0 var(--spacing-sm) var(--spacing-lg); /* Tighten horizontal margins */
-    gap: var(--spacing-lg);
+    padding: 0 0 var(--spacing-sm) 0 !important; /* Flattened padding */
+  }
+
+  .fleet-metrics-row {
+    grid-template-columns: 1fr !important; /* Force stack to prevent horizontal squeeze */
+    gap: var(--spacing-sm);
   }
 
   .fleet-metric-card {
     padding: var(--spacing-md);
     gap: var(--spacing-md);
+    max-width: 100% !important;
   }
 
   .deployment-section {
-    padding: var(--spacing-md) !important;
+    padding: var(--spacing-md);
     border-radius: var(--radius-md);
+  }
+
+  .download-options {
+    grid-template-columns: 1fr !important; /* Single column to prevent cutoff */
+  }
+
+  .installer-card {
+    padding: var(--spacing-md);
+    max-width: 100% !important;
   }
 
   .deployment-content-grid {
@@ -300,16 +329,14 @@
 
   /* Settings Page */
   .settings-container {
-    padding: var(--spacing-md) var(--spacing-sm); /* Unified horizontal padding */
+    padding: var(--spacing-md) 0 !important; /* Removed horizontal padding to fix "huge margins" */
+    width: 100%;
   }
 
   .settings-content {
-    padding: var(--spacing-md); /* Significant reduction from XL to allow room for children */
-    border-radius: var(--radius-md); /* Slightly smaller radius for mobile */
-  }
-
-  .settings-content {
-    padding: var(--spacing-lg); /* Reduce inner padding from xl to lg */
+    padding: var(--spacing-md) !important; /* Tight internal padding */
+    margin: 0 !important; /* Ensure box touches edges if needed, or very small margin */
+    border-radius: var(--radius-md);
   }
 
   .settings-tabs {
