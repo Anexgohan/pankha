@@ -817,7 +817,7 @@
   color: var(--text-primary);
 }
 
-.btn-table-action.update-needed:hover {
+.btn-table-action.update-needed:hover:not(:disabled) {
   background: var(--color-success); /* Green for Stable Ready */
   border-color: var(--color-success);
   color: var(--text-primary);
@@ -1183,7 +1183,6 @@
 .btn-table-action:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  pointer-events: none;
 }
 
 /* Installation Mode Toggle */

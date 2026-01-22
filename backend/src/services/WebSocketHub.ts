@@ -813,6 +813,10 @@ export class WebSocketHub extends EventEmitter {
 
         return {
           ...system,
+          // Override DB status with real-time status from AgentManager (in-memory)
+          // This fixes the bug where agent reconnects without re-registering,
+          // causing DB status to remain "offline" while memory status is "online"
+          status: agentStatus?.status || system.status,
           real_time_status: agentStatus?.status || "unknown",
           last_data_received: agentStatus?.lastDataReceived || null,
           current_temperatures: systemData?.sensors || [],

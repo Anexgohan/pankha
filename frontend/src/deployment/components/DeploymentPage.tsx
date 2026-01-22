@@ -365,14 +365,29 @@ const MaintenanceSection: React.FC<{
                                 {isOutdated ? 'Download MSI' : 'Get MSI'}
                               </a>
                             ) : (
-                              <button
-                                className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
-                                onClick={() => onApplyUpdate(system.id)}
-                                disabled={!isOnline || isUpdating || !hubStatus?.version}
-                                title={!hubStatus?.version ? 'Download a version to local server first' : (!isOnline ? 'Agent is offline' : '')}
+                              <span
+                                title={
+                                  !hubStatus?.version 
+                                    ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first` 
+                                    : (!isOnline 
+                                      ? 'Agent is offline' 
+                                      : (isUpdating 
+                                        ? 'Update in progress...' 
+                                        : (isOutdated 
+                                          ? `Click to update agent to ${targetVersion}` 
+                                          : `Reinstall agent version ${targetVersion}`)))
+                                }
+                                style={{ display: 'inline-block' }}
                               >
-                                {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
-                              </button>
+                                <button
+                                  className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
+                                  onClick={() => onApplyUpdate(system.id)}
+                                  disabled={!isOnline || isUpdating || !hubStatus?.version}
+                                  style={{ pointerEvents: 'auto' }} // Ensure clicks work when enabled
+                                >
+                                  {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
+                                </button>
+                              </span>
                             )}
                           </td>
                       </tr>

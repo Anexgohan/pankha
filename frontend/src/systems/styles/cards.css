@@ -20,7 +20,8 @@
               box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1);
   will-change: transform, opacity;
   position: relative;
-  border: 1px solid var(--border-color);
+  /* border: 1px solid var(--border-color); */
+  border: 1px solid var(--neutral-300);
 }
 
 .pulsate {
@@ -49,7 +50,6 @@
   gap: var(--spacing-md);
   padding: var(--spacing-sm) var(--spacing-lg);
   background: var(--bg-secondary);
-  background-image: var(--bg-overlay-tactical);
   transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), 
               border-color 0.3s cubic-bezier(0.2, 0, 0, 1), 
               background-color 0.3s cubic-bezier(0.2, 0, 0, 1), 
@@ -176,6 +176,7 @@
   transition: transform 0.3s ease, border-color 0.3s ease, background-color 0.3s ease, box-shadow 0.3s ease;
   background-image: var(--bg-overlay-tactical);
   box-sizing: border-box;
+  /* border: 1px solid var(--neutral-200); */
 }
 
 .system-card:hover {
