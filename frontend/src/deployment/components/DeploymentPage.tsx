@@ -481,6 +481,20 @@ export const DeploymentPage: React.FC<{
     const refreshToken = async () => {
       setIsLoadingToken(true);
       try {
+        // Determine the external base URL (what users access from outside)
+        let baseUrl = API_BASE_URL;
+        if (!baseUrl || !baseUrl.startsWith('http')) {
+          const host = window.location.host;
+          const protocol = window.location.protocol;
+          // If on Vite dev port, guess the backend port
+          if (host.includes(':5173')) {
+            const guessedPort = API_BASE_URL?.match(/:(\d+)/)?.[1] || '3000';
+            baseUrl = `${protocol}//${host.split(':')[0]}:${guessedPort}`;
+          } else {
+            baseUrl = `${protocol}//${host}`;
+          }
+        }
+
         const config = {
           log_level: logLevel,
           failsafe_speed: parseInt(failsafe),
@@ -488,7 +502,8 @@ export const DeploymentPage: React.FC<{
           update_interval: parseFloat(agentRate),
           fan_step: parseInt(fanStep),
           hysteresis: parseFloat(hysteresis),
-          path_mode: pathMode
+          path_mode: pathMode,
+          base_url: baseUrl  // Include for backend to use when generating install script
         };
         const response = await createDeploymentTemplate(config);
         setDeploymentToken(response.token);

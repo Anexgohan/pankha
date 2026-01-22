@@ -64,14 +64,26 @@ router.get('/linux', async (req, res) => {
     const config = result[0].config;
     await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
 
-// Extract host and determine backend URL
-    const host = req.headers.host || 'localhost:3000';
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const hostOnly = host.split(':')[0];
-    const port = host.split(':')[1] || '3000';
+    // Use base_url from config (set by frontend) - this is the external URL users access
+    // Falls back to request headers if not provided (legacy templates)
+    let backendUrl: string;
+    let wsUrl: string;
 
-    const backendUrl = `${protocol}://${host}`;
-    const wsUrl = `ws://${hostOnly}:${port}/websocket`;
+    if (config.base_url) {
+      // Use the URL provided by frontend (knows the correct external port)
+      backendUrl = config.base_url;
+      const url = new URL(backendUrl);
+      const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+      wsUrl = `${wsProtocol}//${url.host}/websocket`;
+    } else {
+      // Legacy fallback: try to derive from request headers
+      const host = req.headers.host || 'localhost:3000';
+      const protocol = req.headers['x-forwarded-proto'] || 'http';
+      const hostOnly = host.split(':')[0];
+      const port = host.split(':')[1] || '3000';
+      backendUrl = `${protocol}://${host}`;
+      wsUrl = `ws://${hostOnly}:${port}/websocket`;
+    }
 
     // Local binary distribution URL (hub-and-spoke model)
     const localBinaryBase = `${backendUrl}/api/deploy/binaries`;
