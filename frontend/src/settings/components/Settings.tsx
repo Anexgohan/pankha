@@ -9,6 +9,21 @@ import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } fro
 import { formatDate, formatFriendlyDate } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
 import ColorPicker from './ColorPicker';
+import { 
+  Info, 
+  Github, 
+  ExternalLink, 
+  BookOpen, 
+  MessageSquare, 
+  Code2, 
+  Cpu, 
+  Globe, 
+  ShieldCheck, 
+  Terminal,
+  Wind,
+  Layers,
+  Heart
+} from 'lucide-react';
 import '../styles/settings.css';
 
 // Graph scale configuration constants
@@ -364,6 +379,71 @@ const DiagnosticsTab: React.FC = () => {
 };
 
 
+const AboutTab: React.FC = () => {
+  const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev';
+  
+  return (
+    <div className="settings-section about-overhaul">
+      <div className="about-hero">
+        <div className="about-hero-brand">
+          <div className="about-logo-wrapper">
+             <Wind className="about-logo-icon" size={40} />
+          </div>
+          <div className="about-hero-text">
+            <h1>Pankha</h1>
+            <div className="about-version-badge">
+              <span className="version-label">VERSION:</span>
+              <span className="version-code">{version}</span>
+            </div>
+          </div>
+        </div>
+        <p className="about-tagline">
+          Heterogeneous hardware telemetry governor and thermal orchestration kernel. 
+          Optimized for high-frequency PID-driven cooling topologies and mission-critical infrastructure stability.
+        </p>
+      </div>
+
+      <div className="about-links-tactical">
+        <a href="https://github.com/Anexgohan/pankha" target="_blank" rel="noopener noreferrer" className="link-card">
+          <Github className="link-icon" size={20} />
+          <div className="link-text">
+            <span className="link-title">GitHub Repo</span>
+            <span className="link-desc">Source code & active development</span>
+          </div>
+          <ExternalLink className="link-arrow" size={14} />
+        </a>
+        <a href="https://github.com/Anexgohan/pankha/wiki" target="_blank" rel="noopener noreferrer" className="link-card">
+          <BookOpen className="link-icon" size={20} />
+          <div className="link-text">
+            <span className="link-title">Documentation</span>
+            <span className="link-desc">Setup guides & technical wiki</span>
+          </div>
+          <ExternalLink className="link-arrow" size={14} />
+        </a>
+        <a href="https://github.com/Anexgohan/pankha/issues" target="_blank" rel="noopener noreferrer" className="link-card">
+          <MessageSquare className="link-icon" size={20} />
+          <div className="link-text">
+            <span className="link-title">Report Issue</span>
+            <span className="link-desc">Bugs, feature requests & support</span>
+          </div>
+          <ExternalLink className="link-arrow" size={14} />
+        </a>
+      </div>
+
+      <div className="about-footer-info">
+        <div className="footer-info-item">
+          <ShieldCheck size={14} />
+          <span>License: AGPL-3.0 / Commercial</span>
+        </div>
+        <div className="footer-info-item">
+          <ExternalLink size={14} />
+          <span>Built for Mission Critical Stability</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Settings: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const { license, isLoading, refreshLicense } = useLicense();
@@ -394,12 +474,12 @@ const Settings: React.FC = () => {
 
   const tacticalPresets = [
     { name: 'Cyber Blue', color: '#2196F3' },
-    { name: 'Toxic Green', color: '#4CAF50' },
+    { name: 'Flash Pink', color: '#B61B4F' },
     { name: 'Hazard Orange', color: '#FF9800' },
     { name: 'Bold Saffron', color: '#F0741E' },
     { name: 'Digital Violet', color: '#9C27B0' },
     { name: 'Cosmic Lavender', color: '#867CFF' },
-    { name: 'Flash Pink', color: '#E91E63' },
+    { name: 'Toxic Green', color: '#4CAF50' },
   ];
   
   // Update custom inputs when global values change (e.g. from preset)
@@ -1065,25 +1145,7 @@ const Settings: React.FC = () => {
 
         {/* About Tab */}
         {activeTab === 'about' && (
-          <div className="settings-section">
-            <h2>About Pankha</h2>
-            <div className="about-info">
-              <p><strong>Version:</strong> {typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 'dev'}</p>
-              <p><strong>Description:</strong> Server room fan control system</p>
-              <p><strong>License:</strong> AGPL-3.0 / Commercial</p>
-            </div>
-            <div className="about-links">
-              <a href="https://github.com/Anexgohan/pankha" target="_blank" rel="noopener noreferrer">
-                GitHub Repository
-              </a>
-              <a href="https://github.com/Anexgohan/pankha/wiki" target="_blank" rel="noopener noreferrer">
-                Documentation
-              </a>
-              <a href="https://github.com/Anexgohan/pankha/issues" target="_blank" rel="noopener noreferrer">
-                Report an Issue
-              </a>
-            </div>
-          </div>
+          <AboutTab />
         )}
       </div>
     </div>
