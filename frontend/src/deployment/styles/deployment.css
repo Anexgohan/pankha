@@ -49,13 +49,14 @@
   align-items: center;
   gap: var(--spacing-lg);
   border-left: 3px solid var(--color-accent-dynamic);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .fleet-metric-card:hover {
   transform: translateY(-2px);
   border-color: var(--color-accent-dynamic);
-  box-shadow: var(--shadow-md);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 3%, var(--bg-secondary));
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 10px color-mix(in srgb, var(--color-accent-dynamic), transparent 95%);
 }
 
 .fleet-metric-card .metric-icon {
@@ -101,6 +102,12 @@
   padding: var(--spacing-xl);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow);
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.deployment-section:hover {
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), 0 0 15px color-mix(in srgb, var(--color-accent-dynamic), transparent 96%);
 }
 
 .deployment-section h3 {
@@ -133,6 +140,14 @@
   gap: var(--spacing-md);
   position: relative;
   overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.installer-card:hover {
+  border-color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 3%, var(--bg-tertiary));
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4), 0 0 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 94%);
 }
 
 .installer-card::after {
@@ -681,6 +696,12 @@
   border-radius: var(--radius-md);
   background: var(--bg-tertiary);
   overflow-x: auto;
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.maintenance-table-wrapper:hover {
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 15px color-mix(in srgb, var(--color-accent-dynamic), transparent 95%);
 }
 
 .maintenance-table {
@@ -709,13 +730,34 @@
   color: var(--text-secondary);
 }
 
-.maintenance-table tr:last-child td {
-  border-bottom: none;
+.maintenance-table tr {
+  transition: all 0.2s ease;
+  position: relative;
 }
 
 .maintenance-table tr:hover td {
-  background: rgba(255, 255, 255, 0.01);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 3%, transparent);
   color: var(--text-primary);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Tactical row accent */
+.maintenance-table tr::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent-dynamic);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.maintenance-table tr:hover::before {
+  opacity: 1;
 }
 
 /* Status Tags mirror other parts of app */
@@ -791,13 +833,14 @@
   color: var(--text-primary);
   text-decoration: none;
   font-size: var(--font-size-md);
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
 }
 
 .resource-link:hover {
   transform: translateX(5px);
-  border-color: var(--color-info);
-  background: var(--bg-hover);
+  border-color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 5%, var(--bg-tertiary));
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3), 0 0 10px color-mix(in srgb, var(--color-accent-dynamic), transparent 96%);
 }
 
 .resource-link .link-label {

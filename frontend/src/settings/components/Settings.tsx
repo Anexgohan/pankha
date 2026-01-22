@@ -473,13 +473,14 @@ const Settings: React.FC = () => {
   } = useDashboardSettings();
 
   const tacticalPresets = [
+    { name: 'Kaali', color: '#B61B4F' },
     { name: 'Cyber Blue', color: '#2196F3' },
-    { name: 'Flash Pink', color: '#B61B4F' },
     { name: 'Hazard Orange', color: '#FF9800' },
     { name: 'Bold Saffron', color: '#F0741E' },
     { name: 'Digital Violet', color: '#9C27B0' },
     { name: 'Cosmic Lavender', color: '#867CFF' },
     { name: 'Toxic Green', color: '#4CAF50' },
+    { name: 'Mistic Water', color: '#4cacaf' },
   ];
   
   // Update custom inputs when global values change (e.g. from preset)

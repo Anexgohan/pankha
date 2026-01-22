@@ -64,6 +64,22 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow);
   padding: var(--spacing-xl);
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  border: 1px solid transparent;
+}
+
+.settings-section {
+  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  margin-inline: -var(--spacing-md);
+}
+
+.settings-section:hover {
+  border-color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 1%, transparent);
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), 0 0 15px color-mix(in srgb, var(--color-accent-dynamic), transparent 97%);
 }
 
 .settings-section h2 {
@@ -256,6 +272,34 @@
   background: var(--bg-tertiary);
   border-radius: var(--radius-md);
   gap: var(--spacing-xl);
+  transition: all 0.2s ease;
+  position: relative;
+  border: 1px solid transparent;
+}
+
+.setting-item:hover {
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 4%, var(--bg-tertiary));
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Tactical row accent for setting items */
+.setting-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-accent-dynamic);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  pointer-events: none;
+}
+
+.setting-item:hover::before {
+  opacity: 1;
 }
 
 .setting-info-wrapper {
@@ -326,11 +370,15 @@
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   min-width: 60px;
   font-family: var(--font-mono);
+  position: relative;
+  z-index: 1;
 }
 
-.scale-preset-btn:hover {
+.scale-preset-btn:hover:not(.disabled) {
   color: var(--text-primary);
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 90%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-accent-dynamic), transparent 85%);
+  z-index: 2;
 }
 
 .scale-preset-btn.active {
@@ -421,6 +469,30 @@
     background: rgba(255, 255, 255, 0.03);
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.aesthetics-row:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.aesthetics-row::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-accent-dynamic);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    border-radius: 2px 0 0 2px;
+}
+
+.aesthetics-row:hover::before {
+    opacity: 1;
 }
 
 .aesthetics-row .setting-label {
@@ -941,8 +1013,10 @@
 }
 
 .picker-trigger:hover {
-  background: var(--bg-hover);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 5%, var(--bg-tertiary));
   border-color: var(--color-accent-dynamic);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 90%);
+  transform: translateY(-1px);
 }
 
 .trigger-preview {
