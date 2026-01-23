@@ -222,6 +222,39 @@ export class UpdateDownloadService {
       });
     });
   }
+
+  /**
+   * Deletes all locally cached agent binaries and resets the status
+   */
+  public async clearDownloads(): Promise<boolean> {
+    log.info('Clearing all locally cached agent binaries...', 'UpdateService');
+    try {
+      if (fs.existsSync(this.updatesDir)) {
+        const files = fs.readdirSync(this.updatesDir);
+        for (const file of files) {
+          const filePath = path.join(this.updatesDir, file);
+          if (fs.statSync(filePath).isFile()) {
+            fs.unlinkSync(filePath);
+          }
+        }
+        log.success('All agent binaries cleared successfully.', 'UpdateService');
+      }
+      
+      // Reset status file
+      const emptyStatus: UpdateStatus = {
+        version: null,
+        timestamp: null,
+        files: { x86_64: false, aarch64: false },
+        checksums: {}
+      };
+      fs.writeFileSync(this.statusFile, JSON.stringify(emptyStatus, null, 2));
+      
+      return true;
+    } catch (err) {
+      log.error('Failed to clear agent downloads', 'UpdateService', err);
+      return false;
+    }
+  }
 }
 
 export default UpdateDownloadService;

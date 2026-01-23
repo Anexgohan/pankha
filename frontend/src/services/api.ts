@@ -361,6 +361,11 @@ export const stageUpdateToHub = async (version: string): Promise<{ message: stri
   return response.data;
 };
 
+export const clearHubDownloads = async (): Promise<{ message: string }> => {
+  const response = await api.delete("/api/deploy/hub/clear");
+  return response.data;
+};
+
 // Hardware Diagnostics
 export interface DiagnosticsResponse {
   system_id: number;
@@ -374,3 +379,13 @@ export const getDiagnostics = async (systemId: number): Promise<DiagnosticsRespo
   return response.data;
 };
 
+// Deployment Hub Configuration
+export interface DeploymentHubConfig {
+  hubIp: string | null;
+  hubPort: string;
+}
+
+export const getDeploymentHubConfig = async (): Promise<DeploymentHubConfig> => {
+  const response = await api.get("/api/config/deployment");
+  return response.data;
+};

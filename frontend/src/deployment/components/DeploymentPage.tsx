@@ -16,17 +16,21 @@ import {
   ChevronDown,
   ChevronRight,
   History,
-  FolderDown
+  FolderDown,
+  Link2,
+  RotateCcw,
+  Trash2
 } from 'lucide-react';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
 import { toast } from '../../utils/toast';
 import { uiOptions, getDefault, getOption, interpolateTooltip } from '../../utils/uiOptions';
-import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL, getHubStatus, stageUpdateToHub, type HubStatus } from '../../services/api';
+import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL, getHubStatus, stageUpdateToHub, clearHubDownloads, getDeploymentHubConfig, type HubStatus, type DeploymentHubConfig } from '../../services/api';
 import '../styles/deployment.css';
 
 type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 type Failsafe = '30' | '50' | '100';
 type PathMode = 'standard' | 'portable';
+type UrlMode = 'internal' | 'external';
 
 interface TerminalBlockProps {
   title: string;
@@ -210,9 +214,7 @@ const MaintenanceSection: React.FC<{
   updatingAgents: Set<number>;
   onApplyUpdate: (systemId: number) => void;
   hubStatus: HubStatus | null;
-  onStageUpdate: (version: string) => void;
-  isStaging: boolean;
-}> = React.memo(({ isExpanded, onToggle, systems, stableVersion, unstableVersion, updatingAgents, onApplyUpdate, hubStatus, onStageUpdate, isStaging }) => {
+}> = React.memo(({ isExpanded, onToggle, systems, stableVersion, unstableVersion, updatingAgents, onApplyUpdate, hubStatus }) => {
   const outdatedCount = useMemo(() => {
     // Priority: Hub version > Latest Stable
     const hubVer = hubStatus?.version?.replace('v', '');
@@ -235,49 +237,6 @@ const MaintenanceSection: React.FC<{
             </span>
           )}
         </h3>
-
-        {/* Local Prep Widget */}
-        <div className="local-prep-widget" onClick={(e) => e.stopPropagation()}>
-          <div className="prep-status">
-            <Server size={14} />
-            <span className="prep-label">Hub:</span>
-            {hubStatus?.version ? (
-              <span className="prep-version success">{hubStatus.version} Ready</span>
-            ) : (
-              <span className="prep-version empty">No Cache</span>
-            )}
-          </div>
-          
-          <div className="prep-actions-group">
-            {stableVersion && (
-              <button 
-                className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === stableVersion ? 'current' : ''}`}
-                onClick={() => onStageUpdate(stableVersion)}
-                disabled={isStaging || hubStatus?.version === stableVersion}
-                title={hubStatus?.version === stableVersion 
-                  ? `Stable Version ${stableVersion} is Ready to Deploy.` 
-                  : `Download Stable Version ${stableVersion} \nSafe & Reliable.`}
-              >
-                <Download size={12} />
-                <span>Stable {stableVersion}</span>
-              </button>
-            )}
-            
-            {unstableVersion && (
-              <button 
-                className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === unstableVersion ? 'current' : ''}`}
-                onClick={() => onStageUpdate(unstableVersion)}
-                disabled={isStaging || hubStatus?.version === unstableVersion}
-                title={hubStatus?.version === unstableVersion 
-                  ? `Experimental Version ${unstableVersion} is Ready to Deploy.` 
-                  : `Download Experimental Version ${unstableVersion} \nNewest Features & Fixes, may have bugs.`}
-              >
-                <Activity size={12} />
-                <span>Unstable {unstableVersion}</span>
-              </button>
-            )}
-          </div>
-        </div>
 
         <span className="maintenance-stats">
           {systems.length} System{systems.length !== 1 ? 's' : ''} Connected
@@ -416,6 +375,30 @@ export const DeploymentPage: React.FC<{
   const [fanStep, setFanStep] = useState(String(getDefault('fanStep')));
   const [hysteresis, setHysteresis] = useState(String(getDefault('hysteresis')));
   const [copiedType, setCopiedType] = useState<'curl' | 'wget' | null>(null);
+
+  // Hub URL Configuration - fetched from backend
+  const [hubConfig, setHubConfig] = useState<DeploymentHubConfig | null>(null);
+  const [urlMode, setUrlMode] = useState<UrlMode>('internal');
+
+  // Compute URLs based on mode and config
+  const getExternalUrl = () => {
+    let baseUrl = API_BASE_URL;
+    if (!baseUrl || !baseUrl.startsWith('http')) {
+      const host = window.location.host;
+      const protocol = window.location.protocol;
+      baseUrl = `${protocol}//${host}`;
+    }
+    return baseUrl;
+  };
+
+  const getInternalUrl = () => {
+    if (hubConfig?.hubIp) {
+      return `http://${hubConfig.hubIp}:${hubConfig.hubPort}`;
+    }
+    return getExternalUrl(); // Fallback if not configured
+  };
+
+  const [hubUrl, setHubUrl] = useState<string>('');
   const [isMaintenanceExpanded, setIsMaintenanceExpanded] = useState(true);
   const [deploymentToken, setDeploymentToken] = useState<string | null>(null);
   const [isLoadingToken, setIsLoadingToken] = useState(false);
@@ -463,6 +446,28 @@ export const DeploymentPage: React.FC<{
     return () => clearInterval(interval);
   }, []);
 
+  // Fetch deployment hub config ONCE on mount
+  useEffect(() => {
+    getDeploymentHubConfig()
+      .then(config => {
+        setHubConfig(config);
+        // Set initial URL based on whether internal IP is available
+        if (config.hubIp) {
+          setHubUrl(`http://${config.hubIp}:${config.hubPort}`);
+          setUrlMode('internal');
+        } else {
+          setHubUrl(getExternalUrl());
+          setUrlMode('external');
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch deployment config', err);
+        // Fallback to external URL
+        setHubUrl(getExternalUrl());
+        setUrlMode('external');
+      });
+  }, []);
+
   const handleStageUpdate = async (version: string) => {
     setIsStaging(true);
     try {
@@ -476,25 +481,26 @@ export const DeploymentPage: React.FC<{
     }
   };
 
+  const handleClearDownloads = async () => {
+    if (!hubStatus?.version) {
+      toast.error('No cached agents to clear');
+      return;
+    }
+
+    try {
+      await clearHubDownloads();
+      toast.success('Agent cache cleared successfully');
+      await refreshHubStatus();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Failed to clear cache');
+    }
+  };
+
   // Handle token generation when config changes (debounced)
   useEffect(() => {
     const refreshToken = async () => {
       setIsLoadingToken(true);
       try {
-        // Determine the external base URL (what users access from outside)
-        let baseUrl = API_BASE_URL;
-        if (!baseUrl || !baseUrl.startsWith('http')) {
-          const host = window.location.host;
-          const protocol = window.location.protocol;
-          // If on Vite dev port, guess the backend port
-          if (host.includes(':5173')) {
-            const guessedPort = API_BASE_URL?.match(/:(\d+)/)?.[1] || '3000';
-            baseUrl = `${protocol}//${host.split(':')[0]}:${guessedPort}`;
-          } else {
-            baseUrl = `${protocol}//${host}`;
-          }
-        }
-
         const config = {
           log_level: logLevel,
           failsafe_speed: parseInt(failsafe),
@@ -503,7 +509,7 @@ export const DeploymentPage: React.FC<{
           fan_step: parseInt(fanStep),
           hysteresis: parseFloat(hysteresis),
           path_mode: pathMode,
-          base_url: baseUrl  // Include for backend to use when generating install script
+          base_url: hubUrl  // User-editable Hub URL for agent connections
         };
         const response = await createDeploymentTemplate(config);
         setDeploymentToken(response.token);
@@ -517,7 +523,7 @@ export const DeploymentPage: React.FC<{
 
     const timer = setTimeout(refreshToken, 500); // Debounce 500ms
     return () => clearTimeout(timer);
-  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode]);
+  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode, hubUrl]);
 
   // Clear updating state when agent reconnects
   useEffect(() => {
@@ -540,21 +546,7 @@ export const DeploymentPage: React.FC<{
   const generateCommand = (tool: 'curl' | 'wget') => {
     if (!deploymentToken) return '';
 
-    // Determine backend URL for the install script
-    let baseUrl = API_BASE_URL;
-    if (!baseUrl || !baseUrl.startsWith('http')) {
-      const host = window.location.host;
-      const protocol = window.location.protocol;
-      // If on Vite dev port, guess the backend port
-      if (host.includes(':5173')) {
-        const guessedPort = API_BASE_URL?.match(/:(\d+)/)?.[1] || '3000';
-        baseUrl = `${protocol}//${host.split(':')[0]}:${guessedPort}`;
-      } else {
-        baseUrl = `${protocol}//${host}`;
-      }
-    }
-
-    const url = `${baseUrl}/api/deploy/linux?token=${deploymentToken}`;
+    const url = `${hubUrl}/api/deploy/linux?token=${deploymentToken}`;
 
     if (tool === 'curl') {
       return `curl -sSL "${url}" | bash`;
@@ -676,6 +668,64 @@ export const DeploymentPage: React.FC<{
 
         <ActionButton githubRepo={GITHUB_REPO} />
 
+        {/* Agent Downloads - Stage binaries from GitHub to local Hub */}
+        <section className="deployment-section agent-downloads-panel">
+          <h3><Download size={20} /> Agent Downloads</h3>
+          <div className="local-prep-widget">
+            <div className="prep-status">
+              <Server size={14} />
+              <span className="prep-label">Hub:</span>
+              {hubStatus?.version ? (
+                <span className="prep-version success">{hubStatus.version} Ready</span>
+              ) : (
+                <span className="prep-version empty">No Cache</span>
+              )}
+            </div>
+
+            <div className="prep-actions-group">
+              {latestVersion && (
+                <button
+                  className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === latestVersion ? 'current' : ''}`}
+                  onClick={() => handleStageUpdate(latestVersion)}
+                  disabled={isStaging || hubStatus?.version === latestVersion}
+                  title={hubStatus?.version === latestVersion
+                    ? `Stable Version ${latestVersion} is Ready to Deploy.`
+                    : `Download Stable Version ${latestVersion} \nSafe & Reliable.`}
+                >
+                  <Download size={12} />
+                  <span>Stable {latestVersion}</span>
+                </button>
+              )}
+
+              {unstableVersion && (
+                <button
+                  className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === unstableVersion ? 'current' : ''}`}
+                  onClick={() => handleStageUpdate(unstableVersion)}
+                  disabled={isStaging || hubStatus?.version === unstableVersion}
+                  title={hubStatus?.version === unstableVersion
+                    ? `Experimental Version ${unstableVersion} is Ready to Deploy.`
+                    : `Download Experimental Version ${unstableVersion} \nNewest Features & Fixes, may have bugs.`}
+                >
+                  <Activity size={12} />
+                  <span>Unstable {unstableVersion}</span>
+                </button>
+              )}
+            </div>
+
+            <div className="prep-manual-actions">
+              <button
+                className="btn-clear-cache"
+                onClick={handleClearDownloads}
+                disabled={!hubStatus?.version || isStaging}
+                title="Clear all cached agent binaries from Hub server"
+              >
+                <Trash2 size={14} />
+                <span>Clear Cache</span>
+              </button>
+            </div>
+          </div>
+        </section>
+
         {/* Rapid Deployment Section */}
         <section className="deployment-section builder-panel">
           <h3><Rocket size={20} /> Deployment AIO</h3>
@@ -701,6 +751,58 @@ export const DeploymentPage: React.FC<{
                   >
                     <FolderDown size={14} />
                     Portable (CWD)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Hub URL - Connection Mode Toggle + Editable URL */}
+            <div className="builder-hub-url">
+              <div className="builder-group" title="Select Internal for LAN agents or External for remote agents accessing via public URL.">
+                <span className="builder-label">Connection Mode</span>
+                <div className="toggle-presets">
+                  <button
+                    className={`toggle-item ${urlMode === 'internal' ? 'active' : ''}`}
+                    onClick={() => {
+                      setUrlMode('internal');
+                      setHubUrl(getInternalUrl());
+                    }}
+                    disabled={!hubConfig?.hubIp}
+                    title={hubConfig?.hubIp ? `Internal network address: ${hubConfig.hubIp}:${hubConfig.hubPort}` : 'Internal IP not configured in server settings'}
+                  >
+                    <Server size={14} />{' '}Internal
+                  </button>
+                  <button
+                    className={`toggle-item ${urlMode === 'external' ? 'active' : ''}`}
+                    onClick={() => {
+                      setUrlMode('external');
+                      setHubUrl(getExternalUrl());
+                    }}
+                    title="Uses the URL you're currently accessing this page from"
+                  >
+                    <ExternalLink size={14} />{' '}External
+                  </button>
+                </div>
+              </div>
+              <div className="hub-url-group" title="The URL agents will use to connect to this Pankha Hub. You can edit this manually.">
+                <span className="builder-label"><Link2 size={14} /> Hub URL</span>
+                <div className="hub-url-input-wrapper">
+                  <input
+                    type="text"
+                    className="hub-url-input"
+                    value={hubUrl}
+                    onChange={(e) => setHubUrl(e.target.value)}
+                    placeholder="http://192.168.1.100:3000"
+                  />
+                  <button
+                    className="hub-url-reset"
+                    onClick={() => {
+                      const url = urlMode === 'internal' ? getInternalUrl() : getExternalUrl();
+                      setHubUrl(url);
+                    }}
+                    title={`Reset to ${urlMode} URL`}
+                  >
+                    <RotateCcw size={14} />
                   </button>
                 </div>
               </div>
@@ -835,8 +937,6 @@ export const DeploymentPage: React.FC<{
           updatingAgents={updatingAgents}
           onApplyUpdate={handleRemoteUpdate}
           hubStatus={hubStatus}
-          onStageUpdate={handleStageUpdate}
-          isStaging={isStaging}
         />
 
         {/* Resources Section */}

@@ -134,6 +134,26 @@ router.post('/hub/stage', async (req, res) => {
 });
 
 /**
+ * DELETE /api/deploy/hub/clear
+ * Clears all locally cached agent binaries
+ */
+router.delete('/hub/clear', async (req, res) => {
+  try {
+    const updateService = UpdateDownloadService.getInstance();
+    const success = await updateService.clearDownloads();
+
+    if (success) {
+      res.json({ message: 'All agent downloads cleared successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to clear agent downloads' });
+    }
+  } catch (error) {
+    log.error('Failed to clear hub downloads:', 'deploy', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
  * GET /api/deploy/binaries/:arch
  * Serves the locally cached agent binary
  */
@@ -143,7 +163,22 @@ router.get('/binaries/:arch', (req, res) => {
   const filePath = updateService.getBinaryPath(arch);
 
   if (!filePath || !fs.existsSync(filePath)) {
-    return res.status(404).send('Binary not found on server');
+    const status = updateService.getLocalStatus();
+    const hasAnyVersion = status && status.version;
+
+    let message = `ERROR: Agent binary not found for architecture "${arch}".\n\n`;
+    if (!hasAnyVersion) {
+      message += `No agent version has been staged on this Hub server yet.\n\n`;
+      message += `FIX: Open the Pankha dashboard → Deployment page → "Agent Downloads" section,\n`;
+      message += `     then click "Stable" or "Unstable" to download the agent binary to the Hub.\n`;
+      message += `     After staging completes, re-run this install command.\n`;
+    } else {
+      message += `Version ${status.version} is staged, but the "${arch}" binary is missing.\n\n`;
+      message += `FIX: Re-stage the version in the Pankha dashboard → Deployment → "Agent Downloads".\n`;
+      message += `     Ensure both x86_64 and aarch64 binaries are downloaded.\n`;
+    }
+
+    return res.status(404).type('text/plain').send(message);
   }
 
   res.download(filePath, `pankha-agent-linux_${arch}`);
@@ -232,11 +267,23 @@ echo "      Downloading from local server: $BINARY_URL"
 echo ""
 
 # Download binary
+DOWNLOAD_RESPONSE=$(mktemp)
+HTTP_CODE=$(curl -sSL -w "%{http_code}" "$BINARY_URL" -o "$DOWNLOAD_RESPONSE" 2>&1)
+
+if [ "$HTTP_CODE" != "200" ]; then
+    echo ""
+    echo "ERROR: Failed to download agent binary (HTTP $HTTP_CODE)"
+    echo ""
+    cat "$DOWNLOAD_RESPONSE" 2>/dev/null
+    rm -f "$DOWNLOAD_RESPONSE"
+    exit 1
+fi
+
 if [ "$INSTALL_DIR" = "$(pwd)" ]; then
-    curl -fSL "$BINARY_URL" -o "$INSTALL_DIR/pankha-agent"
+    mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
     chmod +x "$INSTALL_DIR/pankha-agent"
 else
-    run_as_root curl -fSL "$BINARY_URL" -o "$INSTALL_DIR/pankha-agent"
+    run_as_root mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
     run_as_root chmod +x "$INSTALL_DIR/pankha-agent"
 fi
 
