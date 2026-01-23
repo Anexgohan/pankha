@@ -1,8 +1,11 @@
-// Load environment variables FIRST before any other imports
+// Load environment variables from backend directory AND parent (root) directory
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+dotenv.config(); // Try loading from /backend/.env first (if exists)
+dotenv.config({ path: path.join(__dirname, '../../.env') }); // Load from project root
 
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import Database from './database/database';
 import { AgentManager } from './services/AgentManager';
@@ -24,8 +27,11 @@ import { licenseRouter, licenseManager } from './license';
 import { log } from './utils/logger';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const WS_PORT = process.env.WS_PORT || 3002;
+// Port Priority: 
+// 1. process.env.PORT (set by Docker to keep container port static)
+// 2. process.env.PANKHA_PORT (set by user in root .env for host access)
+// 3. 3143 (default fallback / brand port)
+const PORT = process.env.PORT || process.env.PANKHA_PORT || 3143;
 
 // Initialize services
 let services: {
@@ -61,8 +67,8 @@ async function initializeServices() {
     // Initialize license manager
     await licenseManager.initialize();
 
-    // Initialize WebSocket server (agents will connect TO us)
-    webSocketHub.initialize(parseInt(WS_PORT.toString()));
+    // Initialize WebSocket server (attached to HTTP server at /websocket)
+    // server instance will be provided in startServer()
 
     // Set WebSocketHub reference in CommandDispatcher for command sending
     commandDispatcher.setWebSocketHub(webSocketHub);
@@ -182,10 +188,19 @@ app.get('/api/websocket/info', (req, res) => {
   const stats = services.webSocketHub.getStats();
 
   res.json({
-    websocket_endpoint: `ws://localhost:${WS_PORT}`,
+    websocket_endpoint: `/websocket`, // Path-relative endpoint
     connected_clients: clients,
     statistics: stats
   });
+});
+
+// Serve static frontend files (Production)
+const frontendPath = path.join(__dirname, '../frontend');
+app.use(express.static(frontendPath));
+
+// SPA fallback: Route all unknown requests to index.html
+app.get(/^(?!\/(api|health|websocket)).*/, (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 // Emergency stop endpoint
@@ -234,11 +249,19 @@ async function startServer() {
     // Initialize all services first
     await initializeServices();
     
-    // Start HTTP server
-    app.listen(PORT, () => {
-      log.info(` Pankha Backend Server started`, 'index');
-      log.info(` HTTP API: http://localhost:${PORT}`, 'index');
-      log.info(` WebSocket: ws://localhost:${WS_PORT}`, 'index');
+    // 2. Create the unified HTTP server
+    const httpServer = http.createServer(app);
+    
+    // 3. Attach WebSockets to the server
+    if (services) {
+      services.webSocketHub.initialize(httpServer);
+    }
+
+    // 4. Start listening
+    httpServer.listen(PORT, () => {
+      log.info(` Unified Port Architecture: http://localhost:${PORT}`, 'index');
+      log.info(` HTTP API: /api`, 'index');
+      log.info(` WebSocket: /websocket`, 'index');
       log.info(` Health check: http://localhost:${PORT}/health`, 'index');
       log.info(` System overview: http://localhost:${PORT}/api/overview`, 'index');
     });

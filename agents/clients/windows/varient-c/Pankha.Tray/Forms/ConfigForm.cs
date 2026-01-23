@@ -357,7 +357,7 @@ public class ConfigForm : Form
     }
 
     // Placeholder text logic
-    private const string URL_PLACEHOLDER = "192.168.xxx.xxx:3000";
+    private const string URL_PLACEHOLDER = "192.168.xxx.xxx:3143";
 
     private void SetupUrlPlaceholder()
     {

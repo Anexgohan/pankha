@@ -121,7 +121,7 @@ Fully Customizable:
       ```
 
 That's it! The backend is now running with:
-  - Access the Web Dashboard at http://localhost:3000 or, http://[serverIP]:[3000]  
+  - Access the Web Dashboard at http://localhost:3000 or http://[serverIP]:[PANKHA_PORT]
   - To stop the system, run:  
     ```bash
     docker compose down
@@ -278,7 +278,7 @@ Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardw
    docker compose ps
 
    # Check backend health
-   curl http://localhost:3000/health
+   curl http://localhost:${PANKHA_PORT:-3000}/health
 
    # Access dashboard
    open http://localhost:3000

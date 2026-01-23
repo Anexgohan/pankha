@@ -359,9 +359,8 @@ export function useWebSocketData(): UseWebSocketDataReturn {
 
     // Determine WebSocket URL
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const host = window.location.hostname;
-    const wsPort = import.meta.env.VITE_WS_PORT || "3002";
-    const wsUrl = `${protocol}//${host}:${wsPort}`;
+    const host = window.location.host; 
+    const wsUrl = `${protocol}//${host}/websocket`;
 
     console.log(`🔌 Connecting to WebSocket: ${wsUrl}`);
 

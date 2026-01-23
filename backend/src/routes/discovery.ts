@@ -23,8 +23,8 @@ router.post('/scan', async (req: Request, res: Response) => {
     const discoveredSystems = [
       {
         ip_address: '192.168.1.100',
-        api_endpoint: 'http://192.168.1.100:8080',
-        websocket_endpoint: 'ws://192.168.1.100:8081',
+        api_endpoint: 'http://192.168.1.100:3000',
+        websocket_endpoint: 'ws://192.168.1.100:3000/websocket',
         agent_id: 'linux-agent-001',
         agent_version: '1.0.0',
         name: 'Gaming PC',

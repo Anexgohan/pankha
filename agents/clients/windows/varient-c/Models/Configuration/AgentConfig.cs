@@ -245,7 +245,7 @@ public class AgentConfig
             },
             Backend = new BackendSettings
             {
-                ServerUrl = "ws://192.168.100.237:3000/websocket",
+                ServerUrl = "ws://[YOUR_HUB_IP]:3143/websocket",
                 ReconnectInterval = 5.0,
                 MaxReconnectAttempts = -1,
                 ConnectionTimeout = 10.0

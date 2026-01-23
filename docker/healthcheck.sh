@@ -1,4 +1,5 @@
 #!/bin/sh
 
 # Health check script for Docker
-curl -f http://localhost:3000/health || exit 1
+# Always talks to the standardized internal port 3143
+curl -f http://localhost:3143/health || exit 1

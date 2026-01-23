@@ -9,7 +9,7 @@ namespace Pankha.WindowsAgent.Models.Configuration;
 public class BackendSettings
 {
     [JsonProperty("server_url")]
-    public string ServerUrl { get; set; } = "ws://192.168.100.237:3000/websocket";
+    public string ServerUrl { get; set; } = "ws://[YOUR_HUB_IP]:3143/websocket"; // Forces configuration
 
     [JsonProperty("reconnect_interval")]
     public double ReconnectInterval { get; set; } = 5.0; // seconds (unified with Linux)

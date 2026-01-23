@@ -227,7 +227,7 @@ impl Default for AgentConfig {
                 log_level: "INFO".to_string(),
             },
             backend: BackendSettings {
-                server_url: "ws://192.168.100.237:3000/websocket".to_string(),
+                server_url: "ws://[YOUR_HUB_IP]:3143/websocket".to_string(), // Placeholder forces user configuration
                 reconnect_interval: 5.0,
                 max_reconnect_attempts: -1,
                 connection_timeout: 10.0,
@@ -2629,10 +2629,17 @@ pub async fn load_config(path: Option<&str>) -> Result<AgentConfig> {
     if config_path.exists() {
         let content = tokio::fs::read_to_string(&config_path).await?;
         let config: AgentConfig = serde_json::from_str(&content)?;
+        
+        // Validate configuration
+        if config.backend.server_url.contains("[YOUR_HUB_IP]") || config.backend.server_url.is_empty() {
+            warn!("⚠️ Hub URL is not configured in {:?}. Agent will fail to connect.", config_path);
+            warn!("Please run the setup wizard ('--setup') or edit the config file manually.");
+        }
+
         info!("Loaded configuration from: {:?}", config_path);
         Ok(config)
     } else {
-        info!("Config file not found, using defaults");
+        info!("Config file not found. Please run the setup wizard ('--setup') to generate one.");
         Ok(AgentConfig::default())
     }
 }
@@ -2743,7 +2750,7 @@ async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     let default_url = if let Some(ref existing) = existing_config {
         existing.backend.server_url.clone()
     } else {
-        "ws://192.168.100.237:3000/websocket".to_string()
+        "ws://[YOUR_HUB_IP]:3143/websocket".to_string()
     };
     print!("Backend Server URL [{}]: ", default_url);
     io::stdout().flush()?;

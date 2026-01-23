@@ -34,8 +34,7 @@ ARG VERSION=dev
 ENV PANKHA_VERSION=$VERSION
 
 # Runtime dependencies and directory setup
-RUN apk add --no-cache nginx curl && \
-    ln -sf /dev/stderr /var/log/nginx/error.log && \
+RUN apk add --no-cache curl && \
     mkdir -p /app/data /app/backend/data/updates /frontend/src/config
 
 WORKDIR /app
@@ -57,14 +56,14 @@ COPY --from=builder /app/frontend/dist ./frontend/
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
-# Setup nginx configuration
-COPY docker/nginx.conf /etc/nginx/nginx.conf
+# Production stage
+# (No Nginx config needed)
 
 # Copy and setup startup scripts
 COPY docker/healthcheck.sh /healthcheck.sh
 COPY docker/start.sh /start.sh
 RUN chmod +x /healthcheck.sh /start.sh
 
-EXPOSE 3000
+EXPOSE 3143
 
 CMD ["/start.sh"]

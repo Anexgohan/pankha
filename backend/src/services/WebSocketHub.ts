@@ -1,6 +1,6 @@
 import WebSocket, { WebSocketServer } from "ws";
 import { EventEmitter } from "events";
-import { IncomingMessage } from "http";
+import { IncomingMessage, Server } from "http";
 import { DataAggregator } from "./DataAggregator";
 import { AgentManager } from "./AgentManager";
 import { CommandDispatcher } from "./CommandDispatcher";
@@ -75,11 +75,12 @@ export class WebSocketHub extends EventEmitter {
   }
 
   /**
-   * Initialize WebSocket server
+   * Initialize WebSocket server by attaching to an existing HTTP server
    */
-  public initialize(port: number = 3002): void {
+  public initialize(server: Server): void {
     this.wss = new WebSocketServer({
-      port,
+      server,
+      path: "/websocket",
       perMessageDeflate: false, // Disable compression for real-time updates
     });
 
@@ -90,7 +91,7 @@ export class WebSocketHub extends EventEmitter {
     this.startPingInterval();
     this.startCleanupInterval();
 
-    log.info(` WebSocket server started on port ${port}`, "WebSocketHub");
+    log.info(" WebSocket server initialized via unified port architecture", "WebSocketHub");
   }
 
   /**

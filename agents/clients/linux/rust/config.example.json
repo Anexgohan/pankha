@@ -6,7 +6,7 @@
     "log_level": "INFO"
   },
   "backend": {
-    "server_url": "ws://192.168.1.100:3000/websocket",
+    "server_url": "ws://[YOUR_HUB_IP]:3143/websocket",
     "reconnect_interval": 5.0,
     "max_reconnect_attempts": -1,
     "connection_timeout": 10.0

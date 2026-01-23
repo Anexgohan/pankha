@@ -64,26 +64,39 @@ router.get('/linux', async (req, res) => {
     const config = result[0].config;
     await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
 
-    // Use base_url from config (set by frontend) - this is the external URL users access
-    // Falls back to request headers if not provided (legacy templates)
-    let backendUrl: string;
-    let wsUrl: string;
+    // Determine the Hub address for the agent to connect back to
+    const hubIp = process.env.PANKHA_HUB_IP;
+    const requestHost = req.headers.host;
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    
+    // Priority for Hub address:
+    // 1. PANKHA_HUB_IP (explicitly set by user)
+    // 2. config.base_url (sent by frontend if available)
+    // 3. Request headers (derived from browser visit)
+    // 4. Fallback to server's local port
+    
+    // Priority: 1. PANKHA_PORT (.env), 2. Request Port (Dectected from URL), 3. Null (Placeholder)
+    const externalPort = process.env.PANKHA_PORT;
+    const hostParts = requestHost?.split(':');
+    const requestPort = hostParts && hostParts.length > 1 ? hostParts[1] : null;
+    const activePort = externalPort || requestPort;
 
-    if (config.base_url) {
-      // Use the URL provided by frontend (knows the correct external port)
-      backendUrl = config.base_url;
-      const url = new URL(backendUrl);
-      const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-      wsUrl = `${wsProtocol}//${url.host}/websocket`;
+    let hubHost: string;
+    if (hubIp) {
+      // Use specified IP + our prioritized port
+      hubHost = activePort ? `${hubIp}:${activePort}` : hubIp;
+    } else if (config.base_url) {
+      const url = new URL(config.base_url);
+      hubHost = url.host;
+    } else if (requestHost && !requestHost.includes('localhost') && !requestHost.includes('127.0.0.1')) {
+      hubHost = requestHost;
     } else {
-      // Legacy fallback: try to derive from request headers
-      const host = req.headers.host || 'localhost:3000';
-      const protocol = req.headers['x-forwarded-proto'] || 'http';
-      const hostOnly = host.split(':')[0];
-      const port = host.split(':')[1] || '3000';
-      backendUrl = `${protocol}://${host}`;
-      wsUrl = `ws://${hostOnly}:${port}/websocket`;
+      // Fallback for local testing or when no host is recognizable
+      hubHost = `[YOUR_SERVER_IP]${activePort ? `:${activePort}` : ''}`;
     }
+
+    const backendUrl = `${protocol}://${hubHost}`;
+    const wsUrl = `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hubHost}/websocket`;
 
     // Local binary distribution URL (hub-and-spoke model)
     const localBinaryBase = `${backendUrl}/api/deploy/binaries`;

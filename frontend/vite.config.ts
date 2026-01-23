@@ -11,6 +11,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // Allow network access
     port: 5173,      // Explicit port
-    open: true       // Auto-open browser
+    open: true,       // Auto-open browser
+    proxy: {
+      '/api': `http://localhost:${process.env.PANKHA_PORT || 3143}`,
+      '/websocket': {
+        target: `ws://localhost:${process.env.PANKHA_PORT || 3143}`,
+        ws: true
+      }
+    }
   }
 })

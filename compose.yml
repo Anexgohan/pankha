@@ -12,15 +12,14 @@ services:
         max-file: "2"
         compress: "true"
     ports:
-      - "${PANKHA_PORT:-3000}:3000" # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
-      - "${WS_PORT:-3002}:3002" # WebSocket server for frontend (host:container) (change left side only, set to your desired port, or set WS_PORT environment variable)
+      - "${PANKHA_PORT:-3143}:3143" # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
     environment:
-      # Timezone: set TIMEZONE in .env (list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
       - TZ=${TIMEZONE:-UTC}
+      - PORT=3143 # Internal port Do Not Change
     env_file:
       - .env
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3143/health"]
       interval: 30s
       timeout: 10s
       retries: 3
