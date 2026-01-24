@@ -29,7 +29,5 @@ Purchase at: https://pankha.dev/pricing
 
 ## Contributor License Agreement
 
-By contributing to this project, you agree that your contributions may be
-licensed under both the AGPL-3.0 and commercial licenses, granting the
-project maintainers the right to include your contributions in commercially
-licensed versions.
+By contributing to this project, you agree to the terms set forth in [CLA.md](CLA.md).
+All pull requests will require a one-time signature of this agreement via our CLA Assistant bot.
