@@ -1,0 +1,30 @@
+# PR Labeler Configuration
+# Maps files to labels
+
+frontend:
+  - changed-files:
+    - any-glob-to-any-file: 'frontend/**/*'
+
+backend:
+  - changed-files:
+    - any-glob-to-any-file: 'backend/**/*'
+
+agent-windows:
+  - changed-files:
+    - any-glob-to-any-file: 'agents/clients/windows/**/*'
+
+agent-linux:
+  - changed-files:
+    - any-glob-to-any-file: 'agents/clients/linux/**/*'
+
+docker:
+  - changed-files:
+    - any-glob-to-any-file: ['docker/**/*', 'compose.yml', 'compose-public.yml']
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: ['documentation/**/*', '*.md']
+
+devops:
+  - changed-files:
+    - any-glob-to-any-file: '.github/**/*'
