@@ -1531,11 +1531,10 @@
 }
 
 .diagnostics-table .btn-table-action.primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent-dynamic), white 10%);
-  border-color: color-mix(in srgb, var(--color-accent-dynamic), white 10%);
-  color: #000; /* Contrast black text for primary glow */
-  box-shadow: 0 4px 15px color-mix(in srgb, var(--color-accent-dynamic), transparent 60%);
-  transform: translateY(-1px);
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 .diagnostics-table .btn-table-action:disabled {
