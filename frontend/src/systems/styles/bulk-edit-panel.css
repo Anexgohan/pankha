@@ -21,46 +21,71 @@
   }
 }
 
-/* Panel Container */
-.bulk-edit-panel {
+/* Panel Root & Container */
+.bulk-edit-modal-root {
   position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000; /* Higher than system cards and other UI */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.bulk-edit-modal-container {
+  pointer-events: auto;
+  z-index: 2001;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 20px;
+}
+
+.bulk-edit-panel {
   background-color: var(--bg-primary);
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
+  box-shadow: 0 10px 40px rgba(0, 0, 15, 0.6), 0 0 20px rgba(0, 0, 0, 0.4);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border: 1px solid var(--border-color);
 }
 
-/* Desktop: Side Panel from Right */
+/* Desktop: Centered Modal */
 .bulk-edit-panel.desktop {
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 500px;
-  max-width: 90vw;
-  animation: slideLeft 0.3s ease;
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  max-height: 90vh;
+  border-radius: var(--radius-lg);
+  animation: modalScaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-@keyframes slideLeft {
+@keyframes modalScaleIn {
   from {
-    transform: translateX(100%);
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
   }
   to {
-    transform: translateX(0);
+    opacity: 1;
+    transform: scale(1) translateY(0);
   }
 }
 
-/* Mobile: Bottom Sheet */
+/* Mobile: Bottom Sheet (Matches original design intent) */
 .bulk-edit-panel.mobile {
+  position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
-  height: 85vh;
+  height: auto;
   max-height: 85vh;
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-  animation: slideUp 0.3s ease;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  animation: slideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @keyframes slideUp {

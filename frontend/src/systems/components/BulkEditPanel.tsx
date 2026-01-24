@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { FanReading, SensorReading } from '../../types/api';
 import type { FanProfile } from '../../services/fanProfilesApi';
 import { sortSensorGroupIds } from '../../utils/sensorUtils';
@@ -126,176 +127,168 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <>
-      {/* Backdrop */}
+  return createPortal(
+    <div className="bulk-edit-modal-root">
       <div className="bulk-edit-backdrop" onClick={onClose} />
+      <div className="bulk-edit-modal-container" onClick={(e) => e.stopPropagation()}>
+        <div className={`bulk-edit-panel ${isMobile ? 'mobile' : 'desktop'}`}>
+          {isMobile && (
+            <div className="bulk-edit-drag-handle">
+              <div className="drag-indicator" />
+            </div>
+          )}
 
-      {/* Panel */}
-      <div className={`bulk-edit-panel ${isMobile ? 'mobile' : 'desktop'}`}>
-        {/* Mobile: Drag Handle */}
-        {isMobile && (
-          <div className="bulk-edit-drag-handle">
-            <div className="drag-indicator" />
+          <div className="bulk-edit-header">
+            <h3>Bulk Edit Fans</h3>
+            <button
+              className="bulk-edit-close"
+              onClick={onClose}
+              aria-label="Close"
+            >
+              <X size={20} />
+            </button>
           </div>
-        )}
 
-        {/* Header */}
-        <div className="bulk-edit-header">
-          <h3>Bulk Edit Fans</h3>
-          <button
-            className="bulk-edit-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={20} />
-          </button>
-        </div>
+          <div className="bulk-edit-content">
+            <div className="bulk-edit-section">
+              <h4 className="section-title">Master Controls</h4>
 
-        {/* Content - Scrollable */}
-        <div className="bulk-edit-content">
-          {/* Master Controls */}
-          <div className="bulk-edit-section">
-            <h4 className="section-title">Master Controls</h4>
+              <div className="control-group" title="The sensor used to control the speed of selected fans">
+                <label htmlFor="bulk-sensor">Set Control Sensor:</label>
+                <select
+                  id="bulk-sensor"
+                  className="bulk-edit-select"
+                  value={bulkSensorId}
+                  onChange={(e) => setBulkSensorId(e.target.value)}
+                >
+                  <option value="">Don't change</option>
+                  <option value="__highest__">
+                    Highest ({formatTemperature(highestTemperature, '0.0°C')})
+                  </option>
+                  <option disabled>────────────────────</option>
 
-            <div className="control-group" title="The sensor used to control the speed of selected fans">
-              <label htmlFor="bulk-sensor">Set Control Sensor:</label>
-              <select
-                id="bulk-sensor"
-                className="bulk-edit-select"
-                value={bulkSensorId}
-                onChange={(e) => setBulkSensorId(e.target.value)}
-              >
-                <option value="">Don't change</option>
-                <option value="__highest__">
-                  Highest ({formatTemperature(highestTemperature, '0.0°C')})
-                </option>
-                <option disabled>────────────────────</option>
+                  {(() => {
+                    const sensorGroups = groupSensorsByChip(sensors);
+                    const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
+                    const groupsWithMultipleSensors = sortedGroupIds.filter(
+                      groupId => sensorGroups[groupId].length > 1
+                    );
 
-                {/* Sensor Groups */}
-                {(() => {
-                  const sensorGroups = groupSensorsByChip(sensors);
-                  const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
+                    if (groupsWithMultipleSensors.length === 0) return null;
 
-                  const groupsWithMultipleSensors = sortedGroupIds.filter(
-                    groupId => sensorGroups[groupId].length > 1
-                  );
+                    return (
+                      <>
+                        <option disabled>(Groups)</option>
+                        {groupsWithMultipleSensors.map(groupId => {
+                          const groupSensors = sensorGroups[groupId];
+                          const highestTemp = Math.max(...groupSensors.map(s => s.temperature));
+                          return (
+                            <option
+                              key={`group-${groupId}`}
+                              value={`__group__${groupId}`}
+                              title="Selecting a group uses the Highest Temperature of that group"
+                            >
+                              {getChipDisplayName(groupId)} ({formatTemperature(highestTemp)})
+                            </option>
+                          );
+                        })}
+                        <option disabled>────────────────────</option>
+                      </>
+                    );
+                  })()}
 
-                  if (groupsWithMultipleSensors.length === 0) return null;
+                  <option disabled>(Sensors)</option>
+                  {sensors.map((sensor) => (
+                    <option key={sensor.id} value={sensor.id}>
+                      {getSensorDisplayName(sensor.id, sensor.name, sensor.label)} ({formatTemperature(sensor.temperature)})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
+              <div className="control-group" title="The behavior curve or manual speed to apply to selected fans">
+                <label htmlFor="bulk-profile">Set Fan Profile:</label>
+                <select
+                  id="bulk-profile"
+                  className="bulk-edit-select"
+                  value={bulkProfileId || ''}
+                  onChange={(e) => setBulkProfileId(e.target.value ? parseInt(e.target.value) : undefined)}
+                >
+                  <option value="">Don't change</option>
+                  {profiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.profile_name} ({profile.profile_type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="bulk-edit-section">
+              <div className="section-header">
+                <h4 className="section-title">Select Fans</h4>
+                <button
+                  className="select-all-btn"
+                  onClick={handleSelectAll}
+                >
+                  {selectedFanIds.size === fans.length ? (
+                    <><CheckSquare size={14} /> Deselect All</>
+                  ) : (
+                    <><Square size={14} /> Select All</>
+                  )}
+                </button>
+              </div>
+
+              <div className="fan-list">
+                {fans.map((fan) => {
+                  const isSelected = selectedFanIds.has(fan.id);
                   return (
-                    <>
-                      <option disabled>(Groups)</option>
-                      {groupsWithMultipleSensors.map(groupId => {
-                        const groupSensors = sensorGroups[groupId];
-                        const highestTemp = Math.max(...groupSensors.map(s => s.temperature));
-                        return (
-                          <option
-                            key={`group-${groupId}`}
-                            value={`__group__${groupId}`}
-                            title="Selecting a group uses the Highest Temperature of that group"
-                          >
-                            {getChipDisplayName(groupId)} ({formatTemperature(highestTemp)})
-                          </option>
-                        );
-                      })}
-                      <option disabled>────────────────────</option>
-                    </>
-                  );
-                })()}
-
-                <option disabled>(Sensors)</option>
-                {sensors.map((sensor) => (
-                  <option key={sensor.id} value={sensor.id}>
-                    {getSensorDisplayName(sensor.id, sensor.name, sensor.label)} ({formatTemperature(sensor.temperature)})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="control-group" title="The behavior curve or manual speed to apply to selected fans">
-              <label htmlFor="bulk-profile">Set Fan Profile:</label>
-              <select
-                id="bulk-profile"
-                className="bulk-edit-select"
-                value={bulkProfileId || ''}
-                onChange={(e) => setBulkProfileId(e.target.value ? parseInt(e.target.value) : undefined)}
-              >
-                <option value="">Don't change</option>
-                {profiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>
-                    {profile.profile_name} ({profile.profile_type})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Fan Selection */}
-          <div className="bulk-edit-section">
-            <div className="section-header">
-              <h4 className="section-title">Select Fans</h4>
-              <button
-                className="select-all-btn"
-                onClick={handleSelectAll}
-              >
-                {selectedFanIds.size === fans.length ? (
-                  <><CheckSquare size={14} /> Deselect All</>
-                ) : (
-                  <><Square size={14} /> Select All</>
-                )}
-              </button>
-            </div>
-
-            <div className="fan-list">
-              {fans.map((fan) => {
-                const isSelected = selectedFanIds.has(fan.id);
-                return (
-                  <div
-                    key={fan.id}
-                    className={`bulk-edit-fan-item ${isSelected ? 'selected' : ''}`}
-                    onClick={() => handleToggleFan(fan.id)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => handleToggleFan(fan.id)}
-                      className="fan-checkbox"
-                    />
-                    <div className="fan-details">
-                      <div className="fan-name">
-                        <Fan size={16} className={isSelected ? 'animate-fan-spin' : ''} /> {getFanDisplayName(fan.id, fan.name, fan.label)}
-                      </div>
-                      <div className="fan-id">{fan.id}</div>
-                      <div className="fan-stats">
-                        Current: {fan.rpm} RPM | {fan.speed}%
+                    <div
+                      key={fan.id}
+                      className={`bulk-edit-fan-item ${isSelected ? 'selected' : ''}`}
+                      onClick={() => handleToggleFan(fan.id)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleFan(fan.id)}
+                        className="fan-checkbox"
+                      />
+                      <div className="fan-details">
+                        <div className="fan-name">
+                          <Fan size={16} className={isSelected ? 'animate-fan-spin' : ''} /> {getFanDisplayName(fan.id, fan.name, fan.label)}
+                        </div>
+                        <div className="fan-id">{fan.id}</div>
+                        <div className="fan-stats">
+                          Current: {fan.rpm} RPM | {fan.speed}%
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Footer - Fixed */}
-        <div className="bulk-edit-footer">
-          <button
-            className="btn btn-secondary"
-            onClick={onClose}
-            disabled={loading}
-          >
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={handleApply}
-            disabled={loading || selectedFanIds.size === 0}
-          >
-            {loading ? 'Applying...' : `Apply to ${selectedFanIds.size} fan(s)`}
-          </button>
+          <div className="bulk-edit-footer">
+            <button
+              className="btn btn-secondary"
+              onClick={onClose}
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleApply}
+              disabled={loading || selectedFanIds.size === 0}
+            >
+              {loading ? 'Applying...' : `Apply to ${selectedFanIds.size} fan(s)`}
+            </button>
+          </div>
         </div>
       </div>
-    </>
+    </div>,
+    document.body
   );
 };
