@@ -19,22 +19,43 @@ export default defineConfig(({ mode }) => {
       port: 5173,      // Explicit port
       open: true,       // Auto-open browser
       proxy: {
-        '/api': `http://localhost:${backendPort}`,
+        '/api': {
+          target: `http://127.0.0.1:${backendPort}`,
+          changeOrigin: true,
+          configure: (proxy) => {
+            // Silence proxy errors in console during startup
+            proxy.on('error', (err, _req, res) => {
+              if (err.message.includes('ECONNREFUSED')) {
+                if (res && 'writeHead' in res) {
+                   res.writeHead(503, { 'Content-Type': 'text/plain' });
+                   res.end('Backend starting...');
+                }
+                return;
+              }
+            });
+          }
+        },
         '/websocket': {
-          target: `ws://localhost:${backendPort}`,
-          ws: true
+          target: `ws://127.0.0.1:${backendPort}`,
+          ws: true,
+          configure: (proxy) => {
+            proxy.on('error', (err) => {
+              if (err.message.includes('ECONNREFUSED')) return;
+            });
+          }
         }
       }
     },
     build: {
+      chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
           manualChunks(id) {
+            // Keep React engine in the main bundle for maximum stability in Docker
+            // Only split out heavy, non-critical libraries
             if (id.includes('node_modules')) {
-              if (id.includes('react')) return 'vendor-react';
-              if (id.includes('lucide')) return 'vendor-icons';
-              if (id.includes('axios')) return 'vendor-axios';
-              return 'vendor-others';
+              if (id.includes('recharts') || id.includes('d3')) return 'vendor-charts';
+              if (id.includes('lucide-react')) return 'vendor-icons';
             }
           }
         }

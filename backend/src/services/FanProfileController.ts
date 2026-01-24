@@ -48,6 +48,9 @@ export class FanProfileController {
   // Track sensor availability to only log state changes
   private sensorAvailabilityState: Map<string, boolean> = new Map();
 
+  // Track emergency state to only log when entering/exiting
+  private emergencyState: Map<string, boolean> = new Map();
+
   // Hysteresis and stepping state tracking
   private lastAppliedSpeeds: Map<string, number> = new Map();
   private lastSignificantTemp: Map<string, number> = new Map();
@@ -272,16 +275,28 @@ export class FanProfileController {
 
     // EMERGENCY OVERRIDE: Skip all logic if critical temp
     if (currentTemp >= emergencyTemp) {
-      log.warn(
-        `🚨 EMERGENCY: Agent ${agentId} temp ${currentTemp.toFixed(1)}°C >= ${emergencyTemp}°C - ` +
-        `Setting fan ${fanName} to 100%`,
-        'FanProfileController'
-      );
+      const wasEmergency = this.emergencyState.get(fanKey);
+      
+      if (!wasEmergency) {
+        log.warn(
+          `🚨 EMERGENCY: Agent ${agentId} temp ${currentTemp.toFixed(1)}°C >= ${emergencyTemp}°C - ` +
+          `Force Setting fan ${fanName} to 100%`,
+          'FanProfileController'
+        );
+        this.emergencyState.set(fanKey, true);
+      }
+      
       await this.sendFanSpeedCommand(agentId, fanName, 100);
       this.lastAppliedSpeeds.set(fanKey, 100);
       this.lastSignificantTemp.set(fanKey, currentTemp);
       this.lastSpeedChangeTime.set(fanKey, Date.now());
       return;
+    }
+
+    // Exit emergency state if temp dropped below emergency threshold
+    if (this.emergencyState.get(fanKey)) {
+      log.info(`✅ EMERGENCY CLEARED: Agent ${agentId} temp ${currentTemp.toFixed(1)}°C < ${emergencyTemp}°C, resuming normal curve for fan ${fanName}`, 'FanProfileController');
+      this.emergencyState.set(fanKey, false);
     }
 
     // Get current state
@@ -594,6 +609,7 @@ export class FanProfileController {
     this.lastSignificantTemp.delete(fanKey);
     this.lastTargetSpeeds.delete(fanKey);
     this.sensorAvailabilityState.delete(fanKey);
+    this.emergencyState.delete(fanKey);
     // Intentionally NOT clearing:
     // - lastAppliedSpeeds (current fan speed - needed for smooth stepping)
     // - lastSpeedChangeTime (timing info - harmless to keep)
