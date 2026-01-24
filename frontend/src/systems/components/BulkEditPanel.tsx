@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { FanReading, SensorReading } from '../../types/api';
 import type { FanProfile } from '../../services/fanProfilesApi';
@@ -24,6 +24,7 @@ interface BulkEditPanelProps {
   groupSensorsByChip: (sensors: SensorReading[]) => Record<string, SensorReading[]>;
   highestTemperature: number | null;
   isOpen: boolean;
+  anchorRect: DOMRect | null;
   onClose: () => void;
 }
 
@@ -44,6 +45,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   groupSensorsByChip,
   highestTemperature,
   isOpen,
+  anchorRect,
   onClose
 }) => {
   const [selectedFanIds, setSelectedFanIds] = useState<Set<string>>(new Set());
@@ -51,15 +53,65 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   const [bulkProfileId, setBulkProfileId] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [panelStyles, setPanelStyles] = useState<React.CSSProperties>({});
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Calculate position contextually
+  useLayoutEffect(() => {
+    if (!isOpen || isMobile || !anchorRect || !panelRef.current) {
+      setPanelStyles({});
+      return;
+    }
+
+    const panelWidth = panelRef.current.offsetWidth;
+    const gap = 12;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Default: Align to right side of card
+    let left = anchorRect.right + gap;
+    
+    // If overflows right, try placing it to the left of the card
+    if (left + panelWidth > viewportWidth - 10) {
+      left = anchorRect.left - panelWidth - gap;
+      
+      // Safety: If it overflows left now, clamp to edge
+      if (left < 10) {
+        left = 10;
+      }
+    }
+
+    // Vertical positioning: Align tops, then clamp to viewport
+    const panelHeight = panelRef.current.offsetHeight;
+    let top = anchorRect.top;
+    
+    // Ensure the whole panel is visible vertically
+    if (top + panelHeight > viewportHeight - 10) {
+      top = viewportHeight - panelHeight - 10;
+    }
+    
+    // Never go above safety margin
+    if (top < 10) top = 10;
+
+    setPanelStyles({
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      margin: 0,
+      transform: 'none'
+      // Width is handled by CSS to allow fit-content to work correctly
+    });
+  }, [isOpen, isMobile, anchorRect]);
 
   // Reset state when panel closes
   useEffect(() => {
@@ -128,10 +180,10 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="bulk-edit-modal-root">
+    <div className={`bulk-edit-modal-root ${anchorRect && !isMobile ? 'contextual' : ''}`}>
       <div className="bulk-edit-backdrop" onClick={onClose} />
-      <div className="bulk-edit-modal-container" onClick={(e) => e.stopPropagation()}>
-        <div className={`bulk-edit-panel ${isMobile ? 'mobile' : 'desktop'}`}>
+      <div className="bulk-edit-modal-container" onClick={(e) => e.stopPropagation()} style={panelStyles}>
+        <div ref={panelRef} className={`bulk-edit-panel ${isMobile ? 'mobile' : 'desktop'}`}>
           {isMobile && (
             <div className="bulk-edit-drag-handle">
               <div className="drag-indicator" />

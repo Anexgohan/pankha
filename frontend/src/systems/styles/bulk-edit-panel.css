@@ -10,6 +10,7 @@
   background-color: rgba(0, 0, 0, 0.5);
   z-index: 999;
   animation: fadeIn 0.3s ease;
+  pointer-events: auto; /* Ensure backdrop is clickable to close */
 }
 
 @keyframes fadeIn {
@@ -28,11 +29,15 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 2000; /* Higher than system cards and other UI */
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+}
+
+.bulk-edit-modal-root.contextual {
+  display: block; /* Disable flex centering for desktop absolute positioning */
 }
 
 .bulk-edit-modal-container {
@@ -43,6 +48,13 @@
   align-items: center;
   width: 100%;
   padding: 20px;
+  box-sizing: border-box;
+}
+
+.bulk-edit-modal-root.contextual .bulk-edit-modal-container {
+  display: block;
+  width: auto;
+  padding: 0;
 }
 
 .bulk-edit-panel {
@@ -52,12 +64,14 @@
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border-color);
+  pointer-events: auto; /* Explicitly restore pointer events */
 }
 
 /* Desktop: Centered Modal */
 .bulk-edit-panel.desktop {
-  width: 100%;
-  max-width: 420px;
+  width: fit-content;
+  min-width: 400px; /* Slightly wider than 360px card for visual balance */
+  max-width: min(500px, 90vw);
   height: auto;
   max-height: 90vh;
   border-radius: var(--radius-lg);

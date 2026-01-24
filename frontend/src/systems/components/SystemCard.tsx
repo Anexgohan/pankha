@@ -107,6 +107,16 @@ const SystemCard: React.FC<SystemCardProps> = ({
     Record<string, number>
   >({});
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const cardRef = React.useRef<HTMLDivElement>(null);
+
+  const handleOpenBulkEdit = () => {
+    if (cardRef.current) {
+      setAnchorRect(cardRef.current.getBoundingClientRect());
+    }
+    setIsBulkEditOpen(true);
+  };
+
   const {
     toggleSensorVisibility,
     isSensorHidden,
@@ -619,7 +629,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   };
 
   return (
-    <div className={`system-card${isReadOnly ? " read-only" : ""}`}>
+    <div ref={cardRef} className={`system-card${isReadOnly ? " read-only" : ""}`}>
       <div className="system-header">
         <div className="system-title">
           <div className="system-title-top">
@@ -933,7 +943,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
           system.status === "online" && (
             <button
               className="system-stats-button"
-              onClick={() => setIsBulkEditOpen(true)}
+              onClick={handleOpenBulkEdit}
               title={isReadOnly ? readOnlyTooltip : "Bulk edit fan settings"}
               disabled={isReadOnly}
             >
@@ -1330,6 +1340,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
         groupSensorsByChip={groupSensorsByChip}
         highestTemperature={highestTemperature}
         isOpen={isBulkEditOpen}
+        anchorRect={anchorRect}
         onClose={() => setIsBulkEditOpen(false)}
       />
     </div>
