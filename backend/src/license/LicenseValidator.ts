@@ -23,6 +23,7 @@ export interface ValidationResult {
   billing?: 'monthly' | 'yearly' | 'lifetime';
   licenseId?: string;
   expiresAt: Date | null;
+  isGracePeriod: boolean;      // New field: true if currently in 3-day buffer
   activatedAt: Date | null;  // When license was issued
   customerName?: string;
   customerEmail?: string;
@@ -143,6 +144,7 @@ export class LicenseValidator {
           valid: false,
           tier: 'free',
           expiresAt: null,
+          isGracePeriod: false,
           activatedAt: null,
           error: 'License system not configured. Contact support@pankha.app',
         };
@@ -155,6 +157,7 @@ export class LicenseValidator {
           valid: false,
           tier: 'free',
           expiresAt: null,
+          isGracePeriod: false,
           activatedAt: null,
           error: 'Invalid license format',
         };
@@ -181,6 +184,7 @@ export class LicenseValidator {
           valid: false,
           tier: 'free',
           expiresAt: null,
+          isGracePeriod: false,
           activatedAt: null,
           error: 'Invalid license signature',
         };
@@ -190,15 +194,19 @@ export class LicenseValidator {
       const payloadJson = Buffer.from(this.base64UrlDecode(payloadB64), 'base64').toString('utf8');
       const payload: LicensePayload = JSON.parse(payloadJson);
 
-      // Check expiration (exp=0 means lifetime, never expires)
+      // Check expiration with 3-day grace period for offline users
+      const GRACE_PERIOD_SECONDS = 3 * 24 * 60 * 60; // 3 days
       const now = Math.floor(Date.now() / 1000);
       const isLifetime = payload.exp === 0;
-      
-      if (!isLifetime && payload.exp && payload.exp < now) {
+      const isHardExpired = !isLifetime && !!payload.exp && (payload.exp + GRACE_PERIOD_SECONDS) < now;
+      const isGracePeriod = !isLifetime && !!payload.exp && payload.exp < now && (payload.exp + GRACE_PERIOD_SECONDS) >= now;
+
+      if (isHardExpired) {
         return {
           valid: false,
           tier: 'free',
           expiresAt: new Date(payload.exp * 1000),
+          isGracePeriod: false,
           activatedAt: payload.iat ? new Date(payload.iat * 1000) : null,
           error: 'License expired',
         };
@@ -229,6 +237,7 @@ export class LicenseValidator {
         billing,
         licenseId,
         expiresAt,
+        isGracePeriod,
         activatedAt: payload.iat ? new Date(payload.iat * 1000) : null,
         customerName: payload.name,
         customerEmail: payload.email,
@@ -239,6 +248,7 @@ export class LicenseValidator {
         valid: false,
         tier: 'free',
         expiresAt: null,
+        isGracePeriod: false,
         activatedAt: null,
         error: 'License validation failed',
       };
