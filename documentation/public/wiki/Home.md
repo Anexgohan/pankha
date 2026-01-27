@@ -15,7 +15,10 @@ Pankha is an open-source, distributed fan control system designed for self-hoste
 *   **Cross-Platform Agents**:
     *   **Linux**: Rust-based single binary (<10MB RAM).
     *   **Windows**: Native .NET 8 Service with System Tray control.
-*   **Historical Data**: PostgreSQL time-series storage for temperature and fan speed analysis.
+*   **Historical Data**: PostgreSQL storage for temperature and fan speed analysis.
+*   **Hardware Agnostic**: Works with standard fans, custom loops, and professional telemetry.
+*   **Privacy Centric**: Zero cloud dependency. You own your data.
+*   **Self-Hostable**: Deploy the backend on your own server.
 
 ## Architecture
 
