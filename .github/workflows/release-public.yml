@@ -300,10 +300,18 @@ jobs:
           docker manifest push anexgohan/pankha:${VERSION}
           echo "✅ Pushed: anexgohan/pankha:${VERSION}"
 
-          # Update latest tag only for stable releases
+          # Update rolling tags
           if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "🧪 Updating rolling beta tag..."
+            docker manifest create anexgohan/pankha:beta \
+              anexgohan/pankha:${VERSION}-amd64 \
+              anexgohan/pankha:${VERSION}-arm64
+            docker manifest push anexgohan/pankha:beta
+            echo "✅ Pushed: anexgohan/pankha:beta"
+            
             echo "⏭️  Skipped: anexgohan/pankha:latest (pre-release)"
           else
+            echo "🎉 Updating rolling latest tag..."
             docker manifest create anexgohan/pankha:latest \
               anexgohan/pankha:${VERSION}-amd64 \
               anexgohan/pankha:${VERSION}-arm64
@@ -461,6 +469,7 @@ jobs:
           echo "**Docker Images (Multi-arch):**" >> $GITHUB_STEP_SUMMARY
           echo "- \`anexgohan/pankha:${VERSION}\` (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY
           if [ "$IS_PRERELEASE" = "true" ]; then
+            echo "- ✅ \`anexgohan/pankha:beta\` (updated)" >> $GITHUB_STEP_SUMMARY
             echo "- ⏭️ \`anexgohan/pankha:latest\` (skipped - pre-release)" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ✅ \`anexgohan/pankha:latest\` (updated)" >> $GITHUB_STEP_SUMMARY
