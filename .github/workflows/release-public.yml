@@ -302,22 +302,41 @@ jobs:
 
           # Update rolling tags
           if [ "$IS_PRERELEASE" = "true" ]; then
-            echo "🧪 Updating rolling beta tag..."
+            echo "🧪 Updating rolling beta and testing tags..."
+            
+            # Update :beta (Absolute Latest)
             docker manifest create anexgohan/pankha:beta \
               anexgohan/pankha:${VERSION}-amd64 \
               anexgohan/pankha:${VERSION}-arm64
             docker manifest push anexgohan/pankha:beta
             echo "✅ Pushed: anexgohan/pankha:beta"
+
+            # Update :testing (Pre-release Only)
+            docker manifest create anexgohan/pankha:testing \
+              anexgohan/pankha:${VERSION}-amd64 \
+              anexgohan/pankha:${VERSION}-arm64
+            docker manifest push anexgohan/pankha:testing
+            echo "✅ Pushed: anexgohan/pankha:testing"
             
             echo "⏭️  Skipped: anexgohan/pankha:latest (pre-release)"
           else
-            echo "🎉 Updating rolling latest tag..."
+            echo "🎉 Updating rolling latest and beta tags..."
+
+            # Update :latest (Stable Only)
             docker manifest create anexgohan/pankha:latest \
               anexgohan/pankha:${VERSION}-amd64 \
               anexgohan/pankha:${VERSION}-arm64
-
             docker manifest push anexgohan/pankha:latest
             echo "✅ Pushed: anexgohan/pankha:latest"
+
+            # Update :beta (Absolute Latest)
+            docker manifest create anexgohan/pankha:beta \
+              anexgohan/pankha:${VERSION}-amd64 \
+              anexgohan/pankha:${VERSION}-arm64
+            docker manifest push anexgohan/pankha:beta
+            echo "✅ Pushed: anexgohan/pankha:beta"
+
+            echo "⏭️  Skipped: anexgohan/pankha:testing (stable release)"
           fi
 
       # Create version tag (if not exists)
@@ -470,9 +489,12 @@ jobs:
           echo "- \`anexgohan/pankha:${VERSION}\` (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY
           if [ "$IS_PRERELEASE" = "true" ]; then
             echo "- ✅ \`anexgohan/pankha:beta\` (updated)" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ \`anexgohan/pankha:testing\` (updated)" >> $GITHUB_STEP_SUMMARY
             echo "- ⏭️ \`anexgohan/pankha:latest\` (skipped - pre-release)" >> $GITHUB_STEP_SUMMARY
           else
             echo "- ✅ \`anexgohan/pankha:latest\` (updated)" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ \`anexgohan/pankha:beta\` (updated)" >> $GITHUB_STEP_SUMMARY
+            echo "- ⏭️ \`anexgohan/pankha:testing\` (skipped - stable)" >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Release Assets:**" >> $GITHUB_STEP_SUMMARY

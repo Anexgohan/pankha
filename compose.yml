@@ -5,7 +5,7 @@
 services:
   pankha-app:
     container_name: pankha_app
-    image: anexgohan/pankha:latest
+    image: anexgohan/pankha:latest # :latest = stable | :beta = absolute latest | :testing = pre-release
     logging:
       options:
         max-size: "50m"
