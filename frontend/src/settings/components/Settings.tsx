@@ -46,27 +46,27 @@ interface PricingData {
   enterprise: TierPricing;
 }
 
-// Dodo Payments configuration - Environment aware
-const IS_LIVE = false; // Set to true for production
+// Dodo Payments configuration - Toggle IS_LIVE to switch modes
+const IS_LIVE = true;
 
-const CHECKOUT_BASE = IS_LIVE 
-  ? 'https://checkout.dodopayments.com/buy' 
+const CHECKOUT_BASE = IS_LIVE
+  ? 'https://checkout.dodopayments.com/buy'
   : 'https://test.checkout.dodopayments.com/buy';
 
 const PRODUCT_IDS = IS_LIVE ? {
-  // LIVE MODE IDs (Update these from your Dodo Dashboard once you go live)
+  // LIVE MODE IDs
   pro: {
-    monthly: 'pdt_live_pro_monthly_placeholder',
-    yearly: 'pdt_live_pro_yearly_placeholder',
-    lifetime: 'pdt_live_pro_lifetime_placeholder',
+    monthly: 'pdt_0NXHTcRtQcWwEsK5nzGaI',
+    yearly: 'pdt_0NXHU9c2ZTT2vIcTACOJ6',
+    lifetime: 'pdt_0NXHUVBRXsjOEoOr6IuHb',
   },
   enterprise: {
-    monthly: 'pdt_live_ent_monthly_placeholder',
-    yearly: 'pdt_live_ent_yearly_placeholder',
-    lifetime: 'pdt_live_ent_lifetime_placeholder',
+    monthly: 'pdt_0NXHV9tBBwowJQGrcQHtJ',
+    yearly: 'pdt_0NXHVMr0paoF5dyuxh8Tj',
+    lifetime: 'pdt_0NXHVVviTeIhMfLCSLNqS',
   },
 } : {
-  // TEST MODE IDs (Currently active)
+  // TEST MODE IDs
   pro: {
     monthly: 'pdt_0NV3sqzBkKRDNGHgkyOT4',
     yearly: 'pdt_0NV8gT4no4UJnP34pVgnl',
