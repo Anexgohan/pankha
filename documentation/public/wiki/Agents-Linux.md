@@ -58,7 +58,20 @@ The wizard will guide you through:
 1.  **Configuration**: Connecting to your server (e.g., `ws://192.168.1.50:3143/websocket`) and naming the agent.
 2.  **Auto-Start**: Prompting you to install the agent as a **systemd service** so it starts automatically on boot.
 
----
+### Where are files stored?
+
+```text
+/opt/pankha-agent/
+├── pankha-agent         # The binary executable
+├── config.json          # Local configuration file
+└── hardware-info.json   # Cached hardware discovery data
+
+/var/log/pankha-agent/
+└── agent.log            # Running logs (if service is active)
+
+/etc/systemd/system/
+└── pankha-agent.service # Systemd service definition
+```
 
 ### 3. Service Management (Systemd)
 

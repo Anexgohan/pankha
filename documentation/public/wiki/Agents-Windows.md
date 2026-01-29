@@ -45,6 +45,18 @@ stateDiagram-v2
 
 The agent will automatically restart and attempt to connect.
 
+### File System Layout
+
+```text
+C:\Program Files\Pankha Fan Control\
+├── PankhaAgent.exe      # Background Service (Core Logic)
+├── PankhaTray.exe       # System Tray App (GUI)
+├── config.json          # Agent settings
+├── hardware-info.json   # Cached hardware discovery data
+└── logs/
+    └── agent.log        # Detailed log files
+```
+
 ## Troubleshooting
 
 ### Logs
