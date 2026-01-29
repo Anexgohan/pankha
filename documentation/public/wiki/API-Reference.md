@@ -1,6 +1,6 @@
 # API Reference
 
-Pankha exposes a REST API for configuration and a WebSocket interface for real-time data. Base URL: `http://<server-ip>:3000`
+Pankha exposes a REST API for configuration and a WebSocket interface for real-time data. Base URL: `http://<server-ip>:3143`
 
 ---
 

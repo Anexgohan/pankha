@@ -6,7 +6,7 @@
 *   **Cause**: The agent cannot reach the server IP/Port.
 *   **Fix**: 
     1.  Ensure the server container is running (`docker compose ps`).
-    2.  Check if the server firewall allows port `3000`.
+    2.  Check if the server firewall allows port `3143`.
     3.  Verify the `server_url` in `config.json` uses the correct IP (not `localhost` if on a different machine).
 
 ### "WebSocket Handshake Failed"
@@ -26,7 +26,7 @@
 ## Server Issues
 
 ### Port Already in Use
-*   **Error**: "Port 3000 is already allocated"
+*   **Error**: "Port 3143 is already allocated"
 *   **Fix**:
     1.  Change port in `.env`:
         ```bash
@@ -99,7 +99,7 @@
 *   **Cause**: Network partition or firewall blocking WebSocket.
 *   **Fix**: 
     1.  Check backend logs: `docker compose logs app --tail=100`
-    2.  Verify agent can reach backend: `curl http://<server-ip>:3000/health`
+    2.  Verify agent can reach backend: `curl http://<server-ip>:3143/health`
     3.  Check agent config.json has correct `server_url`
     4.  Restart agent: `./pankha-agent --restart`
 

@@ -8,6 +8,26 @@ The Pankha Windows Agent is a native .NET 8 application that runs as a Backgroun
 *   **Failsafe Mode**: Autonomous fan control when disconnected (GPU → auto, others → `failsafe_speed`).
 *   **Ring0 Driver**: Kernel driver for low-level hardware access (auto-extracted on first run).
 
+```mermaid
+---
+title: Connection & Failsafe Lifecycle
+---
+stateDiagram-v2
+    [*] --> Startup
+    
+    state "Startup Sequence" as Startup
+    state "Online (Fan Control Active)" as Online
+    state "Failsafe Mode (Fixed Speed)" as Failsafe
+    
+    Startup --> Online : Connection Success
+    Startup --> Failsafe : Connection Failed
+    
+    Online --> Failsafe : Connection Lost
+    Failsafe --> Online : Connection Restored
+    
+    Failsafe --> Failsafe : Retry Interval (Configurable)
+```
+
 ## Installation
 
 1.  **Download**: Get the latest `pankha-agent-windows_x64.msi` from the [Releases Page](https://github.com/Anexgohan/pankha/releases).
@@ -20,7 +40,7 @@ The Pankha Windows Agent is a native .NET 8 application that runs as a Backgroun
 
 1.  Right-click the **Pankha Tray Icon**.
 2.  Select **Settings**.
-3.  Enter your **Backend URL** (e.g., `ws://192.168.1.50:3000/websocket`).
+3.  Enter your **Backend URL** (e.g., `ws://192.168.1.50:3143/websocket`).
 4.  Click **Save & Restart**.
 
 The agent will automatically restart and attempt to connect.

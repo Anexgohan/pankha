@@ -2,6 +2,32 @@
 
 Each agent has specific settings to fine-tune its behavior. You can edit these in the **Configuration** section of any system card on the dashboard.
 
+```mermaid
+---
+title: Safety & Control Priority Logic
+---
+graph TD
+    Sensor([Sensor Reading]) --> CheckEmerg{Emergency > 80°C?}
+    
+    CheckEmerg -->|Yes| ForceMax[FORCE 100% SPEED]
+    CheckEmerg -->|No| CheckConn{Backend Connected?}
+    
+    CheckConn -->|No| Failsafe[TARGET FAILSAFE %]
+    CheckConn -->|Yes| Profile[Apply Profile Curve]
+    
+    Profile --> Hysteresis{Hysteresis Check}
+    Hysteresis -->|Unchanged| Keep[Keep Current]
+    Hysteresis -->|New Target| Smooth[Smoothing Step Limiter]
+    
+    ForceMax --> Fan([Fan PWM])
+    Failsafe --> Fan
+    Smooth --> Fan
+    Keep --> Fan
+    
+    style ForceMax fill:#ff0000,stroke:#333,stroke-width:2px,color:#fff
+    style Failsafe fill:#ff9900,stroke:#333,stroke-width:2px,color:#000
+```
+
 ## Temperature Control
 
 ### Hysteresis (Start/Stop Delay)
@@ -11,6 +37,23 @@ Each agent has specific settings to fine-tune its behavior. You can edit these i
     *   Temp: 50°C -> Fan: 40%
     *   Temp rises to 53°C (Change < 4°C) -> **Ignored** (Fan stays at 40%)
     *   Temp rises to 55°C (Change > 4°C) -> **Update** (Fan increases to new target)
+
+```mermaid
+---
+title: Hysteresis Logic "Gatekeeper"
+---
+graph LR
+    Input([New Temp]) --> Diff{Diff > 4°C?}
+    
+    Diff -->|No| Block[IGNORE Update]
+    Diff -->|Yes| Pass[ALLOW Update]
+    
+    Block --> Keep[Keep Old Speed]
+    Pass --> New[Set New Speed]
+    
+    style Block fill:#ff9999,stroke:#333,color:#000
+    style Pass fill:#ccffcc,stroke:#333,color:#000
+```
 
 ### Emergency Temperature
 *   **Purpose**: Failsafe protection for hardware safety.
@@ -27,6 +70,24 @@ Each agent has specific settings to fine-tune its behavior. You can edit these i
     *   Configurable: 0-100% (30-70% recommended)
     *   Works with Emergency Temperature: if any sensor ≥ `emergency_temp`, fans go to 100%
 *   **Windows Special Case**: GPU fans go to "auto" (driver control), other fans use `failsafe_speed`.
+
+```mermaid
+---
+title: Connection Safety States
+---
+stateDiagram-v2
+    state "Normal Operation" as Normal
+    state "Failsafe Mode" as Failsafe
+    
+    Normal --> Failsafe : Connection Lost
+    Failsafe --> Normal : Connection Restored
+    
+    Note right of Failsafe
+        Fans locked to
+        FAILSAFE SPEED
+        (Default: 70%)
+    end note
+```
 
 ### Enable Fan Control
 *   **Purpose**: Toggle whether this agent can control fans.
@@ -52,6 +113,24 @@ Each agent has specific settings to fine-tune its behavior. You can edit these i
 *   **Trade-off**:
     *   Lower values (1s) = More responsive, higher CPU usage.
     *   Higher values (5s+) = Very stable, negligible CPU usage.
+
+```mermaid
+---
+title: The Update Loop (Heartbeat)
+---
+graph TD
+    Start([Wake Up]) --> Measure[Measure Temperature]
+    Measure --> Report[Report to Hub]
+    
+    Report -.->|Receive Command| Adjust[Adjust Fan Speed]
+    Adjust --> Sleep[Sleep for 'Interval' Seconds]
+    
+    Report -->|No Command| Sleep
+    
+    Sleep -.->|Repeat| Start
+    
+    style Sleep fill:#d0e0ff,stroke:#333,stroke-width:4px,color:#000
+```
 
 ---
 

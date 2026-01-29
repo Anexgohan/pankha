@@ -4,12 +4,12 @@ The backend server is configured via environment variables, typically set in you
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | HTTP/WebSocket Port | `3000` |
+| Variable       | Description                      | Default                               |
+| -------------- | -------------------------------- | ------------------------------------- |
+| `PANKHA_PORT`  | HTTP/WebSocket Port              | `3143`                                |
 | `DATABASE_URL` | Connection string for PostgreSQL | `postgresql://user:pass@host:5432/db` |
-| `NODE_ENV` | Environment mode | `production` |
-| `LOG_LEVEL` | Server logging verbosity | `info` |
+| `NODE_ENV`     | Environment mode                 | `production`                          |
+| `LOG_LEVEL`    | Server logging verbosity         | `info`                                |
 
 ---
 

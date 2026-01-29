@@ -8,6 +8,26 @@ The Pankha Linux agent is a lightweight, single-binary application written in Ru
 *   **Hardware Support**: Supports any sensor supported by `lm-sensors`.
 *   **Failsafe Mode**: Autonomous fan control when disconnected (configurable `failsafe_speed`, default 70%).
 
+```mermaid
+---
+title: Connection & Failsafe Lifecycle
+---
+stateDiagram-v2
+    [*] --> Startup
+    
+    state "Startup Sequence" as Startup
+    state "Online (Fan Control Active)" as Online
+    state "Failsafe Mode (Fixed Speed)" as Failsafe
+    
+    Startup --> Online : Connection Success
+    Startup --> Failsafe : Connection Failed
+    
+    Online --> Failsafe : Connection Lost
+    Failsafe --> Online : Connection Restored
+    
+    Failsafe --> Failsafe : Retry Interval (Configurable)
+```
+
 ## Installation
 
 ### 1. Download
@@ -35,7 +55,7 @@ The easiest way to get started is by running the interactive setup wizard. This 
 ```
 
 The wizard will guide you through:
-1.  **Configuration**: Connecting to your server (e.g., `ws://192.168.1.50:3000/websocket`) and naming the agent.
+1.  **Configuration**: Connecting to your server (e.g., `ws://192.168.1.50:3143/websocket`) and naming the agent.
 2.  **Auto-Start**: Prompting you to install the agent as a **systemd service** so it starts automatically on boot.
 
 ---

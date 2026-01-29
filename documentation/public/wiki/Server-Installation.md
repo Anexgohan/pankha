@@ -22,7 +22,28 @@ wget https://github.com/Anexgohan/pankha/releases/latest/download/example.env -O
 docker compose pull && docker compose up -d
 ```
 
-The dashboard will be available at `http://localhost:3000`.
+The dashboard will be available at `http://localhost:3143`.
+
+### Deployment Architecture
+
+```mermaid
+---
+title: Deployment Architecture Flow
+---
+graph TD
+    User([User]) -->|Run Command| Docker[Docker Compose]
+    
+    subgraph "Pankha Host Machine"
+        direction TB
+        Docker -->|Starts| Server["Pankha Server (:3143)"]
+        Docker -->|Starts| DB[(PostgreSQL :5432)]
+        
+        Server <-->|Persists Data| DB
+        Server -->|Exposes UI| Web[Web Dashboard]
+    end
+
+    Web -.->|Access via Browser| User
+```
 
 ## 2. Docker Compose Configuration
 
@@ -33,8 +54,9 @@ services:
   app:
     image: anexgohan/pankha:latest
     restart: unless-stopped
+    restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "${PANKHA_PORT:-3143}:3143"
     environment:
       - DATABASE_URL=postgresql://pankha:secure_password@postgres:5432/db_pankha
       - NODE_ENV=production
@@ -66,7 +88,7 @@ wget https://github.com/Anexgohan/pankha/releases/latest/download/example.env -O
 Or create it manually:
 
 ```properties
-PORT=3000
+PANKHA_PORT=3143
 DATABASE_URL=postgresql://pankha:secure_password@postgres:5432/db_pankha
 ...
 ```
