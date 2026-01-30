@@ -20,6 +20,7 @@ namespace Pankha.WixSharpInstaller
     {
         public string Manufacturer { get; set; }
         public string Product { get; set; }
+        public string UpgradeCode { get; set; }
         public BuildPaths Paths { get; set; }
         public BuildFilenames Filenames { get; set; }
         public BrandingConfig Branding { get; set; }
@@ -55,7 +56,6 @@ namespace Pankha.WixSharpInstaller
     class Program
     {
         public static bool IsSelfElevating = false;
-        static readonly Guid UpgradeCode = new Guid("A1B2C3D4-E5F6-4A5B-8C9D-0E1F2A3B4C5D");
         
         // Static config to be accessible
         static BuildConfig Config;
@@ -158,8 +158,7 @@ namespace Pankha.WixSharpInstaller
                 );
 
                 // ... (Metadata) ...
-                project.GUID = Guid.NewGuid();
-                project.UpgradeCode = UpgradeCode;
+                project.UpgradeCode = new Guid(Config.UpgradeCode);
                 var agentVersion = System.Diagnostics.FileVersionInfo.GetVersionInfo(exePath).FileVersion;
                 if (agentVersion == null) agentVersion = "1.0.0";
                 
@@ -221,7 +220,9 @@ namespace Pankha.WixSharpInstaller
                     new Property("MSIRESTARTMANAGERCONTROL", "Disable"), // Prevent killing apps like procexp
                     new Property("MSIDISABLERMRESTART", "1"), // Legacy disable for Restart Manager interaction
                     new Property("AgentExe", Config.Filenames.AgentExe),
-                    new Property("AgentUI", Config.Filenames.AgentUI)
+                    new Property("AgentUI", Config.Filenames.AgentUI),
+                    new Property("ARPINSTALLLOCATION", "[INSTALLDIR]"),
+                    new Property("PREVIOUSINSTALLDIR", "") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } }
                 };
 
                 // Enable full UI for uninstall
@@ -229,12 +230,17 @@ namespace Pankha.WixSharpInstaller
 
                 // CRITICAL: Pass these properties to Deferred Actions
                 // Note: Standard MSI properties like Manufacturer and ProductName must be explicitly included for Deferred actions.
-                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI,UPGRADINGPRODUCTCODE";
+                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI,UPGRADINGPRODUCTCODE,WIX_UPGRADE_DETECTED,PREVIOUSINSTALLDIR=[PREVIOUSINSTALLDIR]";
 
                 // Event handlers
                 project.BeforeInstall += OnBeforeInstall;
                 project.AfterInstall += project_AfterInstall;
                 project.UIInitialized += Project_UIInitialized;
+
+                // (Performance killing is now handled in OnBeforeInstall event handler)
+
+                // Pass previous path to deferred actions for migration
+                project.DefaultDeferredProperties += ",PREVIOUSINSTALLDIR";
 
                 // Build Output
                 // Config path is relative to PROJECT ROOT.
@@ -312,10 +318,122 @@ namespace Pankha.WixSharpInstaller
                     Program.IsSelfElevating = true;
                     e.Result = ActionResult.UserExit; 
                 }
-                catch (Exception)
+                catch
                 {
                     e.Result = ActionResult.UserExit;
                 }
+            }
+
+            // Path Detection: Use the Windows Installer API to find the truth
+            string debugLog = IO.Path.Combine(IO.Path.GetTempPath(), "pankha_installer_ui.log");
+            try
+            {
+                IO.File.AppendAllText(debugLog, $"UI Initialized at {DateTime.Now}\n");
+                
+                // Path Detection: Robustly find the truth
+                DetectPreviousInstallation(e.Session, debugLog);
+
+                // PERFORMANCE OPTIMIZATION: Kill processes as soon as the UI starts
+                string logPath = GetCommonAppLogDir();
+                string logType = e.IsUninstalling ? "uninstall" : "install";
+                KillProcesses(e.Session, logPath, logType);
+            }
+            catch (Exception) { /* Ignored */ }
+        }
+
+        static void DetectPreviousInstallation(Session session, string debugLog)
+        {
+            try
+            {
+                string upgradeCode = session.Property("UpgradeCode");
+                if (string.IsNullOrEmpty(upgradeCode)) return;
+
+                foreach (var product in ProductInstallation.GetRelatedProducts(upgradeCode))
+                {
+                    IO.File.AppendAllText(debugLog, $"Found ProductCode: {product.ProductCode}\n");
+                    string path = product.InstallLocation;
+                    if (string.IsNullOrEmpty(path) || path == "[INSTALLDIR]")
+                    {
+                        path = product["InstallLocation"];
+                    }
+
+                    if (!string.IsNullOrEmpty(path) && IO.Directory.Exists(path))
+                    {
+                        IO.File.AppendAllText(debugLog, $"SUCCESS: Identified path via product: '{path}'\n");
+                        session["INSTALLDIR"] = path;
+                        session["PREVIOUSINSTALLDIR"] = path;
+                        return;
+                    }
+                }
+
+                // ULTIMATE FALLBACK: Query the service path directly
+                try
+                {
+                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\PankhaAgent"))
+                    {
+                        if (key != null)
+                        {
+                            string imagePath = key.GetValue("ImagePath") as string;
+                            if (!string.IsNullOrEmpty(imagePath))
+                            {
+                                string cleanPath = imagePath.Trim('"');
+                                string dir = IO.Path.GetDirectoryName(cleanPath);
+                                if (IO.Directory.Exists(dir))
+                                {
+                                    IO.File.AppendAllText(debugLog, $"SUCCESS: Identified path via Service: '{dir}'\n");
+                                    session["INSTALLDIR"] = dir;
+                                    session["PREVIOUSINSTALLDIR"] = dir;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex) { IO.File.AppendAllText(debugLog, $"Service Detection Error: {ex.Message}\n"); }
+
+                IO.File.AppendAllText(debugLog, "Path detection failed.\n");
+            }
+            catch (Exception ex) { IO.File.AppendAllText(debugLog, $"MSI Discovery Error: {ex.Message}\n"); }
+        }
+
+        static void KillProcesses(Session session, string logPath, string logType)
+        {
+            try
+            {
+                LogToDebugFile(logPath, logType, "Early Process Kill: Starting...");
+                // Stop Service
+                try
+                {
+                    var stopService = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = "net",
+                        Arguments = "stop PankhaAgent",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    });
+                    stopService?.WaitForExit(5000);
+                }
+                catch { }
+
+                // Kill Processes
+                string[] targets = { "pankha-agent", "pankha-tray" };
+                foreach (var target in targets)
+                {
+                    foreach (var proc in Process.GetProcessesByName(target))
+                    {
+                        try 
+                        { 
+                            proc.Kill(); 
+                            proc.WaitForExit(3000);
+                            LogToDebugFile(logPath, logType, $"Killed {target} ({proc.Id})");
+                        } catch { }
+                    }
+                }
+                LogToDebugFile(logPath, logType, "Early Process Kill: Done.");
+            }
+            catch (Exception ex)
+            {
+                LogToDebugFile(logPath, logType, $"Early Process Kill: Error: {ex.Message}");
             }
         }
 
@@ -357,56 +475,75 @@ namespace Pankha.WixSharpInstaller
             {
                 string removeProp = e.Session["REMOVE"];
                 bool isUninstall = e.IsUninstalling || removeProp == "ALL";
-                string logType = isUninstall ? "uninstall" : "install";
-
-                // Always log to Central Location
-                // During Immediate execution, we can access Properties efficiently
                 string manufacturer = e.Session["Manufacturer"];
                 string logPath = GetCommonAppLogDir(manufacturer);
+                string logType = isUninstall ? "uninstall" : "install";
 
-                // Start fresh: Delete existing log to overwrite instead of append
-                try
+                // Ensure path detection for silent installs
+                if (string.IsNullOrEmpty(e.Session["PREVIOUSINSTALLDIR"]))
                 {
-                    // Ensure directory exists first, otherwise GetFiles/Delete might fail or path logic might be weird
-                    if (IO.Directory.Exists(logPath))
-                    {
-                        string file = IO.Path.Combine(logPath, $"{logType}.log");
-                        if (IO.File.Exists(file)) 
-                        {
-                            IO.File.Delete(file);
-                        }
-                    }
+                    DetectPreviousInstallation(e.Session, IO.Path.Combine(IO.Path.GetTempPath(), "pankha_installer_before.log"));
                 }
-                catch 
-                { 
-                    // Best effort: if file is locked or access denied, we just continue appending/ignoring
+
+                // PERFORMANCE OPTIMIZATION: Kill processes early
+                KillProcesses(e.Session, logPath, logType);
+
+                // BACKUP CONFIG: During upgrades, save config BEFORE the old folder is deleted
+                if (!isUninstall && e.Session.IsUpgradingInstalledVersion() && e.Session["RESET_CONFIG"] != "1")
+                {
+                    string prevDir = e.Session["PREVIOUSINSTALLDIR"];
+                    if (!string.IsNullOrEmpty(prevDir) && IO.Directory.Exists(prevDir))
+                    {
+                        string backupDir = IO.Path.Combine(IO.Path.GetTempPath(), "pankha_upgrade_backup");
+                        try
+                        {
+                            if (IO.Directory.Exists(backupDir)) IO.Directory.Delete(backupDir, true);
+                            IO.Directory.CreateDirectory(backupDir);
+
+                            // Backup config.json
+                            string configSrc = IO.Path.Combine(prevDir, "config.json");
+                            if (IO.File.Exists(configSrc))
+                            {
+                                IO.File.Copy(configSrc, IO.Path.Combine(backupDir, "config.json"), true);
+                                LogToDebugFile(logPath, logType, $"Backed up config from '{prevDir}' to '{backupDir}'");
+                            }
+
+                            // Backup logs folder (just contents)
+                            string logsSrc = IO.Path.Combine(prevDir, "logs");
+                            if (IO.Directory.Exists(logsSrc))
+                            {
+                                string logsDest = IO.Path.Combine(backupDir, "logs");
+                                IO.Directory.CreateDirectory(logsDest);
+                                foreach (var file in IO.Directory.GetFiles(logsSrc))
+                                {
+                                    IO.File.Copy(file, IO.Path.Combine(logsDest, IO.Path.GetFileName(file)), true);
+                                }
+                                LogToDebugFile(logPath, logType, "Backed up logs directory");
+                            }
+                        }
+                        catch (Exception ex) { LogToDebugFile(logPath, logType, $"Backup failed: {ex.Message}"); }
+                    }
                 }
 
                 LogToDebugFile(logPath, logType, "==========================================");
                 LogToDebugFile(logPath, logType, "=== SEQUENCE STARTED (OnBeforeInstall) ===");
                 LogToDebugFile(logPath, logType, "==========================================");
                 // ... (rest of logging) ...
-                LogToDebugFile(logPath, logType, $"Mode: {(isUninstall ? "UNINSTALL" : "INSTALL")}");
-                LogToDebugFile(logPath, logType, $"REMOVE Property: '{removeProp}'");
-                LogToDebugFile(logPath, logType, $"Installed Property: '{e.Session["Installed"]}'");
-                LogToDebugFile(logPath, logType, $"User: {Environment.UserName}");
-                LogToDebugFile(logPath, logType, "==========================================");
             }
-            catch
+            catch (Exception)
             {
+                // Silent catch for top-level event errors
             }
         }
 
         static void project_AfterInstall(SetupEventArgs e)
         {
-            // ... (Setup) ...
             string logType = "unknown";
             try
             {
                 bool isUninstalling = e.IsUninstalling;
                 logType = isUninstalling ? "uninstall" : "install";
 
-                // ... (Property helpers see snippet) ...
                 string GetProperty(string name)
                 {
                     if (e.Session.CustomActionData.ContainsKey(name))
@@ -414,27 +551,70 @@ namespace Pankha.WixSharpInstaller
                     return null;
                 }
                 
+                string resetConfig = GetProperty("RESET_CONFIG");
                 string keepConfig = GetProperty("KEEP_CONFIG");
                 string keepLogs = GetProperty("KEEP_LOGS");
-                string resetConfig = GetProperty("RESET_CONFIG");
                 string installDirProp = GetProperty("INSTALLDIR");
                 string manufacturer = GetProperty("Manufacturer");
-                string product = GetProperty("ProductName");
+                string productName = GetProperty("ProductName");
                 string upgradingProductCode = GetProperty("UPGRADINGPRODUCTCODE");
+                string prevDir = GetProperty("PREVIOUSINSTALLDIR");
 
-                // LOGGING: Use Central Directory with Dynamic Manufacturer
                 string logBaseDir = GetCommonAppLogDir(manufacturer);
                 
                 LogToDebugFile(logBaseDir, logType, "=== OnAfterInstall Triggered (Deferred) ===");
-                LogToDebugFile(logBaseDir, logType, $"Context: IsUninstalling={isUninstalling}");
-                LogToDebugFile(logBaseDir, logType, $"Target InstallDir (for Cleanup): '{installDirProp}'");
-                LogToDebugFile(logBaseDir, logType, $"Manufacturer (Dynamic): '{manufacturer}'");
-                LogToDebugFile(logBaseDir, logType, $"Upgrade Code Detected: '{upgradingProductCode}'");
-
-                bool isUpgrade = !string.IsNullOrEmpty(upgradingProductCode);
+                
+                string wixUpgradeDetected = GetProperty("WIX_UPGRADE_DETECTED");
+                bool isUpgrade = !string.IsNullOrEmpty(upgradingProductCode) || !string.IsNullOrEmpty(wixUpgradeDetected);
 
                 if (!isUninstalling)
                 {
+                    // SMART MIGRATION: Restore from backup or sync from old path
+                    if (isUpgrade && resetConfig != "1" && !string.IsNullOrEmpty(installDirProp))
+                    {
+                        string backupDir = IO.Path.Combine(IO.Path.GetTempPath(), "pankha_upgrade_backup");
+                        try
+                        {
+                            // 1. Try restore from backup first (handles early-delete upgrades)
+                            if (IO.Directory.Exists(backupDir))
+                            {
+                                LogToDebugFile(logBaseDir, logType, "Restoring config from backup...");
+                                string configSrc = IO.Path.Combine(backupDir, "config.json");
+                                if (IO.File.Exists(configSrc))
+                                {
+                                    IO.File.Copy(configSrc, IO.Path.Combine(installDirProp, "config.json"), true);
+                                    LogToDebugFile(logBaseDir, logType, "RESTORED config.json from backup");
+                                }
+
+                                string logsSrc = IO.Path.Combine(backupDir, "logs");
+                                if (IO.Directory.Exists(logsSrc))
+                                {
+                                    string logsDest = IO.Path.Combine(installDirProp, "logs");
+                                    if (!IO.Directory.Exists(logsDest)) IO.Directory.CreateDirectory(logsDest);
+                                    foreach (var file in IO.Directory.GetFiles(logsSrc))
+                                    {
+                                        IO.File.Copy(file, IO.Path.Combine(logsDest, IO.Path.GetFileName(file)), true);
+                                    }
+                                    LogToDebugFile(logBaseDir, logType, "RESTORED logs from backup");
+                                }
+                                // Cleanup backup
+                                IO.Directory.Delete(backupDir, true);
+                            }
+                            // 2. Fallback to direct migration if old folder still exists
+                            else if (!string.IsNullOrEmpty(prevDir) && IO.Directory.Exists(prevDir))
+                            {
+                                string oldConfig = IO.Path.Combine(prevDir, "config.json");
+                                string newConfig = IO.Path.Combine(installDirProp, "config.json");
+                                if (IO.File.Exists(oldConfig) && !IO.File.Exists(newConfig))
+                                {
+                                    IO.File.Copy(oldConfig, newConfig, true);
+                                    LogToDebugFile(logBaseDir, logType, "Directly migrated config.json");
+                                }
+                            }
+                        }
+                        catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Migration failed: {ex.Message}"); }
+                    }
+
                      // LAUNCH TRAY APP
                      try
                      {
@@ -465,6 +645,19 @@ namespace Pankha.WixSharpInstaller
                      {
                          LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
                      }
+
+                     // Ensure Service is Started (Race Condition Fix)
+                     try
+                     {
+                          Process.Start(new ProcessStartInfo
+                          {
+                              FileName = "net",
+                              Arguments = "start PankhaAgent",
+                              UseShellExecute = false,
+                              CreateNoWindow = true
+                          })?.WaitForExit(5000);
+                     }
+                     catch {}
 
                      // Configure Service Failure Recovery (SCM)
                      // Restart on failure: 5s → 10s → 15s, reset after 1 day
@@ -696,7 +889,7 @@ namespace Pankha.WixSharpInstaller
                         }
 
                         // 4. Start Menu Shortcuts
-                        string shortcutProduct = !string.IsNullOrEmpty(product) ? product : "Pankha Windows Agent";
+                        string shortcutProduct = !string.IsNullOrEmpty(productName) ? productName : "Pankha Windows Agent";
                         
                         var shortcuts = IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), shortcutProduct);
                         if (IO.Directory.Exists(shortcuts))

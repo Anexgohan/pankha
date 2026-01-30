@@ -2,6 +2,7 @@
     "$schema": "./build-config.schema.json",
     "Manufacturer": "Pankha Fan Control",
     "Product": "Pankha Windows Agent",
+    "UpgradeCode": "08BB88C1-6D1D-476C-98A0-21019082B4F8",
     "Paths": {
         "WixBin": "%UserProfile%\\.nuget\\packages\\wixsharp.wix.bin\\3.10.0\\bin",
         "BuildArtifacts": "publish\\win-x64\\agent\\",

@@ -15,6 +15,11 @@
             "type": "string",
             "description": "Full formal product name"
         },
+        "UpgradeCode": {
+            "type": "string",
+            "description": "Permanent GUID for identifying the product across versions (ensure this NEVER changes once released)",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
         "Paths": {
             "type": "object",
             "properties": {
