@@ -703,68 +703,10 @@ namespace Pankha.WixSharpInstaller
                         
                         LogToDebugFile(logBaseDir, logType, $"Target Directory Resolved: '{dir}'");
 
-                        // Stop service
-                        LogToDebugFile(logBaseDir, logType, "Phase: Stopping Service...");
-                        try
-                        {
-                            var stopService = Process.Start(new ProcessStartInfo
-                            {
-                                FileName = "net",
-                                Arguments = "stop PankhaAgent",
-                                UseShellExecute = false,
-                                CreateNoWindow = true
-                            });
-                            stopService?.WaitForExit(10000);
-                            LogToDebugFile(logBaseDir, logType, "Service stop command executed.");
-                        }
-                        catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Service stop failed: {ex.Message}"); }
+                        LogToDebugFile(logBaseDir, logType, $"Target Directory Resolved: '{dir}'");
 
-                        System.Threading.Thread.Sleep(2000);
-
-                        // Kill processes
-                        LogToDebugFile(logBaseDir, logType, "Phase: Killing Processes...");
-                        
-                        // Dynamically determine process name from configured Exe name passed via CustomActionData
-                        // Dynamically determine process name from configured Exe name passed via CustomActionData
-                        string agentExeName = GetProperty("AgentExe");
-                        string agentUiName = GetProperty("AgentUI"); // Get UI name
-
-                        string processName = !string.IsNullOrEmpty(agentExeName) 
-                            ? IO.Path.GetFileNameWithoutExtension(agentExeName) 
-                            : "pankha-agent-windows"; // Fallback
-
-                        string uiProcessName = !string.IsNullOrEmpty(agentUiName)
-                            ? IO.Path.GetFileNameWithoutExtension(agentUiName)
-                            : "pankha-tray";
-
-                        LogToDebugFile(logBaseDir, logType, $"Targeting Agent process: '{processName}'");
-                        LogToDebugFile(logBaseDir, logType, $"Targeting UI process: '{uiProcessName}'");
-
-                        // Kill UI first
-                        foreach (var proc in Process.GetProcessesByName(uiProcessName))
-                        {
-                            try 
-                            { 
-                                proc.Kill(); 
-                                proc.WaitForExit(5000);
-                                LogToDebugFile(logBaseDir, logType, $"Killed UI process {proc.Id}");
-                            } 
-                            catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Failed to kill UI process {proc.Id}: {ex.Message}"); }
-                        }
-
-                        // Kill Agent
-                        foreach (var proc in Process.GetProcessesByName(processName))
-                        {
-                            try 
-                            { 
-                                proc.Kill(); 
-                                proc.WaitForExit(5000);
-                                LogToDebugFile(logBaseDir, logType, $"Killed process {proc.Id}");
-                            } 
-                            catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Failed to kill process {proc.Id}: {ex.Message}"); }
-                        }
-
-                        System.Threading.Thread.Sleep(1000);
+                        // Optimization: Process killing is handled in OnBeforeInstall (Early Kill).
+                        // We skip directly to driver cleanup and file removal.
 
                         // Unload and clean up runtime-extracted driver
                         // LibreHardwareMonitor 0.9.4 extracts driver at runtime as {processname}.sys
@@ -774,6 +716,7 @@ namespace Pankha.WixSharpInstaller
                             // Derive driver service and file name from AgentExe property
                             // Example: pankha-agent.exe -> service: pankha-agent, file: pankha-agent.sys
 
+                            string agentExeName = GetProperty("AgentExe");
                             string driverServiceName = !string.IsNullOrEmpty(agentExeName)
                                 ? agentExeName.Replace(".exe", "")
                                 : "pankha-agent"; // Fallback
@@ -781,14 +724,14 @@ namespace Pankha.WixSharpInstaller
                             string driverFileName = driverServiceName + ".sys";
 
                             // Stop and delete driver service
-                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"stop {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
-                            System.Threading.Thread.Sleep(1000);
-                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"delete {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(5000);
+                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"stop {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(2000);
+                            Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"delete {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(2000);
                             LogToDebugFile(logBaseDir, logType, $"Driver stop/delete executed for service: {driverServiceName}");
                         }
                         catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Driver unload error: {ex.Message}"); }
 
-                        System.Threading.Thread.Sleep(1000);
+                        // Delete runtime-extracted driver file
+
 
                         // Delete runtime-extracted driver file
                         try
