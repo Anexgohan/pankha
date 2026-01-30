@@ -333,10 +333,8 @@ namespace Pankha.WixSharpInstaller
                 // Path Detection: Robustly find the truth
                 DetectPreviousInstallation(e.Session, debugLog);
 
-                // PERFORMANCE OPTIMIZATION: Kill processes as soon as the UI starts
-                string logPath = GetCommonAppLogDir();
-                string logType = e.IsUninstalling ? "uninstall" : "install";
-                KillProcesses(e.Session, logPath, logType);
+                // Note: Process killing now deferred to OnBeforeInstall (Execution Phase)
+                // to avoid killing the app just by opening the installer UI.
             }
             catch (Exception) { /* Ignored */ }
         }
