@@ -710,13 +710,14 @@ namespace Pankha.WixSharpInstaller
 
                         // Unload and clean up runtime-extracted driver
                         // LibreHardwareMonitor 0.9.4 extracts driver at runtime as {processname}.sys
+                        string agentExeName = GetProperty("AgentExe");
+
                         LogToDebugFile(logBaseDir, logType, "Phase: Unloading Runtime Driver...");
                         try
                         {
                             // Derive driver service and file name from AgentExe property
                             // Example: pankha-agent.exe -> service: pankha-agent, file: pankha-agent.sys
 
-                            string agentExeName = GetProperty("AgentExe");
                             string driverServiceName = !string.IsNullOrEmpty(agentExeName)
                                 ? agentExeName.Replace(".exe", "")
                                 : "pankha-agent"; // Fallback
@@ -729,9 +730,6 @@ namespace Pankha.WixSharpInstaller
                             LogToDebugFile(logBaseDir, logType, $"Driver stop/delete executed for service: {driverServiceName}");
                         }
                         catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Driver unload error: {ex.Message}"); }
-
-                        // Delete runtime-extracted driver file
-
 
                         // Delete runtime-extracted driver file
                         try
