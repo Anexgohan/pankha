@@ -17,6 +17,10 @@ export interface LicenseInfo {
   showBranding: boolean;
   expiresAt: string | null;
   activatedAt: string | null;
+  nextBillingDate: string | null;
+  discountCode: string | null;
+  discountCyclesRemaining: number | null;
+  lastSyncAt: string | null;
 }
 
 interface LicenseContextType {
@@ -59,6 +63,10 @@ export const LicenseProvider: React.FC<LicenseProviderProps> = ({ children }) =>
         showBranding: true,
         expiresAt: null,
         activatedAt: null,
+        nextBillingDate: null,
+        discountCode: null,
+        discountCyclesRemaining: null,
+        lastSyncAt: null,
       });
     } finally {
       setIsLoading(false);

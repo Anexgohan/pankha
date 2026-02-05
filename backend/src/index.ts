@@ -196,10 +196,22 @@ app.get('/api/websocket/info', (req, res) => {
 
 // Serve static frontend files (Production)
 const frontendPath = path.join(__dirname, '../frontend');
-app.use(express.static(frontendPath));
 
-// SPA fallback: Route all unknown requests to index.html
+// Hashed assets (JS/CSS in /assets/) - cache for 1 year (hash changes on update)
+app.use('/assets', express.static(path.join(frontendPath, 'assets'), {
+  maxAge: '1y',
+  immutable: true
+}));
+
+// Other static files (favicons, etc.) - short cache
+app.use(express.static(frontendPath, {
+  maxAge: '1h',
+  index: false  // Don't serve index.html from here
+}));
+
+// SPA fallback: Route all unknown requests to index.html (no cache)
 app.get(/^(?!\/(api|health|websocket)).*/, (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.sendFile(path.join(frontendPath, 'index.html'));
 });
 

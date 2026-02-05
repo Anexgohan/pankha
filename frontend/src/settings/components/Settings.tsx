@@ -9,17 +9,18 @@ import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } fro
 import { formatDate, formatFriendlyDate } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
 import ColorPicker from './ColorPicker';
-import { 
-  Github, 
-  ExternalLink, 
-  BookOpen, 
-  MessageSquare, 
-  ShieldCheck, 
+import {
+  Github,
+  ExternalLink,
+  BookOpen,
+  MessageSquare,
+  ShieldCheck,
   Wind,
   Bug,
   Lightbulb,
   HelpCircle,
-  Upload
+  Upload,
+  Tag
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -667,7 +668,8 @@ const Settings: React.FC = () => {
   const [licenseKey, setLicenseKey] = useState('');
   const [licenseStatus, setLicenseStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Billing period toggles for pricing cards
   const [proBilling, setProBilling] = useState<'monthly' | 'yearly'>('monthly');
   const [enterpriseBilling, setEnterpriseBilling] = useState<'monthly' | 'yearly'>('monthly');
@@ -803,6 +805,33 @@ const Settings: React.FC = () => {
       setLicenseStatus({ success: false, message: 'Failed to remove license' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * Sync license with license server to check for renewals
+   */
+  const handleSyncLicense = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('/api/license/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await response.json();
+
+      if (result.success && result.changed) {
+        setLicenseStatus({ success: true, message: 'License updated!' });
+        await refreshLicense();
+      } else if (result.success) {
+        setLicenseStatus({ success: true, message: 'License is up to date' });
+      } else {
+        setLicenseStatus({ success: false, message: result.error || 'Sync failed' });
+      }
+    } catch {
+      setLicenseStatus({ success: false, message: 'Could not reach license server' });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -1265,6 +1294,15 @@ const Settings: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  {/* Discount banner - only shows when active discount exists */}
+                  {license.discountCode && (license.discountCyclesRemaining ?? 0) > 0 && (
+                    <div className="discount-banner">
+                      <Tag size={14} className="discount-icon" />
+                      <span className="discount-text">
+                        Promo <strong>{license.discountCode}</strong> applied · {license.discountCyclesRemaining} discounted renewal{license.discountCyclesRemaining !== 1 ? 's' : ''} remaining
+                      </span>
+                    </div>
+                  )}
                   <div className="license-limits">
                     <div className="limit-item">
                       <span className="limit-label">Agents</span>
@@ -1307,7 +1345,15 @@ const Settings: React.FC = () => {
                       return (
                         <div className={`limit-item remaining-${remaining.urgency}`}>
                           <span className="limit-label">Remaining</span>
-                          <span className="limit-value">{remaining.text}</span>
+                          <div className="limit-value-group">
+                            <span className="limit-value">{remaining.text}</span>
+                            {/* Show "Renews {date}" for subscriptions, or nothing for lifetime */}
+                            {license.billing !== 'lifetime' && license.nextBillingDate && (
+                              <span className="limit-subtext-date">
+                                Renews {formatFriendlyDate(license.nextBillingDate, timezone)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })()}
@@ -1333,14 +1379,39 @@ const Settings: React.FC = () => {
                       {isSubmitting ? 'Validating...' : 'Activate'}
                     </button>
                     {license.tier !== 'Free' && (
-                      <button 
-                        type="button"
-                        className="remove-license-btn"
-                        onClick={handleRemoveLicense}
-                        disabled={isSubmitting}
-                      >
-                        Remove
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="remove-license-btn"
+                          onClick={handleRemoveLicense}
+                          disabled={isSubmitting}
+                        >
+                          Remove
+                        </button>
+                        <button
+                          type="button"
+                          className="refresh-button"
+                          onClick={handleSyncLicense}
+                          disabled={isSyncing}
+                          title="Check for license updates"
+                          style={{ padding: 'var(--spacing-md)', minWidth: 'auto' }}
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="18"
+                            height="18"
+                            style={{
+                              animation: isSyncing ? 'spin 1s linear infinite' : 'none',
+                              display: 'block'
+                            }}
+                          >
+                            <path
+                              fill="currentColor"
+                              d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                            />
+                          </svg>
+                        </button>
+                      </>
                     )}
                   </div>
                   {licenseStatus && (

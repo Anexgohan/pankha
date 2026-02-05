@@ -1,10 +1,12 @@
 /**
  * License API Routes
- * 
+ *
  * Endpoints for license management:
  * - GET /api/license - Get current license info
  * - GET /api/license/pricing - Get all tier pricing info
  * - POST /api/license - Set/update license key
+ * - POST /api/license/sync - Force sync with license server (for renewals)
+ * - DELETE /api/license - Remove license (revert to free tier)
  */
 
 import { Router, Request, Response } from 'express';
@@ -109,6 +111,34 @@ router.post('/', async (req: Request, res: Response) => {
     res.status(500).json({ 
       success: false, 
       error: 'Failed to validate license' 
+    });
+  }
+});
+
+/**
+ * POST /api/license/sync
+ * Force sync with license server (user-triggered refresh)
+ * Checks for license renewals and updates local cache
+ */
+router.post('/sync', async (req: Request, res: Response) => {
+  try {
+    const result = await licenseManager.syncWithLicenseServer();
+
+    if (result.success && result.changed) {
+      // License was renewed - return updated info
+      const info = await licenseManager.getLicenseInfo();
+      res.json({
+        ...result,
+        license: info
+      });
+    } else {
+      res.json(result);
+    }
+  } catch (error) {
+    console.error('[License API] Sync error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Sync failed'
     });
   }
 });

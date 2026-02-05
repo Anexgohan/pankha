@@ -156,6 +156,29 @@
   font-size: var(--font-size-lg);
 }
 
+/* Discount banner - shows when promo code is active */
+.discount-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--temp-normal-bg);
+  border: 1px solid var(--temp-normal-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.discount-banner .discount-icon {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.discount-banner .discount-text strong {
+  color: var(--color-success);
+}
+
 /* Reuses overview-stats grid pattern */
 .license-limits {
   display: grid;
@@ -220,7 +243,7 @@
 }
 
 .limit-subtext-date {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-tertiary);
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.02em;
