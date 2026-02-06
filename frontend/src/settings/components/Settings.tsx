@@ -820,11 +820,9 @@ const Settings: React.FC = () => {
       });
       const result = await response.json();
 
-      if (result.success && result.changed) {
-        setLicenseStatus({ success: true, message: 'License updated!' });
+      if (result.success) {
+        setLicenseStatus({ success: true, message: result.changed ? 'License updated!' : 'License is up to date' });
         await refreshLicense();
-      } else if (result.success) {
-        setLicenseStatus({ success: true, message: 'License is up to date' });
       } else {
         setLicenseStatus({ success: false, message: result.error || 'Sync failed' });
       }
