@@ -1377,7 +1377,7 @@ const Settings: React.FC = () => {
                       {isSubmitting ? 'Validating...' : 'Activate'}
                     </button>
                     {license.tier !== 'Free' && (
-                      <>
+                      <div className="license-action-row">
                         <button
                           type="button"
                           className="remove-license-btn"
@@ -1392,7 +1392,6 @@ const Settings: React.FC = () => {
                           onClick={handleSyncLicense}
                           disabled={isSyncing}
                           title="Check for license updates"
-                          style={{ padding: 'var(--spacing-md)', minWidth: 'auto' }}
                         >
                           <svg
                             viewBox="0 0 24 24"
@@ -1409,7 +1408,7 @@ const Settings: React.FC = () => {
                             />
                           </svg>
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                   {licenseStatus && (
@@ -1418,6 +1417,30 @@ const Settings: React.FC = () => {
                     </p>
                   )}
                 </form>
+
+                {license.tier !== 'Free' && (license.customerName || license.customerEmail) && (
+                  <div className="license-details">
+                    <h4 className="license-details-title">Account Details</h4>
+                    {license.customerName && (
+                      <div className="license-details-row">
+                        <span className="license-details-label">Name</span>
+                        <span className="license-details-value">{license.customerName}</span>
+                      </div>
+                    )}
+                    {license.customerEmail && (
+                      <div className="license-details-row">
+                        <span className="license-details-label">Email</span>
+                        <span className="license-details-value">{license.customerEmail}</span>
+                      </div>
+                    )}
+                    {license.licenseId && (
+                      <div className="license-details-row">
+                        <span className="license-details-label">License ID</span>
+                        <span className="license-details-value license-id-value">{license.licenseId}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <p>Failed to load license info</p>

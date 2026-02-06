@@ -47,24 +47,19 @@ interface LicensePayload {
 }
 
 /**
- * Public key for verifying license tokens (RS256/RSA)
- * 
- * Generated with: openssl genrsa -out private.pem 2048
- * Extracted with: openssl rsa -in private.pem -pubout -out public.pem
- * 
+ * Public key for verifying license tokens (ES256/ECDSA P-256)
+ *
+ * Generated with: openssl ecparam -genkey -name prime256v1 -noout -out private.pem
+ * Extracted with: openssl ec -in private.pem -pubout -out public.pem
+ *
  * The PRIVATE key stays on pankha.dev license server.
  * This PUBLIC key is embedded here for signature verification.
- * 
+ *
  * Keys location: custom-files/.secrets/keys/license-validator/
  */
 const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu7hErRKFEt2saGxHhZ3b
-TE+Mwgw+AMIpLBzJBL8raOQbdSP5f1HYtLaOwBfhkbsd+bb4m95+S6vZE+ht8RBr
-Y7N3IV7CMj6/pBHuI3acktSlekAH2KSoQfX/JdDrwAp78U2U6EoT0YhbtR+SeOm0
-Y7LjFS8kyO4sTRIxcaG4XUtFsM06vgrVrOd9nbYEPoYMUsCpotYiGA2pUdfHFZ9x
-W39ZQ/tyu43/+W1NjwDqMKlrFj2gBByfoAbavxUNRfvnJEwtXZmFxI+iqTJ3ATvc
-hQP6rIoOpUQfffNyC6ZPj9PD7rqhlTb/PzJALCXOdWkkr6mXkNovuQufjU84Ulxf
-WQIDAQAB
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE4+mp4y/9qNljmR3K8AE3KC1npWeR
+IBURFnhfYbnDXwvKfNRSsB5bP2qjo+8IoOMZJLLQIB+/nwHbR+5O2GgZGg==
 -----END PUBLIC KEY-----`;
 
 // ================================================================
@@ -118,9 +113,9 @@ export class LicenseValidator {
 
   /**
    * Validate a license token (JWT format)
-   * 
+   *
    * Token format: header.payload.signature (base64url encoded)
-   * Algorithm: RS256 (RSA-SHA256)
+   * Algorithm: ES256 (ECDSA P-256 + SHA-256)
    */
   async validate(licenseToken: string): Promise<ValidationResult> {
     console.log(`[LicenseValidator] Validating license token...`);
@@ -174,7 +169,7 @@ export class LicenseValidator {
         Buffer.from(signedData),
         {
           key: this.publicKey,
-          padding: crypto.constants.RSA_PKCS1_PADDING,
+          dsaEncoding: 'ieee-p1363',
         },
         signature
       );

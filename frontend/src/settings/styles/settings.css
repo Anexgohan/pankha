@@ -672,6 +672,21 @@
   gap: var(--spacing-md);
 }
 
+.license-action-row {
+  display: flex;
+  gap: var(--spacing-md);
+}
+
+.license-action-row .remove-license-btn {
+  flex: 1;
+}
+
+.license-action-row .refresh-button {
+  padding: var(--spacing-md);
+  min-width: auto;
+  flex-shrink: 0;
+}
+
 .license-input {
   flex: 1;
   padding: var(--spacing-md);
@@ -711,6 +726,48 @@
 .license-submit:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* License account details - shown for paid tiers */
+.license-details {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.license-details-title {
+  margin: 0 0 var(--spacing-sm) 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.license-details-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-xs) 0;
+}
+
+.license-details-row + .license-details-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.license-details-label {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.license-details-value {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.license-id-value {
+  font-family: monospace;
+  font-size: 0.75rem;
 }
 
 .license-status {

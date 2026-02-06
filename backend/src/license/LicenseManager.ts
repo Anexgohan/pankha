@@ -20,6 +20,7 @@ export class LicenseManager {
   private licenseActivatedAt: Date | null = null;  // When license was issued
   private licenseBilling: 'monthly' | 'yearly' | 'lifetime' | null = null;
   private customerName: string | null = null;
+  private customerEmail: string | null = null;
   private licenseId: string | null = null;  // License ID for /status lookups
   private nextBillingDate: Date | null = null;  // Next payment date (subscriptions)
   private discountCode: string | null = null;  // Applied promo code
@@ -110,6 +111,8 @@ export class LicenseManager {
       this.licenseExpiresAt = null;
       this.licenseBilling = null;
       this.customerName = null;
+      this.customerEmail = null;
+      this.licenseId = null;
       this.cacheExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
       console.log('[LicenseManager] License removed, reverted to free tier');
@@ -196,6 +199,8 @@ export class LicenseManager {
     tier: string;
     billing: string | null;
     customerName: string | null;
+    customerEmail: string | null;
+    licenseId: string | null;
     agentLimit: number;
     retentionDays: number;
     alertLimit: number;
@@ -217,6 +222,8 @@ export class LicenseManager {
       tier: tier.name,
       billing: this.licenseBilling,
       customerName: this.customerName,
+      customerEmail: this.customerEmail,
+      licenseId: this.licenseId,
       agentLimit: tier.agentLimit === Infinity ? -1 : tier.agentLimit,
       retentionDays: tier.retentionDays,
       alertLimit: tier.alertLimit === Infinity ? -1 : tier.alertLimit,
@@ -447,6 +454,7 @@ export class LicenseManager {
     this.licenseActivatedAt = result.activatedAt;  // Store license issued date
     this.licenseBilling = result.billing || null;  // Store billing period
     this.customerName = result.customerName || null;  // Store customer name
+    this.customerEmail = result.customerEmail || null;  // Store customer email
     this.licenseId = result.licenseId || null;  // Store license ID for /status lookups
 
     // Persist to database for offline resilience

@@ -9,6 +9,8 @@ export interface LicenseInfo {
   tier: string;
   billing: string | null;
   customerName: string | null;
+  customerEmail: string | null;
+  licenseId: string | null;
   agentLimit: number;
   retentionDays: number;
   alertLimit: number;
@@ -55,6 +57,8 @@ export const LicenseProvider: React.FC<LicenseProviderProps> = ({ children }) =>
         tier: 'Free',
         billing: null,
         customerName: null,
+        customerEmail: null,
+        licenseId: null,
         agentLimit: 3,
         retentionDays: 7,
         alertLimit: 2,
