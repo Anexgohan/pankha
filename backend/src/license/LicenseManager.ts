@@ -239,6 +239,7 @@ export class LicenseManager {
   async syncWithLicenseServer(): Promise<{
     success: boolean;
     changed: boolean;
+    upgraded?: boolean;
     newExpiresAt?: Date;
     nextBillingDate?: Date | null;
     discountCode?: string;
@@ -280,10 +281,28 @@ export class LicenseManager {
         nextBillingDate?: string;
         discountCode?: string;
         discountCyclesRemaining?: number;
+        upgradeToken?: string;
       };
 
       if (!status.found) {
         return { success: true, changed: false };
+      }
+
+      // Auto-upgrade: if server returns an upgradeToken, activate the new license
+      if (status.upgradeToken) {
+        console.log('[LicenseManager] Auto-upgrade detected! Activating new license...');
+        const upgradeResult = await this.setLicenseKey(status.upgradeToken);
+        if (upgradeResult.success) {
+          console.log(`[LicenseManager] Auto-upgrade successful: now on ${upgradeResult.tier} tier`);
+          // Sync again to fetch D1 metadata (discount, billing date, etc.) for the new license.
+          // No recursion risk: the new license won't have an upgradeToken.
+          const followUp = await this.syncWithLicenseServer();
+          console.log(`[LicenseManager] Post-upgrade sync: discountCode=${followUp.discountCode || 'none'}`);
+          return { success: true, changed: true, upgraded: true };
+        } else {
+          console.error(`[LicenseManager] Auto-upgrade failed: ${upgradeResult.error}`);
+          // Fall through to normal sync logic
+        }
       }
 
       // Check if expiry date changed
@@ -338,11 +357,12 @@ export class LicenseManager {
    * Progressive frequency: closer to expiry = more frequent syncs
    *
    * Schedule:
-   * - 7+ days out: no auto-sync
-   * - 3 days out: every 12 hours
-   * - 2 days out: every 6 hours
-   * - 1 day out: every 1 hour
-   * - 12 hours out: every 15 minutes
+   * - 7+ days out: every 24 hours
+   * - 3-7 days out: every 24 hours
+   * - 2-3 days out: every 12 hours
+   * - 1-2 days out: every 6 hours
+   * - 12h-1 day out: every 1 hour
+   * - < 12 hours out: every 15 minutes
    */
   private async checkAutoSync(): Promise<void> {
     // Skip for free tier or lifetime
