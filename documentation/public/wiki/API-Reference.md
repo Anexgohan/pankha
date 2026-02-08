@@ -18,14 +18,16 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 ## Systems
 
 ### List & CRUD
-| Method | Endpoint                  | Description                          |
-| ------ | ------------------------- | ------------------------------------ |
-| GET    | `/api/systems`            | List all registered agents           |
-| POST   | `/api/systems`            | Add new system                       |
-| GET    | `/api/systems/:id`        | Get system details with sensors/fans |
-| PUT    | `/api/systems/:id`        | Update system configuration          |
-| DELETE | `/api/systems/:id`        | Remove system                        |
-| GET    | `/api/systems/:id/status` | Real-time connection status          |
+| Method | Endpoint                         | Description                          |
+| ------ | -------------------------------- | ------------------------------------ |
+| GET    | `/api/systems`                   | List all registered agents           |
+| POST   | `/api/systems`                   | Add new system                       |
+| GET    | `/api/systems/limit`             | Get agent limit info (current count, tier limit) |
+| GET    | `/api/systems/:id`               | Get system details with sensors/fans |
+| PUT    | `/api/systems/:id`               | Update system configuration          |
+| DELETE | `/api/systems/:id`               | Remove system                        |
+| GET    | `/api/systems/:id/status`        | Real-time connection status          |
+| GET    | `/api/systems/:id/diagnostics`   | Get hardware diagnostics from agent  |
 
 ### Controller
 | Method | Endpoint                           | Description                    |
@@ -60,6 +62,16 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 | PUT    | `/api/systems/:id/enable-fan-control` | Enable/disable fan control           |
 | PUT    | `/api/systems/:id/log-level`          | Set agent log level                  |
 | PUT    | `/api/systems/:id/name`               | Set agent display name               |
+| POST   | `/api/systems/:id/update`             | Trigger remote agent self-update     |
+
+### Backend Settings
+| Method | Endpoint                         | Description                                          |
+| ------ | -------------------------------- | ---------------------------------------------------- |
+| GET    | `/api/systems/settings`          | Get all backend settings                             |
+| GET    | `/api/systems/settings/:key`     | Get a specific setting by key                        |
+| PUT    | `/api/systems/settings/:key`     | Update a setting (`{ "value": "..." }`)              |
+
+Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data_retention_days`, `accent_color`, `hover_tint_color`
 
 ### Profiles & History
 | Method | Endpoint                    | Description                    |
@@ -84,8 +96,10 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 | POST   | `/api/fan-profiles/assign`                | Assign profile to fan     |
 | GET    | `/api/fan-profiles/assignments/:systemId` | Get fan assignments       |
 | POST   | `/api/fan-profiles/calculate-speed`       | Calculate speed for temp  |
-| GET    | `/api/fan-profiles/export`                | Export profiles to JSON   |
-| POST   | `/api/fan-profiles/import`                | Import profiles from JSON |
+| GET    | `/api/fan-profiles/export`                | Export profiles to JSON               |
+| POST   | `/api/fan-profiles/import`                | Import profiles from JSON             |
+| GET    | `/api/fan-profiles/defaults`              | List available default profiles       |
+| POST   | `/api/fan-profiles/load-defaults`         | Load default profiles into database   |
 
 ---
 
@@ -111,6 +125,27 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 
 ---
 
+## Deploy
+
+| Method | Endpoint                     | Description                                      |
+| ------ | ---------------------------- | ------------------------------------------------ |
+| POST   | `/api/deploy/templates`      | Generate a deployment token (expires in 24h)     |
+| GET    | `/api/deploy/linux`          | Serve dynamic install script (`?token=<token>`)  |
+| GET    | `/api/deploy/hub/status`     | Status of locally cached agent binaries          |
+| POST   | `/api/deploy/hub/stage`      | Download a specific agent version to the hub     |
+| DELETE | `/api/deploy/hub/clear`      | Clear all locally cached agent binaries          |
+| GET    | `/api/deploy/binaries/:arch` | Serve cached agent binary (`x86_64` / `aarch64`) |
+
+---
+
+## Config
+
+| Method | Endpoint                 | Description                                 |
+| ------ | ------------------------ | ------------------------------------------- |
+| GET    | `/api/config/deployment` | Get deployment config (hub IP and port)     |
+
+---
+
 ## License
 
 | Method | Endpoint               | Description                                         |
@@ -119,6 +154,7 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 | POST   | `/api/license`         | Activate license key                                |
 | DELETE | `/api/license`         | Remove license (revert to free tier)                |
 | GET    | `/api/license/pricing` | Get tier pricing info                               |
+| POST   | `/api/license/sync`    | Force sync with license server (check for renewals) |
 
 ---
 
