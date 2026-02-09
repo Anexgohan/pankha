@@ -528,6 +528,13 @@ def interactive_build():
     def_linux = sum(1 for a in existing if a.get("platform", "linux") == "linux") if modify_mode else 5
     def_win = sum(1 for a in existing if a.get("platform") == "windows") if modify_mode else 0
 
+    # Persisted wizard defaults (from last --build run)
+    wd = config.get("wizard_defaults", {})
+    def_sensors = wd.get("sensor_range", [5, 15])
+    def_temp = wd.get("temp_range", [35, 85])
+    def_fans = wd.get("fan_range", [4, 9])
+    def_rpm = wd.get("rpm_range", [0, 4500])
+
     # Server URL
     server_input = input(f"Server address [{def_server}]: ").strip()
     server_host = server_input if server_input else def_server
@@ -568,9 +575,10 @@ def interactive_build():
     name_prefix = input("Agent name prefix [random]: ").strip() or "default"
 
     # Sensor range
+    def_sensors_str = f"{def_sensors[0]},{def_sensors[1]}"
     while True:
         try:
-            sensors_input = input("\nSensor count range (min,max) [5,15]: ").strip() or "5,15"
+            sensors_input = input(f"\nSensor count range (min,max) [{def_sensors_str}]: ").strip() or def_sensors_str
             sensors = tuple(map(int, sensors_input.split(',')))
             if len(sensors) != 2 or sensors[0] < 1 or sensors[1] < sensors[0]:
                 print(colorize("  ⚠️  Invalid range. Use: min,max", Colors.YELLOW))
@@ -580,9 +588,10 @@ def interactive_build():
             print(colorize("  ⚠️  Invalid format. Use: min,max", Colors.YELLOW))
 
     # Temperature range
+    def_temp_str = f"{def_temp[0]},{def_temp[1]}"
     while True:
         try:
-            temp_input = input("Sensor temperature range °C (min,max) [35,85]: ").strip() or "35,85"
+            temp_input = input(f"Sensor temperature range °C (min,max) [{def_temp_str}]: ").strip() or def_temp_str
             temp = tuple(map(int, temp_input.split(',')))
             if len(temp) != 2 or temp[0] < 0 or temp[1] < temp[0]:
                 print(colorize("  ⚠️  Invalid range", Colors.YELLOW))
@@ -592,9 +601,10 @@ def interactive_build():
             print(colorize("  ⚠️  Invalid format", Colors.YELLOW))
 
     # Fan range
+    def_fans_str = f"{def_fans[0]},{def_fans[1]}"
     while True:
         try:
-            fans_input = input("Fan count range (min,max) [4,9]: ").strip() or "4,9"
+            fans_input = input(f"Fan count range (min,max) [{def_fans_str}]: ").strip() or def_fans_str
             fans = tuple(map(int, fans_input.split(',')))
             if len(fans) != 2 or fans[0] < 1 or fans[1] < fans[0]:
                 print(colorize("  ⚠️  Invalid range", Colors.YELLOW))
@@ -604,9 +614,10 @@ def interactive_build():
             print(colorize("  ⚠️  Invalid format", Colors.YELLOW))
 
     # RPM range
+    def_rpm_str = f"{def_rpm[0]},{def_rpm[1]}"
     while True:
         try:
-            rpm_input = input("Fan RPM range (min,max) [0,4500]: ").strip() or "0,4500"
+            rpm_input = input(f"Fan RPM range (min,max) [{def_rpm_str}]: ").strip() or def_rpm_str
             rpm = tuple(map(int, rpm_input.split(',')))
             if len(rpm) != 2 or rpm[0] < 0 or rpm[1] < rpm[0]:
                 print(colorize("  ⚠️  Invalid range", Colors.YELLOW))
@@ -655,6 +666,16 @@ def interactive_build():
     else:
         agents = create_agents(amount, name_prefix, linux_count, win_count, sensors, fans, temp, rpm, server_host, server_url)
         print(colorize(f"✅ Created {len(agents)} mock agents\n", Colors.GREEN))
+
+    # Persist wizard defaults for next --build run
+    config = load_config()
+    config["wizard_defaults"] = {
+        "sensor_range": list(sensors),
+        "temp_range": list(temp),
+        "fan_range": list(fans),
+        "rpm_range": list(rpm),
+    }
+    save_config(config)
 
     # Offer to start
     start_now = input("Start swarm now? [Y/n]: ").strip().lower()

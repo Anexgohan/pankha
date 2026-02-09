@@ -151,12 +151,7 @@ class MockHardware:
         sensors = []
         for s in defs:
             sensor = dict(s)  # copy so we don't mutate config
-            sensor["temperature"] = round(random.uniform(*self.temp_range), 1)
-            sensor.setdefault("_base_temp", self._random_base_temp())
-            sensor.setdefault("_variation", random.uniform(8, 20))
-            sensor.setdefault("_phase", random.uniform(0, 2 * math.pi))
-            sensor.setdefault("_max_cooling", random.uniform(12, 18))
-            sensor.setdefault("_cooling_offset", 0.0)
+            self._init_sim_state(sensor)
             sensors.append(sensor)
         return sensors
 
@@ -202,24 +197,18 @@ class MockHardware:
                 if created >= count:
                     break
 
-                random_base = self._random_base_temp()
                 sensor_id = f"{chip_name}_{name.lower().replace(' ', '_')}"
 
                 sensor = {
                     "id": sensor_id,
                     "name": name,
-                    "temperature": round(random.uniform(*self.temp_range), 1),
                     "type": sensor_type,
                     "max_temp": max_temp,
                     "crit_temp": max_temp + 10,
                     "chip": chip_name,
                     "source": f"/sys/class/hwmon/hwmon{hwmon_idx}/temp{sensor_idx + 1}_input",
-                    "_base_temp": random_base,
-                    "_variation": random.uniform(8, 20),
-                    "_phase": random.uniform(0, 2 * math.pi),
-                    "_max_cooling": random.uniform(12, 18),
-                    "_cooling_offset": 0.0,
                 }
+                self._init_sim_state(sensor)
                 sensors.append(sensor)
                 created += 1
 
@@ -243,7 +232,6 @@ class MockHardware:
                 if created >= count:
                     break
 
-                random_base = self._random_base_temp()
                 # Windows ID: {chip}_{chipIndex}_{sanitized_name}
                 sanitized = name.lower().replace(" ", "_").replace("/", "_").replace("#", "").replace("(", "").replace(")", "")
                 sensor_id = f"{chip_id}_{chip_index}_{sanitized}"
@@ -254,19 +242,14 @@ class MockHardware:
                 sensor = {
                     "id": sensor_id,
                     "name": name,
-                    "temperature": round(random.uniform(*self.temp_range), 1),
                     "type": sensor_type,
                     "max_temp": max_temp,
                     "crit_temp": max_temp + 10,
                     "chip": chip_id,
                     "source": source,
                     "hardwareName": hw_name,
-                    "_base_temp": random_base,
-                    "_variation": random.uniform(8, 20),
-                    "_phase": random.uniform(0, 2 * math.pi),
-                    "_max_cooling": random.uniform(12, 18),
-                    "_cooling_offset": 0.0,
                 }
+                self._init_sim_state(sensor)
                 sensors.append(sensor)
                 created += 1
 
@@ -274,13 +257,35 @@ class MockHardware:
 
         return sensors
 
-    def _random_base_temp(self) -> float:
-        """Generate a random base temperature within the configured range."""
-        min_temp, max_temp_config = self.temp_range
-        range_size = max_temp_config - min_temp
-        base_min = min_temp + (range_size * 0.2)
-        base_max = max_temp_config - (range_size * 0.2)
-        return random.uniform(base_min, base_max)
+    # Thermal profiles per sensor type
+    #   idle_offset: °C above temp_range min at idle
+    #   load_peak: °C above idle during a load event
+    #   event_freq: probability of new event per tick when idle (0-1)
+    #   event_dur: (min_ticks, max_ticks) — at 3s/tick: CPU 9s-5min, GPU 2.5-20min, etc.
+    #   ramp_up: approach factor per tick when heating (0-1, higher = faster)
+    #   ramp_down: approach factor per tick when cooling (0-1, lower = slower)
+    THERMAL_PROFILES = {
+        "cpu":         {"idle_offset": 8,  "load_peak": 35, "event_freq": 0.08, "event_dur": (3, 100),  "ramp_up": 0.4,  "ramp_down": 0.12},
+        "gpu":         {"idle_offset": 5,  "load_peak": 40, "event_freq": 0.03, "event_dur": (50, 400), "ramp_up": 0.25, "ramp_down": 0.08},
+        "nvme":        {"idle_offset": 3,  "load_peak": 12, "event_freq": 0.02, "event_dur": (30, 200), "ramp_up": 0.1,  "ramp_down": 0.05},
+        "motherboard": {"idle_offset": 5,  "load_peak": 10, "event_freq": 0.015,"event_dur": (40, 300), "ramp_up": 0.08, "ramp_down": 0.04},
+    }
+
+    def _init_sim_state(self, sensor: Dict):
+        """Initialize runtime simulation state on a sensor dict."""
+        profile = self.THERMAL_PROFILES.get(sensor.get("type", "cpu"), self.THERMAL_PROFILES["cpu"])
+        min_temp = self.temp_range[0]
+
+        sensor["_idle_temp"] = min_temp + profile["idle_offset"] + random.uniform(-2, 2)
+        sensor["_current_temp"] = sensor["_idle_temp"] + random.uniform(-1, 1)
+        sensor["_profile"] = profile
+        sensor["_max_cooling"] = random.uniform(10, 16)
+        sensor["_cooling_offset"] = 0.0
+        # Load event state
+        sensor["_event_active"] = False
+        sensor["_event_target"] = 0.0
+        sensor["_event_ticks_left"] = 0
+        sensor["temperature"] = round(sensor["_current_temp"], 1)
     
     def _create_fans(self, count: int) -> List[Dict]:
         """Create mock fans with PWM control."""
@@ -347,52 +352,85 @@ class MockHardware:
         return int(min_rpm + (max_rpm - min_rpm) * speed / 100)
     
     def update(self):
-        """Update sensor temperatures and fan RPMs with realistic variation.
+        """Update sensor temperatures and fan RPMs with event-driven simulation.
 
-        Thermal coupling: fan speeds affect sensor temperatures.
-        Higher fan speed → more cooling → lower temps (with thermal inertia).
+        Sensors experience random load events that cause realistic temperature
+        spikes, with asymmetric ramp-up (fast) and cooldown (slow).  Fan speeds
+        provide a cooling effect that reduces temperatures with thermal inertia.
+
+        Sensors of the same chip share load events (correlated).
         """
-        current_time = time.time()
-
-        # Compute average fan speed for cooling effect
+        # ── Cooling from fans ──
         if self.fans:
             avg_fan_speed = sum(f["speed"] for f in self.fans) / len(self.fans)
         else:
             avg_fan_speed = 0.0
-        cooling_factor = avg_fan_speed / 100.0  # 0.0 to 1.0
+        cooling_factor = avg_fan_speed / 100.0
 
-        # Update sensors with thermal coupling
+        # ── Chip-correlated load events ──
+        # Decide per-chip whether a new load event starts this tick
+        chip_events: Dict[str, bool] = {}
         for sensor in self.sensors:
-            base = sensor["_base_temp"]
-            variation = sensor["_variation"]
-            phase = sensor["_phase"]
-            max_cooling = sensor["_max_cooling"]
+            chip = sensor["chip"]
+            if chip not in chip_events:
+                profile = sensor["_profile"]
+                chip_events[chip] = random.random() < profile["event_freq"]
 
-            # Thermal inertia: cooling offset moves toward target at ~20% per tick
-            target_cooling = cooling_factor * max_cooling
+        # ── Update each sensor ──
+        min_temp, max_temp = self.temp_range
+        for sensor in self.sensors:
+            profile = sensor["_profile"]
+            idle = sensor["_idle_temp"]
+            current = sensor["_current_temp"]
+
+            # Start new load event (chip-correlated)
+            if not sensor["_event_active"] and chip_events.get(sensor["chip"], False):
+                sensor["_event_active"] = True
+                # Random intensity: 40-100% of load_peak, per-sensor variation
+                intensity = random.uniform(0.4, 1.0)
+                sensor["_event_target"] = idle + profile["load_peak"] * intensity
+                dur_min, dur_max = profile["event_dur"]
+                sensor["_event_ticks_left"] = random.randint(dur_min, dur_max)
+
+            # Tick down active event
+            if sensor["_event_active"]:
+                sensor["_event_ticks_left"] -= 1
+                if sensor["_event_ticks_left"] <= 0:
+                    sensor["_event_active"] = False
+
+            # Compute target temperature
+            if sensor["_event_active"]:
+                target = sensor["_event_target"]
+                approach = profile["ramp_up"]
+            else:
+                target = idle
+                approach = profile["ramp_down"]
+
+            # Cooling effect (thermal inertia)
+            target_cooling = cooling_factor * sensor["_max_cooling"]
             sensor["_cooling_offset"] += (target_cooling - sensor["_cooling_offset"]) * 0.2
 
-            # Slow sine wave + random noise for realistic thermal behavior
-            time_factor = current_time / 60
-            periodic = math.sin(time_factor + phase) * variation
-            noise = random.uniform(-3, 3)
+            # Asymmetric approach toward target
+            current += (target - current) * approach
 
-            new_temp = base + periodic + noise - sensor["_cooling_offset"]
+            # Small noise for realism
+            current += random.uniform(-0.5, 0.5)
 
-            # Clamp to configured range
-            min_temp, max_temp = self.temp_range
-            new_temp = max(min_temp, min(max_temp, new_temp))
+            # Apply cooling
+            current -= sensor["_cooling_offset"]
 
-            sensor["temperature"] = round(new_temp, 1)
+            # Clamp
+            current = max(min_temp, min(max_temp, current))
 
-        # Update fans
+            sensor["_current_temp"] = current
+            sensor["temperature"] = round(current, 1)
+
+        # ── Update fans ──
         for fan in self.fans:
-            # Small RPM variation (+/- 3%)
             target_rpm = self._speed_to_rpm(fan["targetSpeed"])
             variation = int(target_rpm * 0.03)
             fan["rpm"] = max(0, target_rpm + random.randint(-variation, variation))
 
-            # Gradually adjust current speed toward target
             if fan["speed"] != fan["targetSpeed"]:
                 diff = fan["targetSpeed"] - fan["speed"]
                 step = max(1, abs(diff) // 5)
