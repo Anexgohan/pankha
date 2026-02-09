@@ -16,6 +16,14 @@ import uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+try:
+    import readline  # noqa: F401 — enables arrow keys/history in input()
+except ImportError:
+    pass
+
+from hardware import MockHardware
+from machine_names import MACHINE_NAMES
+
 # ============================================================================
 # CONSTANTS
 # ============================================================================
@@ -29,7 +37,15 @@ AGENTS_CONFIG_FILE = DATA_DIR / "agents.json"
 STATUS_FILE = DATA_DIR / "status.json"
 PID_FILE = RUNTIME_DIR / "swarm.pid"
 
-DEFAULT_SERVER = "ws://192.168.100.237:3000/websocket"
+DEFAULT_SERVER = "192.168.100.237:9876"
+
+
+def to_ws_url(host_port: str) -> str:
+    """Convert host:port to full WebSocket URL. Passes through if already a full URL."""
+    s = host_port.strip()
+    if s.startswith("ws://") or s.startswith("wss://"):
+        return s
+    return f"ws://{s}/websocket"
 
 # ============================================================================
 # COLORS
@@ -125,48 +141,175 @@ def save_config(config: Dict):
         json.dump(config, f, indent=2)
 
 
+def _generate_fake_ip(index: int) -> str:
+    """Generate a unique fake private IP for agent at given index."""
+    return f"192.168.{1 + (index // 254)}.{1 + (index % 254)}"
+
+
+def _new_agent(
+    index: int,
+    platform: str,
+    name: str,
+    server_url: str,
+    sensors: Tuple[int, int],
+    fans: Tuple[int, int],
+    temp: Tuple[int, int],
+    rpm: Tuple[int, int],
+) -> Dict:
+    """Create a single new agent config dict with persisted hardware definitions."""
+    sensor_count = random.randint(sensors[0], sensors[1])
+    fan_count = random.randint(fans[0], fans[1])
+
+    # Generate hardware definitions and export for persistence
+    hw_config = {
+        "platform": platform,
+        "sensor_count": sensor_count,
+        "fan_count": fan_count,
+        "temp_range": list(temp),
+        "speed_range": [0, 100],
+        "rpm_range": list(rpm),
+    }
+    hw = MockHardware(hw_config)
+    hw_defs = hw.export_hardware()
+
+    return {
+        "agent_id": f"{platform}-{name.lower()}-{uuid.uuid4().hex[:8]}",
+        "agent_name": name,
+        "platform": platform,
+        "fake_ip": _generate_fake_ip(index),
+        "server_url": server_url,
+        "update_interval": 3.0,
+        "sensor_count": sensor_count,
+        "fan_count": fan_count,
+        "sensors": hw_defs["sensors"],
+        "fans": hw_defs["fans"],
+        "temp_range": list(temp),
+        "speed_range": [0, 100],
+        "rpm_range": list(rpm),
+        "fan_step_percent": 5,
+        "hysteresis_temp": 3.0,
+        "emergency_temp": 85.0,
+        "failsafe_speed": 70,
+        "log_level": "INFO",
+        "enable_fan_control": True,
+    }
+
+
 def create_agents(
     amount: int,
+    name_prefix: str,
+    linux_count: int,
+    win_count: int,
+    sensors: Tuple[int, int],
+    fans: Tuple[int, int],
+    temp: Tuple[int, int],
+    rpm: Tuple[int, int],
+    server_host: str,
+    server_url: str
+) -> List[Dict]:
+    """Create agent configurations from scratch (overwrite mode)."""
+    config = load_config()
+    config["default_server"] = server_host
+    config["agents"] = []
+
+    use_random = (name_prefix == "default")
+    names = _pick_names(amount, use_random, name_prefix)
+
+    for i in range(amount):
+        platform = "linux" if i < linux_count else "windows"
+        agent = _new_agent(i, platform, names[i], server_url, sensors, fans, temp, rpm)
+        config["agents"].append(agent)
+
+    save_config(config)
+    return config["agents"]
+
+
+def modify_agents(
+    linux_count: int,
+    win_count: int,
     name_prefix: str,
     sensors: Tuple[int, int],
     fans: Tuple[int, int],
     temp: Tuple[int, int],
     rpm: Tuple[int, int],
+    server_host: str,
     server_url: str
 ) -> List[Dict]:
-    """Create agent configurations."""
+    """Modify existing agent config — preserve identity, apply new settings, add/remove as needed."""
     config = load_config()
-    config["default_server"] = server_url
-    config["agents"] = []
-    
-    for i in range(1, amount + 1):
-        agent_name = f"{name_prefix}{i:02d}"
-        agent_id = f"mock-{agent_name}-{uuid.uuid4().hex[:8]}"
-        
-        sensor_count = random.randint(sensors[0], sensors[1])
-        fan_count = random.randint(fans[0], fans[1])
-        
-        agent_config = {
-            "agent_id": agent_id,
-            "agent_name": agent_name,
-            "server_url": server_url,
-            "update_interval": 3.0,
-            "sensor_count": sensor_count,
-            "fan_count": fan_count,
-            "temp_range": list(temp),
-            "speed_range": [0, 100],
-            "rpm_range": list(rpm),
-            "fan_step_percent": 5,
-            "hysteresis_temp": 3.0,
-            "emergency_temp": 85.0,
-            "failsafe_speed": 70,
-            "log_level": "INFO",
-            "enable_fan_control": True,
-        }
-        config["agents"].append(agent_config)
-    
+    config["default_server"] = server_host
+    existing = config.get("agents", [])
+
+    # Split existing by platform
+    existing_linux = [a for a in existing if a.get("platform", "linux") == "linux"]
+    existing_win = [a for a in existing if a.get("platform") == "windows"]
+
+    # Build the final agent list: linux first, then windows
+    final = []
+
+    def _update_existing(agent: Dict, platform: str) -> Dict:
+        """Apply new settings to an existing agent while preserving hardware identity."""
+        agent["server_url"] = server_url
+        agent["platform"] = platform
+        # Update simulation ranges (not hardware identity)
+        agent["temp_range"] = list(temp)
+        agent["rpm_range"] = list(rpm)
+        # Backfill missing fields
+        if "fake_ip" not in agent:
+            agent["fake_ip"] = _generate_fake_ip(len(final))
+        # Backfill hardware definitions if missing (old config without persistence)
+        if "sensors" not in agent or not isinstance(agent.get("sensors"), list):
+            hw_config = {
+                "platform": platform,
+                "sensor_count": agent.get("sensor_count", 8),
+                "fan_count": agent.get("fan_count", 4),
+                "temp_range": list(temp),
+                "speed_range": [0, 100],
+                "rpm_range": list(rpm),
+            }
+            hw = MockHardware(hw_config)
+            hw_defs = hw.export_hardware()
+            agent["sensors"] = hw_defs["sensors"]
+            agent["fans"] = hw_defs["fans"]
+        return agent
+
+    # --- Linux agents ---
+    for i in range(linux_count):
+        if i < len(existing_linux):
+            final.append(_update_existing(existing_linux[i], "linux"))
+        else:
+            use_random = (name_prefix == "default")
+            names = _pick_names(1, use_random, name_prefix, offset=len(final))
+            final.append(_new_agent(len(final), "linux", names[0], server_url, sensors, fans, temp, rpm))
+
+    # --- Windows agents ---
+    for i in range(win_count):
+        if i < len(existing_win):
+            final.append(_update_existing(existing_win[i], "windows"))
+        else:
+            use_random = (name_prefix == "default")
+            names = _pick_names(1, use_random, name_prefix, offset=len(final))
+            final.append(_new_agent(len(final), "windows", names[0], server_url, sensors, fans, temp, rpm))
+
+    # Reassign fake_ip sequentially so there are no gaps
+    for i, agent in enumerate(final):
+        agent["fake_ip"] = _generate_fake_ip(i)
+
+    config["agents"] = final
     save_config(config)
-    return config["agents"]
+    return final
+
+
+def _pick_names(count: int, use_random: bool, prefix: str, offset: int = 0) -> List[str]:
+    """Generate a list of agent names."""
+    if use_random:
+        available = list(MACHINE_NAMES)
+        random.shuffle(available)
+        while len(available) < offset + count:
+            available.append(f"node-{len(available) + 1:03d}")
+        return [available[offset + i].title() for i in range(count)]
+    else:
+        return [f"{prefix}{offset + i + 1:02d}" for i in range(count)]
 
 
 # ============================================================================
@@ -334,10 +477,12 @@ def show_status():
     # Show agent list (max 20)
     for i, agent in enumerate(agents[:20]):
         name = agent["agent_name"]
+        platform = agent.get("platform", "linux")
+        plat_tag = colorize("[L]", Colors.CYAN) if platform == "linux" else colorize("[W]", Colors.YELLOW)
         sensors = agent["sensor_count"]
         fans = agent["fan_count"]
         hw_info = colorize(f"S:{sensors} F:{fans}", Colors.GRAY)
-        print(f"  {name:20s}  {hw_info}")
+        print(f"  {plat_tag} {name:20s}  {hw_info}")
     
     if len(agents) > 20:
         print(colorize(f"  ... and {len(agents) - 20} more agents", Colors.GRAY))
@@ -357,33 +502,75 @@ def interactive_build():
     print(colorize("\n" + "=" * 70, Colors.CYAN))
     print(colorize("  Pankha Mock Agent Builder - Swarm Mode", Colors.BOLD))
     print(colorize("=" * 70 + "\n", Colors.CYAN))
-    
+
     print("This wizard will configure mock agents for scaled testing.\n")
-    
-    # Server URL
+
+    # Check for existing config
     config = load_config()
-    default_server = config.get("default_server", DEFAULT_SERVER)
-    server_input = input(f"Server WebSocket URL [{default_server}]: ").strip()
-    server_url = server_input if server_input else default_server
-    
-    # Number of agents
+    existing = config.get("agents", [])
+    modify_mode = False
+
+    if existing:
+        existing_linux = sum(1 for a in existing if a.get("platform", "linux") == "linux")
+        existing_win = sum(1 for a in existing if a.get("platform") == "windows")
+        print(colorize(f"  Existing config found: {len(existing)} agents "
+                        f"({existing_linux} Linux, {existing_win} Windows)", Colors.CYAN))
+        choice = input("\n  [O]verwrite / [M]odify? [M]: ").strip().lower() or "m"
+        if choice == "o":
+            modify_mode = False
+            print(colorize("  Starting fresh.\n", Colors.GRAY))
+        else:
+            modify_mode = True
+            print(colorize("  Modifying existing config. Existing agents preserved.\n", Colors.GRAY))
+
+    # --- Derive current defaults from existing config ---
+    def_server = config.get("default_server", DEFAULT_SERVER)
+    def_linux = sum(1 for a in existing if a.get("platform", "linux") == "linux") if modify_mode else 5
+    def_win = sum(1 for a in existing if a.get("platform") == "windows") if modify_mode else 0
+
+    # Server URL
+    server_input = input(f"Server address [{def_server}]: ").strip()
+    server_host = server_input if server_input else def_server
+    server_url = to_ws_url(server_host)
+
+    # Linux agent count
     while True:
         try:
-            amount = int(input("\nHow many mock agents? [5]: ").strip() or "5")
-            if amount < 1 or amount > 1000:
-                print(colorize("  ⚠️  Please enter 1-1000", Colors.YELLOW))
+            linux_count = int(input(f"\nHow many Linux mock agents? [{def_linux}]: ").strip() or str(def_linux))
+            if linux_count < 0 or linux_count > 1000:
+                print(colorize("  ⚠️  Please enter 0-1000", Colors.YELLOW))
                 continue
             break
         except ValueError:
             print(colorize("  ⚠️  Please enter a valid number", Colors.YELLOW))
-    
-    # Name prefix
-    name_prefix = input("\nAgent name prefix [client_]: ").strip() or "client_"
-    
+
+    # Windows agent count
+    while True:
+        try:
+            win_count = int(input(f"How many Windows mock agents? [{def_win}]: ").strip() or str(def_win))
+            if win_count < 0 or win_count > 1000:
+                print(colorize("  ⚠️  Please enter 0-1000", Colors.YELLOW))
+                continue
+            break
+        except ValueError:
+            print(colorize("  ⚠️  Please enter a valid number", Colors.YELLOW))
+
+    amount = linux_count + win_count
+    if amount < 1:
+        print(colorize("  ⚠️  Need at least 1 agent total", Colors.YELLOW))
+        return
+
+    # Name prefix (only affects new agents in modify mode)
+    if modify_mode:
+        print(f"\n{colorize('Name prefix only affects newly added agents', Colors.CYAN)}")
+    else:
+        print(f"\n{colorize('Press Enter for random realistic names, or type a prefix (e.g. client_)', Colors.CYAN)}")
+    name_prefix = input("Agent name prefix [random]: ").strip() or "default"
+
     # Sensor range
     while True:
         try:
-            sensors_input = input("Sensor count range (min,max) [5,15]: ").strip() or "5,15"
+            sensors_input = input("\nSensor count range (min,max) [5,15]: ").strip() or "5,15"
             sensors = tuple(map(int, sensors_input.split(',')))
             if len(sensors) != 2 or sensors[0] < 1 or sensors[1] < sensors[0]:
                 print(colorize("  ⚠️  Invalid range. Use: min,max", Colors.YELLOW))
@@ -391,11 +578,11 @@ def interactive_build():
             break
         except ValueError:
             print(colorize("  ⚠️  Invalid format. Use: min,max", Colors.YELLOW))
-    
+
     # Temperature range
     while True:
         try:
-            temp_input = input("Sensor temperature range °C (min,max) [25,95]: ").strip() or "25,95"
+            temp_input = input("Sensor temperature range °C (min,max) [35,85]: ").strip() or "35,85"
             temp = tuple(map(int, temp_input.split(',')))
             if len(temp) != 2 or temp[0] < 0 or temp[1] < temp[0]:
                 print(colorize("  ⚠️  Invalid range", Colors.YELLOW))
@@ -403,11 +590,11 @@ def interactive_build():
             break
         except ValueError:
             print(colorize("  ⚠️  Invalid format", Colors.YELLOW))
-    
+
     # Fan range
     while True:
         try:
-            fans_input = input("Fan count range (min,max) [3,7]: ").strip() or "3,7"
+            fans_input = input("Fan count range (min,max) [4,9]: ").strip() or "4,9"
             fans = tuple(map(int, fans_input.split(',')))
             if len(fans) != 2 or fans[0] < 1 or fans[1] < fans[0]:
                 print(colorize("  ⚠️  Invalid range", Colors.YELLOW))
@@ -415,11 +602,11 @@ def interactive_build():
             break
         except ValueError:
             print(colorize("  ⚠️  Invalid format", Colors.YELLOW))
-    
+
     # RPM range
     while True:
         try:
-            rpm_input = input("Fan RPM range (min,max) [0,5000]: ").strip() or "0,5000"
+            rpm_input = input("Fan RPM range (min,max) [0,4500]: ").strip() or "0,4500"
             rpm = tuple(map(int, rpm_input.split(',')))
             if len(rpm) != 2 or rpm[0] < 0 or rpm[1] < rpm[0]:
                 print(colorize("  ⚠️  Invalid range", Colors.YELLOW))
@@ -427,37 +614,48 @@ def interactive_build():
             break
         except ValueError:
             print(colorize("  ⚠️  Invalid format", Colors.YELLOW))
-    
+
     # Summary
     print(colorize("\n" + "=" * 70, Colors.CYAN))
     print(colorize("  Configuration Summary", Colors.BOLD))
     print(colorize("=" * 70 + "\n", Colors.CYAN))
+    print(f"  Mode:              {colorize('Modify existing' if modify_mode else 'Fresh build', Colors.CYAN)}")
     print(f"  Server URL:        {colorize(server_url, Colors.CYAN)}")
-    print(f"  Agent Count:       {colorize(str(amount), Colors.CYAN)}")
-    print(f"  Name Prefix:       {colorize(name_prefix, Colors.CYAN)}")
+    print(f"  Agent Count:       {colorize(str(amount), Colors.CYAN)} "
+          f"({colorize(str(linux_count), Colors.CYAN)} Linux, "
+          f"{colorize(str(win_count), Colors.CYAN)} Windows)")
+    if name_prefix == "default":
+        print(f"  Name Style:        {colorize('Random realistic names', Colors.CYAN)}")
+    else:
+        print(f"  Name Prefix:       {colorize(name_prefix, Colors.CYAN)}")
     print(f"  Sensor Range:      {colorize(f'{sensors[0]}-{sensors[1]}', Colors.CYAN)}")
     print(f"  Temperature Range: {colorize(f'{temp[0]}-{temp[1]}°C', Colors.CYAN)}")
     print(f"  Fan Range:         {colorize(f'{fans[0]}-{fans[1]}', Colors.CYAN)}")
     print(f"  RPM Range:         {colorize(f'{rpm[0]}-{rpm[1]}', Colors.CYAN)}")
     print()
-    
+
     # Confirm
-    confirm = input("Create these agents? [Y/n]: ").strip().lower()
+    action = "Modify existing config" if modify_mode else "Create these agents"
+    confirm = input(f"{action}? [Y/n]: ").strip().lower()
     if confirm and confirm != 'y':
         print(colorize("\n❌ Cancelled\n", Colors.RED))
         return
-    
+
     # Stop existing swarm if running
     running, _ = is_swarm_running()
     if running:
         print(colorize("\n⚠️  Stopping existing swarm first...", Colors.YELLOW))
         stop_swarm()
-    
-    # Create agents
-    print(colorize("\n✨ Creating agents...\n", Colors.GREEN))
-    agents = create_agents(amount, name_prefix, sensors, fans, temp, rpm, server_url)
-    print(colorize(f"✅ Created {len(agents)} mock agents\n", Colors.GREEN))
-    
+
+    # Create or modify agents
+    print(colorize("\n✨ Building agents...\n", Colors.GREEN))
+    if modify_mode:
+        agents = modify_agents(linux_count, win_count, name_prefix, sensors, fans, temp, rpm, server_host, server_url)
+        print(colorize(f"✅ Config updated: {len(agents)} mock agents\n", Colors.GREEN))
+    else:
+        agents = create_agents(amount, name_prefix, linux_count, win_count, sensors, fans, temp, rpm, server_host, server_url)
+        print(colorize(f"✅ Created {len(agents)} mock agents\n", Colors.GREEN))
+
     # Offer to start
     start_now = input("Start swarm now? [Y/n]: ").strip().lower()
     if not start_now or start_now == 'y':

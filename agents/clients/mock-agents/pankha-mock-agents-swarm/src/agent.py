@@ -9,7 +9,10 @@ import asyncio
 import json
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, Optional
+
+_AGENTS_CONFIG = Path(__file__).parent.parent / "data" / "agents.json"
 
 try:
     import websockets
@@ -24,13 +27,13 @@ from hardware import MockHardware
 
 class MockAgent:
     """Single mock agent that connects to Pankha backend via WebSocket."""
-    
-    VERSION = "2.0.0-mock"
-    
+
     def __init__(self, config: Dict):
         """Initialize agent from config dictionary."""
         self.agent_id: str = config["agent_id"]
         self.name: str = config["agent_name"]
+        self.platform: str = config.get("platform", "linux")
+        self.fake_ip: str = config.get("fake_ip", "127.0.0.1")
         self.server_url: str = config["server_url"]
         self.update_interval: float = config.get("update_interval", 3.0)
         
@@ -53,7 +56,11 @@ class MockAgent:
         self.reconnect_count: int = 0
         
         self.log = get_logger()
-    
+
+    @property
+    def version(self) -> str:
+        return f"2.0.0-{self.platform}"
+
     async def run(self):
         """Main agent loop with automatic reconnection."""
         while self.running:
@@ -78,7 +85,10 @@ class MockAgent:
         """Connect to server and handle bidirectional communication."""
         self.log.info(f"[{self.name}] Connecting to {self.server_url}")
         
-        async with websockets.connect(self.server_url) as ws:
+        async with websockets.connect(
+            self.server_url,
+            extra_headers={"X-Forwarded-For": self.fake_ip},
+        ) as ws:
             self.websocket = ws
             self.connected = True
             self.log.info(f"[{self.name}] ✅ Connected")
@@ -107,7 +117,8 @@ class MockAgent:
             "data": {
                 "agentId": self.agent_id,
                 "name": self.name,
-                "agent_version": self.VERSION,
+                "agent_version": self.version,
+                "platform": self.platform,
                 "update_interval": self.update_interval,
                 "fan_step_percent": self.fan_step_percent,
                 "hysteresis_temp": self.hysteresis_temp,
@@ -211,77 +222,94 @@ class MockAgent:
                 interval = payload.get("interval")
                 if interval is not None:
                     self.update_interval = float(interval)
+                    self._persist_config("update_interval", self.update_interval)
                     result_data = {"interval": interval}
                 else:
                     success = False
                     error_msg = "Missing interval"
-            
+
             elif cmd_type == "setFanStep":
                 step = payload.get("step")
                 if step is not None:
                     self.fan_step_percent = int(step)
+                    self._persist_config("fan_step_percent", self.fan_step_percent)
                     result_data = {"step": step}
                 else:
                     success = False
                     error_msg = "Missing step"
-            
+
             elif cmd_type == "setHysteresis":
                 hysteresis = payload.get("hysteresis")
                 if hysteresis is not None:
                     self.hysteresis_temp = float(hysteresis)
+                    self._persist_config("hysteresis_temp", self.hysteresis_temp)
                     result_data = {"hysteresis": hysteresis}
                 else:
                     success = False
                     error_msg = "Missing hysteresis"
-            
+
             elif cmd_type == "setEmergencyTemp":
                 temp = payload.get("temp")
                 if temp is not None:
                     self.emergency_temp = float(temp)
+                    self._persist_config("emergency_temp", self.emergency_temp)
                     result_data = {"temp": temp}
                 else:
                     success = False
                     error_msg = "Missing temp"
-            
+
             elif cmd_type == "setLogLevel":
                 level = payload.get("level")
                 if level:
                     self.log_level = level.upper()
+                    self._persist_config("log_level", self.log_level)
                     result_data = {"level": level}
                 else:
                     success = False
                     error_msg = "Missing level"
-            
+
             elif cmd_type == "setFailsafeSpeed":
                 speed = payload.get("speed")
                 if speed is not None:
                     self.failsafe_speed = int(speed)
+                    self._persist_config("failsafe_speed", self.failsafe_speed)
                     result_data = {"speed": speed}
                 else:
                     success = False
                     error_msg = "Missing speed"
-            
+
             elif cmd_type == "setEnableFanControl":
                 enabled = payload.get("enabled")
                 if enabled is not None:
                     self.enable_fan_control = bool(enabled)
+                    self._persist_config("enable_fan_control", self.enable_fan_control)
                     result_data = {"enabled": enabled}
                 else:
                     success = False
                     error_msg = "Missing enabled"
-            
+
             elif cmd_type == "setAgentName":
                 name = payload.get("name")
                 if name:
                     self.name = name.strip()
+                    self._persist_config("agent_name", self.name)
                     result_data = {"name": name}
                 else:
                     success = False
                     error_msg = "Missing name"
             
+            elif cmd_type == "setProfile":
+                profile_name = payload.get("profileName")
+                if profile_name:
+                    self.current_profile = profile_name
+                    result_data = {"profileName": profile_name}
+                else:
+                    success = False
+                    error_msg = "Missing profileName"
+
             elif cmd_type == "ping":
                 result_data = {"pong": True}
-            
+
             else:
                 success = False
                 error_msg = f"Unknown command: {cmd_type}"
@@ -326,6 +354,23 @@ class MockAgent:
         if "failsafe_speed" in config:
             self.failsafe_speed = int(config["failsafe_speed"])
     
+    def _persist_config(self, key: str, value):
+        """Persist a config change to agents.json."""
+        try:
+            if not _AGENTS_CONFIG.exists():
+                return
+            with open(_AGENTS_CONFIG, 'r') as f:
+                config = json.load(f)
+            for agent in config.get("agents", []):
+                if agent.get("agent_id") == self.agent_id:
+                    agent[key] = value
+                    break
+            with open(_AGENTS_CONFIG, 'w') as f:
+                json.dump(config, f, indent=2)
+            self.log.debug(f"[{self.name}] Persisted {key}={value}")
+        except Exception as e:
+            self.log.warning(f"[{self.name}] Failed to persist {key}: {e}")
+
     def get_status(self) -> Dict:
         """Get agent status for status file."""
         return {
