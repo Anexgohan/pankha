@@ -36,26 +36,30 @@ _WIN_TYPE_MAP = {
 CPUS = {
     "linux": [
         # AMD Ryzen — k10temp driver
-        {"chip": "k10temp", "type": "cpu", "brand": "amd", "sensors": [
+        {"chip": "k10temp", "type": "cpu", "brand": "amd",
+         "hw_name": "AMD Ryzen 5 5600X", "sensors": [
             {"name": "Tctl", "max_temp": 95},
             {"name": "Tdie", "max_temp": 95},
             {"name": "Tccd1", "max_temp": 90},
         ]},
-        {"chip": "k10temp", "type": "cpu", "brand": "amd", "sensors": [
+        {"chip": "k10temp", "type": "cpu", "brand": "amd",
+         "hw_name": "AMD Ryzen 9 5900X", "sensors": [
             {"name": "Tctl", "max_temp": 95},
             {"name": "Tdie", "max_temp": 95},
             {"name": "Tccd1", "max_temp": 90},
             {"name": "Tccd2", "max_temp": 90},
         ]},
         # Intel Core — coretemp driver
-        {"chip": "coretemp", "type": "cpu", "brand": "intel", "sensors": [
+        {"chip": "coretemp", "type": "cpu", "brand": "intel",
+         "hw_name": "Intel Core i5-12600K", "sensors": [
             {"name": "Package id 0", "max_temp": 100},
             {"name": "Core 0", "max_temp": 100},
             {"name": "Core 1", "max_temp": 100},
             {"name": "Core 2", "max_temp": 100},
             {"name": "Core 3", "max_temp": 100},
         ]},
-        {"chip": "coretemp", "type": "cpu", "brand": "intel", "sensors": [
+        {"chip": "coretemp", "type": "cpu", "brand": "intel",
+         "hw_name": "Intel Core i7-13700K", "sensors": [
             {"name": "Package id 0", "max_temp": 100},
             {"name": "Core 0", "max_temp": 100},
             {"name": "Core 1", "max_temp": 100},
@@ -64,7 +68,8 @@ CPUS = {
             {"name": "Core 4", "max_temp": 100},
             {"name": "Core 5", "max_temp": 100},
         ]},
-        {"chip": "coretemp", "type": "cpu", "brand": "intel", "sensors": [
+        {"chip": "coretemp", "type": "cpu", "brand": "intel",
+         "hw_name": "Intel Core i9-13900K", "sensors": [
             {"name": "Package id 0", "max_temp": 100},
             {"name": "Core 0", "max_temp": 100},
             {"name": "Core 1", "max_temp": 100},
@@ -130,7 +135,7 @@ CPUS = {
 MOTHERBOARDS = {
     "linux": [
         # ASUS → Nuvoton NCT6798D
-        {"chip": "nct6798", "type": "motherboard", "desc": "ASUS B550/X570",
+        {"chip": "nct6798", "type": "motherboard", "hw_name": "Nuvoton NCT6798D", "desc": "ASUS B550/X570",
          "sensors": [
             {"name": "SYSTIN", "max_temp": 60},
             {"name": "CPUTIN", "max_temp": 70},
@@ -141,7 +146,7 @@ MOTHERBOARDS = {
                   "Chassis Fan 1", "Chassis Fan 2", "AIO Pump"],
         },
         # Gigabyte → ITE IT8689E
-        {"chip": "it8689e", "type": "motherboard", "desc": "Gigabyte Z690/B550",
+        {"chip": "it8689e", "type": "motherboard", "hw_name": "ITE IT8689E", "desc": "Gigabyte Z690/B550",
          "sensors": [
             {"name": "System", "max_temp": 60},
             {"name": "Chipset", "max_temp": 70},
@@ -151,7 +156,7 @@ MOTHERBOARDS = {
                   "System Fan 3", "CPU OPT"],
         },
         # Gigabyte → ITE IT8686E
-        {"chip": "it8686e", "type": "motherboard", "desc": "Gigabyte B660/B550M",
+        {"chip": "it8686e", "type": "motherboard", "hw_name": "ITE IT8686E", "desc": "Gigabyte B660/B550M",
          "sensors": [
             {"name": "System", "max_temp": 60},
             {"name": "Chipset", "max_temp": 70},
@@ -160,7 +165,7 @@ MOTHERBOARDS = {
          "fans": ["CPU Fan", "System Fan 1", "System Fan 2", "System Fan 3"],
         },
         # ASRock → Nuvoton NCT6796D
-        {"chip": "nct6796d", "type": "motherboard", "desc": "ASRock B550/X670E",
+        {"chip": "nct6796d", "type": "motherboard", "hw_name": "Nuvoton NCT6796D", "desc": "ASRock B550/X670E",
          "sensors": [
             {"name": "SYSTIN", "max_temp": 60},
             {"name": "CPUTIN", "max_temp": 70},
@@ -170,7 +175,7 @@ MOTHERBOARDS = {
                   "Chassis Fan 3", "CPU Fan 2"],
         },
         # ASUS older/budget → Nuvoton NCT6775
-        {"chip": "nct6775", "type": "motherboard", "desc": "ASUS B450/A520",
+        {"chip": "nct6775", "type": "motherboard", "hw_name": "Nuvoton NCT6775F", "desc": "ASUS B450/A520",
          "sensors": [
             {"name": "SYSTIN", "max_temp": 60},
             {"name": "CPUTIN", "max_temp": 70},
@@ -179,7 +184,7 @@ MOTHERBOARDS = {
          "fans": ["CPU Fan", "System Fan 1", "System Fan 2", "Chassis Fan"],
         },
         # Budget boards → ITE IT8628E
-        {"chip": "it8628e", "type": "motherboard", "desc": "Budget B450/H410",
+        {"chip": "it8628e", "type": "motherboard", "hw_name": "ITE IT8628E", "desc": "Budget B450/H410",
          "sensors": [
             {"name": "System", "max_temp": 60},
             {"name": "Chipset", "max_temp": 70},
@@ -251,19 +256,23 @@ MOTHERBOARDS = {
 GPUS = {
     "linux": [
         # NVIDIA (limited hwmon via proprietary driver)
-        {"chip": "nvidia", "type": "gpu", "brand": "nvidia", "sensors": [
+        {"chip": "nvidia", "type": "gpu", "brand": "nvidia",
+         "hw_name": "NVIDIA GeForce RTX 3060", "sensors": [
             {"name": "GPU Core", "max_temp": 90},
         ]},
-        {"chip": "nvidia", "type": "gpu", "brand": "nvidia", "sensors": [
+        {"chip": "nvidia", "type": "gpu", "brand": "nvidia",
+         "hw_name": "NVIDIA GeForce RTX 3070", "sensors": [
             {"name": "GPU Core", "max_temp": 90},
             {"name": "GPU Hot Spot", "max_temp": 95},
         ]},
         # AMD (full hwmon via amdgpu driver)
-        {"chip": "amdgpu", "type": "gpu", "brand": "amd", "sensors": [
+        {"chip": "amdgpu", "type": "gpu", "brand": "amd",
+         "hw_name": "AMD Radeon RX 6700 XT", "sensors": [
             {"name": "edge", "max_temp": 90},
             {"name": "junction", "max_temp": 95},
         ]},
-        {"chip": "amdgpu", "type": "gpu", "brand": "amd", "sensors": [
+        {"chip": "amdgpu", "type": "gpu", "brand": "amd",
+         "hw_name": "AMD Radeon RX 7800 XT", "sensors": [
             {"name": "edge", "max_temp": 90},
         ]},
     ],
@@ -304,20 +313,20 @@ GPUS = {
 
 NVME_DRIVES = {
     "linux": [
-        {"chip": "nvme", "type": "nvme", "model": "Samsung 980 PRO", "sensors": [
+        {"chip": "nvme", "type": "nvme", "hw_name": "Samsung 980 PRO 1TB", "sensors": [
             {"name": "Composite", "max_temp": 70},
             {"name": "Sensor 1", "max_temp": 65},
         ]},
-        {"chip": "nvme", "type": "nvme", "model": "WD Black SN850X", "sensors": [
+        {"chip": "nvme", "type": "nvme", "hw_name": "WD Black SN850X 1TB", "sensors": [
             {"name": "Composite", "max_temp": 70},
         ]},
-        {"chip": "nvme", "type": "nvme", "model": "Kingston NV2", "sensors": [
+        {"chip": "nvme", "type": "nvme", "hw_name": "Kingston NV2 500GB", "sensors": [
             {"name": "Composite", "max_temp": 70},
         ]},
-        {"chip": "nvme", "type": "nvme", "model": "Crucial P3 Plus", "sensors": [
+        {"chip": "nvme", "type": "nvme", "hw_name": "Crucial P3 Plus 1TB", "sensors": [
             {"name": "Composite", "max_temp": 70},
         ]},
-        {"chip": "nvme", "type": "nvme", "model": "Sabrent Rocket 4 Plus", "sensors": [
+        {"chip": "nvme", "type": "nvme", "hw_name": "Sabrent Rocket 4 Plus 2TB", "sensors": [
             {"name": "Composite", "max_temp": 70},
             {"name": "Sensor 1", "max_temp": 65},
         ]},
@@ -365,10 +374,10 @@ class MockHardware:
     #   ramp_up: approach factor per tick when heating (0-1, higher = faster)
     #   ramp_down: approach factor per tick when cooling (0-1, lower = slower)
     THERMAL_PROFILES = {
-        "cpu":         {"idle_offset": 8,  "load_peak": 35, "event_freq": 0.08, "event_dur": (3, 100),  "ramp_up": 0.4,  "ramp_down": 0.12},
-        "gpu":         {"idle_offset": 5,  "load_peak": 40, "event_freq": 0.03, "event_dur": (50, 400), "ramp_up": 0.25, "ramp_down": 0.08},
-        "nvme":        {"idle_offset": 3,  "load_peak": 12, "event_freq": 0.02, "event_dur": (30, 200), "ramp_up": 0.1,  "ramp_down": 0.05},
-        "motherboard": {"idle_offset": 5,  "load_peak": 10, "event_freq": 0.015,"event_dur": (40, 300), "ramp_up": 0.08, "ramp_down": 0.04},
+        "cpu":         {"idle_offset": 8,  "load_peak": 35, "event_freq": 0.08, "event_dur": (3, 100),  "ramp_up": 0.4,  "ramp_down": 0.12, "max_cooling": (10, 16)},
+        "gpu":         {"idle_offset": 5,  "load_peak": 40, "event_freq": 0.03, "event_dur": (50, 400), "ramp_up": 0.25, "ramp_down": 0.08, "max_cooling": (10, 16)},
+        "nvme":        {"idle_offset": 3,  "load_peak": 15, "event_freq": 0.05, "event_dur": (30, 200), "ramp_up": 0.18, "ramp_down": 0.07, "max_cooling": (0.2, 0.8)},
+        "motherboard": {"idle_offset": 5,  "load_peak": 12, "event_freq": 0.04, "event_dur": (40, 300), "ramp_up": 0.15, "ramp_down": 0.06, "max_cooling": (0.2, 0.6)},
     }
 
     def __init__(self, config: Dict):
@@ -397,6 +406,12 @@ class MockHardware:
             self.fans = self._load_fans(config["fans"])
         else:
             self.fans = self._create_fans(config.get("fan_count", 4))
+
+        # ── System health simulation state ──
+        self._cpu_usage = random.uniform(5, 15)       # current value
+        self._cpu_usage_idle = random.uniform(5, 12)   # baseline when no load
+        self._mem_usage = random.uniform(30, 55)       # mostly stable
+        self._mem_target = self._mem_usage              # target for gentle drift
 
     # ── Persistence helpers ──────────────────────────────────────────
 
@@ -436,54 +451,104 @@ class MockHardware:
     def _pick_system_archetype(self, sensor_count: int) -> Dict:
         """Select a coherent set of hardware components for this agent.
 
-        Returns a dict with keys: cpu, motherboard, gpus, nvmes — each
-        holding component definitions from the pools.  The total sensor
-        count across all components is fitted to *sensor_count* by
-        trimming sensors from larger groups or capping at what's available.
+        Builds a realistic system by picking non-CPU components first
+        (motherboard, GPU, NVMe) scaled to the sensor budget, then
+        selecting a CPU that fills the remaining slots.  This prevents
+        a large CPU from monopolizing all sensor slots.
+
+        Returns a dict with keys: cpu, motherboard, gpus, nvmes.
         """
         pool_key = self.platform if self.platform == "windows" else "linux"
 
-        # Deep-copy selected components so trimming doesn't mutate pools
-        def _pick(pool):
-            c = random.choice(pool)
-            return {**c, "sensors": list(c["sensors"]), "fans": list(c.get("fans", []))}
+        def _copy(c):
+            return {**c, "sensors": list(c["sensors"]),
+                    "fans": list(c.get("fans", []))}
 
         def _sample(pool, n):
             items = random.sample(pool, min(n, len(pool)))
-            return [{**c, "sensors": list(c["sensors"])} for c in items]
+            return [_copy(c) for c in items]
 
-        cpu = _pick(CPUS[pool_key])
-        mobo = _pick(MOTHERBOARDS[pool_key])
+        # ── 1. Motherboard (always present) ──
+        mobo = _copy(random.choice(MOTHERBOARDS[pool_key]))
 
-        # 0-2 GPUs (weighted: ~60% one GPU, ~25% no GPU, ~15% two GPUs)
-        gpu_roll = random.random()
-        if gpu_roll < 0.25:
-            gpu_count = 0
-        elif gpu_roll < 0.85:
-            gpu_count = 1
+        # ── 2. Optional devices — scale with sensor budget ──
+        # Small systems (≤6):  CPU + mobo only, maybe 1 GPU or NVMe
+        # Medium systems (7-9):  usually 1 GPU or NVMe, sometimes both
+        # Large systems (10+):  GPU + NVMe, occasionally multiples
+        if sensor_count >= 10:
+            gpu_count = 2 if random.random() < 0.15 else 1
+            nvme_count = 2 if random.random() < 0.30 else 1
+        elif sensor_count >= 7:
+            if random.random() < 0.35:
+                gpu_count, nvme_count = 1, 1
+            elif random.random() < 0.55:
+                gpu_count, nvme_count = 1, 0
+            else:
+                gpu_count, nvme_count = 0, 1
+        elif sensor_count >= 5:
+            if random.random() < 0.45:
+                gpu_count, nvme_count = 1, 0
+            elif random.random() < 0.35:
+                gpu_count, nvme_count = 0, 1
+            else:
+                gpu_count, nvme_count = 0, 0
         else:
-            gpu_count = 2
-        gpus = _sample(GPUS[pool_key], gpu_count)
+            gpu_count, nvme_count = 0, 0
 
-        # 1-2 NVMe drives (weighted: ~70% one, ~30% two)
-        nvme_count = 1 if random.random() < 0.70 else 2
+        gpus = _sample(GPUS[pool_key], gpu_count)
         nvmes = _sample(NVME_DRIVES[pool_key], nvme_count)
 
-        # Fit sensor count: trim from least-important components first
-        # Priority: keep all CPU sensors, trim from nvme → gpu → mobo
-        total_available = sum(
-            len(c["sensors"]) for c in [cpu, mobo] + gpus + nvmes
+        # ── 3. CPU — sized to fill remaining budget ──
+        non_cpu_total = sum(
+            len(c["sensors"]) for c in [mobo] + gpus + nvmes
         )
-        if sensor_count < total_available:
-            excess = total_available - sensor_count
-            for comp in reversed(nvmes + gpus + [mobo]):
+        cpu_budget = max(2, sensor_count - non_cpu_total)
+
+        # Pick a CPU whose sensor count fits within budget.
+        # Among fitting CPUs, prefer larger ones (more cores = more realistic
+        # for the sensor count).
+        cpu_pool = CPUS[pool_key]
+        fitting = [c for c in cpu_pool if len(c["sensors"]) <= cpu_budget]
+        if fitting:
+            best_size = max(len(c["sensors"]) for c in fitting)
+            # Random pick from CPUs within 1 sensor of the best fit
+            top = [c for c in fitting if len(c["sensors"]) >= best_size - 1]
+            cpu = _copy(random.choice(top))
+        else:
+            # All CPUs are too big — pick the smallest, trimming below
+            cpu = _copy(min(cpu_pool, key=lambda c: len(c["sensors"])))
+
+        # ── 4. Safety trim (handles edge cases) ──
+        MIN_CPU = 2
+        MIN_MOBO = 1
+        total = sum(len(c["sensors"]) for c in [cpu, mobo] + gpus + nvmes)
+
+        if sensor_count < total:
+            excess = total - sensor_count
+            # Trim: NVMe → GPU → mobo → CPU
+            for comp in reversed(nvmes + gpus):
                 if excess <= 0:
                     break
-                can_trim = max(0, len(comp["sensors"]) - 1)  # keep at least 1
-                trim = min(excess, can_trim)
+                trim = min(excess, len(comp["sensors"]))
                 if trim > 0:
                     comp["sensors"] = comp["sensors"][:len(comp["sensors"]) - trim]
                     excess -= trim
+            if excess > 0:
+                can_trim = max(0, len(mobo["sensors"]) - MIN_MOBO)
+                trim = min(excess, can_trim)
+                if trim > 0:
+                    mobo["sensors"] = mobo["sensors"][:len(mobo["sensors"]) - trim]
+                    excess -= trim
+            if excess > 0:
+                can_trim = max(0, len(cpu["sensors"]) - MIN_CPU)
+                trim = min(excess, can_trim)
+                if trim > 0:
+                    cpu["sensors"] = cpu["sensors"][:len(cpu["sensors"]) - trim]
+                    excess -= trim
+
+        # Drop fully-trimmed optional devices (and their fans)
+        gpus = [g for g in gpus if g["sensors"]]
+        nvmes = [n for n in nvmes if n["sensors"]]
 
         return {
             "cpu": cpu,
@@ -517,6 +582,8 @@ class MockHardware:
 
         sensors = []
         hwmon_idx = 0
+        # Track chip instances for unique IDs (e.g. 2 NVMe drives both use chip "nvme")
+        chip_instances: Dict[str, int] = {}
 
         # Order: CPU, motherboard, GPUs, NVMe drives
         # Each component gets its own hwmon index
@@ -524,11 +591,19 @@ class MockHardware:
 
         for comp in components:
             chip = comp["chip"]
+            instance = chip_instances.get(chip, 0)
+            chip_instances[chip] = instance + 1
+
             for sensor_idx, sdef in enumerate(comp["sensors"]):
                 if len(sensors) >= count:
                     break
 
-                sensor_id = f"{chip}_{self._sanitize_id(sdef['name'])}"
+                sanitized = self._sanitize_id(sdef["name"])
+                # Append instance index when multiple components share a chip
+                if instance > 0:
+                    sensor_id = f"{chip}{instance}_{sanitized}"
+                else:
+                    sensor_id = f"{chip}_{sanitized}"
 
                 sensor = {
                     "id": sensor_id,
@@ -539,6 +614,9 @@ class MockHardware:
                     "chip": chip,
                     "source": f"/sys/class/hwmon/hwmon{hwmon_idx}/temp{sensor_idx + 1}_input",
                 }
+                hw_name = comp.get("hw_name", "")
+                if hw_name:
+                    sensor["hardwareName"] = hw_name
                 self._init_sim_state(sensor)
                 sensors.append(sensor)
 
@@ -647,16 +725,17 @@ class MockHardware:
             fans.append(fan)
             fan_idx += 1
 
-        # GPU fans: 1 fan per GPU
+        # GPU fans: 1 fan per GPU (use instance index for unique IDs)
         for gpu_i, gpu in enumerate(gpus):
             if fan_idx >= count:
                 break
             gpu_chip = gpu["chip"]
             gpu_hwmon = gpu_hwmon_base + gpu_i
+            chip_instance = gpu.get("_instance", gpu_i)
             speed = random.randint(30, 70)
             fan = {
-                "id": f"{gpu_chip}_fan_1",
-                "name": "GPU Fan",
+                "id": f"{gpu_chip}{chip_instance}_fan_1" if chip_instance > 0 else f"{gpu_chip}_fan_1",
+                "name": f"GPU Fan{f' {chip_instance + 1}' if chip_instance > 0 else ''}",
                 "rpm": self._speed_to_rpm(speed),
                 "speed": speed,
                 "targetSpeed": speed,
@@ -736,7 +815,8 @@ class MockHardware:
         sensor["_idle_temp"] = min_temp + profile["idle_offset"] + random.uniform(-2, 2)
         sensor["_current_temp"] = sensor["_idle_temp"] + random.uniform(-1, 1)
         sensor["_profile"] = profile
-        sensor["_max_cooling"] = random.uniform(10, 16)
+        cooling_range = profile.get("max_cooling", (10, 16))
+        sensor["_max_cooling"] = random.uniform(*cooling_range)
         sensor["_cooling_offset"] = 0.0
         # Load event state
         sensor["_event_active"] = False
@@ -768,13 +848,26 @@ class MockHardware:
         cooling_factor = avg_fan_speed / 100.0
 
         # ── Chip-correlated load events ──
+        # Check if CPU or GPU currently have active load events.
+        # Motherboard and NVMe temps correlate with CPU/GPU activity:
+        # VRM heats up under CPU load, storage is busy when system is busy.
+        cpu_gpu_active = any(
+            s["_event_active"] for s in self.sensors
+            if s["type"] in ("cpu", "gpu")
+        )
+
         # Decide per-chip whether a new load event starts this tick
         chip_events: Dict[str, bool] = {}
         for sensor in self.sensors:
             chip = sensor["chip"]
             if chip not in chip_events:
                 profile = sensor["_profile"]
-                chip_events[chip] = random.random() < profile["event_freq"]
+                freq = profile["event_freq"]
+                # When CPU/GPU are under load, mobo and NVMe very likely to
+                # also start heating — VRM from CPU power, NVMe from I/O
+                if cpu_gpu_active and sensor["type"] in ("motherboard", "nvme"):
+                    freq = min(freq * 6, 0.5)
+                chip_events[chip] = random.random() < freq
 
         # ── Update each sensor ──
         min_temp, max_temp = self.temp_range
@@ -871,7 +964,7 @@ class MockHardware:
                 "chip": s["chip"],
                 "source": s["source"],
             }
-            if self.platform == "windows" and "hardwareName" in s:
+            if "hardwareName" in s:
                 data["hardwareName"] = s["hardwareName"]
             result.append(data)
         return result
@@ -897,10 +990,39 @@ class MockHardware:
         return result
 
     def get_system_health(self) -> Dict:
-        """Get mock system health metrics."""
+        """Get mock system health metrics with event-driven simulation.
+
+        CPU usage correlates with active CPU thermal events (same load events
+        that drive temperature spikes).  Memory is mostly stable with small
+        random drift, simulating long-running processes.
+        """
         uptime = time.time() - self.start_time
+
+        # ── CPU usage: correlate with CPU sensor load events ──
+        cpu_under_load = any(
+            s["_event_active"] for s in self.sensors if s["type"] == "cpu"
+        )
+        if cpu_under_load:
+            # Ramp toward a load target (45-85%)
+            load_target = random.uniform(45, 85)
+            self._cpu_usage += (load_target - self._cpu_usage) * 0.3
+        else:
+            # Cool down toward idle baseline
+            self._cpu_usage += (self._cpu_usage_idle - self._cpu_usage) * 0.15
+        # Add small jitter
+        self._cpu_usage += random.uniform(-1.5, 1.5)
+        self._cpu_usage = max(1.0, min(99.0, self._cpu_usage))
+
+        # ── Memory: stable with slow drift ──
+        if random.random() < 0.05:  # ~5% chance per tick to shift target
+            self._mem_target += random.uniform(-3, 3)
+            self._mem_target = max(20.0, min(80.0, self._mem_target))
+        self._mem_usage += (self._mem_target - self._mem_usage) * 0.1
+        self._mem_usage += random.uniform(-0.3, 0.3)
+        self._mem_usage = max(10.0, min(95.0, self._mem_usage))
+
         return {
-            "cpuUsage": round(random.uniform(5, 45), 1),
-            "memoryUsage": round(random.uniform(25, 65), 1),
+            "cpuUsage": round(self._cpu_usage, 1),
+            "memoryUsage": round(self._mem_usage, 1),
             "agentUptime": round(uptime, 1),
         }

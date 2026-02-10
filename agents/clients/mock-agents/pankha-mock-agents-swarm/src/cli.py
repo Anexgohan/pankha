@@ -316,25 +316,61 @@ def _pick_names(count: int, use_random: bool, prefix: str, offset: int = 0) -> L
 # PROCESS MANAGEMENT
 # ============================================================================
 
-def is_swarm_running() -> Tuple[bool, Optional[int]]:
-    """Check if swarm process is running."""
-    if not PID_FILE.exists():
-        return False, None
-    
+def _pid_alive(pid: int) -> bool:
+    """Check if a process with the given PID exists."""
     try:
-        pid = int(PID_FILE.read_text().strip())
-        
-        # Check if process exists
+        os.kill(pid, 0)
+        return True
+    except OSError:
+        return False
+
+
+def is_swarm_running() -> Tuple[bool, Optional[int]]:
+    """Check if swarm process is running.
+
+    Tries three strategies to find the swarm process:
+      1. PID file (normal path)
+      2. status.json PID field (survives PID file deletion, e.g. rsync --delete)
+      3. Process search by command pattern (last resort for orphans)
+    """
+    # Strategy 1: PID file
+    if PID_FILE.exists():
         try:
-            os.kill(pid, 0)
-            return True, pid
-        except OSError:
+            pid = int(PID_FILE.read_text().strip())
+            if _pid_alive(pid):
+                return True, pid
             # Stale PID file
             PID_FILE.unlink()
-            return False, None
-    
-    except (ValueError, IOError):
-        return False, None
+        except (ValueError, IOError):
+            pass
+
+    # Strategy 2: status.json PID
+    try:
+        if STATUS_FILE.exists():
+            import json as _json
+            status = _json.loads(STATUS_FILE.read_text())
+            pid = status.get("pid")
+            if pid and _pid_alive(pid):
+                return True, pid
+    except (ValueError, IOError, KeyError):
+        pass
+
+    # Strategy 3: find process by command pattern (catches all orphans)
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "run_swarm"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0:
+            # May return multiple PIDs; take the first
+            for line in result.stdout.strip().splitlines():
+                pid = int(line.strip())
+                if _pid_alive(pid):
+                    return True, pid
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+        pass
+
+    return False, None
 
 
 def start_swarm() -> bool:
@@ -394,43 +430,52 @@ run_swarm(Path('{SCRIPT_DIR}'))
         return False
 
 
+def _kill_pid(pid: int) -> bool:
+    """Send SIGTERM then SIGKILL to a process. Returns True if killed."""
+    import signal
+
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        return True  # already dead
+
+    # Wait for graceful shutdown (5 seconds)
+    for _ in range(50):
+        if not _pid_alive(pid):
+            return True
+        time.sleep(0.1)
+
+    # Force kill
+    try:
+        os.kill(pid, signal.SIGKILL)
+        time.sleep(0.5)
+    except OSError:
+        pass
+
+    return not _pid_alive(pid)
+
+
 def stop_swarm() -> bool:
-    """Stop the running swarm."""
+    """Stop the running swarm, including orphaned processes."""
     running, pid = is_swarm_running()
-    
+
     if not running:
         print(colorize("⚠️  Swarm is not running", Colors.YELLOW))
         return False
-    
+
     print(colorize(f"🛑 Stopping swarm (PID: {pid})...", Colors.BOLD))
-    
-    try:
-        import signal
-        os.kill(pid, signal.SIGTERM)
-        
-        # Wait for graceful shutdown
-        for i in range(50):  # 5 seconds max
-            try:
-                os.kill(pid, 0)
-                time.sleep(0.1)
-            except OSError:
-                break
-        else:
-            # Force kill
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
-                pass
-        
-        # Clean up PID file
-        if PID_FILE.exists():
-            PID_FILE.unlink()
-        
+
+    killed = _kill_pid(pid)
+
+    # Clean up PID file
+    if PID_FILE.exists():
+        PID_FILE.unlink()
+
+    if killed:
         print(colorize("✅ Swarm stopped\n", Colors.GREEN))
         return True
-    
-    except Exception as e:
-        print(colorize(f"❌ Failed to stop: {e}", Colors.RED))
+    else:
+        print(colorize(f"❌ Failed to kill PID {pid}", Colors.RED))
         return False
 
 
@@ -525,12 +570,14 @@ def interactive_build():
 
     # --- Derive current defaults from existing config ---
     def_server = config.get("default_server", DEFAULT_SERVER)
-    def_linux = sum(1 for a in existing if a.get("platform", "linux") == "linux") if modify_mode else 5
-    def_win = sum(1 for a in existing if a.get("platform") == "windows") if modify_mode else 0
+    existing_linux = sum(1 for a in existing if a.get("platform", "linux") == "linux")
+    existing_win = sum(1 for a in existing if a.get("platform") == "windows")
+    def_linux = existing_linux if existing_linux else 5
+    def_win = existing_win if existing_win else 0
 
     # Persisted wizard defaults (from last --build run)
     wd = config.get("wizard_defaults", {})
-    def_sensors = wd.get("sensor_range", [5, 15])
+    def_sensors = wd.get("sensor_range", [8, 15])
     def_temp = wd.get("temp_range", [35, 85])
     def_fans = wd.get("fan_range", [4, 9])
     def_rpm = wd.get("rpm_range", [0, 4500])

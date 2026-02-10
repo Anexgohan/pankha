@@ -68,29 +68,42 @@ class SwarmManager:
             self.pid_file.unlink()
     
     async def update_status(self):
-        """Periodically update status.json for CLI --status command."""
+        """Periodically update status.json for CLI --status command.
+        
+        Only writes to disk when connectivity state changes or every 30s
+        as a heartbeat to prevent stale-file false alarms.
+        """
+        prev_connected = -1
+        ticks_since_write = 0
+        heartbeat_ticks = 15  # 15 × 2s = 30s
+        
         while self.running:
             try:
                 connected = sum(1 for a in self.agents if a.connected)
+                ticks_since_write += 1
                 
-                status = {
-                    "updated_at": datetime.now(timezone.utc).isoformat(),
-                    "started_at": self.start_time.isoformat() if self.start_time else None,
-                    "pid": os.getpid(),
-                    "total": len(self.agents),
-                    "connected": connected,
-                    "disconnected": len(self.agents) - connected,
-                    "agents": {
-                        a.name: a.get_status() for a in self.agents
+                # Only write on state change or heartbeat
+                if connected != prev_connected or ticks_since_write >= heartbeat_ticks:
+                    status = {
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                        "started_at": self.start_time.isoformat() if self.start_time else None,
+                        "pid": os.getpid(),
+                        "total": len(self.agents),
+                        "connected": connected,
+                        "disconnected": len(self.agents) - connected,
+                        "agents": {
+                            a.name: a.get_status() for a in self.agents
+                        }
                     }
-                }
-                
-                self.status_file.write_text(json.dumps(status, indent=2))
+                    
+                    self.status_file.write_text(json.dumps(status, indent=2))
+                    prev_connected = connected
+                    ticks_since_write = 0
                 
             except Exception as e:
                 self.log.error(f"Failed to write status: {e}")
             
-            await asyncio.sleep(2)  # Update every 2 seconds
+            await asyncio.sleep(2)  # Check every 2 seconds
     
     def setup_signal_handlers(self):
         """Setup graceful shutdown on SIGTERM/SIGINT."""

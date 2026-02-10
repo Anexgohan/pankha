@@ -54,12 +54,14 @@ class MockAgent:
         self.running: bool = True
         self.last_data_sent: Optional[datetime] = None
         self.reconnect_count: int = 0
+        self.current_profile: str = "default"
+        self._version: str = "0.4.0"
         
         self.log = get_logger()
 
     @property
     def version(self) -> str:
-        return f"2.0.0-{self.platform}"
+        return f"{self._version}-{self.platform}"
 
     async def run(self):
         """Main agent loop with automatic reconnection."""
@@ -309,6 +311,77 @@ class MockAgent:
 
             elif cmd_type == "ping":
                 result_data = {"pong": True}
+
+            elif cmd_type == "getStatus":
+                result_data = {
+                    "agentId": self.agent_id,
+                    "agentName": self.name,
+                    "platform": self.platform,
+                    "version": self.version,
+                    "connected": self.connected,
+                    "updateInterval": self.update_interval,
+                    "fanStepPercent": self.fan_step_percent,
+                    "hysteresisTemp": self.hysteresis_temp,
+                    "emergencyTemp": self.emergency_temp,
+                    "failsafeSpeed": self.failsafe_speed,
+                    "logLevel": self.log_level,
+                    "enableFanControl": self.enable_fan_control,
+                    "currentProfile": self.current_profile,
+                    "sensorCount": len(self.hardware.sensors),
+                    "fanCount": len(self.hardware.fans),
+                }
+
+            elif cmd_type == "getDiagnostics":
+                hw_export = self.hardware.export_hardware()
+                result_data = {
+                    "agentId": self.agent_id,
+                    "agentName": self.name,
+                    "platform": self.platform,
+                    "version": self.version,
+                    "sensors": hw_export["sensors"],
+                    "fans": hw_export["fans"],
+                    "systemHealth": self.hardware.get_system_health(),
+                }
+
+            elif cmd_type == "updateSensorMapping":
+                # Mapping is handled backend-side; mock agent just acknowledges
+                mappings = payload.get("sensorMappings", [])
+                result_data = {"sensorMappings": mappings}
+
+            elif cmd_type == "rescanSensors":
+                # Hardware is static in mock agents; acknowledge with current counts
+                result_data = {
+                    "sensorCount": len(self.hardware.sensors),
+                    "fanCount": len(self.hardware.fans),
+                }
+
+            elif cmd_type == "selfUpdate":
+                # Simulate update: respond success, adopt the version sent by
+                # the backend (hubStatus.version), then disconnect to mimic
+                # the restart window. The reconnect loop will re-register
+                # with the new version automatically.
+                target_version = payload.get("version")
+                if target_version:
+                    # Strip leading 'v' if present (e.g. "v0.4.1" -> "0.4.1")
+                    self._version = target_version.lstrip("v")
+                else:
+                    # Fallback: bump patch if no version provided
+                    parts = self._version.rsplit(".", 1)
+                    self._version = f"{parts[0]}.{int(parts[-1]) + 1}"
+                result_data = {"version": self.version}
+                self.log.info(f"[{self.name}] selfUpdate: {self.version} — disconnecting to simulate restart")
+                # Send response first, then schedule disconnect
+                response = {
+                    "type": "commandResponse",
+                    "commandId": cmd_id,
+                    "success": True,
+                    "data": result_data,
+                    "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+                }
+                await self.websocket.send(json.dumps(response))
+                await asyncio.sleep(1)
+                await self.websocket.close()
+                return  # Skip the normal response path below
 
             else:
                 success = False

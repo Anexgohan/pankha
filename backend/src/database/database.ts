@@ -40,9 +40,10 @@ export class Database {
 
     this.pool = new Pool({
       connectionString: databaseUrl,
-      max: 20, // Maximum number of clients in the pool
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      min: 5,                         // Always keep 5 warm connections ready
+      max: 50,                        // Scale up to 50 under load
+      idleTimeoutMillis: 30000,       // Drop idle connections after 30s
+      connectionTimeoutMillis: 5000,  // Wait 5s before timeout (prevents pool exhaustion under burst)
     });
 
     this.pool.on('error', (err) => {
