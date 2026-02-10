@@ -33,7 +33,7 @@ services:
 
   pankha-postgres:
     container_name: pankha_postgres
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     logging:
       options:
         max-size: "50m"
@@ -61,7 +61,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./docker-data/backend/database/postgres_data:/var/lib/postgresql/data
+      - ./docker-data/backend/database/postgres_data:/var/lib/postgresql
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
