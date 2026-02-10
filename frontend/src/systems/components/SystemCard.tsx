@@ -628,6 +628,28 @@ const SystemCard: React.FC<SystemCardProps> = ({
     fanControl: enableFanControl ? "ENABLED" : "DISABLED"
   };
 
+  const getPlatformIcon = () => {
+    const isWindows =
+      system.platform === "windows" ||
+      system.agent_id.toLowerCase().startsWith("windows-");
+    
+    const getPlatformLabel = () => {
+      if (isWindows) return "Windows";
+      if (system.platform === "macos") return "macOS";
+      if (system.platform === "linux" || system.agent_id.toLowerCase().includes("linux")) return "Linux";
+      return "Agent";
+    };
+
+    const platformLabel = getPlatformLabel();
+    
+    // Option B: Minimalist larger icon without background container
+    return (
+      <div className="platform-icon-minimal" title={platformLabel}>
+        <img src={`/icons/${isWindows ? 'windows_01.svg' : 'linux_01.svg'}`} alt={platformLabel} width="20" height="20" />
+      </div>
+    );
+  };
+
   return (
     <div ref={cardRef} className={`system-card${isReadOnly ? " read-only" : ""}`}>
       <div className="system-header">
@@ -641,6 +663,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               >
                 {system.status}
               </span>
+              {getPlatformIcon()}
             </div>
 
             <div className="header-actions">

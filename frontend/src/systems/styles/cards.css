@@ -209,7 +209,7 @@
 .status-group {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--spacing-lg);
   flex-shrink: 0;
 }
 
@@ -219,6 +219,27 @@
   gap: var(--spacing-xs);
   flex-shrink: 0;
 }
+
+.platform-icon-minimal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: all 0.2s ease;
+}
+
+.platform-icon-minimal:hover {
+  opacity: 1;
+  transform: scale(1.1) translateY(-2px);
+}
+
+
+
+.platform-icon-minimal img {
+  display: block;
+}
+
 
 .system-title-main {
   width: 100%;
