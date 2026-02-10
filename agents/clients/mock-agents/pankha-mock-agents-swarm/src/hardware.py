@@ -4,9 +4,12 @@ Pankha Mock Agents - Hardware Simulation
 Generates realistic mock sensor and fan data.
 Matches the exact data structures used by real Pankha agents.
 Supports both Linux (sysfs/hwmon) and Windows (LibreHardwareMonitor) formats.
+
+Hardware is assembled from coherent system archetypes — each mock agent
+represents a realistic machine with compatible components (no AMD+Intel
+CPU mixing, no dual Super I/O chips, etc.).
 """
 
-import math
 import random
 import time
 from typing import Dict, List, Tuple
@@ -16,108 +19,357 @@ from typing import Dict, List, Tuple
 _WIN_TYPE_MAP = {
     "cpu": "CPU",
     "gpu": "GpuNvidia",
+    "gpu_amd": "GpuAti",
     "nvme": "Storage",
     "motherboard": "SuperIO",
 }
 
+# ─────────────────────────────────────────────────────────────────────
+# Component Pools
+#
+# Each pool contains real hardware definitions for Linux (sysfs/hwmon)
+# and Windows (LibreHardwareMonitor).  One entry per distinct hardware
+# variant.  The archetype picker selects compatible components from
+# these pools to assemble a coherent system.
+# ─────────────────────────────────────────────────────────────────────
+
+CPUS = {
+    "linux": [
+        # AMD Ryzen — k10temp driver
+        {"chip": "k10temp", "type": "cpu", "brand": "amd", "sensors": [
+            {"name": "Tctl", "max_temp": 95},
+            {"name": "Tdie", "max_temp": 95},
+            {"name": "Tccd1", "max_temp": 90},
+        ]},
+        {"chip": "k10temp", "type": "cpu", "brand": "amd", "sensors": [
+            {"name": "Tctl", "max_temp": 95},
+            {"name": "Tdie", "max_temp": 95},
+            {"name": "Tccd1", "max_temp": 90},
+            {"name": "Tccd2", "max_temp": 90},
+        ]},
+        # Intel Core — coretemp driver
+        {"chip": "coretemp", "type": "cpu", "brand": "intel", "sensors": [
+            {"name": "Package id 0", "max_temp": 100},
+            {"name": "Core 0", "max_temp": 100},
+            {"name": "Core 1", "max_temp": 100},
+            {"name": "Core 2", "max_temp": 100},
+            {"name": "Core 3", "max_temp": 100},
+        ]},
+        {"chip": "coretemp", "type": "cpu", "brand": "intel", "sensors": [
+            {"name": "Package id 0", "max_temp": 100},
+            {"name": "Core 0", "max_temp": 100},
+            {"name": "Core 1", "max_temp": 100},
+            {"name": "Core 2", "max_temp": 100},
+            {"name": "Core 3", "max_temp": 100},
+            {"name": "Core 4", "max_temp": 100},
+            {"name": "Core 5", "max_temp": 100},
+        ]},
+        {"chip": "coretemp", "type": "cpu", "brand": "intel", "sensors": [
+            {"name": "Package id 0", "max_temp": 100},
+            {"name": "Core 0", "max_temp": 100},
+            {"name": "Core 1", "max_temp": 100},
+            {"name": "Core 2", "max_temp": 100},
+            {"name": "Core 3", "max_temp": 100},
+            {"name": "Core 4", "max_temp": 100},
+            {"name": "Core 5", "max_temp": 100},
+            {"name": "Core 6", "max_temp": 100},
+            {"name": "Core 7", "max_temp": 100},
+        ]},
+    ],
+    "windows": [
+        {"chip": "amdcpu", "type": "cpu", "brand": "amd",
+         "hw_name": "AMD Ryzen 7 5800X", "sensors": [
+            {"name": "Tctl/Tdie", "max_temp": 95},
+            {"name": "CCD1 (Tdie)", "max_temp": 90},
+        ]},
+        {"chip": "amdcpu", "type": "cpu", "brand": "amd",
+         "hw_name": "AMD Ryzen 9 5950X", "sensors": [
+            {"name": "Tctl/Tdie", "max_temp": 95},
+            {"name": "CCD1 (Tdie)", "max_temp": 90},
+            {"name": "CCD2 (Tdie)", "max_temp": 90},
+        ]},
+        {"chip": "amdcpu", "type": "cpu", "brand": "amd",
+         "hw_name": "AMD Ryzen 9 7950X", "sensors": [
+            {"name": "Tctl/Tdie", "max_temp": 95},
+            {"name": "CCD1 (Tdie)", "max_temp": 90},
+            {"name": "CCD2 (Tdie)", "max_temp": 90},
+        ]},
+        {"chip": "intelcpu", "type": "cpu", "brand": "intel",
+         "hw_name": "Intel Core i5-12600K", "sensors": [
+            {"name": "CPU Package", "max_temp": 100},
+            {"name": "Core #0", "max_temp": 100},
+            {"name": "Core #1", "max_temp": 100},
+            {"name": "Core #2", "max_temp": 100},
+            {"name": "Core #3", "max_temp": 100},
+        ]},
+        {"chip": "intelcpu", "type": "cpu", "brand": "intel",
+         "hw_name": "Intel Core i7-13700K", "sensors": [
+            {"name": "CPU Package", "max_temp": 100},
+            {"name": "Core #0", "max_temp": 100},
+            {"name": "Core #1", "max_temp": 100},
+            {"name": "Core #2", "max_temp": 100},
+            {"name": "Core #3", "max_temp": 100},
+            {"name": "Core #4", "max_temp": 100},
+            {"name": "Core #5", "max_temp": 100},
+        ]},
+        {"chip": "intelcpu", "type": "cpu", "brand": "intel",
+         "hw_name": "Intel Core i9-13900K", "sensors": [
+            {"name": "CPU Package", "max_temp": 100},
+            {"name": "Core #0", "max_temp": 100},
+            {"name": "Core #1", "max_temp": 100},
+            {"name": "Core #2", "max_temp": 100},
+            {"name": "Core #3", "max_temp": 100},
+            {"name": "Core #4", "max_temp": 100},
+            {"name": "Core #5", "max_temp": 100},
+            {"name": "Core #6", "max_temp": 100},
+            {"name": "Core #7", "max_temp": 100},
+        ]},
+    ],
+}
+
+MOTHERBOARDS = {
+    "linux": [
+        # ASUS → Nuvoton NCT6798D
+        {"chip": "nct6798", "type": "motherboard", "desc": "ASUS B550/X570",
+         "sensors": [
+            {"name": "SYSTIN", "max_temp": 60},
+            {"name": "CPUTIN", "max_temp": 70},
+            {"name": "AUXTIN0", "max_temp": 50},
+            {"name": "AUXTIN1", "max_temp": 50},
+         ],
+         "fans": ["CPU Fan", "System Fan 1", "System Fan 2",
+                  "Chassis Fan 1", "Chassis Fan 2", "AIO Pump"],
+        },
+        # Gigabyte → ITE IT8689E
+        {"chip": "it8689e", "type": "motherboard", "desc": "Gigabyte Z690/B550",
+         "sensors": [
+            {"name": "System", "max_temp": 60},
+            {"name": "Chipset", "max_temp": 70},
+            {"name": "VRM", "max_temp": 100},
+         ],
+         "fans": ["CPU Fan", "System Fan 1", "System Fan 2",
+                  "System Fan 3", "CPU OPT"],
+        },
+        # Gigabyte → ITE IT8686E
+        {"chip": "it8686e", "type": "motherboard", "desc": "Gigabyte B660/B550M",
+         "sensors": [
+            {"name": "System", "max_temp": 60},
+            {"name": "Chipset", "max_temp": 70},
+            {"name": "VRM", "max_temp": 100},
+         ],
+         "fans": ["CPU Fan", "System Fan 1", "System Fan 2", "System Fan 3"],
+        },
+        # ASRock → Nuvoton NCT6796D
+        {"chip": "nct6796d", "type": "motherboard", "desc": "ASRock B550/X670E",
+         "sensors": [
+            {"name": "SYSTIN", "max_temp": 60},
+            {"name": "CPUTIN", "max_temp": 70},
+            {"name": "AUXTIN0", "max_temp": 50},
+         ],
+         "fans": ["CPU Fan 1", "Chassis Fan 1", "Chassis Fan 2",
+                  "Chassis Fan 3", "CPU Fan 2"],
+        },
+        # ASUS older/budget → Nuvoton NCT6775
+        {"chip": "nct6775", "type": "motherboard", "desc": "ASUS B450/A520",
+         "sensors": [
+            {"name": "SYSTIN", "max_temp": 60},
+            {"name": "CPUTIN", "max_temp": 70},
+            {"name": "AUXTIN", "max_temp": 50},
+         ],
+         "fans": ["CPU Fan", "System Fan 1", "System Fan 2", "Chassis Fan"],
+        },
+        # Budget boards → ITE IT8628E
+        {"chip": "it8628e", "type": "motherboard", "desc": "Budget B450/H410",
+         "sensors": [
+            {"name": "System", "max_temp": 60},
+            {"name": "Chipset", "max_temp": 70},
+            {"name": "VRM", "max_temp": 100},
+         ],
+         "fans": ["CPU Fan", "Rear Fan", "Front Fan 1"],
+        },
+    ],
+    "windows": [
+        {"chip": "superio", "type": "motherboard",
+         "hw_name": "Nuvoton NCT6798D", "desc": "ASUS B550/X570",
+         "sensors": [
+            {"name": "CPU Core", "max_temp": 60},
+            {"name": "System", "max_temp": 70},
+            {"name": "Auxiliary", "max_temp": 50},
+            {"name": "VRM MOS", "max_temp": 100},
+         ],
+         "fans": ["CPU_FAN", "SYS_FAN1", "SYS_FAN2",
+                  "CHA_FAN1", "CHA_FAN2", "AIO_PUMP"],
+        },
+        {"chip": "superio", "type": "motherboard",
+         "hw_name": "ITE IT8689E", "desc": "Gigabyte Z690/B550",
+         "sensors": [
+            {"name": "System", "max_temp": 60},
+            {"name": "Chipset", "max_temp": 70},
+            {"name": "VRM", "max_temp": 100},
+         ],
+         "fans": ["CPU_FAN", "SYS_FAN1", "SYS_FAN2", "SYS_FAN3", "CPU_OPT"],
+        },
+        {"chip": "superio", "type": "motherboard",
+         "hw_name": "ITE IT8686E", "desc": "Gigabyte B660/B550M",
+         "sensors": [
+            {"name": "System", "max_temp": 60},
+            {"name": "Chipset", "max_temp": 70},
+            {"name": "VRM", "max_temp": 100},
+         ],
+         "fans": ["CPU_FAN", "SYS_FAN1", "SYS_FAN2", "SYS_FAN3"],
+        },
+        {"chip": "superio", "type": "motherboard",
+         "hw_name": "Nuvoton NCT6796D", "desc": "ASRock B550/X670E",
+         "sensors": [
+            {"name": "CPU Core", "max_temp": 60},
+            {"name": "System", "max_temp": 70},
+            {"name": "Auxiliary", "max_temp": 50},
+         ],
+         "fans": ["CPU_FAN1", "CHA_FAN1", "CHA_FAN2", "CHA_FAN3", "CPU_FAN2"],
+        },
+        {"chip": "superio", "type": "motherboard",
+         "hw_name": "Nuvoton NCT6775F", "desc": "ASUS B450/A520",
+         "sensors": [
+            {"name": "CPU Core", "max_temp": 60},
+            {"name": "System", "max_temp": 70},
+            {"name": "Auxiliary", "max_temp": 50},
+         ],
+         "fans": ["CPU_FAN", "SYS_FAN1", "SYS_FAN2", "CHA_FAN"],
+        },
+        {"chip": "superio", "type": "motherboard",
+         "hw_name": "ITE IT8628E", "desc": "Budget B450/H410",
+         "sensors": [
+            {"name": "System", "max_temp": 60},
+            {"name": "Chipset", "max_temp": 70},
+            {"name": "VRM", "max_temp": 100},
+         ],
+         "fans": ["CPU_FAN", "REAR_FAN", "FRONT_FAN1"],
+        },
+    ],
+}
+
+GPUS = {
+    "linux": [
+        # NVIDIA (limited hwmon via proprietary driver)
+        {"chip": "nvidia", "type": "gpu", "brand": "nvidia", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+        ]},
+        {"chip": "nvidia", "type": "gpu", "brand": "nvidia", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+            {"name": "GPU Hot Spot", "max_temp": 95},
+        ]},
+        # AMD (full hwmon via amdgpu driver)
+        {"chip": "amdgpu", "type": "gpu", "brand": "amd", "sensors": [
+            {"name": "edge", "max_temp": 90},
+            {"name": "junction", "max_temp": 95},
+        ]},
+        {"chip": "amdgpu", "type": "gpu", "brand": "amd", "sensors": [
+            {"name": "edge", "max_temp": 90},
+        ]},
+    ],
+    "windows": [
+        {"chip": "nvidiagpu", "type": "gpu", "brand": "nvidia",
+         "hw_name": "NVIDIA GeForce RTX 3060", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+            {"name": "GPU Hot Spot", "max_temp": 95},
+        ]},
+        {"chip": "nvidiagpu", "type": "gpu", "brand": "nvidia",
+         "hw_name": "NVIDIA GeForce RTX 3070", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+            {"name": "GPU Hot Spot", "max_temp": 95},
+            {"name": "GPU Memory Junction", "max_temp": 95},
+        ]},
+        {"chip": "nvidiagpu", "type": "gpu", "brand": "nvidia",
+         "hw_name": "NVIDIA GeForce RTX 4070", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+            {"name": "GPU Hot Spot", "max_temp": 95},
+        ]},
+        {"chip": "nvidiagpu", "type": "gpu", "brand": "nvidia",
+         "hw_name": "NVIDIA GeForce RTX 4080", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+            {"name": "GPU Hot Spot", "max_temp": 95},
+        ]},
+        {"chip": "amdgpu", "type": "gpu", "brand": "amd",
+         "hw_name": "AMD Radeon RX 6700 XT", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+            {"name": "GPU Hot Spot", "max_temp": 95},
+        ]},
+        {"chip": "amdgpu", "type": "gpu", "brand": "amd",
+         "hw_name": "AMD Radeon RX 7800 XT", "sensors": [
+            {"name": "GPU Core", "max_temp": 90},
+            {"name": "GPU Hot Spot", "max_temp": 95},
+        ]},
+    ],
+}
+
+NVME_DRIVES = {
+    "linux": [
+        {"chip": "nvme", "type": "nvme", "model": "Samsung 980 PRO", "sensors": [
+            {"name": "Composite", "max_temp": 70},
+            {"name": "Sensor 1", "max_temp": 65},
+        ]},
+        {"chip": "nvme", "type": "nvme", "model": "WD Black SN850X", "sensors": [
+            {"name": "Composite", "max_temp": 70},
+        ]},
+        {"chip": "nvme", "type": "nvme", "model": "Kingston NV2", "sensors": [
+            {"name": "Composite", "max_temp": 70},
+        ]},
+        {"chip": "nvme", "type": "nvme", "model": "Crucial P3 Plus", "sensors": [
+            {"name": "Composite", "max_temp": 70},
+        ]},
+        {"chip": "nvme", "type": "nvme", "model": "Sabrent Rocket 4 Plus", "sensors": [
+            {"name": "Composite", "max_temp": 70},
+            {"name": "Sensor 1", "max_temp": 65},
+        ]},
+    ],
+    "windows": [
+        {"chip": "nvmegeneric", "type": "nvme",
+         "hw_name": "Samsung SSD 980 PRO 1TB", "sensors": [
+            {"name": "Temperature", "max_temp": 70},
+            {"name": "Temperature 2", "max_temp": 65},
+        ]},
+        {"chip": "nvmegeneric", "type": "nvme",
+         "hw_name": "WD Black SN850X 1TB", "sensors": [
+            {"name": "Temperature", "max_temp": 70},
+        ]},
+        {"chip": "nvmegeneric", "type": "nvme",
+         "hw_name": "Kingston NV2 500GB", "sensors": [
+            {"name": "Temperature", "max_temp": 70},
+        ]},
+        {"chip": "nvmegeneric", "type": "nvme",
+         "hw_name": "Crucial P3 Plus 1TB", "sensors": [
+            {"name": "Temperature", "max_temp": 70},
+        ]},
+        {"chip": "nvmegeneric", "type": "nvme",
+         "hw_name": "Sabrent Rocket 4 Plus 2TB", "sensors": [
+            {"name": "Temperature", "max_temp": 70},
+            {"name": "Temperature 2", "max_temp": 65},
+        ]},
+    ],
+}
+
 
 class MockHardware:
-    """Generates realistic mock hardware data for a single agent."""
+    """Generates realistic mock hardware data for a single agent.
 
-    # ── Linux chip groups (sysfs/hwmon naming) ──
-    CHIP_GROUPS = [
-        ("k10temp", "cpu", [
-            ("Tctl", 35, 95),
-            ("Tdie", 35, 95),
-            ("Tccd1", 30, 90),
-        ]),
-        ("coretemp", "cpu", [
-            ("Core 0", 35, 100),
-            ("Core 1", 35, 100),
-            ("Core 2", 35, 100),
-            ("Core 3", 35, 100),
-        ]),
-        ("nvidia", "gpu", [
-            ("GPU Core", 30, 90),
-            ("GPU Hot Spot", 35, 95),
-        ]),
-        ("amdgpu", "gpu", [
-            ("edge", 30, 90),
-            ("junction", 35, 95),
-        ]),
-        ("nvme", "nvme", [
-            ("Composite", 25, 70),
-            ("Sensor 1", 25, 65),
-        ]),
-        ("it8628", "motherboard", [
-            ("System", 25, 60),
-            ("Chipset", 30, 70),
-            ("VRM", 35, 100),
-        ]),
-        ("nct6798", "motherboard", [
-            ("SYSTIN", 25, 60),
-            ("CPUTIN", 30, 70),
-            ("AUXTIN", 25, 50),
-        ]),
-    ]
+    Each agent is assembled from a coherent system archetype: one CPU,
+    one motherboard (Super I/O chip), zero to two GPUs, and zero to two
+    NVMe drives.  No impossible combinations (e.g. AMD + Intel CPU).
+    """
 
-    FAN_NAMES = [
-        "CPU Fan",
-        "System Fan 1",
-        "System Fan 2",
-        "Rear Exhaust",
-        "Front Intake",
-        "Top Exhaust",
-        "Side Intake",
-        "Chassis Fan",
-    ]
-
-    # ── Windows chip groups (LibreHardwareMonitor naming) ──
-    # Format: (chip_id, hardware_name, sensor_type, [(sensor_name, base_temp, max_temp), ...])
-    WIN_CHIP_GROUPS = [
-        ("amdcpu", "AMD Ryzen 9 5900X", "cpu", [
-            ("Tctl/Tdie", 35, 95),
-            ("CCD1 (Tdie)", 30, 90),
-            ("CCD2 (Tdie)", 30, 90),
-        ]),
-        ("intelcpu", "Intel Core i7-12700K", "cpu", [
-            ("CPU Package", 35, 100),
-            ("Core #0", 35, 100),
-            ("Core #1", 35, 100),
-            ("Core #2", 35, 100),
-        ]),
-        ("nvidiagpu", "NVIDIA GeForce RTX 3070", "gpu", [
-            ("GPU Core", 30, 90),
-            ("GPU Hot Spot", 35, 95),
-            ("GPU Memory Junction", 30, 95),
-        ]),
-        ("amdgpu", "AMD Radeon RX 6800 XT", "gpu", [
-            ("GPU Core", 30, 90),
-            ("GPU Hot Spot", 35, 95),
-        ]),
-        ("nvmegeneric", "Samsung SSD 980 PRO 1TB", "nvme", [
-            ("Temperature", 25, 70),
-            ("Temperature 2", 25, 65),
-        ]),
-        ("superio", "Nuvoton NCT6798D", "motherboard", [
-            ("CPU Core", 25, 60),
-            ("System", 30, 70),
-            ("Auxiliary", 25, 50),
-            ("VRM MOS", 35, 100),
-        ]),
-    ]
-
-    # Windows fan definitions: (label, chip_source)
-    WIN_FAN_NAMES = [
-        ("CPU_FAN", "superio"),
-        ("SYS_FAN1", "superio"),
-        ("SYS_FAN2", "superio"),
-        ("CHA_FAN1", "superio"),
-        ("CHA_FAN2", "superio"),
-        ("AIO_PUMP", "superio"),
-        ("GPU Fan", "nvidiagpu"),
-        ("GPU Fan 2", "nvidiagpu"),
-    ]
+    # Thermal profiles per sensor type
+    #   idle_offset: deg C above temp_range min at idle
+    #   load_peak: deg C above idle during a load event
+    #   event_freq: probability of new event per tick when idle (0-1)
+    #   event_dur: (min_ticks, max_ticks) — at 3s/tick: CPU 9s-5min, GPU 2.5-20min, etc.
+    #   ramp_up: approach factor per tick when heating (0-1, higher = faster)
+    #   ramp_down: approach factor per tick when cooling (0-1, lower = slower)
+    THERMAL_PROFILES = {
+        "cpu":         {"idle_offset": 8,  "load_peak": 35, "event_freq": 0.08, "event_dur": (3, 100),  "ramp_up": 0.4,  "ramp_down": 0.12},
+        "gpu":         {"idle_offset": 5,  "load_peak": 40, "event_freq": 0.03, "event_dur": (50, 400), "ramp_up": 0.25, "ramp_down": 0.08},
+        "nvme":        {"idle_offset": 3,  "load_peak": 12, "event_freq": 0.02, "event_dur": (30, 200), "ramp_up": 0.1,  "ramp_down": 0.05},
+        "motherboard": {"idle_offset": 5,  "load_peak": 10, "event_freq": 0.015,"event_dur": (40, 300), "ramp_up": 0.08, "ramp_down": 0.04},
+    }
 
     def __init__(self, config: Dict):
         """Initialize hardware simulation from agent config.
@@ -145,6 +397,8 @@ class MockHardware:
             self.fans = self._load_fans(config["fans"])
         else:
             self.fans = self._create_fans(config.get("fan_count", 4))
+
+    # ── Persistence helpers ──────────────────────────────────────────
 
     def _load_sensors(self, defs: List[Dict]) -> List[Dict]:
         """Load persisted sensor definitions, adding runtime simulation state."""
@@ -176,100 +430,303 @@ class MockHardware:
         sensors = [{k: s[k] for k in sensor_keys if k in s} for s in self.sensors]
         fans = [{k: f[k] for k in fan_keys if k in f} for f in self.fans]
         return {"sensors": sensors, "fans": fans}
-    
+
+    # ── System archetype assembly ────────────────────────────────────
+
+    def _pick_system_archetype(self, sensor_count: int) -> Dict:
+        """Select a coherent set of hardware components for this agent.
+
+        Returns a dict with keys: cpu, motherboard, gpus, nvmes — each
+        holding component definitions from the pools.  The total sensor
+        count across all components is fitted to *sensor_count* by
+        trimming sensors from larger groups or capping at what's available.
+        """
+        pool_key = self.platform if self.platform == "windows" else "linux"
+
+        # Deep-copy selected components so trimming doesn't mutate pools
+        def _pick(pool):
+            c = random.choice(pool)
+            return {**c, "sensors": list(c["sensors"]), "fans": list(c.get("fans", []))}
+
+        def _sample(pool, n):
+            items = random.sample(pool, min(n, len(pool)))
+            return [{**c, "sensors": list(c["sensors"])} for c in items]
+
+        cpu = _pick(CPUS[pool_key])
+        mobo = _pick(MOTHERBOARDS[pool_key])
+
+        # 0-2 GPUs (weighted: ~60% one GPU, ~25% no GPU, ~15% two GPUs)
+        gpu_roll = random.random()
+        if gpu_roll < 0.25:
+            gpu_count = 0
+        elif gpu_roll < 0.85:
+            gpu_count = 1
+        else:
+            gpu_count = 2
+        gpus = _sample(GPUS[pool_key], gpu_count)
+
+        # 1-2 NVMe drives (weighted: ~70% one, ~30% two)
+        nvme_count = 1 if random.random() < 0.70 else 2
+        nvmes = _sample(NVME_DRIVES[pool_key], nvme_count)
+
+        # Fit sensor count: trim from least-important components first
+        # Priority: keep all CPU sensors, trim from nvme → gpu → mobo
+        total_available = sum(
+            len(c["sensors"]) for c in [cpu, mobo] + gpus + nvmes
+        )
+        if sensor_count < total_available:
+            excess = total_available - sensor_count
+            for comp in reversed(nvmes + gpus + [mobo]):
+                if excess <= 0:
+                    break
+                can_trim = max(0, len(comp["sensors"]) - 1)  # keep at least 1
+                trim = min(excess, can_trim)
+                if trim > 0:
+                    comp["sensors"] = comp["sensors"][:len(comp["sensors"]) - trim]
+                    excess -= trim
+
+        return {
+            "cpu": cpu,
+            "motherboard": mobo,
+            "gpus": gpus,
+            "nvmes": nvmes,
+        }
+
+    # ── Sensor creation ──────────────────────────────────────────────
+
     def _create_sensors(self, count: int) -> List[Dict]:
-        """Create mock temperature sensors grouped by chip type."""
+        """Create mock temperature sensors from a coherent system archetype."""
         if self.platform == "windows":
             return self._create_sensors_windows(count)
         return self._create_sensors_linux(count)
 
+    def _sanitize_id(self, name: str) -> str:
+        """Sanitize a sensor name into an ID segment (lowercase, special chars → _)."""
+        return (name.lower()
+                .replace(" ", "_")
+                .replace("/", "_")
+                .replace("#", "")
+                .replace("(", "")
+                .replace(")", ""))
+
     def _create_sensors_linux(self, count: int) -> List[Dict]:
-        """Create Linux-style sensors (sysfs/hwmon paths)."""
+        """Create Linux-style sensors (sysfs/hwmon paths) from archetype."""
+        arch = self._pick_system_archetype(count)
+        # Store archetype for fan creation
+        self._archetype = arch
+
         sensors = []
-        created = 0
-        group_idx = 0
+        hwmon_idx = 0
 
-        while created < count:
-            chip_name, sensor_type, sensor_defs = self.CHIP_GROUPS[group_idx % len(self.CHIP_GROUPS)]
-            hwmon_idx = group_idx
+        # Order: CPU, motherboard, GPUs, NVMe drives
+        # Each component gets its own hwmon index
+        components = [arch["cpu"], arch["motherboard"]] + arch["gpus"] + arch["nvmes"]
 
-            for sensor_idx, (name, base_temp, max_temp) in enumerate(sensor_defs):
-                if created >= count:
+        for comp in components:
+            chip = comp["chip"]
+            for sensor_idx, sdef in enumerate(comp["sensors"]):
+                if len(sensors) >= count:
                     break
 
-                sensor_id = f"{chip_name}_{name.lower().replace(' ', '_')}"
+                sensor_id = f"{chip}_{self._sanitize_id(sdef['name'])}"
 
                 sensor = {
                     "id": sensor_id,
-                    "name": name,
-                    "type": sensor_type,
-                    "max_temp": max_temp,
-                    "crit_temp": max_temp + 10,
-                    "chip": chip_name,
+                    "name": sdef["name"],
+                    "type": comp["type"],
+                    "max_temp": sdef["max_temp"],
+                    "crit_temp": sdef["max_temp"] + 10,
+                    "chip": chip,
                     "source": f"/sys/class/hwmon/hwmon{hwmon_idx}/temp{sensor_idx + 1}_input",
                 }
                 self._init_sim_state(sensor)
                 sensors.append(sensor)
-                created += 1
 
-            group_idx += 1
+            hwmon_idx += 1
+            if len(sensors) >= count:
+                break
 
         return sensors
 
     def _create_sensors_windows(self, count: int) -> List[Dict]:
-        """Create Windows-style sensors (LibreHardwareMonitor naming)."""
+        """Create Windows-style sensors (LibreHardwareMonitor naming) from archetype."""
+        arch = self._pick_system_archetype(count)
+        # Store archetype for fan creation
+        self._archetype = arch
+
         sensors = []
-        created = 0
-        group_idx = 0
+        # Track chip_index per chip type (for multiple GPUs or NVMe)
+        chip_indices: Dict[str, int] = {}
 
-        while created < count:
-            chip_id, hw_name, sensor_type, sensor_defs = self.WIN_CHIP_GROUPS[
-                group_idx % len(self.WIN_CHIP_GROUPS)
-            ]
-            chip_index = group_idx // len(self.WIN_CHIP_GROUPS)
+        components = [arch["cpu"], arch["motherboard"]] + arch["gpus"] + arch["nvmes"]
 
-            for sensor_idx, (name, base_temp, max_temp) in enumerate(sensor_defs):
-                if created >= count:
+        for comp in components:
+            chip = comp["chip"]
+            chip_index = chip_indices.get(chip, 0)
+            chip_indices[chip] = chip_index + 1
+
+            hw_name = comp.get("hw_name", "")
+            hw_type_key = comp["type"]
+            # AMD GPUs use GpuAti in LHM
+            if hw_type_key == "gpu" and comp.get("brand") == "amd":
+                hw_type_key = "gpu_amd"
+            hw_type = _WIN_TYPE_MAP.get(hw_type_key, "Unknown")
+
+            for sdef in comp["sensors"]:
+                if len(sensors) >= count:
                     break
 
-                # Windows ID: {chip}_{chipIndex}_{sanitized_name}
-                sanitized = name.lower().replace(" ", "_").replace("/", "_").replace("#", "").replace("(", "").replace(")", "")
-                sensor_id = f"{chip_id}_{chip_index}_{sanitized}"
-                # Windows source: {HardwareType}/{SensorName}
-                hw_type = _WIN_TYPE_MAP.get(sensor_type, "Unknown")
-                source = f"{hw_type}/{name}"
+                sanitized = self._sanitize_id(sdef["name"])
+                sensor_id = f"{chip}_{chip_index}_{sanitized}"
+                source = f"{hw_type}/{sdef['name']}"
 
                 sensor = {
                     "id": sensor_id,
-                    "name": name,
-                    "type": sensor_type,
-                    "max_temp": max_temp,
-                    "crit_temp": max_temp + 10,
-                    "chip": chip_id,
+                    "name": sdef["name"],
+                    "type": comp["type"],
+                    "max_temp": sdef["max_temp"],
+                    "crit_temp": sdef["max_temp"] + 10,
+                    "chip": chip,
                     "source": source,
                     "hardwareName": hw_name,
                 }
                 self._init_sim_state(sensor)
                 sensors.append(sensor)
-                created += 1
 
-            group_idx += 1
+            if len(sensors) >= count:
+                break
 
         return sensors
 
-    # Thermal profiles per sensor type
-    #   idle_offset: °C above temp_range min at idle
-    #   load_peak: °C above idle during a load event
-    #   event_freq: probability of new event per tick when idle (0-1)
-    #   event_dur: (min_ticks, max_ticks) — at 3s/tick: CPU 9s-5min, GPU 2.5-20min, etc.
-    #   ramp_up: approach factor per tick when heating (0-1, higher = faster)
-    #   ramp_down: approach factor per tick when cooling (0-1, lower = slower)
-    THERMAL_PROFILES = {
-        "cpu":         {"idle_offset": 8,  "load_peak": 35, "event_freq": 0.08, "event_dur": (3, 100),  "ramp_up": 0.4,  "ramp_down": 0.12},
-        "gpu":         {"idle_offset": 5,  "load_peak": 40, "event_freq": 0.03, "event_dur": (50, 400), "ramp_up": 0.25, "ramp_down": 0.08},
-        "nvme":        {"idle_offset": 3,  "load_peak": 12, "event_freq": 0.02, "event_dur": (30, 200), "ramp_up": 0.1,  "ramp_down": 0.05},
-        "motherboard": {"idle_offset": 5,  "load_peak": 10, "event_freq": 0.015,"event_dur": (40, 300), "ramp_up": 0.08, "ramp_down": 0.04},
-    }
+    # ── Fan creation ─────────────────────────────────────────────────
+
+    def _create_fans(self, count: int) -> List[Dict]:
+        """Create mock fans with PWM control."""
+        if self.platform == "windows":
+            return self._create_fans_windows(count)
+        return self._create_fans_linux(count)
+
+    def _create_fans_linux(self, count: int) -> List[Dict]:
+        """Create Linux-style fans (sysfs pwm paths) using mobo chip name."""
+        fans = []
+        arch = getattr(self, "_archetype", None)
+
+        if arch is None:
+            # Fallback if called without sensors being created first
+            # (shouldn't happen in normal flow)
+            arch = self._pick_system_archetype(8)
+            self._archetype = arch
+
+        mobo = arch["motherboard"]
+        mobo_chip = mobo["chip"]
+        mobo_fan_names = mobo["fans"]
+        gpus = arch["gpus"]
+
+        # Motherboard hwmon index: CPU is hwmon0, mobo is hwmon1
+        mobo_hwmon_idx = 1
+
+        # GPU hwmon indices: after CPU(0), mobo(1)
+        gpu_hwmon_base = 2
+
+        # Mobo fans first
+        fan_idx = 0
+        for i, fan_name in enumerate(mobo_fan_names):
+            if fan_idx >= count:
+                break
+            speed = random.randint(30, 70)
+            fan = {
+                "id": f"{mobo_chip}_fan_{i + 1}",
+                "name": fan_name,
+                "rpm": self._speed_to_rpm(speed),
+                "speed": speed,
+                "targetSpeed": speed,
+                "status": "ok",
+                "has_pwm_control": True,
+                "pwm_file": f"/sys/class/hwmon/hwmon{mobo_hwmon_idx}/pwm{i + 1}",
+            }
+            fans.append(fan)
+            fan_idx += 1
+
+        # GPU fans: 1 fan per GPU
+        for gpu_i, gpu in enumerate(gpus):
+            if fan_idx >= count:
+                break
+            gpu_chip = gpu["chip"]
+            gpu_hwmon = gpu_hwmon_base + gpu_i
+            speed = random.randint(30, 70)
+            fan = {
+                "id": f"{gpu_chip}_fan_1",
+                "name": "GPU Fan",
+                "rpm": self._speed_to_rpm(speed),
+                "speed": speed,
+                "targetSpeed": speed,
+                "status": "ok",
+                "has_pwm_control": True,
+                "pwm_file": f"/sys/class/hwmon/hwmon{gpu_hwmon}/pwm1",
+            }
+            fans.append(fan)
+            fan_idx += 1
+
+        return fans
+
+    def _create_fans_windows(self, count: int) -> List[Dict]:
+        """Create Windows-style fans (LibreHardwareMonitor naming)."""
+        fans = []
+        arch = getattr(self, "_archetype", None)
+
+        if arch is None:
+            arch = self._pick_system_archetype(8)
+            self._archetype = arch
+
+        mobo = arch["motherboard"]
+        mobo_fan_names = mobo["fans"]
+        gpus = arch["gpus"]
+
+        # Mobo fans (chip = superio)
+        fan_idx = 0
+        superio_fan_idx = 0
+        for fan_name in mobo_fan_names:
+            if fan_idx >= count:
+                break
+            speed = random.randint(30, 70)
+            fan = {
+                "id": f"superio_0_fan_{superio_fan_idx}",
+                "name": fan_name,
+                "rpm": self._speed_to_rpm(speed),
+                "speed": speed,
+                "targetSpeed": speed,
+                "status": "ok",
+                "has_pwm_control": True,
+                "label": fan_name,
+                "_chip_source": "superio",
+            }
+            fans.append(fan)
+            fan_idx += 1
+            superio_fan_idx += 1
+
+        # GPU fans: 1 fan per GPU, chip matches the actual GPU
+        for gpu_i, gpu in enumerate(gpus):
+            if fan_idx >= count:
+                break
+            gpu_chip = gpu["chip"]  # "nvidiagpu" or "amdgpu"
+            speed = random.randint(30, 70)
+            fan = {
+                "id": f"{gpu_chip}_{gpu_i}_fan_0",
+                "name": "GPU Fan",
+                "rpm": self._speed_to_rpm(speed),
+                "speed": speed,
+                "targetSpeed": speed,
+                "status": "ok",
+                "has_pwm_control": True,
+                "label": "GPU Fan",
+                "_chip_source": gpu_chip,
+            }
+            fans.append(fan)
+            fan_idx += 1
+
+        return fans
+
+    # ── Simulation state ─────────────────────────────────────────────
 
     def _init_sim_state(self, sensor: Dict):
         """Initialize runtime simulation state on a sensor dict."""
@@ -286,71 +743,14 @@ class MockHardware:
         sensor["_event_target"] = 0.0
         sensor["_event_ticks_left"] = 0
         sensor["temperature"] = round(sensor["_current_temp"], 1)
-    
-    def _create_fans(self, count: int) -> List[Dict]:
-        """Create mock fans with PWM control."""
-        if self.platform == "windows":
-            return self._create_fans_windows(count)
-        return self._create_fans_linux(count)
 
-    def _create_fans_linux(self, count: int) -> List[Dict]:
-        """Create Linux-style fans (sysfs pwm paths)."""
-        fans = []
-
-        for i in range(count):
-            fan_name = self.FAN_NAMES[i % len(self.FAN_NAMES)]
-            if i >= len(self.FAN_NAMES):
-                fan_name = f"{fan_name} {i // len(self.FAN_NAMES) + 1}"
-
-            speed = random.randint(30, 70)
-
-            fan = {
-                "id": f"fan_{i + 1:03d}",
-                "name": fan_name,
-                "rpm": self._speed_to_rpm(speed),
-                "speed": speed,
-                "targetSpeed": speed,
-                "status": "ok",
-                "has_pwm_control": True,
-                "pwm_file": f"/sys/class/hwmon/hwmon0/pwm{i + 1}",
-            }
-            fans.append(fan)
-
-        return fans
-
-    def _create_fans_windows(self, count: int) -> List[Dict]:
-        """Create Windows-style fans (LibreHardwareMonitor naming)."""
-        fans = []
-
-        for i in range(count):
-            label, chip_source = self.WIN_FAN_NAMES[i % len(self.WIN_FAN_NAMES)]
-            # Track per-chip fan index
-            chip_fan_idx = sum(
-                1 for f in fans
-                if f.get("_chip_source") == chip_source
-            )
-            speed = random.randint(30, 70)
-
-            fan = {
-                "id": f"{chip_source}_0_fan_{chip_fan_idx}",
-                "name": label,
-                "rpm": self._speed_to_rpm(speed),
-                "speed": speed,
-                "targetSpeed": speed,
-                "status": "ok",
-                "has_pwm_control": True,
-                "label": label,
-                "_chip_source": chip_source,  # internal tracking
-            }
-            fans.append(fan)
-
-        return fans
-    
     def _speed_to_rpm(self, speed: int) -> int:
         """Convert speed percentage to RPM."""
         min_rpm, max_rpm = self.rpm_range
         return int(min_rpm + (max_rpm - min_rpm) * speed / 100)
-    
+
+    # ── Runtime update ───────────────────────────────────────────────
+
     def update(self):
         """Update sensor temperatures and fan RPMs with event-driven simulation.
 
@@ -438,7 +838,7 @@ class MockHardware:
                     fan["speed"] = min(fan["speed"] + step, fan["targetSpeed"])
                 else:
                     fan["speed"] = max(fan["speed"] - step, fan["targetSpeed"])
-    
+
     def set_fan_speed(self, fan_id: str, speed: int) -> bool:
         """Set fan target speed (0-100%)."""
         speed = max(0, min(100, speed))
@@ -447,14 +847,16 @@ class MockHardware:
                 fan["targetSpeed"] = speed
                 return True
         return False
-    
+
     def emergency_stop(self):
         """Set all fans to 100%."""
         for fan in self.fans:
             fan["targetSpeed"] = 100
             fan["speed"] = 100
             fan["rpm"] = self._speed_to_rpm(100)
-    
+
+    # ── Telemetry output ─────────────────────────────────────────────
+
     def get_sensors_data(self) -> List[Dict]:
         """Get sensor data for telemetry (without internal state)."""
         result = []
@@ -493,7 +895,7 @@ class MockHardware:
                 data["label"] = f["label"]
             result.append(data)
         return result
-    
+
     def get_system_health(self) -> Dict:
         """Get mock system health metrics."""
         uptime = time.time() - self.start_time
