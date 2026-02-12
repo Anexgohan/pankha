@@ -41,13 +41,13 @@ Centralized Dashboard:
 ![Centralized Dashboard](documentation/public/images/pankha_title-bar_01.png)  
 
 Agent widget:  
-![Agent widget](documentation/public/images/pankha_system-cards_01.png)  
+![Agent widget](documentation/public/images/pankha_system-cards_02.png)  
 
 Temperature Sensors:  
-![Temperature Sensors](documentation/public/images/pankha_sensor-cards_01.png)  
+![Temperature Sensors](documentation/public/images/pankha_sensor-cards_02.png)  
 
 Fan Control:  
-![Fan Control](documentation/public/images/pankha_fan-cards_01.png)  
+![Fan Control](documentation/public/images/pankha_fan-cards_02.png)  
 
 Profiles:  
 ![Profiles](documentation/public/images/pankha_fan-profiles_01.png)  
