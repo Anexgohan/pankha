@@ -23,38 +23,39 @@
 
 ---
 ### Open Source Fan Control System
-Pankha is an open-source Distributed fan control system with Centralized Management system for monitoring and controlling hardware cooling across multiple machines. Production-ready with real-time hardware monitoring, WebSocket communication, and PostgreSQL database.
+Pankha is an open-source Distributed fan control system with a Centralized Management Web Interface for monitoring and controlling hardware cooling across multiple machines. Production-ready with real-time hardware monitoring, WebSocket communication, and PostgreSQL database.
 
 ## Features:
 
-- **Real-time Temperature Monitoring** - Manage multiple sensors across multiple hardware types
+- **Real-time Temperature Monitoring** - Manage Sensors across multiple hardware types and and Operating System.
 - **PWM Fan Control** - Direct hardware control with RPM feedback, Profiles, and Safety features, historical data visualization.
 - **Multi-System Support** - Monitor and control multiple machines from one dashboard
-- **Web Dashboard** - Modern React interface with real-time updates
+- **Web Dashboard** - Modern Web UI Interface with real-time updates
 - **WebSocket Communication** - Bidirectional real-time data transmission to centralize control
 - **Easy Deployment** - Docker based server deployment, with one command setup for agents
-- **PostgreSQL Database** - Production-grade time-series data storage
-- **Open Source**
+- **PostgreSQL Database** - Production ready data storage.
+- **Open Source** - Pankha is an open source project, Contribute to the project. 
 
 ## Showcase:  
 Centralized Dashboard:  
-![Centralized Dashboard](documentation/public/images/zen_2025-11-05_00-38-15_IutnWbxl11.png)  
+![Centralized Dashboard](documentation/public/images/pankha_title-bar_01.png)  
 
 Agent widget:  
-![Agent widget](documentation/public/images/zen_2025-11-09_10-06-33_dsPnjkAOT3.png)  
+![Agent widget](documentation/public/images/pankha_system-cards_01.png)  
 
 Temperature Sensors:  
-![Temperature Sensors](documentation/public/images/2025-11-09_10-08-14_sQjuyQPPjL.png)  
+![Temperature Sensors](documentation/public/images/pankha_sensor-cards_01.png)  
 
 Fan Control:  
-![Fan Control](documentation/public/images/2025-11-09_10-11-32_2L9HjamqLC.png)  
+![Fan Control](documentation/public/images/pankha_fan-cards_01.png)  
 
 Profiles:  
-![Profiles](documentation/public/images/zen_2025-11-05_00-38-44_57LBUM5n3B.png)  
+![Profiles](documentation/public/images/pankha_fan-profiles_01.png)  
 
 Fully Customizable:  
-![Profiles](documentation/public/images/zen_2025-11-05_00-39-25_A8ywDiMWc8.png)  
-![Import Export](documentation/public/images/zen_2025-11-05_00-41-41_7vx3VRh0Fl.png)  
+![Profiles](documentation/public/images/pankha_fan-profile_editor_01.png)
+
+![Import Export](documentation/public/images/pankha_fan-profile_import-export_01.png)  
 
 ## Why Pankha?
 

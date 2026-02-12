@@ -2,7 +2,7 @@
 
 Pankha is an open-source, distributed fan control system designed for self-hosters and hardware enthusiasts. It allows you to monitor and control hardware cooling across multiple physical machines from a single, centralized dashboard.
 
-![Centralized Dashboard](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/zen_2025-11-05_00-38-15_IutnWbxl11.png)
+![Centralized Dashboard](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/pankha_title-bar_01.png)
 
 ## Key Features
 

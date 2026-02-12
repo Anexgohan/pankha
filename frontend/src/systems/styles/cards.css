@@ -344,7 +344,7 @@
   background: var(--bg-secondary);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
   margin-inline: -10px;
 }
 
@@ -391,7 +391,7 @@
 
 /* 3.5 Command Center (Compact Grid) */
 .system-command-center {
-  background: var(--bg-secondary);
+  background: var(--bg-panels_02);
   border-radius: var(--radius-lg);
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--border-light);
