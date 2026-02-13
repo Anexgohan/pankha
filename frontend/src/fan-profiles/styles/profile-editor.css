@@ -30,47 +30,62 @@
 
 .selection-toggle-button,
 .import-export-button,
-.create-profile-button {
+.create-profile-button,
+.docs-link-button {
   padding: var(--spacing-sm) var(--spacing-lg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-secondary);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font-size: 13px;
   font-weight: var(--font-weight-semibold);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.05em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.docs-link-button {
+  color: var(--color-accent-dynamic);
 }
 
 .create-profile-button {
-  background: var(--color-success);
-  color: white;
-  border: none;
-}
-
-.create-profile-button:hover {
-  background: var(--color-success-hover, #45a049);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+  border-color: color-mix(in srgb, var(--color-success), transparent 40%);
+  color: var(--color-success);
 }
 
 .selection-toggle-button:hover,
-.import-export-button:hover {
-  border-color: var(--color-primary);
-  background: var(--bg-hover);
-  transform: translateY(-1px);
+.import-export-button:hover,
+.docs-link-button:hover {
+  border-color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 92%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 80%);
+}
+
+.create-profile-button:hover {
+  background: color-mix(in srgb, var(--color-success), transparent 92%);
+  border-color: var(--color-success);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 80%);
 }
 
 .selection-toggle-button.active,
 .import-export-button.active {
-  background: var(--color-primary);
+  background: var(--color-accent-dynamic);
   color: white;
-  border-color: var(--color-primary);
+  border-color: var(--color-accent-dynamic);
+  transform: translateY(-1px);
+}
+
+.docs-link-button .external-icon {
+  opacity: 0.6;
+  margin-left: -2px;
 }
 
 /* Profile Selection Checkboxes */
@@ -705,40 +720,53 @@
 .action-pill {
   padding: var(--spacing-md) var(--spacing-xl);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
   color: var(--text-primary);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   display: flex;
   justify-content: center;
   align-items: center;
   gap: var(--spacing-sm);
   text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .action-pill:hover:not(:disabled) {
   background: var(--bg-hover);
-  border-color: var(--color-info);
+  border-color: var(--color-accent-dynamic);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
 }
 
 .action-pill:disabled {
-  opacity: 0.5;
+  opacity: 0.3;
   cursor: not-allowed;
+  filter: grayscale(1);
 }
 
 .action-pill.primary {
-  background: var(--bg-tertiary);
-  border-color: var(--border-light);
+  background: var(--bg-secondary);
+  border-color: color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
 }
 
-.action-pill.primary:hover {
-  background: var(--bg-active);
-  border-color: var(--color-info);
+.action-pill.highlight {
+  border-color: color-mix(in srgb, var(--color-success), transparent 70%);
+  color: var(--color-success);
+}
+
+.action-pill.highlight:hover:not(:disabled) {
+  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success), transparent 94%);
+}
+
+.action-pill.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 94%);
+  border-color: var(--color-accent-dynamic);
 }
 
 .hint-text {

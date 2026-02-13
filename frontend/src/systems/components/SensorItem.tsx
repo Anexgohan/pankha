@@ -93,9 +93,9 @@ const SensorItem: React.FC<SensorItemProps> = ({
             <span className={`sensor-temperature temperature-${tempClass}`}>
               {formatTemperature(sensor.temperature)}
             </span>
-            {/* Status badge */}
-            <span className={`sensor-status-badge status-${sensor.status}`}>
-              {sensor.status.toUpperCase()}
+            {/* Status badge — derived from frontend thresholds */}
+            <span className={`sensor-status-badge status-${tempClass}`}>
+              {tempClass.toUpperCase()}
             </span>
           </div>
         </div>

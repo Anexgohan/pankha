@@ -20,7 +20,11 @@ import {
   Lightbulb,
   HelpCircle,
   Upload,
-  Tag
+  Tag,
+  ClipboardPaste,
+  RotateCcw,
+  Square,
+  CheckSquare
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -686,10 +690,14 @@ const Settings: React.FC = () => {
   const [isCustomRetention, setIsCustomRetention] = useState(false);
   const [customRetentionInput, setCustomRetentionInput] = useState(dataRetentionDays.toString());
   
-  // Appearance state
   const { 
     accentColor, updateAccentColor,
-    hoverTintColor, updateHoverTintColor
+    hoverTintColor, updateHoverTintColor,
+    tempThresholds, updateTempThresholds,
+    tempColors, updateTempColors,
+    perTypeEnabled, setPerTypeEnabled,
+    perTypeThresholds, updatePerTypeThresholds,
+    resetTempDefaults,
   } = useDashboardSettings();
 
   const tacticalPresets = [
@@ -700,7 +708,7 @@ const Settings: React.FC = () => {
     { name: 'Digital Violet', color: '#9C27B0' },
     { name: 'Cosmic Lavender', color: '#867CFF' },
     { name: 'Toxic Green', color: '#4CAF50' },
-    { name: 'Mistic Water', color: '#4cacaf' },
+    { name: 'Mistic Water', color: '#0FEEEE' },
   ];
   
   // Update custom inputs when global values change (e.g. from preset)
@@ -1038,35 +1046,267 @@ const Settings: React.FC = () => {
               <p className="settings-info">
                 Personalize the dashboard color scheme and interaction feedback.
               </p>
-              
-              <div className="settings-list aesthetics-compact-list">
-                <div className="setting-item aesthetics-row">
-                  <span className="setting-label">Accent Color</span>
-                  <div className="tactical-accent-picker">
-                    <ColorPicker 
-                      color={accentColor} 
-                      onChange={updateAccentColor} 
-                      label="Accent Color" 
-                      presets={tacticalPresets}
-                    />
+
+              <div className="appearance-wrapper">
+                <div className="threshold-section-header">
+                  <h4 className="threshold-wrapper-title">Theme Colors</h4>
+                  <p className="settings-info">
+                    Customize the primary accent and interaction colors for the interface.
+                  </p>
+                </div>
+
+                <div className="settings-list aesthetics-compact-list">
+                  <div className="setting-item aesthetics-row">
+                    <span className="setting-label">Accent Color</span>
+                    <div className="tactical-accent-picker">
+                      <ColorPicker 
+                        color={accentColor} 
+                        onChange={updateAccentColor} 
+                        label="Accent Color" 
+                        presets={tacticalPresets}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="setting-item aesthetics-row">
+                    <span className="setting-label">Hover Tint</span>
+                    <div className="tactical-accent-picker">
+                      <ColorPicker 
+                        color={hoverTintColor} 
+                        onChange={updateHoverTintColor} 
+                        label="Hover Tint" 
+                        presets={tacticalPresets}
+                      />
+                    </div>
                   </div>
                 </div>
 
-                <div className="setting-item aesthetics-row">
-                  <span className="setting-label">Hover Tint</span>
-                  <div className="tactical-accent-picker">
-                    <ColorPicker 
-                      color={hoverTintColor} 
-                      onChange={updateHoverTintColor} 
-                      label="Hover Tint" 
-                      presets={tacticalPresets}
-                    />
+                {/* Temperature Thresholds — sub-section heading */}
+                <div className="threshold-section-header">
+                  <h4 className="threshold-wrapper-title">Temperature Thresholds</h4>
+                  <p className="settings-info">
+                    Configure when sensor status changes color on the dashboard.
+                  </p>
+                </div>
+
+                <div className="threshold-wrapper">
+                  <div className="settings-list">
+                {/* Global Thresholds — Card Grid */}
+                <div className="threshold-card-grid">
+                  {/* Normal — color only */}
+                  <div className="threshold-card" style={{ borderLeftColor: tempColors.normal }}>
+                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.normal }} />
+                    <span className="threshold-level-label">Normal</span>
+                    <div className="threshold-color-picker">
+                      <ColorPicker
+                        color={tempColors.normal}
+                        onChange={(c) => updateTempColors({ ...tempColors, normal: c })}
+                        label="Normal"
+                      />
+                    </div>
                   </div>
+
+                  {/* Caution */}
+                  <div className="threshold-card" style={{ borderLeftColor: tempColors.caution }}>
+                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.caution }} />
+                    <span className="threshold-level-label">Caution</span>
+                    <input
+                      type="number"
+                      className="setting-input threshold-input"
+                      defaultValue={tempThresholds.caution}
+                      key={`caution-${tempThresholds.caution}`}
+                      min={1}
+                      max={tempThresholds.warning - 1}
+                      onBlur={(e) => {
+                        const val = Math.max(1, Math.min(tempThresholds.warning - 1, parseInt(e.target.value, 10) || tempThresholds.caution));
+                        updateTempThresholds({ ...tempThresholds, caution: val });
+                      }}
+                    />
+                    <span className="threshold-unit">°C</span>
+                    <div className="threshold-color-picker">
+                      <ColorPicker
+                        color={tempColors.caution}
+                        onChange={(c) => updateTempColors({ ...tempColors, caution: c })}
+                        label="Caution"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Warning */}
+                  <div className="threshold-card" style={{ borderLeftColor: tempColors.warning }}>
+                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.warning }} />
+                    <span className="threshold-level-label">Warning</span>
+                    <input
+                      type="number"
+                      className="setting-input threshold-input"
+                      defaultValue={tempThresholds.warning}
+                      key={`warning-${tempThresholds.warning}`}
+                      min={tempThresholds.caution + 1}
+                      max={tempThresholds.critical - 1}
+                      onBlur={(e) => {
+                        const val = Math.max(tempThresholds.caution + 1, Math.min(tempThresholds.critical - 1, parseInt(e.target.value, 10) || tempThresholds.warning));
+                        updateTempThresholds({ ...tempThresholds, warning: val });
+                      }}
+                    />
+                    <span className="threshold-unit">°C</span>
+                    <div className="threshold-color-picker">
+                      <ColorPicker
+                        color={tempColors.warning}
+                        onChange={(c) => updateTempColors({ ...tempColors, warning: c })}
+                        label="Warning"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Critical */}
+                  <div className="threshold-card" style={{ borderLeftColor: tempColors.critical }}>
+                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.critical }} />
+                    <span className="threshold-level-label">Critical</span>
+                    <input
+                      type="number"
+                      className="setting-input threshold-input"
+                      defaultValue={tempThresholds.critical}
+                      key={`critical-${tempThresholds.critical}`}
+                      min={tempThresholds.warning + 1}
+                      max={150}
+                      onBlur={(e) => {
+                        const val = Math.max(tempThresholds.warning + 1, Math.min(150, parseInt(e.target.value, 10) || tempThresholds.critical));
+                        updateTempThresholds({ ...tempThresholds, critical: val });
+                      }}
+                    />
+                    <span className="threshold-unit">°C</span>
+                    <div className="threshold-color-picker">
+                      <ColorPicker
+                        color={tempColors.critical}
+                        onChange={(c) => updateTempColors({ ...tempColors, critical: c })}
+                        label="Critical"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Per-type toggle */}
+                <div className="setting-item threshold-per-type-toggle">
+                  <button
+                    className="threshold-checkbox-btn"
+                    onClick={() => setPerTypeEnabled(!perTypeEnabled)}
+                  >
+                    {perTypeEnabled ? <CheckSquare size={16} /> : <Square size={16} />}
+                    <span>Customize per type</span>
+                  </button>
+                </div>
+
+                {/* Per-type cards (expanded) */}
+                {perTypeEnabled && (
+                  <div className="threshold-per-type-container">
+                    {(['cpu', 'gpu', 'nvme', 'mobo'] as const).map((type) => {
+                      const t = perTypeThresholds[type] || { ...tempThresholds };
+                      const label = type === 'nvme' ? 'NVMe' : type === 'mobo' ? 'Mobo' : type.toUpperCase();
+                      return (
+                        <div key={type} className="threshold-type-group">
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span className="threshold-type-label">{label}</span>
+                            <button
+                              className="threshold-action-btn"
+                              onClick={() => {
+                                updatePerTypeThresholds({
+                                  ...perTypeThresholds,
+                                  [type]: { ...tempThresholds },
+                                });
+                                toast.success(`${label} reset to global values`);
+                              }}
+                              title="Paste global thresholds"
+                            >
+                              <ClipboardPaste size={14} />
+                            </button>
+                          </div>
+                          <div className="threshold-type-cards">
+                            <div className="threshold-card" style={{ borderLeftColor: tempColors.caution }}>
+                              <span className="threshold-color-dot" style={{ backgroundColor: tempColors.caution }} />
+                              <span className="threshold-level-label">Caution</span>
+                              <input
+                                type="number"
+                                className="setting-input threshold-input"
+                                defaultValue={t.caution}
+                                key={`${type}-caution-${t.caution}`}
+                                min={1}
+                                max={t.warning - 1}
+                                onBlur={(e) => {
+                                  const val = Math.max(1, Math.min(t.warning - 1, parseInt(e.target.value, 10) || t.caution));
+                                  updatePerTypeThresholds({
+                                    ...perTypeThresholds,
+                                    [type]: { ...t, caution: val },
+                                  });
+                                }}
+                              />
+                              <span className="threshold-unit">°C</span>
+                            </div>
+                            <div className="threshold-card" style={{ borderLeftColor: tempColors.warning }}>
+                              <span className="threshold-color-dot" style={{ backgroundColor: tempColors.warning }} />
+                              <span className="threshold-level-label">Warning</span>
+                              <input
+                                type="number"
+                                className="setting-input threshold-input"
+                                defaultValue={t.warning}
+                                key={`${type}-warning-${t.warning}`}
+                                min={t.caution + 1}
+                                max={t.critical - 1}
+                                onBlur={(e) => {
+                                  const val = Math.max(t.caution + 1, Math.min(t.critical - 1, parseInt(e.target.value, 10) || t.warning));
+                                  updatePerTypeThresholds({
+                                    ...perTypeThresholds,
+                                    [type]: { ...t, warning: val },
+                                  });
+                                }}
+                              />
+                              <span className="threshold-unit">°C</span>
+                            </div>
+                            <div className="threshold-card" style={{ borderLeftColor: tempColors.critical }}>
+                              <span className="threshold-color-dot" style={{ backgroundColor: tempColors.critical }} />
+                              <span className="threshold-level-label">Critical</span>
+                              <input
+                                type="number"
+                                className="setting-input threshold-input"
+                                defaultValue={t.critical}
+                                key={`${type}-critical-${t.critical}`}
+                                min={t.warning + 1}
+                                max={150}
+                                onBlur={(e) => {
+                                  const val = Math.max(t.warning + 1, Math.min(150, parseInt(e.target.value, 10) || t.critical));
+                                  updatePerTypeThresholds({
+                                    ...perTypeThresholds,
+                                    [type]: { ...t, critical: val },
+                                  });
+                                }}
+                              />
+                              <span className="threshold-unit">°C</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Reset Defaults */}
+                <div className="threshold-reset-row">
+                  <button
+                    className="threshold-reset-btn"
+                    onClick={() => {
+                      resetTempDefaults();
+                      toast.success('Temperature thresholds and colors reset to defaults');
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    Reset Defaults
+                  </button>
                 </div>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+    )}
 
         {/* License/Subscription Tab */}
         {activeTab === 'license' && (

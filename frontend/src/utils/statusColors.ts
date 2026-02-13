@@ -51,14 +51,18 @@ export function getStatusColor(
 
 /**
  * Get status class for a temperature value.
+ * Accepts optional thresholds for user-configurable color coding.
  */
 export function getTemperatureClass(
   temp: number,
-  critTemp?: number
+  critTemp?: number,
+  thresholds?: { caution: number; warning: number; critical: number }
 ): string {
+  const t = thresholds || { caution: 60, warning: 70, critical: 85 };
   if (critTemp && temp >= critTemp) return "critical";
-  if (temp >= 70) return "warning";
-  if (temp >= 60) return "caution";
+  if (temp >= t.critical) return "critical";
+  if (temp >= t.warning) return "warning";
+  if (temp >= t.caution) return "caution";
   return "normal";
 }
 

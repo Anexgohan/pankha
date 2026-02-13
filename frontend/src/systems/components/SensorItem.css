@@ -272,7 +272,7 @@
   line-height: 1;
 }
 
-.sensor-status-badge.status-ok {
+.sensor-status-badge.status-normal {
   background: var(--temp-normal-bg);
   color: var(--temp-normal-text);
   border: 1px solid var(--temp-normal-border);

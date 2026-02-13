@@ -75,7 +75,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onToggleFans,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
-  const { timezone } = useDashboardSettings();
+  const { timezone, tempThresholds } = useDashboardSettings();
   const [agentInterval, setAgentInterval] = useState<number>(
     system.current_update_interval ?? getDefault<number>('updateInterval')
   );
@@ -734,7 +734,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               <div className="summary-stat-label">Avg Temp</div>
               <div
                 className={`summary-stat-value temperature-${getTemperatureClass(
-                  averageTemperature
+                  averageTemperature, undefined, tempThresholds
                 )}`}
               >
                 {formatTemperature(averageTemperature, "0.0")}
@@ -746,7 +746,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
               <div className="summary-stat-label">Peak Temp</div>
               <div
                 className={`summary-stat-value temperature-${getTemperatureClass(
-                  highestTemperature
+                  highestTemperature, undefined, tempThresholds
                 )}`}
               >
                 {formatTemperature(highestTemperature, "0.0")}
@@ -1060,7 +1060,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                     await updateSensorLabel(system.id, sensorDbId, newLabel);
                                     onUpdate();
                                   }}
-                                  getTemperatureClass={getTemperatureClass}
+                                  getTemperatureClass={(temp, _maxTemp, critTemp) => getTemperatureClass(temp, critTemp, tempThresholds)}
                                   getSensorIcon={getSensorIcon}
                                   history={history[sensor.id]}
                                 />

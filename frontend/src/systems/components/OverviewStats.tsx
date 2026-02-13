@@ -12,12 +12,14 @@ import {
 import type { SystemOverview } from '../../types/api';
 import { formatTemperature } from '../../utils/formatters';
 import { getTemperatureClass } from '../../utils/statusColors';
+import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 
 interface OverviewStatsProps {
   overview: SystemOverview;
 }
 
 const OverviewStats: React.FC<OverviewStatsProps> = ({ overview }) => {
+  const { tempThresholds } = useDashboardSettings();
   // Determine limit display and styling
   const hasLimit = overview.agentLimit !== undefined && overview.agentLimit !== 'unlimited';
   const limitValue = hasLimit ? overview.agentLimit as number : null;
@@ -107,7 +109,7 @@ const OverviewStats: React.FC<OverviewStatsProps> = ({ overview }) => {
       <div className="stat-card temperature-avg">
         <div className="stat-icon"><ThermometerSnowflake size={20} /></div>
         <div className="stat-content">
-          <div className={`stat-value temperature-${getTemperatureClass(overview.avgTemperature)}`}>
+          <div className={`stat-value temperature-${getTemperatureClass(overview.avgTemperature, undefined, tempThresholds)}`}>
             {formatTemperature(overview.avgTemperature)}
           </div>
           <div className="stat-label">Avg Temp</div>
@@ -117,7 +119,7 @@ const OverviewStats: React.FC<OverviewStatsProps> = ({ overview }) => {
       <div className="stat-card temperature-high">
         <div className="stat-icon"><Thermometer size={20} /></div>
         <div className="stat-content">
-          <div className={`stat-value temperature-${getTemperatureClass(overview.highestTemperature)}`}>
+          <div className={`stat-value temperature-${getTemperatureClass(overview.highestTemperature, undefined, tempThresholds)}`}>
             {formatTemperature(overview.highestTemperature)}
           </div>
           <div className="stat-label">Highest Temp</div>

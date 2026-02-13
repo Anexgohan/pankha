@@ -12,7 +12,9 @@ import {
   Library,
   Box,
   LayoutGrid,
-  CheckSquare
+  CheckSquare,
+  BookOpen,
+  ExternalLink
 } from 'lucide-react';
 import {
   getFanProfiles,
@@ -183,9 +185,21 @@ const FanProfileManager: React.FC = () => {
           <p>Create and manage custom fan curves for automatic temperature-based control</p>
         </div>
         <div className="header-actions">
+          <a
+            href="https://pankha.app/docs/wiki/fan-profiles/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="docs-link-button"
+            title="Read documentation for fan profile management"
+          >
+            <BookOpen size={16} />
+            <span>Documentation</span>
+            <ExternalLink size={12} className="external-icon" />
+          </a>
           <button
             onClick={() => setShowSelectionCheckboxes(!showSelectionCheckboxes)}
             className={`selection-toggle-button ${showSelectionCheckboxes ? 'active' : ''}`}
+            title={showSelectionCheckboxes ? 'Exit selection mode' : 'Enable profile selection for bulk actions'}
           >
             {showSelectionCheckboxes ? <CheckSquare size={16} /> : <LayoutGrid size={16} />}
             <span>{showSelectionCheckboxes ? 'Selection Mode' : 'Select Profiles'}</span>
@@ -193,11 +207,16 @@ const FanProfileManager: React.FC = () => {
           <button
             onClick={() => setShowImportExport(!showImportExport)}
             className={`import-export-button ${showImportExport ? 'active' : ''}`}
+            title="Open/Close profile management console"
           >
             <Library size={16} />
             <span>Import & Export</span>
           </button>
-          <button onClick={handleCreateProfile} className="create-profile-button">
+          <button
+            onClick={handleCreateProfile}
+            className="create-profile-button"
+            title="Create a new fan control profile"
+          >
             <Plus size={16} />
             <span>Create New Profile</span>
           </button>

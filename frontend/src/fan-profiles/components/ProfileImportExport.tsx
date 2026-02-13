@@ -217,6 +217,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                 onClick={handleExportAll}
                 disabled={isExporting}
                 className="action-pill primary"
+                title="Export all profiles to a JSON file"
               >
                 {isExporting ? <RefreshCw size={16} className="spin" /> : <FileDown size={16} />}
                 <span>{isExporting ? 'Exporting...' : 'Export All Profiles'}</span>
@@ -225,6 +226,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                 onClick={handleExportSelected}
                 disabled={isExporting}
                 className="action-pill"
+                title="Export currently selected profiles to a JSON file"
               >
                 {isExporting ? <RefreshCw size={16} className="spin" /> : <Plus size={16} />}
                 <span>{isExporting ? 'Exporting...' : 'Export Selected'}</span>
@@ -240,6 +242,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                 onClick={handleRestoreAllDefaults}
                 disabled={isLoadingDefaults}
                 className="action-pill highlight"
+                title="Reset library to system default fan curves"
               >
                 {isLoadingDefaults ? <RefreshCw size={16} className="spin" /> : <RefreshCw size={16} />}
                 <span>{isLoadingDefaults ? 'Loading...' : 'Restore All Defaults'}</span>
@@ -247,6 +250,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
               <button
                 onClick={() => setShowDefaultsDialog(true)}
                 className="action-pill"
+                title="Select specific system defaults to load into your library"
               >
                 <Plus size={16} />
                 <span>Load Default Profiles...</span>
@@ -254,6 +258,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
               <button
                 onClick={() => setShowImportDialog(true)}
                 className="action-pill"
+                title="Upload profiles from a previously exported JSON file"
               >
                 <FileJson size={16} />
                 <span>Import From File...</span>
