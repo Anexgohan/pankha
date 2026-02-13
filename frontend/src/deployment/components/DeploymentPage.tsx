@@ -120,7 +120,7 @@ const InstallerSection: React.FC<{
             <Download size={16} /> Get Latest Release
           </a>
           <a
-            href={`${githubRepo}/wiki/Agents-Windows`}
+            href={`${PANKHA_SITE}/docs/wiki/agents-windows/`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-outline-tactical"
@@ -149,7 +149,7 @@ const InstallerSection: React.FC<{
             </p>
         </div>
         <a
-          href={`${githubRepo}/wiki/Agents-Linux`}
+          href={`${PANKHA_SITE}/docs/wiki/agents-linux/`}
           target="_blank"
           rel="noopener noreferrer"
           className="btn-outline-tactical"
@@ -162,6 +162,7 @@ const InstallerSection: React.FC<{
 ));
 
 const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
+const PANKHA_SITE = 'https://pankha.app';
 
 const ActionButton: React.FC<{ githubRepo: string }> = React.memo(({ githubRepo }) => (
   <div className="deployment-action-bar">
@@ -180,14 +181,14 @@ const ResourcesSection: React.FC<{ githubRepo: string }> = React.memo(({ githubR
   <section className="deployment-section">
     <h3><Terminal size={20} /> Technical Documentation</h3>
     <div className="resource-grid">
-      <a href={`${githubRepo}/wiki`} target="_blank" rel="noopener noreferrer" className="resource-link">
+      <a href={`${PANKHA_SITE}/docs/`} target="_blank" rel="noopener noreferrer" className="resource-link">
         <div className="link-label">
           <Server size={18} />
           <span>Wiki: Setup & Configuration</span>
         </div>
         <ArrowRight size={16} className="link-arrow" />
       </a>
-      <a href={`${githubRepo}/wiki/Agents-Linux`} target="_blank" rel="noopener noreferrer" className="resource-link">
+      <a href={`${PANKHA_SITE}/docs/wiki/agents-linux/`} target="_blank" rel="noopener noreferrer" className="resource-link">
         <div className="link-label">
           <Settings2 size={18} />
           <span>Linux Service Guide</span>

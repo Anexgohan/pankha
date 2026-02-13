@@ -76,11 +76,11 @@
   margin-inline: -var(--spacing-md);
 }
 
-.settings-section:hover {
+/* .settings-section:hover {
   border-color: var(--color-accent-dynamic);
   background: color-mix(in srgb, var(--color-hover-tint-dynamic) 1%, transparent);
   box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), 0 0 15px color-mix(in srgb, var(--color-accent-dynamic), transparent 97%);
-}
+} */
 
 .settings-section h2 {
   margin: 0 0 var(--spacing-lg) 0;

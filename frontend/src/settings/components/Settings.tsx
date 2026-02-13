@@ -28,6 +28,10 @@ import '../styles/settings.css';
 const GRAPH_SCALE_MIN_HOURS = 1;
 const GRAPH_SCALE_MAX_HOURS = 720; // 30 days
 
+// Site URLs
+const PANKHA_SITE = 'https://pankha.app';
+const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
+
 type SettingsTab = 'general' | 'license' | 'diagnostics' | 'about';
 
 interface TierPricing {
@@ -208,9 +212,6 @@ const DiagnosticsTab: React.FC = () => {
       }), 3000);
     }
   };
-
-  // GitHub Issue URL builder with pre-filled template
-  const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
 
   const handleReportIssue = async (system: SystemInfo) => {
     const isOnline = system.real_time_status === 'online';
@@ -556,7 +557,7 @@ const DiagnosticsTab: React.FC = () => {
             Feature Request
           </a>
           <a
-            href={`${GITHUB_REPO}/wiki`}
+            href={`${PANKHA_SITE}/docs/`}
             target="_blank"
             rel="noopener noreferrer"
             className="help-action-btn docs"
@@ -630,7 +631,7 @@ const AboutTab: React.FC = () => {
           </div>
           <ExternalLink className="link-arrow" size={14} />
         </a>
-        <a href="https://github.com/Anexgohan/pankha/wiki" target="_blank" rel="noopener noreferrer" className="link-card">
+        <a href={`${PANKHA_SITE}/docs/`} target="_blank" rel="noopener noreferrer" className="link-card">
           <BookOpen className="link-icon" size={20} />
           <div className="link-text">
             <span className="link-title">Documentation</span>
