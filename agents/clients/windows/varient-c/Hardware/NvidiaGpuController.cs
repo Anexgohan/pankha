@@ -53,9 +53,9 @@ public class NvidiaGpuController : IDisposable
     {
         if (!IsAvailable) return false;
 
-        // Check if this is an NVIDIA GPU fan
-        return fanId.Contains("nvidia", StringComparison.OrdinalIgnoreCase) ||
-               fanId.Contains("gpunvidia", StringComparison.OrdinalIgnoreCase);
+        // Check if this is an NVIDIA GPU fan by identifier pattern
+        // New format: gpu_nvidia_0_fan_0 (from LHM identifier /gpu-nvidia/0/fan/0)
+        return fanId.StartsWith("gpu_nvidia", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<bool> SetFanSpeedAsync(string fanId, int speedPercent)
@@ -194,9 +194,9 @@ public class NvidiaGpuController : IDisposable
         }
 
         // Parse GPU index from fan ID for multi-GPU systems
-        // Expected format: "gpunvidia_fan_gpu_fan__gpu-nvidia_0_fan_1"
-        // Extract the GPU index (e.g., "0" from "_gpu-nvidia_0_")
-        var match = System.Text.RegularExpressions.Regex.Match(fanId, @"nvidia[_-](\d+)");
+        // New format: "gpu_nvidia_0_fan_0" (from LHM identifier /gpu-nvidia/0/fan/0)
+        // Extract the GPU index (e.g., "0" from "gpu_nvidia_0_...")
+        var match = System.Text.RegularExpressions.Regex.Match(fanId, @"gpu_nvidia_(\d+)");
         if (match.Success && int.TryParse(match.Groups[1].Value, out var gpuIndex))
         {
             var gpuKey = $"nvidia_gpu_{gpuIndex}";

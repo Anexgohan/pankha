@@ -20,9 +20,8 @@ public class LibreHardwareAdapter : IHardwareMonitor
     // Thread safety lock for hardware access
     private readonly object _hardwareLock = new();
 
-    // Cache for discovered hardware
+    // Cache for discovered fans (preserves rate-limiting/dedup state across cycles)
     private readonly Dictionary<string, Fan> _fanCache = new();
-    private readonly Dictionary<string, Sensor> _sensorCache = new();
 
     // System health cache (1-second TTL like Rust agent)
     private SystemHealth? _cachedSystemHealth;
@@ -180,8 +179,11 @@ public class LibreHardwareAdapter : IHardwareMonitor
                 HardwareName = hardware.Name  // Full hardware name: "AMD Ryzen 9 3900X", "NVIDIA GeForce RTX 2070 SUPER"
             };
 
-            // Try to get max and critical temps
-            // LibreHardwareMonitor doesn't expose these directly, so we use defaults
+            // NOTE: LibreHardwareMonitor doesn't expose hardware max temp thresholds
+            // (unlike Linux sysfs temp{N}_max). This 70°C value is NOT used by the frontend —
+            // the frontend has its own hardcoded 70°C threshold in getTemperatureClass().
+            // A future improvement could make this user-configurable via
+            // Settings > General > Appearance (see frontend discussion).
             sensorModel.MaxTemp = 70.0;
             sensorModel.CritTemp = GetCriticalTemp(hardware.HardwareType);
 
@@ -413,10 +415,24 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
             var fanId = GenerateFanId(hardware, rpmSensor);
 
-            // Try to find matching control sensor
-            // Match "Fan #1" with "Fan Control #1" by simpler name parsing
-            // This is heuristic but works for most mobos (Nuvoton/ITE)
-            var controlSensor = fanControlSensors.FirstOrDefault(c =>
+            // Match RPM sensor to control sensor using LHM identifier patterns
+            // Pattern: /lpc/.../fan/0 <-> /lpc/.../control/0
+            //          /gpu-nvidia/0/fan/1 <-> /gpu-nvidia/0/control/1
+            // This is deterministic and works for all SuperIO chips (Nuvoton, ITE, Fintek, Winbond)
+            var rpmId = rpmSensor.Identifier.ToString();
+            var lastSlash = rpmId.LastIndexOf('/');
+            var fanIndex = lastSlash >= 0 ? rpmId.Substring(lastSlash + 1) : "";
+            var fanPathIndex = rpmId.LastIndexOf("/fan/");
+            ISensor? controlSensor = null;
+            if (fanPathIndex >= 0 && !string.IsNullOrEmpty(fanIndex))
+            {
+                var basePath = rpmId.Substring(0, fanPathIndex);
+                var expectedControlId = $"{basePath}/control/{fanIndex}";
+                controlSensor = fanControlSensors.FirstOrDefault(c =>
+                    c.Identifier.ToString() == expectedControlId);
+            }
+            // Fallback: try name-based heuristic for non-standard chips
+            controlSensor ??= fanControlSensors.FirstOrDefault(c =>
                 c.Name.Contains(rpmSensor.Name.Split(' ')[0]));
 
             // Preserve existing fan control state if already cached
@@ -462,20 +478,15 @@ public class LibreHardwareAdapter : IHardwareMonitor
 
     private string GenerateFanId(IHardware hardware, ISensor sensor)
     {
-        // Create simple, stable IDs like Rust agent
-        var chipName = hardware.Name
-            .Replace(" ", "")
-            .Replace("-", "")
-            .Replace("_", "")
+        // Use LHM identifier for stable, unique IDs that preserve GPU index
+        // e.g., /gpu-nvidia/0/fan/0 -> "gpu_nvidia_0_fan_0"
+        //       /lpc/nct6798d/fan/2 -> "lpc_nct6798d_fan_2"
+        // This fixes multi-GPU NVIDIA routing by keeping the GPU index in the fan ID
+        var sensorId = sensor.Identifier.ToString()
+            .Replace("/", "_")
+            .TrimStart('_')
             .ToLowerInvariant();
-
-        // Extract numeric index from identifier
-        var identifier = sensor.Identifier.ToString();
-        var lastSlashIndex = identifier.LastIndexOf('/');
-        var fanIndex = lastSlashIndex >= 0 ? identifier.Substring(lastSlashIndex + 1) : "0";
-
-        // Simple fan ID: "nvidiagefortertx2070super_fan1"
-        return $"{chipName}_fan{fanIndex}";
+        return sensorId;
     }
 
     public async Task<SystemHealth> GetSystemHealthAsync()
@@ -727,8 +738,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
     /// </summary>
     public async Task<double> GetMaxTemperatureAsync()
     {
-        // FIX: Use DiscoverSensorsAsync() to get actual sensor data
-        // Previous bug: _sensorCache was never populated, so this always returned 0.0
+        // NOTE: Sensors are discovered fresh each call, no cache needed
         var sensors = await DiscoverSensorsAsync();
         
         if (!sensors.Any())
