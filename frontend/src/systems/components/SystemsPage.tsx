@@ -29,6 +29,8 @@ const SystemsPage: React.FC = () => {
   const [overview, setOverview] = useState<any>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [unstableVersion, setUnstableVersion] = useState<string | null>(null);
+  const [stableReleases, setStableReleases] = useState<{ tag_name: string }[]>([]);
+  const [unstableReleases, setUnstableReleases] = useState<{ tag_name: string }[]>([]);
   // Persistent dropdown states across re-renders
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
@@ -61,7 +63,7 @@ const SystemsPage: React.FC = () => {
   React.useEffect(() => {
     const fetchVersions = async () => {
       try {
-        const response = await fetch('https://api.github.com/repos/Anexgohan/pankha/releases');
+        const response = await fetch('https://api.github.com/repos/Anexgohan/pankha/releases?per_page=30');
         if (response.ok) {
           const releases = await response.json();
           if (releases.length > 0) {
@@ -76,6 +78,18 @@ const SystemsPage: React.FC = () => {
             } else {
               setUnstableVersion(null);
             }
+
+            // Collect up to 10 of each type for the version dropdown
+            const stables = releases
+              .filter((r: any) => !r.prerelease)
+              .slice(0, 10)
+              .map((r: any) => ({ tag_name: r.tag_name }));
+            const unstables = releases
+              .filter((r: any) => r.prerelease)
+              .slice(0, 10)
+              .map((r: any) => ({ tag_name: r.tag_name }));
+            setStableReleases(stables);
+            setUnstableReleases(unstables);
           }
         }
       } catch (err) {
@@ -281,9 +295,11 @@ const SystemsPage: React.FC = () => {
         )}
 
         {activeTab === 'deployment' && (
-          <DeploymentPage 
-            latestVersion={latestVersion} 
+          <DeploymentPage
+            latestVersion={latestVersion}
             unstableVersion={unstableVersion}
+            stableReleases={stableReleases}
+            unstableReleases={unstableReleases}
           />
         )}
 

@@ -16,6 +16,7 @@
 
 /* Page Header mirroring other sections */
 .deployment-section-header {
+  margin-top: var(--spacing-md);
   margin-bottom: var(--spacing-lg);
 }
 
@@ -1014,7 +1015,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 .prep-status svg {
@@ -1038,6 +1039,11 @@
   color: var(--color-success);
 }
 
+.prep-version.available {
+  background: color-mix(in srgb, var(--color-warning), transparent 90%);
+  color: var(--color-warning);
+}
+
 .prep-version.empty {
   background: var(--bg-hover);
   color: var(--text-tertiary);
@@ -1046,8 +1052,17 @@
 
 .prep-actions-group {
   display: flex;
+  align-items: center;
   gap: var(--spacing-md);
   flex: 1;
+}
+
+/* Version picker — reuses stealth-select, just widens for longer text */
+.version-picker-wrapper {
+  width: auto;
+  min-width: 140px;
+  height: 30px;
+  padding: 4px 12px;
 }
 
 .prep-manual-actions {
@@ -1289,6 +1304,16 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     font-family: var(--font-mono);
+}
+
+.update-badge.downgrade {
+    background: color-mix(in srgb, var(--color-warning), transparent 70%);
+    color: var(--color-warning);
+}
+
+.btn-table-action.downgrade {
+    border-color: color-mix(in srgb, var(--color-warning), transparent 60%);
+    color: var(--color-warning);
 }
 
 /* Disabled button states */

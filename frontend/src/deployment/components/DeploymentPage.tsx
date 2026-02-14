@@ -195,6 +195,20 @@ const ResourcesSection: React.FC<{ githubRepo: string }> = React.memo(({ githubR
         </div>
         <ArrowRight size={16} className="link-arrow" />
       </a>
+      <a href={`${PANKHA_SITE}/docs/wiki/agents-windows/`} target="_blank" rel="noopener noreferrer" className="resource-link">
+        <div className="link-label">
+          <Settings2 size={18} />
+          <span>Windows Service Guide</span>
+        </div>
+        <ArrowRight size={16} className="link-arrow" />
+      </a>
+      <a href={`${PANKHA_SITE}/docs/wiki/agents-advanced-settings/`} target="_blank" rel="noopener noreferrer" className="resource-link">
+        <div className="link-label">
+          <Settings2 size={18} />
+          <span>Advanced Agent Settings</span>
+        </div>
+        <ArrowRight size={16} className="link-arrow" />
+      </a>
       <a href={`${githubRepo}/issues`} target="_blank" rel="noopener noreferrer" className="resource-link">
         <div className="link-label">
           <ExternalLink size={18} />
@@ -217,13 +231,20 @@ const MaintenanceSection: React.FC<{
   hubStatus: HubStatus | null;
 }> = React.memo(({ isExpanded, onToggle, systems, stableVersion, unstableVersion, updatingAgents, onApplyUpdate, hubStatus }) => {
   const outdatedCount = useMemo(() => {
-    // Priority: Hub version > Latest Stable
-    const hubVer = hubStatus?.version?.replace('v', '');
-    const stableVer = stableVersion?.replace('v', '');
-    const targetVersion = hubVer || stableVer;
-    
-    if (!targetVersion) return 0;
-    return systems.filter(s => s.agent_version && !s.agent_version.includes(targetVersion)).length;
+    // Hub staging is for Linux agents only; Windows agents use GitHub MSI directly
+    const hubVer = hubStatus?.version?.replace('v', '') || '';
+    const stableVer = stableVersion?.replace('v', '') || '';
+
+    const linuxTarget = hubVer || stableVer;
+    const windowsTarget = stableVer;
+
+    if (!linuxTarget && !windowsTarget) return 0;
+    return systems.filter(s => {
+      if (!s.agent_version) return false;
+      const isWindows = s.platform === 'windows' || s.agent_id?.toLowerCase().startsWith('windows-');
+      const target = isWindows ? windowsTarget : linuxTarget;
+      return target && !s.agent_version.includes(target);
+    }).length;
   }, [systems, stableVersion, hubStatus]);
 
   return (
@@ -266,18 +287,25 @@ const MaintenanceSection: React.FC<{
                   </tr>
                 ) : (
                   systems.map(system => {
-                    const targetVersion = hubStatus?.version || stableVersion;
-                    const cleanTarget = targetVersion ? targetVersion.replace('v', '') : '';
-                    const isOutdated = targetVersion && system.agent_version && 
+                    const isWindows = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-');
+
+                    // Windows compares against GitHub latest; Linux compares against hub staged version
+                    const hubVer = hubStatus?.version?.replace('v', '') || '';
+                    const stableVer = stableVersion?.replace('v', '') || '';
+                    const cleanTarget = isWindows ? stableVer : (hubVer || stableVer);
+                    const targetVersion = cleanTarget ? `v${cleanTarget}` : null;
+                    const isMismatch = cleanTarget && system.agent_version &&
                                       !system.agent_version.includes(cleanTarget);
+                    // Determine if this is an upgrade or downgrade
+                    const agentVer = (system.agent_version || '').replace(/^v/, '').replace(/-.*$/, '');
+                    const isDowngrade = isMismatch && cleanTarget < agentVer;
+                    const isOutdated = isMismatch && !isDowngrade;
                     const isUpdating = updatingAgents.has(system.id);
                     const isOnline = system.status === 'online';
 
                     // Determine status display
                     const statusLabel = isUpdating ? 'UPDATING' : (isOnline ? 'ONLINE' : 'OFFLINE');
                     const statusClass = isUpdating ? 'updating' : (isOnline ? 'online' : 'offline');
-
-                    const isWindows = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-');
                     const platformIcon = isWindows ? (
                       <div className="platform-icon windows" title="Windows Agent">
                         <img src="/icons/windows_01.svg" alt="Windows" width="14" height="14" />
@@ -305,6 +333,11 @@ const MaintenanceSection: React.FC<{
                                 NEW {targetVersion}
                               </span>
                             )}
+                            {isDowngrade && !isUpdating && (
+                              <span className="update-badge downgrade" title={`Downgrade to ${targetVersion}`}>
+                                {targetVersion}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td>
@@ -327,25 +360,27 @@ const MaintenanceSection: React.FC<{
                             ) : (
                               <span
                                 title={
-                                  !hubStatus?.version 
-                                    ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first` 
-                                    : (!isOnline 
-                                      ? 'Agent is offline' 
-                                      : (isUpdating 
-                                        ? 'Update in progress...' 
-                                        : (isOutdated 
-                                          ? `Click to update agent to ${targetVersion}` 
-                                          : `Reinstall agent version ${targetVersion}`)))
+                                  !hubStatus?.version
+                                    ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first`
+                                    : (!isOnline
+                                      ? 'Agent is offline'
+                                      : (isUpdating
+                                        ? 'Update in progress...'
+                                        : (isDowngrade
+                                          ? `Downgrade agent to ${targetVersion}`
+                                          : (isOutdated
+                                            ? `Click to update agent to ${targetVersion}`
+                                            : `Reinstall agent version ${targetVersion}`))))
                                 }
                                 style={{ display: 'inline-block' }}
                               >
                                 <button
-                                  className={`btn-table-action ${isOutdated ? 'update-needed' : ''}`}
+                                  className={`btn-table-action ${isOutdated ? 'update-needed' : ''} ${isDowngrade ? 'downgrade' : ''}`}
                                   onClick={() => onApplyUpdate(system.id)}
                                   disabled={!isOnline || isUpdating || !hubStatus?.version}
-                                  style={{ pointerEvents: 'auto' }} // Ensure clicks work when enabled
+                                  style={{ pointerEvents: 'auto' }}
                                 >
-                                  {isUpdating ? 'Updating...' : (isOutdated ? 'Update Now' : 'Reinstall')}
+                                  {isUpdating ? 'Updating...' : (isDowngrade ? 'Downgrade' : (isOutdated ? 'Update Now' : 'Reinstall'))}
                                 </button>
                               </span>
                             )}
@@ -363,10 +398,12 @@ const MaintenanceSection: React.FC<{
   );
 });
 
-export const DeploymentPage: React.FC<{ 
+export const DeploymentPage: React.FC<{
   latestVersion: string | null;
   unstableVersion?: string | null;
-}> = ({ latestVersion, unstableVersion }) => {
+  stableReleases?: { tag_name: string }[];
+  unstableReleases?: { tag_name: string }[];
+}> = ({ latestVersion, unstableVersion, stableReleases = [], unstableReleases = [] }) => {
   const { systems } = useWebSocketData();
   const [logLevel, setLogLevel] = useState<LogLevel>(getDefault('logLevel'));
   const [failsafe, setFailsafe] = useState<Failsafe>(String(getDefault('failsafeSpeed')) as Failsafe);
@@ -406,6 +443,11 @@ export const DeploymentPage: React.FC<{
   const [updatingAgents, setUpdatingAgents] = useState<Set<number>>(new Set());
   const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
   const [isStaging, setIsStaging] = useState(false);
+  const [selectedStableVersion, setSelectedStableVersion] = useState<string>('');
+  const [selectedUnstableVersion, setSelectedUnstableVersion] = useState<string>('');
+  const [pickerDisplay, setPickerDisplay] = useState<string>(() => {
+    return sessionStorage.getItem('pankha-picker-display') || 'Pick a version';
+  });
 
   // Tooltip context for interpolation (uses current form values)
   const tooltipContext = useMemo(() => ({
@@ -446,6 +488,23 @@ export const DeploymentPage: React.FC<{
     const interval = setInterval(refreshHubStatus, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  // Default selections to saved pick or latest of each type when releases load
+  useEffect(() => {
+    if (!selectedStableVersion && stableReleases.length > 0) {
+      const saved = sessionStorage.getItem('pankha-picker-stable');
+      const match = saved && stableReleases.some(r => r.tag_name === saved);
+      setSelectedStableVersion(match ? saved : stableReleases[0].tag_name);
+    }
+  }, [stableReleases]);
+
+  useEffect(() => {
+    if (!selectedUnstableVersion && unstableReleases.length > 0) {
+      const saved = sessionStorage.getItem('pankha-picker-unstable');
+      const match = saved && unstableReleases.some(r => r.tag_name === saved);
+      setSelectedUnstableVersion(match ? saved : unstableReleases[0].tag_name);
+    }
+  }, [unstableReleases]);
 
   // Fetch deployment hub config ONCE on mount
   useEffect(() => {
@@ -672,43 +731,90 @@ export const DeploymentPage: React.FC<{
         {/* Agent Downloads - Stage binaries from GitHub to local Hub */}
         <section className="deployment-section agent-downloads-panel">
           <h3><Download size={20} /> Agent Downloads</h3>
+          <p style={{ margin: '-12px 0 0 28px', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>Download a release to the Pankha Hub, then push it to Clients from Fleet Maintenance.</p>
           <div className="local-prep-widget">
             <div className="prep-status">
               <Server size={14} />
-              <span className="prep-label">Hub:</span>
+              <span className="prep-label">Pankha Hub:</span>
               {hubStatus?.version ? (
                 <span className="prep-version success">{hubStatus.version} Ready</span>
               ) : (
                 <span className="prep-version empty">No Cache</span>
               )}
+              {latestVersion && hubStatus?.version && hubStatus.version !== latestVersion && (
+                <span className="prep-version available">{latestVersion} Available</span>
+              )}
             </div>
 
             <div className="prep-actions-group">
+              <div className="stealth-select-wrapper version-picker-wrapper">
+                <div className="select-display">{pickerDisplay}</div>
+                <select
+                  className="select-engine"
+                  value=""
+                  onChange={(e) => {
+                    const ver = e.target.value;
+                    const isStable = stableReleases.some(r => r.tag_name === ver);
+                    if (isStable) {
+                      setSelectedStableVersion(ver);
+                      sessionStorage.setItem('pankha-picker-stable', ver);
+                    } else {
+                      setSelectedUnstableVersion(ver);
+                      sessionStorage.setItem('pankha-picker-unstable', ver);
+                    }
+                    const label = isStable ? `Stable ${ver}` : `Unstable ${ver}`;
+                    setPickerDisplay(label);
+                    sessionStorage.setItem('pankha-picker-display', label);
+                  }}
+                  disabled={isStaging}
+                >
+                  <option value="" disabled>Pick a version</option>
+                  {stableReleases.length > 0 && (
+                    <optgroup label="Stable">
+                      {stableReleases.map(r => (
+                        <option key={r.tag_name} value={r.tag_name}>
+                          {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {unstableReleases.length > 0 && (
+                    <optgroup label="Unstable">
+                      {unstableReleases.map(r => (
+                        <option key={r.tag_name} value={r.tag_name}>
+                          {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
               {latestVersion && (
                 <button
-                  className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === latestVersion ? 'current' : ''}`}
-                  onClick={() => handleStageUpdate(latestVersion)}
-                  disabled={isStaging || hubStatus?.version === latestVersion}
-                  title={hubStatus?.version === latestVersion
-                    ? `Stable Version ${latestVersion} is Ready to Deploy.`
-                    : `Download Stable Version ${latestVersion} \nSafe & Reliable.`}
+                  className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedStableVersion ? 'current' : ''}`}
+                  onClick={() => handleStageUpdate(selectedStableVersion)}
+                  disabled={isStaging || hubStatus?.version === selectedStableVersion}
+                  title={hubStatus?.version === selectedStableVersion
+                    ? `Stable Version ${selectedStableVersion} is Ready to Deploy.`
+                    : `Download Stable Version ${selectedStableVersion} \nSafe & Reliable.`}
                 >
                   <Download size={12} />
-                  <span>Stable {latestVersion}</span>
+                  <span>Stable {selectedStableVersion}</span>
                 </button>
               )}
 
               {unstableVersion && (
                 <button
-                  className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === unstableVersion ? 'current' : ''}`}
-                  onClick={() => handleStageUpdate(unstableVersion)}
-                  disabled={isStaging || hubStatus?.version === unstableVersion}
-                  title={hubStatus?.version === unstableVersion
-                    ? `Experimental Version ${unstableVersion} is Ready to Deploy.`
-                    : `Download Experimental Version ${unstableVersion} \nNewest Features & Fixes, may have bugs.`}
+                  className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedUnstableVersion ? 'current' : ''}`}
+                  onClick={() => handleStageUpdate(selectedUnstableVersion)}
+                  disabled={isStaging || hubStatus?.version === selectedUnstableVersion}
+                  title={hubStatus?.version === selectedUnstableVersion
+                    ? `Experimental Version ${selectedUnstableVersion} is Ready to Deploy.`
+                    : `Download Experimental Version ${selectedUnstableVersion} \nNewest Features & Fixes, may have bugs.`}
                 >
                   <Activity size={12} />
-                  <span>Unstable {unstableVersion}</span>
+                  <span>Unstable {selectedUnstableVersion}</span>
                 </button>
               )}
             </div>

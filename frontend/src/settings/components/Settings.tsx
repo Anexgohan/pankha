@@ -131,7 +131,7 @@ const DiagnosticsTab: React.FC = () => {
     fetchSystems();
   }, []);
 
-  const handleCopyToClipboard = async (systemId: number) => {
+  const handleCopyToClipboard = async (systemId: number, systemName?: string) => {
     setActionStatus(prev => ({ ...prev, [systemId]: { type: 'loading', message: 'Fetching...' } }));
     
     try {
@@ -163,7 +163,7 @@ const DiagnosticsTab: React.FC = () => {
       
       if (copied) {
         setActionStatus(prev => ({ ...prev, [systemId]: { type: 'success', message: 'Copied!' } }));
-        toast.success('Diagnostics copied to clipboard');
+        toast.success(`${systemName || 'Diagnostics'} diagnostics copied to clipboard`);
       } else {
         throw new Error('Copy failed');
       }
@@ -200,7 +200,7 @@ const DiagnosticsTab: React.FC = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       setActionStatus(prev => ({ ...prev, [systemId]: { type: 'success', message: 'Downloaded!' } }));
-      toast.success(`Downloaded ${systemName} diagnostics`);
+      toast.success(`${systemName} diagnostics downloaded`);
       setTimeout(() => setActionStatus(prev => {
         const newStatus = { ...prev };
         delete newStatus[systemId];
@@ -220,9 +220,8 @@ const DiagnosticsTab: React.FC = () => {
   const handleReportIssue = async (system: SystemInfo) => {
     const isOnline = system.real_time_status === 'online';
     const platform = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-') ? 'Windows' : 'Linux';
-    
-    // Build issue body template
-    const issueTitle = encodeURIComponent(`[Hardware Support] ${system.name}`);
+
+    const issueTitle = encodeURIComponent(`[Hardware Support] ${system.name} - ${platform}`);
     const issueBody = encodeURIComponent(
 `## System Information
 - **Name:** ${system.name}
@@ -251,18 +250,14 @@ const DiagnosticsTab: React.FC = () => {
       try {
         const response = await getDiagnostics(system.id);
         const jsonString = JSON.stringify(response.diagnostics, null, 2);
-        
-        // Copy to clipboard
+
         let copied = false;
         if (navigator.clipboard && navigator.clipboard.writeText) {
           try {
             await navigator.clipboard.writeText(jsonString);
             copied = true;
-          } catch {
-            copied = false;
-          }
+          } catch { copied = false; }
         }
-        
         if (!copied) {
           const textarea = document.createElement('textarea');
           textarea.value = jsonString;
@@ -273,18 +268,17 @@ const DiagnosticsTab: React.FC = () => {
           copied = document.execCommand('copy');
           document.body.removeChild(textarea);
         }
-        
+
         if (copied) {
-          toast.success('Diagnostics copied! Paste into the GitHub issue.');
+          toast.success(`${system.name} diagnostics copied to clipboard. Paste into the GitHub issue.`);
         }
       } catch {
-        toast.warning('Could not copy diagnostics. Please download and attach manually.');
+        toast.warning('Could not fetch diagnostics. Please download and attach manually.');
       }
     } else {
       toast.info('Agent offline - please describe your hardware in the issue.');
     }
-    
-    // Open GitHub issue in new tab
+
     const issueUrl = `${GITHUB_REPO}/issues/new?title=${issueTitle}&labels=hardware-support&body=${issueBody}`;
     window.open(issueUrl, '_blank', 'noopener,noreferrer');
   };
@@ -347,18 +341,15 @@ const DiagnosticsTab: React.FC = () => {
     }
 
     const jsonString = JSON.stringify(results, null, 2);
-    
-    // Copy to clipboard
+
+    // Copy diagnostics to clipboard
     let copied = false;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       try {
         await navigator.clipboard.writeText(jsonString);
         copied = true;
-      } catch {
-        copied = false;
-      }
+      } catch { copied = false; }
     }
-    
     if (!copied) {
       const textarea = document.createElement('textarea');
       textarea.value = jsonString;
@@ -369,14 +360,13 @@ const DiagnosticsTab: React.FC = () => {
       copied = document.execCommand('copy');
       document.body.removeChild(textarea);
     }
-    
+
     if (copied) {
-      toast.success(`Diagnostics from ${onlineSystems.length} agents copied! Paste into the issue.`);
+      toast.success(`Diagnostics from ${onlineSystems.length} agents copied to clipboard. Paste into the GitHub issue.`);
     } else {
       toast.warning('Could not copy to clipboard. Use Export All and attach the file.');
     }
 
-    // Build issue template
     const issueTitle = encodeURIComponent(`[Bug Report] Fleet Issue - ${onlineSystems.length} Agents`);
     const issueBody = encodeURIComponent(
 `## Fleet Information
@@ -472,7 +462,7 @@ const DiagnosticsTab: React.FC = () => {
                       )}
                       <button
                         className={`btn-table-action ${status?.type === 'loading' ? 'loading' : ''}`}
-                        onClick={() => handleCopyToClipboard(system.id)}
+                        onClick={() => handleCopyToClipboard(system.id, system.name)}
                         disabled={!isOnline || status?.type === 'loading'}
                         title="Copy diagnostics to clipboard"
                       >
@@ -543,7 +533,28 @@ const DiagnosticsTab: React.FC = () => {
         
         <div className="help-actions">
           <a
-            href={`${GITHUB_REPO}/issues/new?template=bug_report.md&labels=bug`}
+            href={`${GITHUB_REPO}/issues/new?labels=bug&title=${encodeURIComponent('[Bug] ')}&body=${encodeURIComponent(
+`## Bug Description
+<!-- What happened? -->
+
+
+## Steps to Reproduce
+1.
+2.
+3.
+
+## Expected Behavior
+<!-- What did you expect to happen? -->
+
+
+## Environment
+- **Pankha Version:** ${__APP_VERSION__}
+- **Browser:**
+- **OS:**
+
+## Screenshots / Logs
+<!-- If applicable, add screenshots or paste relevant logs -->
+`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="help-action-btn bug"
@@ -552,7 +563,26 @@ const DiagnosticsTab: React.FC = () => {
             Report Bug
           </a>
           <a
-            href={`${GITHUB_REPO}/issues/new?template=feature_request.md&labels=enhancement`}
+            href={`${GITHUB_REPO}/issues/new?labels=enhancement&title=${encodeURIComponent('[Feature] ')}&body=${encodeURIComponent(
+`## Feature Description
+<!-- What would you like to see? -->
+
+
+## Use Case
+<!-- Why is this useful? What problem does it solve? -->
+
+
+## Proposed Solution
+<!-- How do you think this should work? -->
+
+
+## Alternatives Considered
+<!-- Any other approaches you've thought of? -->
+
+
+## Screenshots / Mockups
+<!-- If applicable, drag and drop images here to help illustrate your idea -->
+`)}`}
             target="_blank"
             rel="noopener noreferrer"
             className="help-action-btn feature"
@@ -621,8 +651,8 @@ const AboutTab: React.FC = () => {
           </div>
         </div>
         <p className="about-tagline">
-          Heterogeneous hardware telemetry governor and thermal orchestration kernel. 
-          Optimized for high-frequency PID-driven cooling topologies and mission-critical infrastructure stability.
+          Monitor temperatures and control fan speeds across all your machines from one dashboard.
+          Pankha connects to distributed agents running on your systems, giving you real-time visibility and automated cooling management.
         </p>
       </div>
 
@@ -1056,25 +1086,25 @@ const Settings: React.FC = () => {
                 </div>
 
                 <div className="settings-list aesthetics-compact-list">
-                  <div className="setting-item aesthetics-row">
+                  <div className="setting-item aesthetics-row" style={{ '--row-accent': accentColor, borderLeft: `3px solid ${accentColor}` } as React.CSSProperties}>
                     <span className="setting-label">Accent Color</span>
                     <div className="tactical-accent-picker">
-                      <ColorPicker 
-                        color={accentColor} 
-                        onChange={updateAccentColor} 
-                        label="Accent Color" 
+                      <ColorPicker
+                        color={accentColor}
+                        onChange={updateAccentColor}
+                        label="Accent Color"
                         presets={tacticalPresets}
                       />
                     </div>
                   </div>
 
-                  <div className="setting-item aesthetics-row">
+                  <div className="setting-item aesthetics-row" style={{ '--row-accent': hoverTintColor, borderLeft: `3px solid ${hoverTintColor}` } as React.CSSProperties}>
                     <span className="setting-label">Hover Tint</span>
                     <div className="tactical-accent-picker">
-                      <ColorPicker 
-                        color={hoverTintColor} 
-                        onChange={updateHoverTintColor} 
-                        label="Hover Tint" 
+                      <ColorPicker
+                        color={hoverTintColor}
+                        onChange={updateHoverTintColor}
+                        label="Hover Tint"
                         presets={tacticalPresets}
                       />
                     </div>
@@ -1113,12 +1143,13 @@ const Settings: React.FC = () => {
                     <input
                       type="number"
                       className="setting-input threshold-input"
-                      defaultValue={tempThresholds.caution}
-                      key={`caution-${tempThresholds.caution}`}
+                      value={tempThresholds.caution}
                       min={1}
                       max={tempThresholds.warning - 1}
-                      onBlur={(e) => {
-                        const val = Math.max(1, Math.min(tempThresholds.warning - 1, parseInt(e.target.value, 10) || tempThresholds.caution));
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value, 10);
+                        if (isNaN(raw)) return;
+                        const val = Math.max(1, Math.min(tempThresholds.warning - 1, raw));
                         updateTempThresholds({ ...tempThresholds, caution: val });
                       }}
                     />
@@ -1139,12 +1170,13 @@ const Settings: React.FC = () => {
                     <input
                       type="number"
                       className="setting-input threshold-input"
-                      defaultValue={tempThresholds.warning}
-                      key={`warning-${tempThresholds.warning}`}
+                      value={tempThresholds.warning}
                       min={tempThresholds.caution + 1}
                       max={tempThresholds.critical - 1}
-                      onBlur={(e) => {
-                        const val = Math.max(tempThresholds.caution + 1, Math.min(tempThresholds.critical - 1, parseInt(e.target.value, 10) || tempThresholds.warning));
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value, 10);
+                        if (isNaN(raw)) return;
+                        const val = Math.max(tempThresholds.caution + 1, Math.min(tempThresholds.critical - 1, raw));
                         updateTempThresholds({ ...tempThresholds, warning: val });
                       }}
                     />
@@ -1165,12 +1197,13 @@ const Settings: React.FC = () => {
                     <input
                       type="number"
                       className="setting-input threshold-input"
-                      defaultValue={tempThresholds.critical}
-                      key={`critical-${tempThresholds.critical}`}
+                      value={tempThresholds.critical}
                       min={tempThresholds.warning + 1}
                       max={150}
-                      onBlur={(e) => {
-                        const val = Math.max(tempThresholds.warning + 1, Math.min(150, parseInt(e.target.value, 10) || tempThresholds.critical));
+                      onChange={(e) => {
+                        const raw = parseInt(e.target.value, 10);
+                        if (isNaN(raw)) return;
+                        const val = Math.max(tempThresholds.warning + 1, Math.min(150, raw));
                         updateTempThresholds({ ...tempThresholds, critical: val });
                       }}
                     />
@@ -1227,12 +1260,13 @@ const Settings: React.FC = () => {
                               <input
                                 type="number"
                                 className="setting-input threshold-input"
-                                defaultValue={t.caution}
-                                key={`${type}-caution-${t.caution}`}
+                                value={t.caution}
                                 min={1}
                                 max={t.warning - 1}
-                                onBlur={(e) => {
-                                  const val = Math.max(1, Math.min(t.warning - 1, parseInt(e.target.value, 10) || t.caution));
+                                onChange={(e) => {
+                                  const raw = parseInt(e.target.value, 10);
+                                  if (isNaN(raw)) return;
+                                  const val = Math.max(1, Math.min(t.warning - 1, raw));
                                   updatePerTypeThresholds({
                                     ...perTypeThresholds,
                                     [type]: { ...t, caution: val },
@@ -1247,12 +1281,13 @@ const Settings: React.FC = () => {
                               <input
                                 type="number"
                                 className="setting-input threshold-input"
-                                defaultValue={t.warning}
-                                key={`${type}-warning-${t.warning}`}
+                                value={t.warning}
                                 min={t.caution + 1}
                                 max={t.critical - 1}
-                                onBlur={(e) => {
-                                  const val = Math.max(t.caution + 1, Math.min(t.critical - 1, parseInt(e.target.value, 10) || t.warning));
+                                onChange={(e) => {
+                                  const raw = parseInt(e.target.value, 10);
+                                  if (isNaN(raw)) return;
+                                  const val = Math.max(t.caution + 1, Math.min(t.critical - 1, raw));
                                   updatePerTypeThresholds({
                                     ...perTypeThresholds,
                                     [type]: { ...t, warning: val },
@@ -1267,12 +1302,13 @@ const Settings: React.FC = () => {
                               <input
                                 type="number"
                                 className="setting-input threshold-input"
-                                defaultValue={t.critical}
-                                key={`${type}-critical-${t.critical}`}
+                                value={t.critical}
                                 min={t.warning + 1}
                                 max={150}
-                                onBlur={(e) => {
-                                  const val = Math.max(t.warning + 1, Math.min(150, parseInt(e.target.value, 10) || t.critical));
+                                onChange={(e) => {
+                                  const raw = parseInt(e.target.value, 10);
+                                  if (isNaN(raw)) return;
+                                  const val = Math.max(t.warning + 1, Math.min(150, raw));
                                   updatePerTypeThresholds({
                                     ...perTypeThresholds,
                                     [type]: { ...t, critical: val },
