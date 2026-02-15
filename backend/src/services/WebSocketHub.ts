@@ -530,7 +530,6 @@ export class WebSocketHub extends EventEmitter {
         platform: registrationData.platform || "unknown", // "linux", "windows", "macos"
         apiEndpoint: `http://${client?.metadata.ip || "unknown"}:8080`, // Mock endpoint
         websocketEndpoint: `ws://${client?.metadata.ip || "unknown"}:8081`, // Mock endpoint
-        authToken: registrationData.auth_token || "websocket-agent-token",
         updateInterval: registrationData.update_interval || 3000, // From client config or default
         capabilities: registrationData.capabilities || {
           sensors: [],

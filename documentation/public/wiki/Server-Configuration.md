@@ -15,7 +15,7 @@ The backend server is configured via environment variables, typically set in you
 
 ## Custom Port
 
-If port 3000 is already in use, change it in your `.env` file:
+If port 3143 is already in use, change it in your `.env` file:
 
 ```bash
 PANKHA_PORT=7000
@@ -81,8 +81,6 @@ graph TD
 
 
 ---
-
-```
 
 ### File System Layout
 

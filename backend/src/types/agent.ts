@@ -6,7 +6,6 @@ export interface AgentConfig {
   platform?: string; // "linux", "windows", "macos"
   apiEndpoint: string; // 'http://192.168.1.100:8080'
   websocketEndpoint: string; // 'ws://192.168.1.100:8081'
-  authToken: string;
   updateInterval: number; // milliseconds
   capabilities: AgentCapabilities;
 }

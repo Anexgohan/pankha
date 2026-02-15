@@ -57,14 +57,13 @@ export class AgentManager extends EventEmitter {
       const sql = `
         INSERT INTO systems (
           name, agent_id, ip_address, api_endpoint, websocket_endpoint,
-          auth_token, agent_version, platform, status, capabilities, last_seen
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'online', $9, CURRENT_TIMESTAMP)
+          agent_version, platform, status, capabilities, last_seen
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'online', $8, CURRENT_TIMESTAMP)
         ON CONFLICT (agent_id) DO UPDATE SET
           name = EXCLUDED.name,
           ip_address = EXCLUDED.ip_address,
           api_endpoint = EXCLUDED.api_endpoint,
           websocket_endpoint = EXCLUDED.websocket_endpoint,
-          auth_token = EXCLUDED.auth_token,
           agent_version = EXCLUDED.agent_version,
           platform = EXCLUDED.platform,
           status = 'online',
@@ -80,7 +79,6 @@ export class AgentManager extends EventEmitter {
         ipAddress,
         agentConfig.apiEndpoint,
         agentConfig.websocketEndpoint,
-        agentConfig.authToken,
         agentConfig.version,
         agentConfig.platform || 'unknown',
         JSON.stringify(agentConfig.capabilities),
@@ -286,7 +284,6 @@ export class AgentManager extends EventEmitter {
           platform: system.platform || "unknown",
           apiEndpoint: system.api_endpoint,
           websocketEndpoint: system.websocket_endpoint,
-          authToken: system.auth_token,
           updateInterval: 3000, // Default 3 seconds
           capabilities,
         };

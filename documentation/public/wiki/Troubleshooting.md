@@ -55,7 +55,7 @@
 *   **Cause**: Database needs maintenance after months of sensor data.
 *   **Fix**: Vacuum the database:
     ```bash
-    docker compose exec postgres psql -U pankha_user -d db_pankha -c "VACUUM ANALYZE;"
+    docker compose exec postgres psql -U pankha -d db_pankha -c "VACUUM ANALYZE;"
     ```
 
 ## Hardware Issues

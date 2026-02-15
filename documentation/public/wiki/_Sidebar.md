@@ -6,6 +6,7 @@
   * [Linux Agent](Agents-Linux)
   * [Windows Agent](Agents-Windows)
   * [Advanced Settings](Agents-Advanced-Settings)
+* [Deployment Center](Deployment-Center)
 * [Fan Profiles & Logic](Fan-Profiles)
 * [API Reference](API-Reference)
 * **Development**

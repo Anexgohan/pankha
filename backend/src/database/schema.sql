@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS systems (
   ip_address VARCHAR(45),
   api_endpoint VARCHAR(500),
   websocket_endpoint VARCHAR(500),
-  auth_token VARCHAR(255),
   agent_version VARCHAR(50),
   platform VARCHAR(20),                   -- 'linux', 'windows', 'macos'
   status VARCHAR(50) CHECK(status IN ('online', 'offline', 'error', 'installing')) DEFAULT 'offline',
@@ -306,5 +305,17 @@ BEGIN
   ) THEN
     ALTER TABLE systems ADD COLUMN platform VARCHAR(20) DEFAULT 'unknown';
     RAISE NOTICE 'Migration v0.3.5: Added platform column to systems table';
+  END IF;
+END $$;
+
+-- Migration: Remove unused auth_token column from systems table
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'systems' AND column_name = 'auth_token'
+  ) THEN
+    ALTER TABLE systems DROP COLUMN auth_token;
+    RAISE NOTICE 'Migration: Removed unused auth_token column from systems table';
   END IF;
 END $$;

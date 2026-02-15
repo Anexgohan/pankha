@@ -143,6 +143,28 @@ graph TD
 
 ---
 
+## Sensor Visibility
+
+You can hide individual sensors or entire sensor groups from the dashboard. This keeps your view clean and also affects fan control behavior.
+
+### Hiding Sensors
+
+*   Click the **visibility toggle** (eye icon) next to any sensor to hide or show it.
+*   You can also hide an **entire sensor group** (e.g., all `gigabyte_wmi` sensors) at once using the group-level toggle.
+*   Use the **"Show Hidden Sensors"** toggle to temporarily reveal hidden sensors for review.
+
+### How Visibility Affects Fan Control
+
+Hidden sensors are **excluded** from the **Highest Temperature** (`__highest__`) calculation. This means:
+
+*   If a fan's control sensor is set to "Highest", only **visible** sensors contribute to the maximum temperature.
+*   Hiding a noisy or irrelevant sensor (e.g., a chipset sensor that always reads high) prevents it from driving your fans unnecessarily.
+*   Sensors assigned **directly** to a fan (e.g., "CPU Package") are always used, regardless of visibility.
+
+> **Example**: Your motherboard has a VRM sensor that consistently reads 75°C. If your case fan is set to "Highest", this sensor would keep the fan spinning fast. Hiding it excludes it from the calculation, and the fan responds only to sensors you care about.
+
+---
+
 ## Debugging
 
 ### Log Level

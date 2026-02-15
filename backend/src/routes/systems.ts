@@ -104,7 +104,6 @@ router.post("/", async (req: Request, res: Response) => {
       ip_address,
       api_endpoint,
       websocket_endpoint,
-      auth_token,
       agent_version,
       capabilities,
     } = req.body;
@@ -132,8 +131,8 @@ router.post("/", async (req: Request, res: Response) => {
       `
       INSERT INTO systems (
         name, agent_id, ip_address, api_endpoint, websocket_endpoint,
-        auth_token, agent_version, capabilities, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'offline')
+        agent_version, capabilities, status
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'offline')
     `,
       [
         name,
@@ -141,7 +140,6 @@ router.post("/", async (req: Request, res: Response) => {
         ip_address,
         api_endpoint,
         websocket_endpoint,
-        auth_token,
         agent_version || "1.0.0",
         capabilities ? JSON.stringify(capabilities) : null,
       ]
@@ -154,8 +152,6 @@ router.post("/", async (req: Request, res: Response) => {
         agentId: agent_id,
         apiEndpoint: api_endpoint,
         websocketEndpoint: websocket_endpoint,
-        authToken:
-          auth_token || `mock_token_${Math.floor(Math.random() * 1000000)}`,
         version: agent_version || "1.0.0",
         updateInterval: 3000, // Default 3 seconds for real-time updates
         capabilities: capabilities || {},
@@ -319,7 +315,6 @@ router.put("/:id", async (req: Request, res: Response) => {
       ip_address,
       api_endpoint,
       websocket_endpoint,
-      auth_token,
       agent_version,
       capabilities,
       config_data,
@@ -339,18 +334,16 @@ router.put("/:id", async (req: Request, res: Response) => {
         ip_address = COALESCE($2, ip_address),
         api_endpoint = COALESCE($3, api_endpoint),
         websocket_endpoint = COALESCE($4, websocket_endpoint),
-        auth_token = COALESCE($5, auth_token),
-        agent_version = COALESCE($6, agent_version),
-        capabilities = COALESCE($7, capabilities),
-        config_data = COALESCE($8, config_data)
-      WHERE id = $9
+        agent_version = COALESCE($5, agent_version),
+        capabilities = COALESCE($6, capabilities),
+        config_data = COALESCE($7, config_data)
+      WHERE id = $8
     `,
       [
         name,
         ip_address,
         api_endpoint,
         websocket_endpoint,
-        auth_token,
         agent_version,
         capabilities ? JSON.stringify(capabilities) : null,
         config_data ? JSON.stringify(config_data) : null,

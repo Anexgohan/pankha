@@ -18,16 +18,16 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 ## Systems
 
 ### List & CRUD
-| Method | Endpoint                         | Description                          |
-| ------ | -------------------------------- | ------------------------------------ |
-| GET    | `/api/systems`                   | List all registered agents           |
-| POST   | `/api/systems`                   | Add new system                       |
-| GET    | `/api/systems/limit`             | Get agent limit info (current count, tier limit) |
-| GET    | `/api/systems/:id`               | Get system details with sensors/fans |
-| PUT    | `/api/systems/:id`               | Update system configuration          |
-| DELETE | `/api/systems/:id`               | Remove system                        |
-| GET    | `/api/systems/:id/status`        | Real-time connection status          |
-| GET    | `/api/systems/:id/diagnostics`   | Get hardware diagnostics from agent  |
+| Method | Endpoint                       | Description                                      |
+| ------ | ------------------------------ | ------------------------------------------------ |
+| GET    | `/api/systems`                 | List all registered agents                       |
+| POST   | `/api/systems`                 | Add new system                                   |
+| GET    | `/api/systems/limit`           | Get agent limit info (current count, tier limit) |
+| GET    | `/api/systems/:id`             | Get system details with sensors/fans             |
+| PUT    | `/api/systems/:id`             | Update system configuration                      |
+| DELETE | `/api/systems/:id`             | Remove system                                    |
+| GET    | `/api/systems/:id/status`      | Real-time connection status                      |
+| GET    | `/api/systems/:id/diagnostics` | Get hardware diagnostics from agent              |
 
 ### Controller
 | Method | Endpoint                           | Description                    |
@@ -65,11 +65,11 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 | POST   | `/api/systems/:id/update`             | Trigger remote agent self-update     |
 
 ### Backend Settings
-| Method | Endpoint                         | Description                                          |
-| ------ | -------------------------------- | ---------------------------------------------------- |
-| GET    | `/api/systems/settings`          | Get all backend settings                             |
-| GET    | `/api/systems/settings/:key`     | Get a specific setting by key                        |
-| PUT    | `/api/systems/settings/:key`     | Update a setting (`{ "value": "..." }`)              |
+| Method | Endpoint                     | Description                             |
+| ------ | ---------------------------- | --------------------------------------- |
+| GET    | `/api/systems/settings`      | Get all backend settings                |
+| GET    | `/api/systems/settings/:key` | Get a specific setting by key           |
+| PUT    | `/api/systems/settings/:key` | Update a setting (`{ "value": "..." }`) |
 
 Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data_retention_days`, `accent_color`, `hover_tint_color`
 
@@ -85,21 +85,21 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 ## Fan Profiles
 
-| Method | Endpoint                                  | Description               |
-| ------ | ----------------------------------------- | ------------------------- |
-| GET    | `/api/fan-profiles`                       | List all profiles         |
-| GET    | `/api/fan-profiles/:id`                   | Get profile details       |
-| POST   | `/api/fan-profiles`                       | Create new profile        |
-| PUT    | `/api/fan-profiles/:id`                   | Update profile            |
-| DELETE | `/api/fan-profiles/:id`                   | Delete profile            |
-| GET    | `/api/fan-profiles/stats`                 | Profile statistics        |
-| POST   | `/api/fan-profiles/assign`                | Assign profile to fan     |
-| GET    | `/api/fan-profiles/assignments/:systemId` | Get fan assignments       |
-| POST   | `/api/fan-profiles/calculate-speed`       | Calculate speed for temp  |
-| GET    | `/api/fan-profiles/export`                | Export profiles to JSON               |
-| POST   | `/api/fan-profiles/import`                | Import profiles from JSON             |
-| GET    | `/api/fan-profiles/defaults`              | List available default profiles       |
-| POST   | `/api/fan-profiles/load-defaults`         | Load default profiles into database   |
+| Method | Endpoint                                  | Description                         |
+| ------ | ----------------------------------------- | ----------------------------------- |
+| GET    | `/api/fan-profiles`                       | List all profiles                   |
+| GET    | `/api/fan-profiles/:id`                   | Get profile details                 |
+| POST   | `/api/fan-profiles`                       | Create new profile                  |
+| PUT    | `/api/fan-profiles/:id`                   | Update profile                      |
+| DELETE | `/api/fan-profiles/:id`                   | Delete profile                      |
+| GET    | `/api/fan-profiles/stats`                 | Profile statistics                  |
+| POST   | `/api/fan-profiles/assign`                | Assign profile to fan               |
+| GET    | `/api/fan-profiles/assignments/:systemId` | Get fan assignments                 |
+| POST   | `/api/fan-profiles/calculate-speed`       | Calculate speed for temp            |
+| GET    | `/api/fan-profiles/export`                | Export profiles to JSON             |
+| POST   | `/api/fan-profiles/import`                | Import profiles from JSON           |
+| GET    | `/api/fan-profiles/defaults`              | List available default profiles     |
+| POST   | `/api/fan-profiles/load-defaults`         | Load default profiles into database |
 
 ---
 
@@ -140,9 +140,9 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 ## Config
 
-| Method | Endpoint                 | Description                                 |
-| ------ | ------------------------ | ------------------------------------------- |
-| GET    | `/api/config/deployment` | Get deployment config (hub IP and port)     |
+| Method | Endpoint                 | Description                             |
+| ------ | ------------------------ | --------------------------------------- |
+| GET    | `/api/config/deployment` | Get deployment config (hub IP and port) |
 
 ---
 
@@ -160,7 +160,7 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 ## WebSocket API
 
-**Endpoint**: `ws://<server-ip>:3000/websocket`
+**Endpoint**: `ws://<server-ip>:3143/websocket`
 
 ### Events (Server → Client)
 
@@ -193,14 +193,14 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 ### Set Fan Speed
 ```bash
-curl -X PUT http://localhost:3000/api/systems/1/fans/fan1 \
+curl -X PUT http://localhost:3143/api/systems/1/fans/fan1 \
   -H "Content-Type: application/json" \
   -d '{"speed": 75}'
 ```
 
 ### Create Fan Profile
 ```bash
-curl -X POST http://localhost:3000/api/fan-profiles \
+curl -X POST http://localhost:3143/api/fan-profiles \
   -H "Content-Type: application/json" \
   -d '{
     "profile_name": "Silent",
@@ -214,7 +214,7 @@ curl -X POST http://localhost:3000/api/fan-profiles \
 
 ### Check Health
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:3143/health
 ```
 
 ---

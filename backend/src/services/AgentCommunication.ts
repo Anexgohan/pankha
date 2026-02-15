@@ -46,7 +46,7 @@ export class AgentCommunication extends EventEmitter {
    * Connect to an agent via WebSocket
    */
   public async connectToAgent(agentConfig: AgentConfig): Promise<void> {
-    const { agentId, websocketEndpoint, authToken } = agentConfig;
+    const { agentId, websocketEndpoint } = agentConfig;
 
     try {
       log.info(
@@ -56,7 +56,6 @@ export class AgentCommunication extends EventEmitter {
 
       const ws = new WebSocket(websocketEndpoint, {
         headers: {
-          Authorization: `Bearer ${authToken}`,
           "User-Agent": "Pankha-Server/1.0.0",
         },
       });
