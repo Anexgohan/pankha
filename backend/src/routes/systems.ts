@@ -1508,6 +1508,7 @@ const ALLOWED_SETTINGS = [
   'data_retention_days',
   'accent_color',
   'hover_tint_color',
+  'hardware_prune_days',
 ] as const;
 
 type AllowedSettingKey = typeof ALLOWED_SETTINGS[number];

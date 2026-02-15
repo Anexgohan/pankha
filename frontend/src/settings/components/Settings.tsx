@@ -714,7 +714,7 @@ const Settings: React.FC = () => {
   const [pricing, setPricing] = useState<PricingData | null>(null);
 
   // General Settings from Context
-  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone } = useDashboardSettings();
+  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone, hardwarePruneDays, updateHardwarePruneDays } = useDashboardSettings();
   const [isCustomScale, setIsCustomScale] = useState(false);
   const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
   const [isCustomRetention, setIsCustomRetention] = useState(false);
@@ -773,6 +773,13 @@ const Settings: React.FC = () => {
     { label: '365d', value: 365 },
   ];
   
+  const prunePresets = [
+    { label: '1d', value: 1, tooltip: 'Clean up undetected fans after 24 hours' },
+    { label: '7d', value: 7, tooltip: 'Clean up undetected fans after 7 days' },
+    { label: '30d', value: 30, tooltip: 'Clean up undetected fans after 30 days' },
+    { label: 'Never', value: 0, tooltip: 'Never auto-clean. Manage fan records manually' },
+  ];
+
   // Max retention allowed by license tier (from SST via API)
   const maxRetentionDays = license?.retentionDays || 7;
   
@@ -1067,6 +1074,33 @@ const Settings: React.FC = () => {
                       </button>
                     </form>
                   )}
+                </div>
+              </div>
+
+              {/* Hardware Pruning Setting
+                  Controls when stale fan/sensor records are marked inactive.
+                  Data is preserved for reactivation if hardware returns. */}
+              <div className="setting-item graph-scale-section">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Hardware Pruning</span>
+                  <span className="setting-description">
+                    Automatically clean up fans no longer detected on your systems. Records are preserved if hardware returns.
+                  </span>
+                </div>
+
+                <div className="scale-control-wrapper">
+                  <div className="scale-presets">
+                    {prunePresets.map((preset) => (
+                      <button
+                        key={preset.value}
+                        className={`scale-preset-btn ${hardwarePruneDays === preset.value ? 'active' : ''}`}
+                        onClick={() => updateHardwarePruneDays(preset.value)}
+                        title={preset.tooltip}
+                      >
+                        {preset.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

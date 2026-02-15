@@ -82,7 +82,9 @@ CREATE TABLE IF NOT EXISTS fans (
   target_speed INTEGER,
   is_controllable BOOLEAN DEFAULT true,     -- Can PWM be controlled
   enabled BOOLEAN DEFAULT true,
+  is_stale BOOLEAN DEFAULT false,             -- Auto-pruning flag (separate from user's enabled toggle)
   last_command TIMESTAMPTZ,                   -- Last control command sent
+  last_reported TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, -- Last time agent reported this fan
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
@@ -241,6 +243,11 @@ ON CONFLICT (setting_key) DO NOTHING;
 -- Insert default graph history setting (24 hours)
 INSERT INTO backend_settings (setting_key, setting_value, description)
 VALUES ('graph_history_hours', '24', 'Historical data window for sparklines in hours')
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- Insert default hardware prune days setting (7 days, 0 = never)
+INSERT INTO backend_settings (setting_key, setting_value, description)
+VALUES ('hardware_prune_days', '7', 'Days before unreported hardware is marked stale (0 = never)')
 ON CONFLICT (setting_key) DO NOTHING;
 
 -- Create index for faster setting lookups

@@ -61,6 +61,7 @@ export class DataAggregator extends EventEmitter {
   private agentManager: AgentManager;
   private aggregatedData: Map<string, AggregatedSystemData> = new Map();
   private dataRetentionInterval: NodeJS.Timeout | null = null;
+  private hardwarePruneInterval: NodeJS.Timeout | null = null;
   private dataRetentionDays: number; // Configurable via DATA_RETENTION_DAYS env var
 
   // Data aggregation system - raw data to dashboard, aggregated averages to DB
@@ -100,7 +101,9 @@ export class DataAggregator extends EventEmitter {
     );
 
     this.setupEventListeners();
+    this.runMigrations();
     this.startDataRetentionCleanup();
+    this.startHardwarePruning();
     this.startDataAggregation();
   }
 
@@ -291,11 +294,12 @@ export class DataAggregator extends EventEmitter {
     if (!fans || fans.length === 0) return;
 
     for (const fan of fans) {
-      // Use ON CONFLICT to handle race conditions - if fan already exists, do nothing
+      // Use ON CONFLICT to handle race conditions
+      // On conflict: update last_reported and clear is_stale (reactivation if hardware returns)
       await this.db.run(
         `INSERT INTO fans (system_id, fan_name, fan_label, is_controllable)
          VALUES ($1, $2, $3, true)
-         ON CONFLICT (system_id, fan_name) DO NOTHING`,
+         ON CONFLICT (system_id, fan_name) DO UPDATE SET last_reported = CURRENT_TIMESTAMP, is_stale = false`,
         [systemId, fan.id, fan.id]
       );
     }
@@ -526,7 +530,7 @@ export class DataAggregator extends EventEmitter {
   ): Promise<void> {
     for (const fan of fans) {
       await this.db.run(
-        "UPDATE fans SET current_speed = $1, current_rpm = $2, last_command = CURRENT_TIMESTAMP WHERE system_id = $3 AND fan_name = $4",
+        "UPDATE fans SET current_speed = $1, current_rpm = $2, last_command = CURRENT_TIMESTAMP, last_reported = CURRENT_TIMESTAMP WHERE system_id = $3 AND fan_name = $4",
         [fan.speed, fan.rpm, systemId, fan.id]
       );
     }
@@ -960,11 +964,78 @@ export class DataAggregator extends EventEmitter {
   }
 
   /**
+   * Run database migrations for new columns (safe for existing deployments)
+   */
+  private async runMigrations(): Promise<void> {
+    try {
+      await this.db.run(`ALTER TABLE fans ADD COLUMN IF NOT EXISTS last_reported TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP`);
+      await this.db.run(`ALTER TABLE fans ADD COLUMN IF NOT EXISTS is_stale BOOLEAN DEFAULT false`);
+      await this.db.run(
+        `INSERT INTO backend_settings (setting_key, setting_value, description)
+         VALUES ('hardware_prune_days', '7', 'Days before unreported hardware is marked stale (0 = never)')
+         ON CONFLICT (setting_key) DO NOTHING`
+      );
+      log.info('[DataAggregator] Migrations applied successfully', 'DataAggregator');
+    } catch (error) {
+      log.warn('[DataAggregator] Migration warning (may already exist):', 'DataAggregator', error);
+    }
+  }
+
+  /**
+   * Start hardware pruning check (runs every hour)
+   */
+  private startHardwarePruning(): void {
+    // Run pruning check every hour
+    this.hardwarePruneInterval = setInterval(() => {
+      this.pruneStaleHardware();
+    }, 60 * 60 * 1000); // 1 hour
+
+    // Also run once on startup (after a short delay for DB to be ready)
+    setTimeout(() => this.pruneStaleHardware(), 30 * 1000);
+
+    log.info('[DataAggregator] Hardware pruning started', 'DataAggregator');
+  }
+
+  /**
+   * Mark fans as stale if not reported within the configured prune window
+   */
+  private async pruneStaleHardware(): Promise<void> {
+    try {
+      const setting = await this.db.get(
+        "SELECT setting_value FROM backend_settings WHERE setting_key = 'hardware_prune_days'"
+      );
+      const pruneDays = parseInt(setting?.setting_value || '7', 10);
+
+      if (pruneDays === 0) {
+        log.debug('[DataAggregator] Hardware pruning disabled (set to Never)', 'DataAggregator');
+        return;
+      }
+
+      const result = await this.db.run(
+        `UPDATE fans SET is_stale = true
+         WHERE is_stale = false
+           AND last_reported IS NOT NULL
+           AND last_reported < NOW() - INTERVAL '1 day' * $1`,
+        [pruneDays]
+      );
+
+      if (result && (result as any).rowCount > 0) {
+        log.info(`[DataAggregator] Marked ${(result as any).rowCount} fan(s) as stale (not reported in ${pruneDays} days)`, 'DataAggregator');
+      }
+    } catch (error) {
+      log.error('[DataAggregator] Error during hardware pruning:', 'DataAggregator', error);
+    }
+  }
+
+  /**
    * Cleanup resources
    */
   public cleanup(): void {
     if (this.dataRetentionInterval) {
       clearInterval(this.dataRetentionInterval);
+    }
+    if (this.hardwarePruneInterval) {
+      clearInterval(this.hardwarePruneInterval);
     }
     if (this.aggregationInterval) {
       clearInterval(this.aggregationInterval);

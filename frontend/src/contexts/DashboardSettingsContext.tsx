@@ -70,6 +70,9 @@ interface DashboardSettingsContextType {
   updatePerTypeThresholds: (thresholds: PerTypeThresholds) => Promise<void>;
   resetTempDefaults: () => Promise<void>;
   getThresholdsForType: (sensorType?: string) => TempThresholds;
+  // Hardware pruning
+  hardwarePruneDays: number;
+  updateHardwarePruneDays: (days: number) => Promise<void>;
 }
 
 const DashboardSettingsContext = createContext<DashboardSettingsContextType | undefined>(undefined);
@@ -127,6 +130,9 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   const [perTypeEnabled, setPerTypeEnabledState] = useState<boolean>(false);
   const [perTypeThresholds, setPerTypeThresholds] = useState<PerTypeThresholds>({});
 
+  // Hardware pruning state
+  const [hardwarePruneDays, setHardwarePruneDays] = useState<number>(7);
+
   const fetchSettings = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
@@ -139,6 +145,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
         getSetting('temp_colors'),
         getSetting('per_type_enabled'),
         getSetting('per_type_thresholds'),
+        getSetting('hardware_prune_days'),
       ]);
 
       // Process graph scale
@@ -176,6 +183,11 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       }
       if (results[8].status === 'fulfilled' && results[8].value?.setting_value) {
         try { setPerTypeThresholds(JSON.parse(results[8].value.setting_value)); } catch { /* keep defaults */ }
+      }
+
+      // Process hardware prune days
+      if (results[9].status === 'fulfilled' && results[9].value?.setting_value) {
+        setHardwarePruneDays(parseInt(results[9].value.setting_value, 10));
       }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
@@ -281,6 +293,16 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     }
   };
 
+  const updateHardwarePruneDays = async (days: number) => {
+    setHardwarePruneDays(days);
+    try {
+      await updateSetting('hardware_prune_days', days);
+    } catch (err) {
+      console.error('Failed to update hardware prune days:', err);
+      fetchSettings();
+    }
+  };
+
   const resetTempDefaults = async () => {
     setTempThresholds(DEFAULT_TEMP_THRESHOLDS);
     setTempColors(DEFAULT_TEMP_COLORS);
@@ -343,6 +365,8 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       updatePerTypeThresholds: updatePerTypeThresholdsHandler,
       resetTempDefaults,
       getThresholdsForType,
+      hardwarePruneDays,
+      updateHardwarePruneDays,
     }}>
       {children}
     </DashboardSettingsContext.Provider>

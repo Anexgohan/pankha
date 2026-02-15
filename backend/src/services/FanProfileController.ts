@@ -149,6 +149,7 @@ export class FanProfileController {
         LEFT JOIN sensors sens ON COALESCE(fc.sensor_id, fpa.sensor_id) = sens.id
         WHERE fpa.is_active = TRUE
           AND f.enabled = TRUE
+          AND f.is_stale = FALSE
           AND f.is_controllable = TRUE
           AND s.status = 'online'
       `);
@@ -366,6 +367,14 @@ export class FanProfileController {
       // Process each assignment
       for (const assignment of assignments) {
         try {
+          // Check if fan is currently reported by the agent (immediate availability check)
+          const systemData = this.dataAggregator.getSystemData(assignment.agent_id);
+          const fanCurrentlyReported = systemData?.fans?.some(f => f.id === assignment.fan_name);
+          if (!fanCurrentlyReported) {
+            log.trace(`Fan ${assignment.fan_name} not in current data for agent ${assignment.agent_id}, skipping`, 'FanProfileController');
+            continue;
+          }
+
           // Get current sensor temperature
           const temperature = this.getSensorTemperature(
             assignment.agent_id,
