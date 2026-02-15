@@ -53,12 +53,72 @@ namespace Pankha.WixSharpInstaller
         public string ShortName { get; set; }
     }
 
-    class Program
+    public class Program
     {
         public static bool IsSelfElevating = false;
-        
+
         // Static config to be accessible
         static BuildConfig Config;
+
+        /// <summary>
+        /// Immediate custom action that runs BEFORE InstallValidate.
+        /// Kills the agent service and tray process so MSI's FilesInUse check
+        /// doesn't spend ~45s per validation attempting to resolve file locks.
+        /// Runs in the execute sequence (after user clicks Install, not on UI open).
+        /// </summary>
+        [CustomAction]
+        public static ActionResult KillProcessesBeforeValidate(Session session)
+        {
+            try
+            {
+                // Stop service via SCM (graceful stop, clean SCM state)
+                var scStop = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "sc",
+                    Arguments = "stop PankhaAgent",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true
+                });
+                scStop?.WaitForExit(5000);
+
+                // Poll until service is confirmed STOPPED (max ~10s)
+                for (int i = 0; i < 20; i++)
+                {
+                    try
+                    {
+                        var scQuery = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "sc",
+                            Arguments = "query PankhaAgent",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true
+                        });
+                        string output = scQuery?.StandardOutput.ReadToEnd() ?? "";
+                        scQuery?.WaitForExit(2000);
+                        if (output.Contains("STOPPED") || output.Contains("1060"))
+                            break;
+                    }
+                    catch { break; }
+                    System.Threading.Thread.Sleep(500);
+                }
+
+                // Kill tray process (not a service, direct kill is correct)
+                foreach (var proc in Process.GetProcessesByName("pankha-tray"))
+                {
+                    try { proc.Kill(); proc.WaitForExit(2000); } catch { }
+                }
+
+                // Final safety: kill agent process if SCM stop didn't work
+                foreach (var proc in Process.GetProcessesByName("pankha-agent"))
+                {
+                    try { proc.Kill(); proc.WaitForExit(2000); } catch { }
+                }
+            }
+            catch { }
+            return ActionResult.Success;
+        }
 
         static void Main(string[] args)
         {
@@ -105,8 +165,8 @@ namespace Pankha.WixSharpInstaller
                     DisplayName = Config.Product, // "Pankha Windows Agent" or similar (Service Name stays formal)
                     Description = "Monitors hardware sensors and controls fan speeds for the Pankha system",
                     StartOn = SvcEvent.Install,
-                    StopOn = SvcEvent.InstallUninstall_Wait,
-                    RemoveOn = SvcEvent.Uninstall_Wait,
+                    StopOn = SvcEvent.InstallUninstall,   // No _Wait: we stop service in OnBeforeInstall via SCM
+                    RemoveOn = SvcEvent.Uninstall,        // No _Wait: service already stopped by our custom action
                     Account = @"LocalSystem",
                     Interactive = false
                 };
@@ -186,6 +246,20 @@ namespace Pankha.WixSharpInstaller
                     DowngradeErrorMessage = "A newer version is already installed.",
                     AllowSameVersionUpgrades = true
                 };
+
+                // UPGRADE OPTIMIZATION: Kill agent/tray BEFORE InstallValidate.
+                // Without this, MSI's built-in FilesInUse check spends ~45s per InstallValidate
+                // (twice during upgrade: once for new MSI, once inside RemoveExistingProducts)
+                // trying to resolve file locks on running pankha-agent.exe and pankha-tray.exe.
+                // This immediate action runs in the execute sequence AFTER user clicks Install.
+                project.AddAction(new ManagedAction(
+                    new Id("CA_KillProcessesEarly"),
+                    KillProcessesBeforeValidate,
+                    Return.ignore,
+                    When.Before,
+                    new Step("InstallValidate"),
+                    Condition.Always
+                ));
 
                 // Setup ManagedUI
                 project.ManagedUI = new ManagedUI();
@@ -399,34 +473,74 @@ namespace Pankha.WixSharpInstaller
             try
             {
                 LogToDebugFile(logPath, logType, "Early Process Kill: Starting...");
-                // Stop Service
+
+                // 1. Stop service properly via SCM (prevents WiX ServiceControl from waiting on confused SCM state)
                 try
                 {
-                    var stopService = Process.Start(new ProcessStartInfo
+                    var scStop = Process.Start(new ProcessStartInfo
                     {
-                        FileName = "net",
+                        FileName = "sc",
                         Arguments = "stop PankhaAgent",
                         UseShellExecute = false,
-                        CreateNoWindow = true
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true
                     });
-                    stopService?.WaitForExit(5000);
+                    scStop?.WaitForExit(3000);
+                    LogToDebugFile(logPath, logType, "Sent: sc stop PankhaAgent");
                 }
                 catch { }
 
-                // Kill Processes
-                string[] targets = { "pankha-agent", "pankha-tray" };
-                foreach (var target in targets)
+                // 2. Poll SCM until service is confirmed STOPPED (avoids WiX waiting ~30s on stale SCM state)
+                bool serviceStopped = false;
+                for (int poll = 0; poll < 16; poll++) // 16 × 500ms = 8s max
                 {
-                    foreach (var proc in Process.GetProcessesByName(target))
+                    try
                     {
-                        try 
-                        { 
-                            proc.Kill(); 
-                            proc.WaitForExit(3000);
-                            LogToDebugFile(logPath, logType, $"Killed {target} ({proc.Id})");
-                        } catch { }
+                        var scQuery = Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "sc",
+                            Arguments = "query PankhaAgent",
+                            UseShellExecute = false,
+                            CreateNoWindow = true,
+                            RedirectStandardOutput = true
+                        });
+                        string output = scQuery?.StandardOutput.ReadToEnd() ?? "";
+                        scQuery?.WaitForExit(2000);
+
+                        if (output.Contains("STOPPED") || output.Contains("1060"))
+                        {
+                            serviceStopped = true;
+                            LogToDebugFile(logPath, logType, $"Service confirmed stopped (poll {poll}, ~{poll * 500}ms)");
+                            break;
+                        }
+                    }
+                    catch { serviceStopped = true; break; } // Query failed = service likely doesn't exist
+
+                    System.Threading.Thread.Sleep(500);
+                }
+
+                // 3. Fallback: force kill agent process only if SCM stop failed
+                if (!serviceStopped)
+                {
+                    LogToDebugFile(logPath, logType, "Service did not stop via SCM within 8s, force killing agent process...");
+                    foreach (var proc in Process.GetProcessesByName("pankha-agent"))
+                    {
+                        try { proc.Kill(); proc.WaitForExit(2000); LogToDebugFile(logPath, logType, $"Force killed pankha-agent ({proc.Id})"); } catch { }
                     }
                 }
+
+                // 4. Kill tray process (not a service — direct kill is correct)
+                foreach (var proc in Process.GetProcessesByName("pankha-tray"))
+                {
+                    try
+                    {
+                        proc.Kill();
+                        proc.WaitForExit(2000);
+                        LogToDebugFile(logPath, logType, $"Killed pankha-tray ({proc.Id})");
+                    }
+                    catch { }
+                }
+
                 LogToDebugFile(logPath, logType, "Early Process Kill: Done.");
             }
             catch (Exception ex)
@@ -644,18 +758,8 @@ namespace Pankha.WixSharpInstaller
                          LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
                      }
 
-                     // Ensure Service is Started (Race Condition Fix)
-                     try
-                     {
-                          Process.Start(new ProcessStartInfo
-                          {
-                              FileName = "net",
-                              Arguments = "start PankhaAgent",
-                              UseShellExecute = false,
-                              CreateNoWindow = true
-                          })?.WaitForExit(5000);
-                     }
-                     catch {}
+                     // Note: Service is started by WiX ServiceControl (StartOn = SvcEvent.Install).
+                     // No manual 'net start' needed — WiX handles it during the install sequence.
 
                      // Configure Service Failure Recovery (SCM)
                      // Restart on failure: 5s → 10s → 15s, reset after 1 day

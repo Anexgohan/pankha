@@ -6,7 +6,7 @@
 </auto-generated>
 -->
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-  <Product Id="971cfce6-e3a8-4a0d-beaa-acd152860e42" Name="Pankha Windows Agent" Language="1033" Codepage="Windows-1252" Version="0.4.16" UpgradeCode="08bb88c1-6d1d-476c-98a0-21019082b4f8" Manufacturer="Pankha Fan Control">
+  <Product Id="3b0802c3-8c81-475e-aaa8-9ffc80264b70" Name="Pankha Windows Agent" Language="1033" Codepage="Windows-1252" Version="0.4.17" UpgradeCode="08bb88c1-6d1d-476c-98a0-21019082b4f8" Manufacturer="Pankha Fan Control">
     <Package InstallerVersion="200" Compressed="yes" Platform="x64" SummaryCodepage="Windows-1252" InstallScope="perMachine" Languages="1033" />
     <Media Id="1" Cabinet="Pankha20Windows20Agent.cab" EmbedCab="yes" />
 
@@ -14,21 +14,21 @@
       <Directory Id="ProgramFiles64Folder" Name="ProgramFiles64Folder">
         <Directory Id="INSTALLDIR" Name="Pankha Fan Control">
 
-          <Component Id="Component.pankha2dagent.exe_2959411416" Guid="971cfce6-e3a8-4a0d-beaa-acd173a27591" Win64="yes">
+          <Component Id="Component.pankha2dagent.exe_2959411416" Guid="3b0802c3-8c81-475e-aaa8-9ffca142a2bf" Win64="yes">
             <File Id="pankha2dagent.exe_2959411416" Source="..\publish\win-x64\agent\pankha-agent.exe" />
 
             <ServiceInstall Id="PankhaAgent" Name="PankhaAgent" DisplayName="Pankha Windows Agent" Description="Monitors hardware sensors and controls fan speeds for the Pankha system" Type="ownProcess" Start="auto" ErrorControl="normal" Account="LocalSystem" Interactive="no" />
 
-            <ServiceControl Id="StopPankhaAgent" Name="PankhaAgent" Stop="both" Wait="yes" />
+            <ServiceControl Id="StopPankhaAgent" Name="PankhaAgent" Stop="both" Wait="no" />
             <ServiceControl Id="StartPankhaAgent" Name="PankhaAgent" Start="install" Wait="no" />
-            <ServiceControl Id="RemovePankhaAgent" Name="PankhaAgent" Remove="uninstall" Wait="yes" />
+            <ServiceControl Id="RemovePankhaAgent" Name="PankhaAgent" Remove="uninstall" Wait="no" />
           </Component>
 
-          <Component Id="Component.pankha2dtray.exe_1108545044" Guid="971cfce6-e3a8-4a0d-beaa-acd12e997f13" Win64="yes">
+          <Component Id="Component.pankha2dtray.exe_1108545044" Guid="3b0802c3-8c81-475e-aaa8-9ffc5c39ac41" Win64="yes">
             <File Id="pankha2dtray.exe_1108545044" Source="..\publish\win-x64\agent\pankha-tray.exe" />
           </Component>
 
-          <Component Id="Component.Configure20Pankha20Agent" Guid="971cfce6-e3a8-4a0d-beaa-acd193f38152" Win64="yes">
+          <Component Id="Component.Configure20Pankha20Agent" Guid="3b0802c3-8c81-475e-aaa8-9ffcc193ae80" Win64="yes">
             <Shortcut Id="INSTALLDIR.Configure20Pankha20Agent" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--setup" Name="Configure Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -39,7 +39,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.View20Pankha20Agent20Logs" Guid="971cfce6-e3a8-4a0d-beaa-acd17c302ce8" Win64="yes">
+          <Component Id="Component.View20Pankha20Agent20Logs" Guid="3b0802c3-8c81-475e-aaa8-9ffcaad05916" Win64="yes">
             <Shortcut Id="INSTALLDIR.View20Pankha20Agent20Logs" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--logs follow" Name="View Pankha Agent Logs.lnk" />
 
             <CreateFolder />
@@ -49,7 +49,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Pankha20Agent20Status" Guid="971cfce6-e3a8-4a0d-beaa-acd1c1f8ba9d" Win64="yes">
+          <Component Id="Component.Pankha20Agent20Status" Guid="3b0802c3-8c81-475e-aaa8-9ffcef98e7cb" Win64="yes">
             <Shortcut Id="INSTALLDIR.Pankha20Agent20Status" WorkingDirectory="INSTALLDIR" Target="[System64Folder]cmd.exe" Arguments="/K &quot;cd /d &quot;[INSTALLDIR]&quot; &amp;&amp; pankha-agent.exe --status &amp;&amp; pause&quot;" Name="Pankha Agent Status.lnk" />
 
             <CreateFolder />
@@ -59,7 +59,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Uninstall20Pankha20Agent" Guid="971cfce6-e3a8-4a0d-beaa-acd1b75e2191" Win64="yes">
+          <Component Id="Component.Uninstall20Pankha20Agent" Guid="3b0802c3-8c81-475e-aaa8-9ffce5fe4ebf" Win64="yes">
             <Shortcut Id="INSTALLDIR.Uninstall20Pankha20Agent" WorkingDirectory="INSTALLDIR" Target="[SystemFolder]msiexec.exe" Arguments="/i [ProductCode] /l*v &quot;[CommonAppDataFolder]Pankha Fan Control\logs\uninstall_full.log&quot;" Name="Uninstall Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -71,7 +71,7 @@
 
           <Directory Id="logs" Name="logs">
 
-            <Component Id="Component.logs.EmptyDirectory" Guid="971cfce6-e3a8-4a0d-beaa-acd1648464e0" KeyPath="yes" Win64="yes">
+            <Component Id="Component.logs.EmptyDirectory" Guid="3b0802c3-8c81-475e-aaa8-9ffc9224910e" KeyPath="yes" Win64="yes">
               <CreateFolder />
               <RemoveFolder Id="logs" On="uninstall" />
             </Component>
@@ -83,7 +83,7 @@
       <Directory Id="ProgramMenuFolder" Name="ProgramMenuFolder">
         <Directory Id="Pankha20Windows20Agent_" Name="Pankha Windows Agent">
 
-          <Component Id="Component.Pankha20Tray" Guid="971cfce6-e3a8-4a0d-beaa-acd1dd76d8ba" Win64="yes">
+          <Component Id="Component.Pankha20Tray" Guid="3b0802c3-8c81-475e-aaa8-9ffc0b1605e8" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Pankha20Tray" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-tray.exe" Name="Pankha Tray.lnk" />
 
             <CreateFolder />
@@ -94,7 +94,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Configure20Pankha20Agent.1" Guid="971cfce6-e3a8-4a0d-beaa-acd1658b70fa" Win64="yes">
+          <Component Id="Component.Configure20Pankha20Agent.1" Guid="3b0802c3-8c81-475e-aaa8-9ffc932b9d28" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Configure20Pankha20Agent.1" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--setup" Name="Configure Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -104,7 +104,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.View20Pankha20Agent20Logs.1" Guid="971cfce6-e3a8-4a0d-beaa-acd1473d9083" Win64="yes">
+          <Component Id="Component.View20Pankha20Agent20Logs.1" Guid="3b0802c3-8c81-475e-aaa8-9ffc75ddbdb1" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.View20Pankha20Agent20Logs.1" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-agent.exe" Arguments="--logs follow" Name="View Pankha Agent Logs.lnk" />
 
             <CreateFolder />
@@ -114,7 +114,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Pankha20Agent20Status.1" Guid="971cfce6-e3a8-4a0d-beaa-acd137d972a0" Win64="yes">
+          <Component Id="Component.Pankha20Agent20Status.1" Guid="3b0802c3-8c81-475e-aaa8-9ffc65799fce" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Pankha20Agent20Status.1" WorkingDirectory="System64Folder" Target="[System64Folder]cmd.exe" Arguments="/K &quot;cd /d &quot;[INSTALLDIR]&quot; &amp;&amp; pankha-agent.exe --status &amp;&amp; pause&quot;" Name="Pankha Agent Status.lnk" />
 
             <CreateFolder />
@@ -124,7 +124,7 @@
             </RegistryKey>
           </Component>
 
-          <Component Id="Component.Uninstall20Pankha20Agent.1" Guid="971cfce6-e3a8-4a0d-beaa-acd10ec9e7eb" Win64="yes">
+          <Component Id="Component.Uninstall20Pankha20Agent.1" Guid="3b0802c3-8c81-475e-aaa8-9ffc3c691419" Win64="yes">
             <Shortcut Id="Pankha20Windows20Agent_.Uninstall20Pankha20Agent.1" WorkingDirectory="SystemFolder" Target="[SystemFolder]msiexec.exe" Arguments="/i [ProductCode] /l*v &quot;[CommonAppDataFolder]Pankha Fan Control\logs\uninstall_full.log&quot;" Name="Uninstall Pankha Agent.lnk" />
 
             <CreateFolder />
@@ -139,7 +139,7 @@
 
       <Directory Id="StartupFolder" Name="StartupFolder">
 
-        <Component Id="Component.Pankha20Tray.1" Guid="971cfce6-e3a8-4a0d-beaa-acd17e1a616b" Win64="yes">
+        <Component Id="Component.Pankha20Tray.1" Guid="3b0802c3-8c81-475e-aaa8-9ffcacba8e99" Win64="yes">
           <Shortcut Id="StartupFolder.Pankha20Tray.1" WorkingDirectory="INSTALLDIR" Target="[INSTALLDIR]pankha-tray.exe" Name="Pankha Tray.lnk" />
 
           <CreateFolder />
@@ -151,7 +151,7 @@
 
       </Directory>
 
-      <Component Id="TARGETDIR" Guid="971cfce6-e3a8-4a0d-beaa-acd1c5156eb5" KeyPath="yes" Win64="yes">
+      <Component Id="TARGETDIR" Guid="3b0802c3-8c81-475e-aaa8-9ffcf3b59be3" KeyPath="yes" Win64="yes">
         <RemoveFolder Id="TARGETDIR" On="uninstall" />
       </Component>
 
@@ -169,6 +169,7 @@
 
     <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version is already installed." Schedule="afterInstallInitialize" />
 
+    <CustomAction Id="CA_KillProcessesEarly" BinaryKey="KillProcessesBeforeValidate_File" DllEntry="KillProcessesBeforeValidate" Return="ignore" Execute="immediate" />
     <CustomAction Id="Set_WixSharp_EnableUninstallFullUI_Action_Props" Property="WixSharp_EnableUninstallFullUI_Action" Value="MSIEXEC_EXTRA_PARAMETERS=;INSTALLDIR=[INSTALLDIR];UILevel=[UILevel];ProductCode=[ProductCode];ADDLOCAL=[ADDLOCAL];ADDFEATURES=[ADDFEATURES]" />
     <CustomAction Id="WixSharp_EnableUninstallFullUI_Action" BinaryKey="WixSharp_EnableUninstallFullUI_Action_File" DllEntry="WixSharp_EnableUninstallFullUI_Action" Return="ignore" Impersonate="no" Execute="deferred" />
     <CustomAction Id="WixSharp_InitRuntime_Action" BinaryKey="WixSharp_EnableUninstallFullUI_Action_File" DllEntry="WixSharp_InitRuntime_Action" Return="check" Execute="immediate" />
@@ -178,6 +179,7 @@
     <CustomAction Id="Set_WixSharp_AfterInstall_Action_Props" Property="WixSharp_AfterInstall_Action" Value="WixSharp_AfterInstall_Handlers=[WixSharp_AfterInstall_Handlers];WIXSHARP_RUNTIME_DATA=[WIXSHARP_RUNTIME_DATA];INSTALLDIR=[INSTALLDIR];UILevel=[UILevel];ProductName=[ProductName];FOUNDPREVIOUSVERSION=[FOUNDPREVIOUSVERSION];UpgradeCode=[UpgradeCode];MsiLogFileLocation=[MsiLogFileLocation];KEEP_CONFIG=[KEEP_CONFIG];RESET_CONFIG=[RESET_CONFIG];KEEP_LOGS=[KEEP_LOGS];Manufacturer=[Manufacturer];AgentExe=[AgentExe];AgentUI=[AgentUI];UPGRADINGPRODUCTCODE=[UPGRADINGPRODUCTCODE];WIX_UPGRADE_DETECTED=[WIX_UPGRADE_DETECTED];PREVIOUSINSTALLDIR=[PREVIOUSINSTALLDIR];PREVIOUSINSTALLDIR=[PREVIOUSINSTALLDIR];INSTALLDIR=[INSTALLDIR];UILevel=[UILevel];ProductCode=[ProductCode];ADDLOCAL=[ADDLOCAL];ADDFEATURES=[ADDFEATURES]" />
     <CustomAction Id="WixSharp_AfterInstall_Action" BinaryKey="WixSharp_EnableUninstallFullUI_Action_File" DllEntry="WixSharp_AfterInstall_Action" Return="check" Impersonate="no" Execute="deferred" />
 
+    <Binary Id="KillProcessesBeforeValidate_File" SourceFile="..\publish\win-x64\installer\%this%.CA.dll" />
     <Binary Id="WixSharp_EnableUninstallFullUI_Action_File" SourceFile="..\publish\win-x64\installer\WixSharp.CA.dll" />
     <Binary Id="ProductLogo" SourceFile="..\graphics\icons\pankha_icon_256x256_6-fins.ico" />
     <Binary Id="ui_shell_icon" SourceFile="..\graphics\icons\pankha_icon_256x256_6-fins.ico" />
@@ -200,11 +202,11 @@
     <Property Id="UI_AUTOSCALEMODE" Value="Font" />
     <Property Id="WixSharp_UI_INSTALLDIR" Value="INSTALLDIR" />
     <Property Id="UAC_WARNING" Value="Please wait for UAC prompt to appear.&#xD;&#xA;&#xD;&#xA;If it appears minimized then activate it from the taskbar." />
-    <Property Id="WixSharp_InstallDialogs" Value="WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.WelcomeDialog&#xA;WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.InstallDirDialog&#xA;pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.ConfigurationDialog&#xA;WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.ProgressDialog&#xA;pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.ConditionalExitDialog" />
-    <Property Id="WixSharp_ModifyDialogs" Value="pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.CustomMaintenanceDialog&#xA;pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.UninstallConfirmDialog&#xA;WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.ProgressDialog&#xA;pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.ConditionalExitDialog" />
-    <Property Id="WixSharp_UIInitialized_Handlers" Value="pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.Program|Project_UIInitialized" />
-    <Property Id="WixSharp_BeforeInstall_Handlers" Value="pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.Program|OnBeforeInstall" />
-    <Property Id="WixSharp_AfterInstall_Handlers" Value="pankha-agent, Version=0.4.16.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.Program|project_AfterInstall" />
+    <Property Id="WixSharp_InstallDialogs" Value="WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.WelcomeDialog&#xA;WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.InstallDirDialog&#xA;pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.ConfigurationDialog&#xA;WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.ProgressDialog&#xA;pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.ConditionalExitDialog" />
+    <Property Id="WixSharp_ModifyDialogs" Value="pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.CustomMaintenanceDialog&#xA;pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.UninstallConfirmDialog&#xA;WixSharp.UI, Version=1.26.0.0, Culture=neutral, PublicKeyToken=3775edd25acc43c2|WixSharp.UI.Forms.ProgressDialog&#xA;pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.ConditionalExitDialog" />
+    <Property Id="WixSharp_UIInitialized_Handlers" Value="pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.Program|Project_UIInitialized" />
+    <Property Id="WixSharp_BeforeInstall_Handlers" Value="pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.Program|OnBeforeInstall" />
+    <Property Id="WixSharp_AfterInstall_Handlers" Value="pankha-agent, Version=0.4.17.0, Culture=neutral, PublicKeyToken=null|Pankha.WixSharpInstaller.Program|project_AfterInstall" />
     <Property Id="ARPPRODUCTICON" Value="app_icon.ico" />
     <Property Id="REINSTALLMODE" Value="omus" />
 
@@ -226,6 +228,7 @@
     </Feature>
 
     <InstallExecuteSequence>
+      <Custom Action="CA_KillProcessesEarly" Before="InstallValidate"> (1) </Custom>
       <Custom Action="Set_WixSharp_EnableUninstallFullUI_Action_Props" Before="InstallFinalize" />
       <Custom Action="WixSharp_EnableUninstallFullUI_Action" After="Set_WixSharp_EnableUninstallFullUI_Action_Props"> (NOT Installed) </Custom>
       <Custom Action="WixSharp_InitRuntime_Action" Before="AppSearch"> (1) </Custom>
