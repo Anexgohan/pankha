@@ -1267,12 +1267,18 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         {/* Individual Sensors Header */}
                         <option disabled>(Sensors)</option>
 
-                        {/* Individual Sensors */}
+                        {/* Individual Sensors (sorted by group, then by ID) */}
                         {system.current_temperatures
                           ?.filter(
                             (sensor: SensorReading) =>
                               !isSensorOrGroupHidden(sensor)
                           )
+                          .sort((a: SensorReading, b: SensorReading) => {
+                            const groupA = deriveSensorGroupId(a);
+                            const groupB = deriveSensorGroupId(b);
+                            if (groupA !== groupB) return groupA.localeCompare(groupB);
+                            return a.id.localeCompare(b.id);
+                          })
                           .map((sensor: SensorReading) => (
                             <option key={sensor.id} value={sensor.id}>
                               {getSensorDisplayName(

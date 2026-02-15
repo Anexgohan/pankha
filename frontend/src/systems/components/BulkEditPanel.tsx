@@ -2,7 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { FanReading, SensorReading } from '../../types/api';
 import type { FanProfile } from '../../services/fanProfilesApi';
-import { sortSensorGroupIds } from '../../utils/sensorUtils';
+import { sortSensorGroupIds, deriveSensorGroupId } from '../../utils/sensorUtils';
 import { formatTemperature } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
 import { 
@@ -250,7 +250,12 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
                   })()}
 
                   <option disabled>(Sensors)</option>
-                  {sensors.map((sensor) => (
+                  {[...sensors].sort((a, b) => {
+                    const groupA = deriveSensorGroupId(a);
+                    const groupB = deriveSensorGroupId(b);
+                    if (groupA !== groupB) return groupA.localeCompare(groupB);
+                    return a.id.localeCompare(b.id);
+                  }).map((sensor) => (
                     <option key={sensor.id} value={sensor.id}>
                       {getSensorDisplayName(sensor.id, sensor.name, sensor.label)} ({formatTemperature(sensor.temperature)})
                     </option>

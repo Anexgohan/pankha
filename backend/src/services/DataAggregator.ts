@@ -4,6 +4,7 @@ import { AgentDataPacket, SensorInfo, FanInfo } from "../types/agent";
 import { AggregatedSystemData } from "../types/aggregatedData";
 import { AgentManager } from "./AgentManager";
 import { log } from "../utils/logger";
+import { deriveChipName } from "../utils/sensorUtils";
 // Removed AgentCommunication import to prevent circular dependency
 
 /**
@@ -569,8 +570,7 @@ export class DataAggregator extends EventEmitter {
 
         if (!isHidden) {
           // Check if part of hidden group
-          const chipMatch = sensor.id.match(/^([a-z0-9_]+?)_\d+$/i);
-          const chipName = chipMatch ? chipMatch[1] : sensor.id.split("_")[0];
+          const chipName = deriveChipName(sensor.id);
           isHidden = hiddenGroupNames.has(chipName);
         }
 

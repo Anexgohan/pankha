@@ -3,6 +3,7 @@ import { DataAggregator } from './DataAggregator';
 import { CommandDispatcher } from './CommandDispatcher';
 import { AgentManager } from './AgentManager';
 import { log } from '../utils/logger';
+import { deriveChipName } from '../utils/sensorUtils';
 
 interface FanAssignment {
   assignment_id: number;
@@ -191,9 +192,7 @@ export class FanProfileController {
             // Skip hidden sensors
             if (s.isHidden) return false;
 
-            // Extract chip name from sensor ID (e.g., "k10temp_1" -> "k10temp")
-            const chipMatch = s.id.match(/^([a-z0-9_]+?)_\d+$/i);
-            const chipName = chipMatch ? chipMatch[1] : s.id.split('_')[0];
+            const chipName = deriveChipName(s.id);
             return chipName === groupName;
           });
 
