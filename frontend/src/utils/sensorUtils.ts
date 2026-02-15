@@ -1,5 +1,7 @@
 /**
- * Sensor utility functions for grouping and sorting sensors
+ * Sensor utility functions for grouping and sorting sensors.
+ *
+ * deriveChipName() must stay in sync with backend's deriveChipName() in backend/src/utils/sensorUtils.ts
  */
 
 import type { SensorReading } from '../types/api';
@@ -29,33 +31,34 @@ export function sortSensorGroupIds(groupIds: string[]): string[] {
 }
 
 /**
- * Derive group ID from sensor ID using hardware-agnostic pattern extraction.
- * Handles various sensor ID formats from Windows/Linux agents.
+ * Derive chip/group name from a sensor ID string.
+ *
+ * Uses a 3-strategy cascade to handle various sensor ID formats:
+ * - Strategy 1: Indexed chip — "chip_N" prefix (e.g., nvidiagpu_0, gpu-nvidia_0, amdcpu_0)
+ * - Strategy 2: Non-indexed chip — "chip_" prefix (e.g., k10temp, it8628, acpitz)
+ * - Strategy 3: Fallback — everything before first underscore, or the full ID
+ *
+ * Uses [^_]+ (anything except underscore) to handle any chip naming convention
+ * (hyphens, dots, etc.) without needing to whitelist specific characters.
+ */
+export function deriveChipName(sensorId: string): string {
+  // Strategy 1: indexed chip — e.g., nvidiagpu_0, gpu-nvidia_0, amdcpu_0, nvme_0
+  const indexedChipMatch = sensorId.match(/^([^_]+_\d+)/);
+  if (indexedChipMatch?.[1]) return indexedChipMatch[1];
+
+  // Strategy 2: non-indexed chip — e.g., k10temp, it8628, acpitz
+  const nonIndexedChipMatch = sensorId.match(/^([^_]+)_/);
+  if (nonIndexedChipMatch?.[1]) return nonIndexedChipMatch[1];
+
+  // Strategy 3: fallback — no underscores in ID, return as-is
+  return sensorId.split('_')[0] || sensorId;
+}
+
+/**
+ * Derive group ID from a SensorReading. Convenience wrapper around deriveChipName.
  */
 export function deriveSensorGroupId(sensor: SensorReading): string {
-  // Strategy:
-  // 1. Look for "Chip ID" pattern: [alphanumeric]_[digits] (e.g. nvidiagpu_0, amdcpu_0)
-  //    This covers most Windows/Linux indexed chips.
-  const indexedChipMatch = sensor.id.match(/^([a-z0-9]+_\d+)/i);
-  if (indexedChipMatch?.[1]) {
-    return indexedChipMatch[1];
-  }
-
-  // 2. Look for "Chip ID" pattern without index: [alphanumeric]_ (e.g. k10temp_tctl, it8628_fan1)
-  //    This covers Linux chips that don't have an index suffix on the chip name itself.
-  const nonIndexedChipMatch = sensor.id.match(/^([a-z0-9]+)_/i);
-  if (nonIndexedChipMatch?.[1]) {
-    return nonIndexedChipMatch[1];
-  }
-
-  // 3. Fallback to old logic for safety (e.g. if ID has no underscores)
-  const standardMatch = sensor.id.match(/^([a-z0-9_]+?)_\d+$/i);
-  if (standardMatch?.[1]) {
-    return standardMatch[1];
-  }
-
-  // Fallback to sensor type
-  return sensor.type || 'other';
+  return deriveChipName(sensor.id);
 }
 
 /**
