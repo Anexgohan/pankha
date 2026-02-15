@@ -296,9 +296,18 @@ const MaintenanceSection: React.FC<{
                     const targetVersion = cleanTarget ? `v${cleanTarget}` : null;
                     const isMismatch = cleanTarget && system.agent_version &&
                                       !system.agent_version.includes(cleanTarget);
-                    // Determine if this is an upgrade or downgrade
+                    // Determine if this is an upgrade or downgrade (semver-aware comparison)
                     const agentVer = (system.agent_version || '').replace(/^v/, '').replace(/-.*$/, '');
-                    const isDowngrade = isMismatch && cleanTarget < agentVer;
+                    const compareSemver = (a: string, b: string): number => {
+                      const pa = a.split('.').map(Number);
+                      const pb = b.split('.').map(Number);
+                      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                        const na = pa[i] || 0, nb = pb[i] || 0;
+                        if (na !== nb) return na - nb;
+                      }
+                      return 0;
+                    };
+                    const isDowngrade = isMismatch && compareSemver(cleanTarget, agentVer) < 0;
                     const isOutdated = isMismatch && !isDowngrade;
                     const isUpdating = updatingAgents.has(system.id);
                     const isOnline = system.status === 'online';
