@@ -265,24 +265,19 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
 
               <div className="control-group" title="The behavior curve or manual speed to apply to selected fans">
                 <label htmlFor="bulk-profile">Set Fan Profile:</label>
-                <div className="stealth-select-wrapper bulk-profile-select">
-                  <div className="select-display">
-                    {profiles.find(p => p.id === bulkProfileId)?.profile_name || "Don't change"}
-                  </div>
-                  <select
-                    id="bulk-profile"
-                    className="select-engine"
-                    value={bulkProfileId || ''}
-                    onChange={(e) => setBulkProfileId(e.target.value ? parseInt(e.target.value) : undefined)}
-                  >
-                    <option value="">Don't change</option>
-                    {profiles.map((profile) => (
-                      <option key={profile.id} value={profile.id}>
-                        {profile.profile_name} ({profile.created_by === 'system' ? 'default' : 'custom'})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  id="bulk-profile"
+                  className="bulk-edit-select"
+                  value={bulkProfileId || ''}
+                  onChange={(e) => setBulkProfileId(e.target.value ? parseInt(e.target.value) : undefined)}
+                >
+                  <option value="">Don't change</option>
+                  {profiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.profile_name} ({profile.created_by === 'system' ? 'default' : 'custom'})
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 

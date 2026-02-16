@@ -109,6 +109,31 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const cardRef = React.useRef<HTMLDivElement>(null);
+  const fanRpmStateRef = React.useRef<Record<string, { rpm: number; decreasing: boolean }>>({});
+
+  React.useEffect(() => {
+    if (system.current_fan_speeds) {
+      const prev = fanRpmStateRef.current;
+      const next: Record<string, { rpm: number; decreasing: boolean }> = {};
+      for (const fan of system.current_fan_speeds) {
+        const p = prev[fan.id];
+        if (!p) {
+          next[fan.id] = { rpm: fan.rpm, decreasing: false };
+        } else {
+          const delta = fan.rpm - p.rpm;
+          const threshold = Math.max(p.rpm * 0.01, 50);
+          if (Math.abs(delta) < threshold) {
+            next[fan.id] = { rpm: p.rpm, decreasing: p.decreasing };
+          } else if (delta < 0) {
+            next[fan.id] = { rpm: fan.rpm, decreasing: true };
+          } else {
+            next[fan.id] = { rpm: fan.rpm, decreasing: false };
+          }
+        }
+      }
+      fanRpmStateRef.current = next;
+    }
+  }, [system.current_fan_speeds]);
 
   const handleOpenBulkEdit = () => {
     if (cardRef.current) {
@@ -1134,34 +1159,70 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       </div>
                     </div>
 
-                    <div className="speed-display">
-                      <div className="speed-circle">
-                        <svg width="60" height="60" className="speed-gauge">
-                          <circle
-                            cx="30"
-                            cy="30"
-                            r="25"
-                            fill="none"
-                            stroke="#e0e0e0"
-                            strokeWidth="5"
-                          />
-                          <circle
-                            cx="30"
-                            cy="30"
-                            r="25"
-                            fill="none"
-                            stroke="#2196F3"
-                            strokeWidth="5"
-                            strokeDasharray={`${2 * Math.PI * 25}`}
-                            strokeDashoffset={`${
-                              2 * Math.PI * 25 * (1 - fan.speed / 100)
-                            }`}
-                            transform="rotate(-90 30 30)"
-                          />
-                        </svg>
-                        <span className="speed-value">{fan.speed}%</span>
-                      </div>
-                    </div>
+                    {(() => {
+                      const rpmDecreasing = fanRpmStateRef.current[fan.id]?.decreasing ?? false;
+                      const flowDir = fan.rpm === 0 ? '' : rpmDecreasing ? 'ccw' : 'cw';
+
+                      let speedClass: string;
+                      if (fan.speed > 95) speedClass = 'critical';
+                      else if (fan.speed > 75) speedClass = 'warning';
+                      else if (rpmDecreasing) speedClass = 'caution';
+                      else speedClass = 'normal';
+
+                      const ringColor = `var(--temp-${speedClass}-border)`;
+
+                      const circumference = 2 * Math.PI * 25;
+                      const dashOffset = circumference * (1 - fan.speed / 100);
+
+                      return (
+                        <div className="speed-display">
+                          <div className="speed-circle">
+                            <svg width="60" height="60" className="speed-gauge">
+                              <circle
+                                cx="30"
+                                cy="30"
+                                r="25"
+                                fill="none"
+                                className="speed-track"
+                                strokeWidth="5"
+                              />
+                              <circle
+                                cx="30"
+                                cy="30"
+                                r="25"
+                                fill="none"
+                                stroke={ringColor}
+                                strokeWidth="5"
+                                strokeDasharray={`${circumference}`}
+                                strokeDashoffset={`${dashOffset}`}
+                                transform="rotate(-90 30 30)"
+                              />
+                            </svg>
+                            {flowDir && (
+                              <div
+                                className="speed-flow-mask"
+                                style={{ '--arc-deg': `${fan.speed * 3.6}deg` } as React.CSSProperties}
+                              >
+                                <div className={`speed-flow-pattern flow-${flowDir}`}>
+                                  <svg viewBox="0 0 60 60" width="60" height="60">
+                                    {Array.from({ length: 16 }, (_, i) => (
+                                      <polygon
+                                        key={i}
+                                        points={flowDir === 'cw' ? '27,2.5 33,5 27,7.5' : '33,2.5 27,5 33,7.5'}
+                                        fill="var(--speed-flow-color)"
+                                        opacity="0.35"
+                                        transform={`rotate(${i * 22.5}, 30, 30)`}
+                                      />
+                                    ))}
+                                  </svg>
+                                </div>
+                              </div>
+                            )}
+                            <span className="speed-value" style={{ color: ringColor }}>{fan.speed}%</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="fan-controls">

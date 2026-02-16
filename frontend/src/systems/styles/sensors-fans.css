@@ -380,17 +380,64 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  --speed-flow-color: var(--bg-panels_02);
 }
 
 .speed-gauge {
   transform: rotate(-90deg);
 }
 
+.speed-track {
+  stroke: var(--border-color);
+  transition: stroke 0.3s ease;
+}
+
+.speed-gauge circle:not(.speed-track) {
+  transition: stroke 0.3s ease;
+}
+
+.speed-flow-mask {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  -webkit-mask-image:
+    radial-gradient(circle at center, transparent 22px, black 23px, black 27px, transparent 28px),
+    conic-gradient(from -90deg, black 0deg, black var(--arc-deg, 0deg), transparent var(--arc-deg, 0deg));
+  mask-image:
+    radial-gradient(circle at center, transparent 22px, black 23px, black 27px, transparent 28px),
+    conic-gradient(from -90deg, black 0deg, black var(--arc-deg, 0deg), transparent var(--arc-deg, 0deg));
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.speed-flow-pattern {
+  width: 100%;
+  height: 100%;
+}
+
+.speed-flow-pattern.flow-cw {
+  animation: speed-flow-cw 6s linear infinite;
+}
+
+.speed-flow-pattern.flow-ccw {
+  animation: speed-flow-ccw 6s linear infinite;
+}
+
+@keyframes speed-flow-cw {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes speed-flow-ccw {
+  to { transform: rotate(-360deg); }
+}
+
 .speed-value {
   position: absolute;
   font-weight: var(--font-weight-bold);
   font-size: var(--font-size-md);
-  color: var(--color-info);
+  transition: color 0.3s ease;
 }
 
 .fan-controls {
