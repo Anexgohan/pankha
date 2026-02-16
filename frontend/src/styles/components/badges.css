@@ -66,38 +66,35 @@
 
 .badge {
   padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: 12px;
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.badge.type-custom {
+  background: color-mix(in srgb, var(--text-tertiary), transparent 92%);
+  border-color: color-mix(in srgb, var(--text-tertiary), transparent 85%);
+  color: var(--text-tertiary);
+}
+
+.badge.type-default {
+  background: color-mix(in srgb, var(--color-primary), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-primary), transparent 85%);
+  color: var(--color-primary);
 }
 
 .badge.global {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.badge.active {
-  background: #e8f5e8;
+  background: color-mix(in srgb, var(--color-success), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-success), transparent 85%);
   color: var(--color-success);
 }
 
-.badge.system {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-
-/* Profile Type Badges */
-.badge.type-custom {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-color);
-}
-
-.badge.type-template {
-  background: rgba(33, 150, 243, 0.1);
-  color: var(--color-primary);
-  border: 1px solid rgba(33, 150, 243, 0.2);
+.badge.active {
+  background: color-mix(in srgb, var(--color-warning), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-warning), transparent 85%);
+  color: var(--color-warning);
 }
 
 /* Read-Only Badge (License Limit) */

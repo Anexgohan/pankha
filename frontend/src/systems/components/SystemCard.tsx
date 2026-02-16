@@ -1168,8 +1168,46 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     {/* Sensor Selection Dropdown */}
                     <div className="fan-control-row">
                       <label className="control-label">Control Sensor:</label>
+                      <div className="stealth-select-wrapper sensor-select">
+                        <div className="select-display sensor-select-display">
+                          {(() => {
+                            const val = selectedSensors[fan.id] || "";
+                            if (!val) return <span className="sensor-select-name">Select Sensor...</span>;
+                            if (val === "__highest__") return (
+                              <>
+                                <span className="sensor-select-name">Highest</span>
+                                <span className="sensor-select-temp">({formatTemperature(highestTemperature, '0.0°C')})</span>
+                              </>
+                            );
+                            if (val.startsWith("__group__")) {
+                              const groupId = val.replace("__group__", "");
+                              const visibleSensorsForGroups = system.current_temperatures?.filter(
+                                (s: SensorReading) => !isSensorOrGroupHidden(s)
+                              ) || [];
+                              const groups = groupSensorsByChip(visibleSensorsForGroups);
+                              const groupSensors = groups[groupId] || [];
+                              const temp = groupSensors.length > 0
+                                ? Math.max(...groupSensors.map(s => s.temperature))
+                                : null;
+                              return (
+                                <>
+                                  <span className="sensor-select-name">{getChipDisplayName(groupId, groupSensors)}</span>
+                                  {temp !== null && <span className="sensor-select-temp">({formatTemperature(temp)})</span>}
+                                </>
+                              );
+                            }
+                            const sensor = system.current_temperatures?.find((s: SensorReading) => s.id === val);
+                            if (sensor) return (
+                              <>
+                                <span className="sensor-select-name">{getSensorDisplayName(sensor.id, sensor.name, sensor.label)}</span>
+                                <span className="sensor-select-temp">({formatTemperature(sensor.temperature)})</span>
+                              </>
+                            );
+                            return <span className="sensor-select-name">{val}</span>;
+                          })()}
+                        </div>
                       <select
-                        className="fan-dropdown"
+                        className="select-engine"
                         value={selectedSensors[fan.id] || ""}
                         onChange={async (e) => {
                           const newSensorId = e.target.value;
@@ -1290,50 +1328,56 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             </option>
                           ))}
                       </select>
+                      </div>
                     </div>
 
                     {/* Profile Selection Dropdown */}
                     <div className="fan-control-row">
                       <label className="control-label">Fan Profile:</label>
-                      <select
-                        className="fan-dropdown"
-                        value={selectedProfiles[fan.id] || ""}
-                        onChange={(e) => {
-                          const profileId = e.target.value;
-                          if (profileId) {
-                            setSelectedProfiles((prev) => ({
-                              ...prev,
-                              [fan.id]: parseInt(profileId),
-                            }));
-                            handleFanProfileAssignment(
-                              fan,
-                              parseInt(profileId)
-                            );
-                          } else {
-                            setSelectedProfiles((prev) => {
-                              const updated = { ...prev };
-                              delete updated[fan.id];
-                              return updated;
-                            });
+                      <div className="stealth-select-wrapper fan-profile-select">
+                        <div className="select-display">
+                          {fanProfiles.find(p => p.id === selectedProfiles[fan.id])?.profile_name || 'No Profile'}
+                        </div>
+                        <select
+                          className="select-engine"
+                          value={selectedProfiles[fan.id] || ""}
+                          onChange={(e) => {
+                            const profileId = e.target.value;
+                            if (profileId) {
+                              setSelectedProfiles((prev) => ({
+                                ...prev,
+                                [fan.id]: parseInt(profileId),
+                              }));
+                              handleFanProfileAssignment(
+                                fan,
+                                parseInt(profileId)
+                              );
+                            } else {
+                              setSelectedProfiles((prev) => {
+                                const updated = { ...prev };
+                                delete updated[fan.id];
+                                return updated;
+                              });
+                            }
+                          }}
+                          disabled={
+                            loading === `fan-profile-${fan.id}` ||
+                            system.status !== "online" ||
+                            isReadOnly
                           }
-                        }}
-                        disabled={
-                          loading === `fan-profile-${fan.id}` ||
-                          system.status !== "online" ||
-                          isReadOnly
-                        }
-                      >
-                        <option value="">No Profile (Manual)</option>
-                        {fanProfiles.map((profile: FanProfile) => (
-                          <option
-                            key={profile.id}
-                            value={profile.id}
-                            title={profile.description || profile.profile_name}
-                          >
-                            {profile.profile_name} ({profile.profile_type})
-                          </option>
-                        ))}
-                      </select>
+                        >
+                          <option value="">No Profile (Manual)</option>
+                          {fanProfiles.map((profile: FanProfile) => (
+                            <option
+                              key={profile.id}
+                              value={profile.id}
+                              title={profile.description || profile.profile_name}
+                            >
+                              {profile.profile_name} ({profile.created_by === 'system' ? 'default' : 'custom'})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                       {loading === `fan-profile-${fan.id}` && (
                         <Loader2 className="animate-spin" size={14} />
                       )}

@@ -329,17 +329,14 @@ const FanProfileManager: React.FC = () => {
             )}
 
             <div className="profile-badges">
-              <span className={`badge type-${profile.profile_type.toLowerCase()}`}>
-                {profile.profile_type}
+              <span className={`badge type-${profile.created_by === 'system' ? 'default' : 'custom'}`}>
+                {profile.created_by === 'system' ? 'Default' : 'Custom'}
               </span>
               {profile.is_global && (
                 <span className="badge global">Global</span>
               )}
               {profile.is_active && (
                 <span className="badge active">Active</span>
-              )}
-              {profile.created_by === 'system' && (
-                <span className="badge system">System Default</span>
               )}
             </div>
           </div>

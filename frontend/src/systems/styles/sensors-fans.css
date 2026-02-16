@@ -418,7 +418,8 @@
   flex-shrink: 0;
 }
 
-.fan-dropdown {
+.fan-dropdown,
+.fan-control-row .stealth-select-wrapper {
   flex: 1;
   min-width: 0;
   padding: 4px var(--spacing-sm);
@@ -430,6 +431,24 @@
   cursor: pointer;
   transition: all 0.2s ease;
   box-sizing: border-box;
+}
+
+.sensor-select-display {
+  display: flex !important;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.sensor-select-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.sensor-select-temp {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .fan-dropdown:hover:not(:disabled) {
