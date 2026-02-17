@@ -374,10 +374,10 @@ class MockHardware:
     #   ramp_up: approach factor per tick when heating (0-1, higher = faster)
     #   ramp_down: approach factor per tick when cooling (0-1, lower = slower)
     THERMAL_PROFILES = {
-        "cpu":         {"idle_offset": 8,  "load_peak": 35, "event_freq": 0.08, "event_dur": (3, 100),  "ramp_up": 0.4,  "ramp_down": 0.12, "max_cooling": (10, 16)},
-        "gpu":         {"idle_offset": 5,  "load_peak": 40, "event_freq": 0.03, "event_dur": (50, 400), "ramp_up": 0.25, "ramp_down": 0.08, "max_cooling": (10, 16)},
-        "nvme":        {"idle_offset": 3,  "load_peak": 15, "event_freq": 0.05, "event_dur": (30, 200), "ramp_up": 0.18, "ramp_down": 0.07, "max_cooling": (0.2, 0.8)},
-        "motherboard": {"idle_offset": 5,  "load_peak": 12, "event_freq": 0.04, "event_dur": (40, 300), "ramp_up": 0.15, "ramp_down": 0.06, "max_cooling": (0.2, 0.6)},
+        "cpu":         {"idle_offset": 8,  "load_peak": 55, "event_freq": 0.08, "event_dur": (3, 100),  "ramp_up": 0.4,  "ramp_down": 0.12, "max_cooling": (10, 25)},
+        "gpu":         {"idle_offset": 5,  "load_peak": 60, "event_freq": 0.03, "event_dur": (50, 400), "ramp_up": 0.25, "ramp_down": 0.08, "max_cooling": (10, 25)},
+        "nvme":        {"idle_offset": 3,  "load_peak": 25, "event_freq": 0.05, "event_dur": (30, 200), "ramp_up": 0.18, "ramp_down": 0.07, "max_cooling": (5, 10)},
+        "motherboard": {"idle_offset": 5,  "load_peak": 15, "event_freq": 0.04, "event_dur": (40, 300), "ramp_up": 0.15, "ramp_down": 0.06, "max_cooling": (5, 10)},
     }
 
     def __init__(self, config: Dict):

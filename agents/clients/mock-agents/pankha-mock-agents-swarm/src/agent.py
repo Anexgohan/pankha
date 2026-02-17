@@ -89,7 +89,7 @@ class MockAgent:
         
         async with websockets.connect(
             self.server_url,
-            extra_headers={"X-Forwarded-For": self.fake_ip},
+            additional_headers={"X-Forwarded-For": self.fake_ip},
         ) as ws:
             self.websocket = ws
             self.connected = True

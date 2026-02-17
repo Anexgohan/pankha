@@ -84,35 +84,64 @@ def check_dependencies() -> bool:
     
     print(f"  ✅ Python {py_version.major}.{py_version.minor}.{py_version.micro}: {colorize(sys.executable, Colors.GREEN)}")
     
-    # Check websockets
+    # Check websockets version
     try:
         import websockets
-        print(f"  ✅ websockets library: {colorize('installed', Colors.GREEN)}")
-    except ImportError:
-        print(f"  ❌ websockets library: {colorize('not installed', Colors.RED)}")
+        ws_version = getattr(websockets, "__version__", "0.0.0")
+        # Split version string and check major version
+        major_v = int(ws_version.split('.')[0])
+        if major_v < 11:
+             print(f"  ⚠️  websockets library: {colorize(f'found {ws_version} (v11.0+ recommended)', Colors.YELLOW)}")
+             raise ImportError("Version too old")
+        print(f"  ✅ websockets library: {colorize(f'v{ws_version}', Colors.GREEN)}")
+    except (ImportError, ModuleNotFoundError):
+        is_upgrade = 'websockets' in sys.modules
+        if is_upgrade:
+             print(f"  ❌ websockets library: {colorize('outdated', Colors.RED)}")
+        else:
+             print(f"  ❌ websockets library: {colorize('not installed', Colors.RED)}")
         
-        # Offer to install
+        # Offer to install/upgrade
         print()
-        install = input(colorize("Install websockets now? [Y/n]: ", Colors.BOLD)).strip().lower()
+        prompt = "Upgrade websockets now?" if is_upgrade else "Install websockets now?"
+        install = input(colorize(f"{prompt} [Y/n]: ", Colors.BOLD)).strip().lower()
         if install and install != 'y':
-            print(colorize("\n⚠️  Please install manually: pip3 install websockets\n", Colors.YELLOW))
+            cmd = "pip3 install --upgrade websockets" if is_upgrade else "pip3 install websockets"
+            print(colorize(f"\n⚠️  Please install manually: {cmd}\n", Colors.YELLOW))
             return False
         
-        print(colorize("\n📦 Installing websockets...", Colors.CYAN))
+        print(colorize(f"\n📦 {'Upgrading' if is_upgrade else 'Installing'} websockets...", Colors.CYAN))
         try:
             result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "websockets"],
+                [sys.executable, "-m", "pip", "install", "--upgrade", "websockets"],
                 capture_output=True,
                 text=True,
                 timeout=60
             )
             if result.returncode == 0:
-                print(colorize("  ✅ websockets installed successfully\n", Colors.GREEN))
+                print(colorize(f"  ✅ websockets {'updated' if is_upgrade else 'installed'} successfully\n", Colors.GREEN))
             else:
-                print(colorize(f"  ❌ Installation failed: {result.stderr}\n", Colors.RED))
+                print(colorize(f"  ❌ Failed: {result.stderr.splitlines()[0]}", Colors.RED))
+                if "externally-managed-environment" in result.stderr or "No module named pip" in result.stderr:
+                    setup_script = Path(__file__).parent.parent / "scripts" / "setup.sh"
+                    if setup_script.exists():
+                        print(colorize("\n� Environment restriction detected. Starting self-healing setup...", Colors.CYAN))
+                        os.system(f"bash {setup_script}")
+                        print(f"\n{colorize('✨ Environment fixed.', Colors.GREEN)} Re-running command...")
+                        
+                        # Re-execute the original command to ensure a clean state
+                        os.execv(sys.executable, [sys.executable] + sys.argv)
+                    
+                    print(colorize("\n💡 Tip: Your environment is restricted or missing pip.", Colors.CYAN))
+                    print(colorize("   You must create a local Virtual Environment (venv) manually:", Colors.CYAN))
+                    print(f"\n   1. {colorize('python3 -m venv venv', Colors.BOLD)}")
+                    print(f"   2. {colorize('./venv/bin/python3 -m pip install websockets', Colors.BOLD)}")
+                    print(f"   3. {colorize('./mock-agents --build', Colors.BOLD)}\n")
+                else:
+                    print(f"  Full Error: {result.stderr}")
                 return False
         except Exception as e:
-            print(colorize(f"  ❌ Installation error: {e}\n", Colors.RED))
+            print(colorize(f"  ❌ Error: {e}\n", Colors.RED))
             return False
     
     print(colorize("\n✅ All dependencies satisfied\n", Colors.GREEN))
@@ -797,6 +826,7 @@ def main():
     
     # Help
     if args.help or len(sys.argv) == 1:
+        check_dependencies()
         show_help()
         return
     
@@ -814,6 +844,9 @@ def main():
     
     # Start
     if args.start:
+        if not check_dependencies():
+            print(colorize("\n⚠️  Missing dependencies. Run --build or scripts/setup.sh first.\n", Colors.YELLOW))
+            sys.exit(1)
         if not start_swarm():
             sys.exit(1)
         return
@@ -826,11 +859,17 @@ def main():
     
     # Status
     if args.status:
+        if not check_dependencies():
+            print(colorize("\n⚠️  Missing dependencies. Run --build or scripts/setup.sh first.\n", Colors.YELLOW))
+            sys.exit(1)
         show_status()
         return
     
     # Restart
     if args.restart:
+        if not check_dependencies():
+            print(colorize("\n⚠️  Missing dependencies. Run --build or scripts/setup.sh first.\n", Colors.YELLOW))
+            sys.exit(1)
         stop_swarm()
         time.sleep(1)
         start_swarm()
