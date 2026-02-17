@@ -57,6 +57,7 @@ import { getOption, getValues, getLabel, getCleanLabel, getDefault, interpolateT
 
 interface SystemCardProps {
   system: SystemData;
+  isDemoMode: boolean;
   onUpdate: () => void;
   onRemove: () => void;
   expandedSensors: boolean;
@@ -67,6 +68,7 @@ interface SystemCardProps {
 
 const SystemCard: React.FC<SystemCardProps> = ({
   system,
+  isDemoMode,
   onUpdate,
   onRemove,
   expandedSensors,
@@ -267,9 +269,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setFailsafeSpeedLocal(system.failsafe_speed);
     }
     if (system.enable_fan_control !== undefined) {
-      setEnableFanControlLocal(system.enable_fan_control);
+      setEnableFanControlLocal(isDemoMode ? true : system.enable_fan_control);
     }
   }, [
+    isDemoMode,
     system.current_update_interval,
     // filter_duplicate_sensors removed (deprecated)
     // duplicate_sensor_tolerance removed (deprecated)
@@ -280,6 +283,46 @@ const SystemCard: React.FC<SystemCardProps> = ({
     system.failsafe_speed,
     system.enable_fan_control,
   ]);
+
+  // In demo mode, keep fan control ON if incoming data reports it disabled.
+  useEffect(() => {
+    if (!isDemoMode || system.read_only === true || system.enable_fan_control !== false) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    const enforceFanControl = async () => {
+      try {
+        setLoading("enable-fan-control");
+        const result = await setEnableFanControl(system.id, true);
+        if (result.locked) {
+          toast.warning(
+            result.message || "setEnableFanControl(true) locked in demonstration"
+          );
+          return;
+        }
+        if (!isCancelled) {
+          setEnableFanControlLocal(true);
+        }
+      } catch (error) {
+        toast.error(
+          "Failed to enforce fan control in demo mode: " +
+            (error instanceof Error ? error.message : "Unknown error")
+        );
+      } finally {
+        if (!isCancelled) {
+          setLoading(null);
+        }
+      }
+    };
+
+    enforceFanControl();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isDemoMode, system.read_only, system.enable_fan_control, system.id]);
 
   // Wrapper to toggle sensor visibility (updates both localStorage and backend)
   const handleToggleSensorVisibility = async (
@@ -337,6 +380,11 @@ const SystemCard: React.FC<SystemCardProps> = ({
   // Original handleFanSpeedChange function removed as fans are now controlled via profiles
 
   const handleDeleteSystem = async () => {
+    if (isDemoMode) {
+      toast.warning("deleteSystem locked in demonstration");
+      return;
+    }
+
     if (
       !confirm(
         `Are you sure you want to delete "${system.name}"? This action cannot be undone.`
@@ -347,7 +395,11 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
     try {
       setLoading("delete");
-      await deleteSystem(system.id);
+      const result = await deleteSystem(system.id);
+      if (result.locked) {
+        toast.warning(result.message || "deleteSystem locked in demonstration");
+        return;
+      }
       toast.success(`System "${system.name}" deleted successfully`);
       onRemove();
     } catch (error) {
@@ -460,9 +512,22 @@ const SystemCard: React.FC<SystemCardProps> = ({
   };
 
   const handleEnableFanControlChange = async (enabled: boolean) => {
+    if (isDemoMode && enabled === false) {
+      setEnableFanControlLocal(true);
+      toast.warning("setEnableFanControl(false) locked in demonstration");
+      return;
+    }
+
     try {
       setLoading("enable-fan-control");
-      await setEnableFanControl(system.id, enabled);
+      const result = await setEnableFanControl(system.id, enabled);
+      if (result.locked) {
+        setEnableFanControlLocal(true);
+        toast.warning(
+          result.message || "setEnableFanControl(false) locked in demonstration"
+        );
+        return;
+      }
       setEnableFanControlLocal(enabled);
       // No need to call onUpdate() since this doesn't affect displayed data
     } catch (error) {
@@ -701,7 +766,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 className="delete-button"
                 onClick={handleDeleteSystem}
                 disabled={loading === "delete"}
-                title="Delete system"
+                title={isDemoMode ? "deleteSystem locked in demonstration" : "Delete system"}
               >
                 {loading === "delete" ? (
                   <Loader2 className="animate-spin" size={14} />
@@ -813,7 +878,16 @@ const SystemCard: React.FC<SystemCardProps> = ({
           <div className="system-command-center">
             <div className="command-grid">
               {/* Row 1: Fan Control, Log Level */}
-              <div className="command-item" title={isReadOnly ? readOnlyTooltip : interpolateTooltip(getOption('fanControl').tooltip, tooltipContext)}>
+              <div
+                className="command-item"
+                title={
+                  isReadOnly
+                    ? readOnlyTooltip
+                    : isDemoMode
+                    ? "setEnableFanControl(false) locked in demonstration"
+                    : interpolateTooltip(getOption('fanControl').tooltip, tooltipContext)
+                }
+              >
                 <div className="command-label-row">
                   <Zap size={14} className="label-icon" />
                   <span className="stat-label">{getLabel('fanControl')}</span>
@@ -1511,6 +1585,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.current_fan_speeds ===
       nextProps.system.current_fan_speeds &&
     prevProps.expandedSensors === nextProps.expandedSensors &&
-    prevProps.expandedFans === nextProps.expandedFans
+    prevProps.expandedFans === nextProps.expandedFans &&
+    prevProps.isDemoMode === nextProps.isDemoMode
   );
 });

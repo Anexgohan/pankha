@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { log } from '../utils/logger';
+import { getPankhaMode, isDemoMode } from '../utils/mode';
 
 const router = Router();
 
@@ -11,12 +12,19 @@ const router = Router();
 router.get('/deployment', (req, res) => {
   const hubIp = process.env.PANKHA_HUB_IP || null;
   const hubPort = process.env.PANKHA_PORT || '3000';
+  const pankhaMode = getPankhaMode();
+  const demoMode = isDemoMode();
 
-  log.debug(`Deployment config requested: hubIp=${hubIp}, hubPort=${hubPort}`, 'config');
+  log.debug(
+    `Deployment config requested: hubIp=${hubIp}, hubPort=${hubPort}, mode=${pankhaMode ?? "unset"}`,
+    'config'
+  );
 
   res.json({
     hubIp,
     hubPort,
+    pankhaMode,
+    isDemoMode: demoMode,
   });
 });
 

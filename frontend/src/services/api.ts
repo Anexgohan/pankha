@@ -8,6 +8,18 @@ const api = axios.create({
   timeout: 10000,
 });
 
+export interface DemoLockResponse {
+  locked: true;
+  message: string;
+  code: "DEMO_MODE_LOCKED";
+}
+
+export interface ActionResponse {
+  locked?: boolean;
+  message?: string;
+  code?: string;
+}
+
 // Health and Overview
 export const getHealth = async () => {
   const response = await api.get("/health");
@@ -35,8 +47,9 @@ export const getSystemStatus = async (id: number): Promise<SystemHealth> => {
   return response.data;
 };
 
-export const deleteSystem = async (id: number): Promise<void> => {
-  await api.delete(`/api/systems/${id}`);
+export const deleteSystem = async (id: number): Promise<ActionResponse> => {
+  const response = await api.delete(`/api/systems/${id}`);
+  return response.data;
 };
 
 export const getSensors = async (id: number) => {
@@ -190,7 +203,7 @@ export const setEnableFanControl = async (
   systemId: number,
   enabled: boolean,
   priority: string = "normal"
-) => {
+) : Promise<ActionResponse> => {
   const response = await api.put(
     `/api/systems/${systemId}/enable-fan-control`,
     {
@@ -202,7 +215,7 @@ export const setEnableFanControl = async (
 };
 
 // Emergency
-export const emergencyStop = async () => {
+export const emergencyStop = async (): Promise<ActionResponse> => {
   const response = await api.post("/api/emergency-stop");
   return response.data;
 };
@@ -383,6 +396,8 @@ export const getDiagnostics = async (systemId: number): Promise<DiagnosticsRespo
 export interface DeploymentHubConfig {
   hubIp: string | null;
   hubPort: string;
+  pankhaMode?: string | null;
+  isDemoMode?: boolean;
 }
 
 export const getDeploymentHubConfig = async (): Promise<DeploymentHubConfig> => {

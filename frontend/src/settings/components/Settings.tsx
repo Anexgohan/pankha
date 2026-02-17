@@ -8,6 +8,7 @@ import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
 import { formatDate, formatFriendlyDate } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import ColorPicker from './ColorPicker';
 import {
   Github,
@@ -698,6 +699,7 @@ const AboutTab: React.FC = () => {
 };
 
 const Settings: React.FC = () => {
+  const { isDemoMode } = useDemoMode();
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const { license, isLoading, refreshLicense } = useLicense();
   const [licenseKey, setLicenseKey] = useState('');
@@ -749,6 +751,12 @@ const Settings: React.FC = () => {
   useEffect(() => {
     setCustomRetentionInput(dataRetentionDays.toString());
   }, [dataRetentionDays]);
+
+  useEffect(() => {
+    if (isDemoMode && activeTab === 'license') {
+      setActiveTab('general');
+    }
+  }, [isDemoMode, activeTab]);
 
   const scalePresets = [
     { label: '1h', value: 1 },
@@ -935,12 +943,14 @@ const Settings: React.FC = () => {
         >
           General
         </button>
-        <button
-          className={`settings-tab ${activeTab === 'license' ? 'active' : ''}`}
-          onClick={() => setActiveTab('license')}
-        >
-          Subscription
-        </button>
+        {!isDemoMode && (
+          <button
+            className={`settings-tab ${activeTab === 'license' ? 'active' : ''}`}
+            onClick={() => setActiveTab('license')}
+          >
+            Subscription
+          </button>
+        )}
         <button
           className={`settings-tab ${activeTab === 'diagnostics' ? 'active' : ''}`}
           onClick={() => setActiveTab('diagnostics')}
@@ -1379,7 +1389,7 @@ const Settings: React.FC = () => {
     )}
 
         {/* License/Subscription Tab */}
-        {activeTab === 'license' && (
+        {!isDemoMode && activeTab === 'license' && (
           <div className="settings-section">
             <h2>Subscription</h2>
             

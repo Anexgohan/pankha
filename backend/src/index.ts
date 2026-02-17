@@ -25,6 +25,7 @@ import deployRouter from './routes/deploy';
 import configRouter from './routes/config';
 import { licenseRouter, licenseManager } from './license';
 import { log } from './utils/logger';
+import { createDemoLockResponse, isDemoMode } from './utils/mode';
 
 const app = express();
 // Port Priority: 
@@ -219,6 +220,10 @@ app.get(/^(?!\/(api|health|websocket)).*/, (req, res) => {
 app.post('/api/emergency-stop', async (req, res) => {
   if (!services) {
     return res.status(503).json({ error: 'Services not initialized' });
+  }
+
+  if (isDemoMode()) {
+    return res.json(createDemoLockResponse("emergencyStop"));
   }
 
   try {

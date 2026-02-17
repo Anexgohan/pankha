@@ -8,6 +8,7 @@ import { WebSocketHub } from "../services/WebSocketHub";
 import { licenseManager } from "../license/LicenseManager";
 import UpdateDownloadService from "../services/UpdateDownloadService";
 import { log } from "../utils/logger";
+import { createDemoLockResponse, isDemoMode } from "../utils/mode";
 import {
   validFanSteps,
   validHysteresis,
@@ -371,6 +372,10 @@ router.put("/:id", async (req: Request, res: Response) => {
 // DELETE /api/systems/:id - Remove system
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
+    if (isDemoMode()) {
+      return res.json(createDemoLockResponse("deleteSystem"));
+    }
+
     const systemId = parseInt(req.params.id);
 
     const system = await db.get("SELECT * FROM systems WHERE id = $1", [
@@ -1093,6 +1098,10 @@ router.put("/:id/enable-fan-control", async (req: Request, res: Response) => {
 
     if (typeof enabled !== "boolean") {
       return res.status(400).json({ error: "enabled must be a boolean" });
+    }
+
+    if (isDemoMode() && enabled === false) {
+      return res.json(createDemoLockResponse("setEnableFanControl(false)"));
     }
 
     const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [

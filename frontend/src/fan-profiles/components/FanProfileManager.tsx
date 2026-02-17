@@ -30,8 +30,10 @@ import FanProfileEditor from './FanProfileEditor';
 import FanCurveChart from './FanCurveChart';
 import ProfileImportExport from './ProfileImportExport';
 import { toast } from '../../utils/toast';
+import { useDemoMode } from '../../hooks/useDemoMode';
 
 const FanProfileManager: React.FC = () => {
+  const { isDemoMode } = useDemoMode();
   const [profiles, setProfiles] = useState<FanProfile[]>([]);
   const [stats, setStats] = useState<FanProfileStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,12 +99,21 @@ const FanProfileManager: React.FC = () => {
     const profile = profiles.find(p => p.id === profileId);
     if (!profile) return;
 
+    if (isDemoMode && profile.created_by === 'system') {
+      toast.warning('deleteFanProfile(default) locked in demonstration');
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete the "${profile.profile_name}" profile? This action cannot be undone.`)) {
       return;
     }
 
     try {
-      await deleteFanProfile(profileId);
+      const result = await deleteFanProfile(profileId);
+      if (result.locked) {
+        toast.warning(result.message || 'deleteFanProfile(default) locked in demonstration');
+        return;
+      }
       await loadData(); // Reload data
     } catch (err) {
       toast.error('Failed to delete profile: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -301,7 +312,11 @@ const FanProfileManager: React.FC = () => {
                 <button
                   onClick={() => handleDeleteProfile(profile.id)}
                   className="action-button delete-button"
-                  title="Delete profile"
+                  title={
+                    isDemoMode && profile.created_by === 'system'
+                      ? 'deleteFanProfile(default) locked in demonstration'
+                      : 'Delete profile'
+                  }
                 >
                   <Trash2 size={16} />
                 </button>

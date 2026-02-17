@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api';
+import type { ActionResponse } from './api';
 
 export interface FanProfile {
   id: number;
@@ -230,7 +231,7 @@ export const updateFanProfile = async (profileId: number, request: UpdateFanProf
 /**
  * Delete a fan profile
  */
-export const deleteFanProfile = async (profileId: number): Promise<void> => {
+export const deleteFanProfile = async (profileId: number): Promise<ActionResponse> => {
   const response = await fetch(`${API_BASE_URL}/api/fan-profiles/${profileId}`, {
     method: 'DELETE',
   });
@@ -239,6 +240,8 @@ export const deleteFanProfile = async (profileId: number): Promise<void> => {
     const error = await response.json();
     throw new Error(error.message || `Failed to delete fan profile: ${response.statusText}`);
   }
+
+  return await response.json();
 };
 
 /**

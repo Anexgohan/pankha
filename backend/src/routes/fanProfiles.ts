@@ -10,9 +10,11 @@ import {
   ExportOptions
 } from '../types/fanProfiles';
 import { log } from '../utils/logger';
+import { createDemoLockResponse, isDemoMode } from '../utils/mode';
 
 const router = Router();
 const fanProfileManager = FanProfileManager.getInstance();
+const db = Database.getInstance();
 
 /**
  * GET /api/fan-profiles
@@ -327,6 +329,21 @@ router.delete('/:id', async (req: Request, res: Response) => {
       });
     }
     
+    const profile = await fanProfileManager.getFanProfile(profileId);
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        error: 'Fan profile not found'
+      });
+    }
+
+    if (isDemoMode() && profile.created_by === 'system') {
+      return res.json({
+        success: true,
+        ...createDemoLockResponse("deleteFanProfile(default)")
+      });
+    }
+
     await fanProfileManager.deleteFanProfile(profileId);
     
     res.json({
@@ -364,7 +381,6 @@ router.post('/assign', async (req: Request, res: Response) => {
     
     // Clear cached hysteresis/stepping state for this fan so the new profile takes effect immediately
     // Look up the fan details to get agent_id and fan_name
-    const db = Database.getInstance();
     const fanDetails = await db.get(`
       SELECT f.fan_name, s.agent_id
       FROM fans f

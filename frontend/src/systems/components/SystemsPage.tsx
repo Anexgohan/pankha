@@ -8,6 +8,7 @@ import ControllerIntervalSelector from '../../components/ControllerIntervalSelec
 import FanProfileManager from '../../fan-profiles/components/FanProfileManager';
 import Settings from '../../settings/components/Settings';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
+import { useDemoMode } from '../../hooks/useDemoMode';
 import HeaderFan from '../../components/HeaderFan';
 import { 
   Loader2, 
@@ -43,6 +44,7 @@ const SystemsPage: React.FC = () => {
     reconnect,
     removeSystem
   } = useWebSocketData();
+  const { isDemoMode } = useDemoMode();
 
   // Fetch overview data separately (could be added to WebSocket later)
   React.useEffect(() => {
@@ -110,9 +112,18 @@ const SystemsPage: React.FC = () => {
   };
 
   const handleEmergencyStop = async () => {
+    if (isDemoMode) {
+      toast.warning('emergencyStop locked in demonstration');
+      return;
+    }
+
     if (window.confirm('Are you sure you want to trigger emergency stop for ALL systems? This will set all fans to maximum speed.')) {
       try {
-        await emergencyStop();
+        const result = await emergencyStop();
+        if (result.locked) {
+          toast.warning(result.message || 'emergencyStop locked in demonstration');
+          return;
+        }
         toast.success('Emergency stop triggered successfully');
       } catch (err) {
         toast.error('Emergency stop failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
@@ -276,6 +287,7 @@ const SystemsPage: React.FC = () => {
                 <SystemCard
                   key={system.id}
                   system={system}
+                  isDemoMode={isDemoMode}
                   onUpdate={handleUpdate}
                   onRemove={() => removeSystem(system.id)}
                   expandedSensors={expandedSensors[system.id] || false}
