@@ -123,7 +123,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
           const delta = fan.rpm - p.rpm;
           const threshold = Math.max(p.rpm * 0.01, 50);
           if (Math.abs(delta) < threshold) {
-            next[fan.id] = { rpm: p.rpm, decreasing: p.decreasing };
+            next[fan.id] = { rpm: p.rpm, decreasing: false };
           } else if (delta < 0) {
             next[fan.id] = { rpm: fan.rpm, decreasing: true };
           } else {

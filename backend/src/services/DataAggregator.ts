@@ -732,6 +732,8 @@ export class DataAggregator extends EventEmitter {
         hysteresis_temp: this.agentManager.getAgentHysteresis(agentId),
         emergency_temp: this.agentManager.getAgentEmergencyTemp(agentId),
         log_level: this.agentManager.getAgentLogLevel(agentId),
+        failsafe_speed: this.agentManager.getAgentFailsafeSpeed(agentId),
+        enable_fan_control: this.agentManager.getAgentEnableFanControl(agentId),
       };
 
       // Enrich with database information (adds dbId, isHidden flag to sensors)

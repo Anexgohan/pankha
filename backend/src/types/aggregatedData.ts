@@ -67,6 +67,8 @@ export interface AggregatedSystemData {
   hysteresis_temp?: number;
   emergency_temp?: number;
   log_level?: string;
+  failsafe_speed?: number;
+  enable_fan_control?: boolean;
 
   // License limit fields
   // NOTE: These are computed per-update based on agent registration order

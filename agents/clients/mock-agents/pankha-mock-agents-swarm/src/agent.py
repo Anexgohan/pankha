@@ -177,8 +177,10 @@ class MockAgent:
             elif msg_type == "registered":
                 self.log.info(f"[{self.name}] ✅ Registration confirmed")
                 # Apply any config from server
-                if "configuration" in data:
-                    self.apply_config(data["configuration"])
+                # Configuration is nested inside data["data"], not at the top level
+                reg_data = data.get("data", {})
+                if "configuration" in reg_data:
+                    self.apply_config(reg_data["configuration"])
             elif msg_type == "ping":
                 await self.send_pong()
             else:
@@ -426,7 +428,9 @@ class MockAgent:
             self.log_level = config["log_level"].upper()
         if "failsafe_speed" in config:
             self.failsafe_speed = int(config["failsafe_speed"])
-    
+        if "enable_fan_control" in config:
+            self.enable_fan_control = bool(config["enable_fan_control"])
+
     def _persist_config(self, key: str, value):
         """Persist a config change to agents.json."""
         try:

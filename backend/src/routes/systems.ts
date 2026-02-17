@@ -85,6 +85,8 @@ router.get("/", async (req: Request, res: Response) => {
         hysteresis_temp: agentManager.getAgentHysteresis(system.agent_id),
         emergency_temp: agentManager.getAgentEmergencyTemp(system.agent_id),
         log_level: agentManager.getAgentLogLevel(system.agent_id),
+        failsafe_speed: agentManager.getAgentFailsafeSpeed(system.agent_id),
+        enable_fan_control: agentManager.getAgentEnableFanControl(system.agent_id),
       };
     });
 

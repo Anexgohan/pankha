@@ -919,18 +919,14 @@ class MockHardware:
             sensor["temperature"] = round(current, 1)
 
         # ── Update fans ──
+        # Apply target speed immediately — the backend's FanProfileController
+        # already handles gradual stepping via fan_step_percent, so mock
+        # hardware should not add its own ramping on top.
         for fan in self.fans:
-            target_rpm = self._speed_to_rpm(fan["targetSpeed"])
+            fan["speed"] = fan["targetSpeed"]
+            target_rpm = self._speed_to_rpm(fan["speed"])
             variation = int(target_rpm * 0.03)
             fan["rpm"] = max(0, target_rpm + random.randint(-variation, variation))
-
-            if fan["speed"] != fan["targetSpeed"]:
-                diff = fan["targetSpeed"] - fan["speed"]
-                step = max(1, abs(diff) // 5)
-                if diff > 0:
-                    fan["speed"] = min(fan["speed"] + step, fan["targetSpeed"])
-                else:
-                    fan["speed"] = max(fan["speed"] - step, fan["targetSpeed"])
 
     def set_fan_speed(self, fan_id: str, speed: int) -> bool:
         """Set fan target speed (0-100%)."""

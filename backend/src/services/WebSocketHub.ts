@@ -836,6 +836,9 @@ export class WebSocketHub extends EventEmitter {
           failsafe_speed: this.agentManager.getAgentFailsafeSpeed(
             system.agent_id
           ),
+          enable_fan_control: this.agentManager.getAgentEnableFanControl(
+            system.agent_id
+          ),
         };
       });
 

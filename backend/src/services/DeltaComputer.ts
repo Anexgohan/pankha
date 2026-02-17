@@ -24,6 +24,8 @@ export interface SystemDelta {
     hysteresis_temp?: number;
     emergency_temp?: number;
     log_level?: string;
+    failsafe_speed?: number;
+    enable_fan_control?: boolean;
   };
 }
 
@@ -109,6 +111,12 @@ export class DeltaComputer {
     }
     if (currentState.log_level !== previousState.log_level) {
       delta.changes.log_level = currentState.log_level;
+    }
+    if (currentState.failsafe_speed !== previousState.failsafe_speed) {
+      delta.changes.failsafe_speed = currentState.failsafe_speed;
+    }
+    if (currentState.enable_fan_control !== previousState.enable_fan_control) {
+      delta.changes.enable_fan_control = currentState.enable_fan_control;
     }
 
     // Update stored state
