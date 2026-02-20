@@ -1011,10 +1011,11 @@ export class DataAggregator extends EventEmitter {
     let highestTemp = 0;
 
     for (const system of systems) {
-      totalSensors += system.sensors.length;
+      const visibleSensors = system.sensors.filter((s) => !s.isHidden);
+      totalSensors += visibleSensors.length;
       totalFans += system.fans.length;
 
-      for (const sensor of system.sensors) {
+      for (const sensor of visibleSensors) {
         tempSum += sensor.temperature;
         tempCount++;
         if (sensor.temperature > highestTemp) {

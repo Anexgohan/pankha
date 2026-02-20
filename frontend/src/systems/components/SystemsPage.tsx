@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { emergencyStop, getOverview } from '../../services/api';
+import { emergencyStop } from '../../services/api';
 import { toast } from '../../utils/toast';
 import SystemCard from './SystemCard';
 import OverviewStats from './OverviewStats';
@@ -27,7 +27,6 @@ type TabType = 'systems' | 'profiles' | 'deployment' | 'settings';
 
 const SystemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
-  const [overview, setOverview] = useState<any>(null);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [unstableVersion, setUnstableVersion] = useState<string | null>(null);
   const [stableReleases, setStableReleases] = useState<{ tag_name: string }[]>([]);
@@ -39,29 +38,13 @@ const SystemsPage: React.FC = () => {
   // Pure WebSocket - no HTTP polling!
   const {
     systems,
+    overview,
     connectionState,
     error,
     reconnect,
     removeSystem
   } = useWebSocketData();
   const { isDemoMode } = useDemoMode();
-
-  // Fetch overview data separately (could be added to WebSocket later)
-  React.useEffect(() => {
-    if (activeTab !== 'systems') return;
-
-    const fetchOverview = async () => {
-      try {
-        const data = await getOverview();
-        setOverview(data);
-      } catch (err) {
-        console.error('Failed to fetch overview:', err);
-      }
-    };
-    fetchOverview();
-    const interval = setInterval(fetchOverview, 10000); // Every 10 seconds while Systems tab is active
-    return () => clearInterval(interval);
-  }, [activeTab]);
 
   // Fetch versions from GitHub API
   React.useEffect(() => {

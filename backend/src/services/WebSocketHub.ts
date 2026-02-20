@@ -102,10 +102,14 @@ export class WebSocketHub extends EventEmitter {
     // Listen for aggregated data updates - use delta optimization
     this.dataAggregator.on("dataAggregated", async (data: AggregatedSystemData) => {
       const delta = this.deltaComputer.computeDelta(data.agentId, data);
+      
+      // Calculate real-time global overview stats on every tick
+      const overviewStats = this.dataAggregator.getSystemOverview();
 
       if (delta) {
         // Send delta update (changed values only)
-        this.broadcast("systemDelta", delta, [
+        // Delta updates only need the changing overview stats (temperatures, counts)
+        this.broadcast("systemDelta", { ...delta, overview: overviewStats }, [
           `system:${data.agentId}`,
           "systems:all",
         ]);
@@ -128,9 +132,21 @@ export class WebSocketHub extends EventEmitter {
             readOnlyStatus.get(data.agentId) || false
           );
 
+          // Add license limit info ONLY to fullState (less frequent) to save DB/memory lookups
+          const tier = await licenseManager.getCurrentTier();
+          const agentLimit = tier.agentLimit;
+          const isUnlimited = agentLimit === Infinity;
+          
+          const fullOverview = {
+            ...overviewStats,
+            agentLimit: isUnlimited ? 'unlimited' : agentLimit,
+            overLimit: !isUnlimited && overviewStats.totalSystems > agentLimit,
+            tierName: tier.name
+          };
+
           this.broadcast(
             "fullState",
-            [normalizedSystem],
+            { systems: [normalizedSystem], overview: fullOverview },
             [`system:${data.agentId}`, "systems:all"]
           );
         } catch (error) {
@@ -858,9 +874,22 @@ export class WebSocketHub extends EventEmitter {
           readOnlyStatus.get(system.agent_id) || false
         );
       });
+      
+      // Calculate real-time global overview stats
+      const overviewStats = this.dataAggregator.getSystemOverview();
+      const tier = await licenseManager.getCurrentTier();
+      const agentLimit = tier.agentLimit;
+      const isUnlimited = agentLimit === Infinity;
 
-      // Send full state to client
-      this.sendToClient(clientId, "fullState", enhancedSystems);
+      const fullOverview = {
+        ...overviewStats,
+        agentLimit: isUnlimited ? 'unlimited' : agentLimit,
+        overLimit: !isUnlimited && overviewStats.totalSystems > agentLimit,
+        tierName: tier.name
+      };
+
+      // Send full state to client with combined overview stats
+      this.sendToClient(clientId, "fullState", { systems: enhancedSystems, overview: fullOverview });
       log.info(
         ` Sent full sync (${enhancedSystems.length} systems) to client ${clientId}`,
         "WebSocketHub"

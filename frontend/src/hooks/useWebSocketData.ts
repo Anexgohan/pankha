@@ -45,6 +45,7 @@ interface UseWebSocketDataReturn {
   lastUpdate: Date;
   reconnect: () => void;
   removeSystem: (systemId: number) => void;
+  overview: any | null;
 }
 
 /**
@@ -64,6 +65,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   >("connecting");
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [overview, setOverview] = useState<any | null>(null);
 
   const wsRef = useRef<WebSocketService | null>(null);
   const mountedRef = useRef(true);
@@ -176,16 +178,24 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   /**
    * Handle full state update
    */
-  const handleFullState = useCallback((data: SystemData[]) => {
-    console.log("📦 Received full state:", data.length, "systems");
+  const handleFullState = useCallback((data: { systems: SystemData[], overview?: any } | SystemData[]) => {
+    // Backend previously sent SystemData[], now sends { systems, overview }
+    const systemsList = Array.isArray(data) ? data : data.systems;
+    const overviewData = Array.isArray(data) ? undefined : data.overview;
+    
+    console.log("📦 Received full state:", systemsList?.length || 0, "systems");
 
     if (!mountedRef.current) return;
+    
+    if (overviewData) {
+      setOverview(overviewData);
+    }
 
     // Merge with existing systems (in case of partial sync)
     setSystems((prevSystems) => {
       const merged = [...prevSystems];
 
-      data.forEach((newSystem) => {
+      (systemsList || []).forEach((newSystem) => {
         // Defensive: Validate system has required fields
         if (!newSystem.name || !newSystem.agent_id) {
           console.error(
@@ -231,7 +241,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
    * Handle delta update
    */
   const handleDelta = useCallback(
-    (data: SystemDelta) => {
+    (data: SystemDelta & { overview?: any }) => {
       console.log(
         "📊 Received delta for:",
         data.agentId,
@@ -242,13 +252,18 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       // Broadcast raw delta to shared listeners (e.g. history live-tail hooks).
       for (const listener of systemDeltaListeners) {
         try {
-          listener(data);
+          // Type-cast data to ignore overview property for listeners that just expect SystemDelta
+          listener(data as SystemDelta);
         } catch (error) {
           console.error("Error in system delta listener:", error);
         }
       }
 
-      mergeDelta(data);
+      if (data.overview) {
+        setOverview(data.overview);
+      }
+
+      mergeDelta(data as SystemDelta);
     },
     [mergeDelta]
   );
@@ -487,5 +502,6 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     lastUpdate,
     reconnect: connect,
     removeSystem,
+    overview,
   };
 }
