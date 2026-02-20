@@ -1,8 +1,11 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { getSensorHistory } from '../../services/api';
 import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
-import type { HistoryDataPoint, SensorHistory, SensorReading, GapInfo } from '../../types/api';
-import WebSocketService from '../../services/websocket';
+import type { HistoryDataPoint, SensorHistory, GapInfo } from '../../types/api';
+import {
+  subscribeToSystemDelta,
+  type SystemDelta,
+} from '../../hooks/useWebSocketData';
 
 // Gap detection thresholds by graph scale (in ms)
 // Used as fallback when data is too sparse to calculate adaptive threshold
@@ -86,15 +89,6 @@ interface HistoryApiResponse {
   data: HistoryDataPoint[];
   data_points: number;
   total_available: number;
-}
-
-/** Delta update structure for sensor data */
-interface SystemDelta {
-  agentId: string;
-  timestamp: string;
-  changes: {
-    sensors?: Record<string, Partial<SensorReading>>;
-  };
 }
 
 // 15 minutes in milliseconds
@@ -223,19 +217,9 @@ export const useSensorHistory = (systemId: number, agentId?: string) => {
     });
   }, [agentId]);
 
-  // Subscribe to WebSocket delta events
+  // Subscribe to shared delta stream from the existing dashboard WebSocket
   useEffect(() => {
-    const wsService = new WebSocketService();
-    
-    const handler = (data: unknown) => {
-      handleDeltaUpdate(data as SystemDelta);
-    };
-    
-    wsService.on('systemDelta', handler);
-    
-    return () => {
-      wsService.off('systemDelta', handler);
-    };
+    return subscribeToSystemDelta(handleDeltaUpdate);
   }, [handleDeltaUpdate]);
 
   // Auto-refresh DB history while section is expanded

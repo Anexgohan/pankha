@@ -3,7 +3,7 @@ import type { SystemData } from "../types/api";
 import WebSocketService from "../services/websocket";
 
 // Delta update structure from backend
-interface SystemDelta {
+export interface SystemDelta {
   agentId: string;
   timestamp: string;
   changes: {
@@ -22,6 +22,18 @@ interface SystemDelta {
     failsafe_speed?: number;
     enable_fan_control?: boolean;
     name?: string; // Agent name change
+  };
+}
+
+type SystemDeltaListener = (delta: SystemDelta) => void;
+const systemDeltaListeners = new Set<SystemDeltaListener>();
+
+export function subscribeToSystemDelta(
+  listener: SystemDeltaListener
+): () => void {
+  systemDeltaListeners.add(listener);
+  return () => {
+    systemDeltaListeners.delete(listener);
   };
 }
 
@@ -226,6 +238,16 @@ export function useWebSocketData(): UseWebSocketDataReturn {
         "changes:",
         Object.keys(data.changes)
       );
+
+      // Broadcast raw delta to shared listeners (e.g. history live-tail hooks).
+      for (const listener of systemDeltaListeners) {
+        try {
+          listener(data);
+        } catch (error) {
+          console.error("Error in system delta listener:", error);
+        }
+      }
+
       mergeDelta(data);
     },
     [mergeDelta]

@@ -6,6 +6,7 @@ import { AgentManager } from "./AgentManager";
 import { CommandDispatcher } from "./CommandDispatcher";
 import { AgentCommunication } from "./AgentCommunication";
 import { DeltaComputer } from "./DeltaComputer";
+import type { AggregatedSystemData } from "../types/aggregatedData";
 import { licenseManager } from "../license";
 import { log } from "../utils/logger";
 import { 
@@ -99,7 +100,7 @@ export class WebSocketHub extends EventEmitter {
    */
   private setupEventListeners(): void {
     // Listen for aggregated data updates - use delta optimization
-    this.dataAggregator.on("dataAggregated", (data) => {
+    this.dataAggregator.on("dataAggregated", async (data: AggregatedSystemData) => {
       const delta = this.deltaComputer.computeDelta(data.agentId, data);
 
       if (delta) {
@@ -109,12 +110,36 @@ export class WebSocketHub extends EventEmitter {
           "systems:all",
         ]);
       } else {
-        // First update for this agent - send full state
-        this.broadcast(
-          "fullState",
-          [data],
-          [`system:${data.agentId}`, "systems:all"]
-        );
+        // First update for this agent - send full state in frontend-compatible shape
+        try {
+          const system = await this.getSystemRecordByAgentId(data.agentId);
+          if (!system) {
+            log.warn(
+              `Skipping first-update fullState for unknown agent: ${data.agentId}`,
+              "WebSocketHub"
+            );
+            return;
+          }
+
+          const readOnlyStatus = await this.agentManager.getAgentsReadOnlyStatus();
+          const normalizedSystem = this.buildEnhancedSystemState(
+            system,
+            data,
+            readOnlyStatus.get(data.agentId) || false
+          );
+
+          this.broadcast(
+            "fullState",
+            [normalizedSystem],
+            [`system:${data.agentId}`, "systems:all"]
+          );
+        } catch (error) {
+          log.error(
+            `Failed to build first-update fullState for agent ${data.agentId}`,
+            "WebSocketHub",
+            error
+          );
+        }
       }
     });
 
@@ -805,50 +830,17 @@ export class WebSocketHub extends EventEmitter {
     try {
       // Get systems from database (same as /api/systems route)
       const systems = await this.dataAggregator.getAllSystems();
+      const readOnlyStatus = await this.agentManager.getAgentsReadOnlyStatus();
 
-      // Enhance with real-time data
+      // Enhance with real-time data (same mapping used by first-update fullState)
       const enhancedSystems = systems.map((system) => {
         const systemData = this.dataAggregator.getSystemData(system.agent_id);
-        const agentStatus = this.agentManager.getAgentStatus(system.agent_id);
-
-        return {
-          ...system,
-          // Override DB status with real-time status from AgentManager (in-memory)
-          // This fixes the bug where agent reconnects without re-registering,
-          // causing DB status to remain "offline" while memory status is "online"
-          status: agentStatus?.status || system.status,
-          real_time_status: agentStatus?.status || "unknown",
-          last_data_received: agentStatus?.lastDataReceived || null,
-          current_temperatures: systemData?.sensors || [],
-          current_fan_speeds: systemData?.fans || [],
-          system_health: systemData?.systemHealth || null,
-          current_update_interval: this.agentManager.getAgentUpdateInterval(
-            system.agent_id
-          ),
-          fan_step_percent: this.agentManager.getAgentFanStep(system.agent_id),
-          hysteresis_temp: this.agentManager.getAgentHysteresis(
-            system.agent_id
-          ),
-          emergency_temp: this.agentManager.getAgentEmergencyTemp(
-            system.agent_id
-          ),
-          log_level: this.agentManager.getAgentLogLevel(system.agent_id),
-          failsafe_speed: this.agentManager.getAgentFailsafeSpeed(
-            system.agent_id
-          ),
-          enable_fan_control: this.agentManager.getAgentEnableFanControl(
-            system.agent_id
-          ),
-        };
+        return this.buildEnhancedSystemState(
+          system,
+          systemData,
+          readOnlyStatus.get(system.agent_id) || false
+        );
       });
-
-      // Add license limit status (read_only)
-      const readOnlyStatus = await this.agentManager.getAgentsReadOnlyStatus();
-      for (const system of enhancedSystems) {
-        const isReadOnly = readOnlyStatus.get(system.agent_id) || false;
-        (system as any).read_only = isReadOnly;
-        (system as any).access_status = isReadOnly ? 'over_limit' : 'active';
-      }
 
       // Send full state to client
       this.sendToClient(clientId, "fullState", enhancedSystems);
@@ -863,6 +855,48 @@ export class WebSocketHub extends EventEmitter {
         error
       );
     }
+  }
+
+  /**
+   * Get system row from DB-style systems list by agent_id
+   */
+  private async getSystemRecordByAgentId(agentId: string): Promise<any | null> {
+    const systems = await this.dataAggregator.getAllSystems();
+    return systems.find((system) => system.agent_id === agentId) || null;
+  }
+
+  /**
+   * Build frontend-compatible fullState system payload
+   * Used by both handleFullSyncRequest and first-update fullState broadcast.
+   */
+  private buildEnhancedSystemState(
+    system: any,
+    systemData?: AggregatedSystemData,
+    isReadOnly: boolean = false
+  ): any {
+    const agentId = system.agent_id;
+    const agentStatus = this.agentManager.getAgentStatus(agentId);
+
+    return {
+      ...system,
+      status: agentStatus?.status || systemData?.status || system.status,
+      real_time_status: agentStatus?.status || systemData?.status || "unknown",
+      last_seen: systemData?.lastUpdate?.toISOString() || system.last_seen || null,
+      last_data_received:
+        agentStatus?.lastDataReceived || systemData?.lastUpdate?.toISOString() || null,
+      current_temperatures: systemData?.sensors || [],
+      current_fan_speeds: systemData?.fans || [],
+      system_health: systemData?.systemHealth || null,
+      current_update_interval: this.agentManager.getAgentUpdateInterval(agentId),
+      fan_step_percent: this.agentManager.getAgentFanStep(agentId),
+      hysteresis_temp: this.agentManager.getAgentHysteresis(agentId),
+      emergency_temp: this.agentManager.getAgentEmergencyTemp(agentId),
+      log_level: this.agentManager.getAgentLogLevel(agentId),
+      failsafe_speed: this.agentManager.getAgentFailsafeSpeed(agentId),
+      enable_fan_control: this.agentManager.getAgentEnableFanControl(agentId),
+      read_only: isReadOnly,
+      access_status: isReadOnly ? "over_limit" : "active",
+    };
   }
 
   /**
