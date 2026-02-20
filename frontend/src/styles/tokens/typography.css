@@ -4,8 +4,11 @@
 
 :root {
   /* Font Families */
-  --font-primary: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Monaco', 'Courier New', monospace;
+  --font-primary-default: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  --font-secondary-default: 'JetBrains Mono', 'Monaco', 'Courier New', monospace;
+  --font-primary: var(--font-primary-default);
+  --font-secondary: var(--font-secondary-default);
+  --font-mono: var(--font-secondary);
 
   /* Font Sizes */
   --font-size-xs: 11px;

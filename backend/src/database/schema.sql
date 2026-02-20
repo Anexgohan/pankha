@@ -250,6 +250,15 @@ INSERT INTO backend_settings (setting_key, setting_value, description)
 VALUES ('hardware_prune_days', '7', 'Days before unreported hardware is marked stale (0 = never)')
 ON CONFLICT (setting_key) DO NOTHING;
 
+-- Insert default UI font settings
+INSERT INTO backend_settings (setting_key, setting_value, description)
+VALUES ('ui_font_primary', 'outfit', 'Primary UI font family token')
+ON CONFLICT (setting_key) DO NOTHING;
+
+INSERT INTO backend_settings (setting_key, setting_value, description)
+VALUES ('ui_font_secondary', 'jetbrains-mono', 'Secondary UI font family token')
+ON CONFLICT (setting_key) DO NOTHING;
+
 -- Create index for faster setting lookups
 CREATE INDEX IF NOT EXISTS idx_backend_settings_key ON backend_settings(setting_key);
 

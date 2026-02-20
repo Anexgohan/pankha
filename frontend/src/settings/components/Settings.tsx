@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLicense } from '../../license';
-import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
+import { FONT_OPTIONS, type UIFontChoice, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
 import { formatDate, formatFriendlyDate } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
@@ -725,6 +725,8 @@ const Settings: React.FC = () => {
   const { 
     accentColor, updateAccentColor,
     hoverTintColor, updateHoverTintColor,
+    primaryFont, updatePrimaryFont,
+    secondaryFont, updateSecondaryFont,
     tempThresholds, updateTempThresholds,
     tempColors, updateTempColors,
     perTypeEnabled, setPerTypeEnabled,
@@ -969,12 +971,21 @@ const Settings: React.FC = () => {
         {/* General Tab */}
         {activeTab === 'general' && (
           <div className="settings-section">
-            <h2>General Settings</h2>
+            <h2>General</h2>
             <p className="settings-info">
               Configure global dashboard preferences and display options.
             </p>
-            
-            <div className="settings-list">
+
+            <div className="settings-groups">
+              <div className="settings-group">
+                <div className="settings-group-header">
+                  <h3 className="settings-group-title">GUI Settings</h3>
+                  <p className="settings-group-info">
+                    Dashboard presentation and interaction preferences.
+                  </p>
+                </div>
+
+                <div className="settings-list">
               <div className="setting-item graph-scale-section">
                 <div className="setting-info-wrapper">
                   <span className="setting-label">Graph Scale</span>
@@ -1026,7 +1037,19 @@ const Settings: React.FC = () => {
                   )}
                 </div>
               </div>
-              
+
+            </div>
+              </div>
+
+              <div className="settings-group">
+                <div className="settings-group-header">
+                  <h3 className="settings-group-title">Backend Settings</h3>
+                  <p className="settings-group-info">
+                    Server-side data retention and hardware cleanup behavior.
+                  </p>
+                </div>
+
+                <div className="settings-list">
               {/* Data Retention Days Setting
                   Configurable within license tier limit.
                   Options above license.retentionDays are disabled (from SST via API) */}
@@ -1114,12 +1137,15 @@ const Settings: React.FC = () => {
                 </div>
               </div>
             </div>
+              </div>
 
-            <div className="settings-section">
-              <h3>Appearance</h3>
-              <p className="settings-info">
-                Personalize the dashboard color scheme and interaction feedback.
-              </p>
+              <div className="settings-group settings-group-appearance">
+                <div className="settings-group-header">
+                  <h3 className="settings-group-title">Appearance</h3>
+                  <p className="settings-group-info">
+                    Theme colors and temperature status styling.
+                  </p>
+                </div>
 
               <div className="appearance-wrapper">
                 <div className="threshold-section-header">
@@ -1151,6 +1177,49 @@ const Settings: React.FC = () => {
                         label="Hover Tint"
                         presets={tacticalPresets}
                       />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="threshold-section-header">
+                  <h4 className="threshold-wrapper-title">Typography</h4>
+                  <p className="settings-info">
+                    Choose the primary and secondary fonts used across the interface.
+                  </p>
+                </div>
+
+                <div className="settings-list aesthetics-compact-list">
+                  <div className="setting-item aesthetics-row">
+                    <span className="setting-label">Primary Font</span>
+                    <div className="font-select-wrapper">
+                      <select
+                        className="font-select"
+                        value={primaryFont}
+                        onChange={(e) => updatePrimaryFont(e.target.value as UIFontChoice)}
+                      >
+                        {FONT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="setting-item aesthetics-row">
+                    <span className="setting-label">Secondary Font</span>
+                    <div className="font-select-wrapper">
+                      <select
+                        className="font-select"
+                        value={secondaryFont}
+                        onChange={(e) => updateSecondaryFont(e.target.value as UIFontChoice)}
+                      >
+                        {FONT_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>
@@ -1383,8 +1452,9 @@ const Settings: React.FC = () => {
                 </div>
               </div>
             </div>
+              </div>
+            </div>
           </div>
-        </div>
       </div>
     )}
 

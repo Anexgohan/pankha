@@ -425,10 +425,12 @@
 }
 
 .command-label-row .stat-label {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.01em;
+  word-spacing: normal;
+  white-space: nowrap;
 }
 
 .command-label-row .label-icon { 

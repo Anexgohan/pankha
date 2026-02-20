@@ -36,7 +36,7 @@
   color: #666;
   margin-top: -4px;
   padding-left: 8px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-primary);
 }
 
 .inline-edit-input {

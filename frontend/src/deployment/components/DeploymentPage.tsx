@@ -5,7 +5,6 @@ import {
   Copy,
   Check,
   Rocket,
-  Binary,
   Activity,
   Server,
   Terminal,
@@ -30,6 +29,8 @@ type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 type Failsafe = '30' | '50' | '100';
 type PathMode = 'standard' | 'portable';
 type UrlMode = 'internal' | 'external';
+type MaintenanceSortKey = 'name' | 'agentId' | 'platform' | 'version' | 'status' | 'maintenance';
+type SortDirection = 'asc' | 'desc';
 
 interface TerminalBlockProps {
   title: string;
@@ -101,7 +102,7 @@ const InstallerSection: React.FC<{
     <div className="download-options">
       <div className="installer-card">
         <h4>
-          <Binary size={18} /> Windows Agent
+          <img src="/icons/windows_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Windows Agent
           <div className="version-tags-row">
             {latestVersion && <span className="version-tag stable">S {latestVersion}</span>}
             {unstableVersion && <span className="version-tag unstable">U {unstableVersion}</span>}
@@ -131,7 +132,7 @@ const InstallerSection: React.FC<{
 
       <div className="installer-card">
         <h4>
-          <Settings2 size={18} /> Linux Setup
+          <img src="/icons/linux_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Linux Setup
           <div className="version-tags-row">
             <span className="version-tag stable">STABLE</span>
             {unstableVersion && <span className="version-tag unstable">PRE-RELEASE</span>}
@@ -229,6 +230,70 @@ const MaintenanceSection: React.FC<{
   onApplyUpdate: (systemId: number) => void;
   hubStatus: HubStatus | null;
 }> = React.memo(({ isExpanded, onToggle, systems, stableVersion, unstableVersion, updatingAgents, onApplyUpdate, hubStatus }) => {
+  const [sortKey, setSortKey] = useState<MaintenanceSortKey | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const isWindowsSystem = (system: any) =>
+    system.platform === 'windows' || system.agent_id?.toLowerCase().startsWith('windows-');
+
+  const getStatusLabel = (system: any) =>
+    updatingAgents.has(system.id) ? 'UPDATING' : (system.status === 'online' ? 'ONLINE' : 'OFFLINE');
+
+  const normalizeVersion = (version?: string) => (version || '0.0.0').replace(/^v/, '').replace(/-.*$/, '');
+
+  const compareSemver = (a: string, b: string): number => {
+    const pa = a.split('.').map(Number);
+    const pb = b.split('.').map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+      const na = pa[i] || 0;
+      const nb = pb[i] || 0;
+      if (na !== nb) return na - nb;
+    }
+    return 0;
+  };
+
+  const getMaintenanceLabel = (system: any) => {
+    const isWindows = isWindowsSystem(system);
+    const hubVer = hubStatus?.version?.replace('v', '') || '';
+    const stableVer = stableVersion?.replace('v', '') || '';
+    const cleanTarget = isWindows ? stableVer : (hubVer || stableVer);
+    const isMismatch = cleanTarget && system.agent_version && !system.agent_version.includes(cleanTarget);
+    const isDowngrade = isMismatch && compareSemver(cleanTarget, normalizeVersion(system.agent_version)) < 0;
+    const isOutdated = isMismatch && !isDowngrade;
+    const isUpdating = updatingAgents.has(system.id);
+    const isOnline = system.status === 'online';
+
+    if (isWindows) return isOutdated ? 'DOWNLOAD MSI' : 'GET MSI';
+    if (!hubStatus?.version) return 'UNAVAILABLE';
+    if (!isOnline) return 'OFFLINE';
+    if (isUpdating) return 'UPDATING';
+    if (isDowngrade) return 'DOWNGRADE';
+    if (isOutdated) return 'UPDATE NOW';
+    return 'REINSTALL';
+  };
+
+  const handleSort = (key: MaintenanceSortKey) => {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDirection('asc');
+      return;
+    }
+
+    if (sortDirection === 'asc') {
+      setSortDirection('desc');
+      return;
+    }
+
+    // Third click resets to default incoming order.
+    setSortKey(null);
+    setSortDirection('asc');
+  };
+
+  const getSortIndicator = (key: MaintenanceSortKey) => {
+    if (sortKey !== key) return '↕';
+    return sortDirection === 'asc' ? '↑' : '↓';
+  };
+
   const outdatedCount = useMemo(() => {
     // Hub staging is for Linux agents only; Windows agents use GitHub MSI directly
     const hubVer = hubStatus?.version?.replace('v', '') || '';
@@ -240,11 +305,41 @@ const MaintenanceSection: React.FC<{
     if (!linuxTarget && !windowsTarget) return 0;
     return systems.filter(s => {
       if (!s.agent_version) return false;
-      const isWindows = s.platform === 'windows' || s.agent_id?.toLowerCase().startsWith('windows-');
+      const isWindows = isWindowsSystem(s);
       const target = isWindows ? windowsTarget : linuxTarget;
       return target && !s.agent_version.includes(target);
     }).length;
   }, [systems, stableVersion, hubStatus]);
+
+  const sortedSystems = useMemo(() => {
+    if (!sortKey) return systems;
+
+    const sorted = [...systems].sort((a, b) => {
+      switch (sortKey) {
+        case 'name':
+          return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base', numeric: true });
+        case 'agentId':
+          return (a.agent_id || '').localeCompare((b.agent_id || ''), undefined, { sensitivity: 'base', numeric: true });
+        case 'platform': {
+          const pa = isWindowsSystem(a) ? 'WINDOWS' : 'LINUX';
+          const pb = isWindowsSystem(b) ? 'WINDOWS' : 'LINUX';
+          return pa.localeCompare(pb, undefined, { sensitivity: 'base' });
+        }
+        case 'version':
+          return compareSemver(normalizeVersion(a.agent_version), normalizeVersion(b.agent_version));
+        case 'status': {
+          const rank: Record<string, number> = { OFFLINE: 0, ONLINE: 1, UPDATING: 2 };
+          return (rank[getStatusLabel(a)] ?? 0) - (rank[getStatusLabel(b)] ?? 0);
+        }
+        case 'maintenance':
+          return getMaintenanceLabel(a).localeCompare(getMaintenanceLabel(b), undefined, { sensitivity: 'base', numeric: true });
+        default:
+          return 0;
+      }
+    });
+
+    return sortDirection === 'asc' ? sorted : sorted.reverse();
+  }, [systems, sortKey, sortDirection, updatingAgents]);
 
   return (
     <section className={`deployment-section maintenance-panel ${!isExpanded ? 'collapsed' : ''}`}>
@@ -270,23 +365,48 @@ const MaintenanceSection: React.FC<{
             <table className="maintenance-table">
               <thead>
                 <tr>
-                  <th>Hostname</th>
-                  <th>Agent ID</th>
-                  <th>Version</th>
-                  <th>Status</th>
-                  <th>Maintenance</th>
+                  <th>
+                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'name' ? 'active' : ''}`} onClick={() => handleSort('name')}>
+                      Hostname <span className="sort-indicator">{getSortIndicator('name')}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'agentId' ? 'active' : ''}`} onClick={() => handleSort('agentId')}>
+                      Agent ID <span className="sort-indicator">{getSortIndicator('agentId')}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'platform' ? 'active' : ''}`} onClick={() => handleSort('platform')}>
+                      Platform <span className="sort-indicator">{getSortIndicator('platform')}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'version' ? 'active' : ''}`} onClick={() => handleSort('version')}>
+                      Version <span className="sort-indicator">{getSortIndicator('version')}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'status' ? 'active' : ''}`} onClick={() => handleSort('status')}>
+                      Status <span className="sort-indicator">{getSortIndicator('status')}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'maintenance' ? 'active' : ''}`} onClick={() => handleSort('maintenance')}>
+                      Maintenance <span className="sort-indicator">{getSortIndicator('maintenance')}</span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {systems.length === 0 ? (
                   <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: 'var(--spacing-2xl) 0', color: 'var(--text-tertiary)' }}>
+                    <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--spacing-2xl) 0', color: 'var(--text-tertiary)' }}>
                       NO REMOTE NODES DISCOVERED
                     </td>
                   </tr>
                 ) : (
-                  systems.map(system => {
-                    const isWindows = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-');
+                  sortedSystems.map(system => {
+                    const isWindows = isWindowsSystem(system);
 
                     // Windows compares against GitHub latest; Linux compares against hub staged version
                     const hubVer = hubStatus?.version?.replace('v', '') || '';
@@ -296,23 +416,14 @@ const MaintenanceSection: React.FC<{
                     const isMismatch = cleanTarget && system.agent_version &&
                                       !system.agent_version.includes(cleanTarget);
                     // Determine if this is an upgrade or downgrade (semver-aware comparison)
-                    const agentVer = (system.agent_version || '').replace(/^v/, '').replace(/-.*$/, '');
-                    const compareSemver = (a: string, b: string): number => {
-                      const pa = a.split('.').map(Number);
-                      const pb = b.split('.').map(Number);
-                      for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-                        const na = pa[i] || 0, nb = pb[i] || 0;
-                        if (na !== nb) return na - nb;
-                      }
-                      return 0;
-                    };
+                    const agentVer = normalizeVersion(system.agent_version);
                     const isDowngrade = isMismatch && compareSemver(cleanTarget, agentVer) < 0;
                     const isOutdated = isMismatch && !isDowngrade;
                     const isUpdating = updatingAgents.has(system.id);
                     const isOnline = system.status === 'online';
 
                     // Determine status display
-                    const statusLabel = isUpdating ? 'UPDATING' : (isOnline ? 'ONLINE' : 'OFFLINE');
+                    const statusLabel = getStatusLabel(system);
                     const statusClass = isUpdating ? 'updating' : (isOnline ? 'online' : 'offline');
                     const platformIcon = isWindows ? (
                       <div className="platform-icon windows" title="Windows Agent">
@@ -333,6 +444,12 @@ const MaintenanceSection: React.FC<{
                           </div>
                         </td>
                         <td className="agent-id-cell"><code>{system.agent_id}</code></td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
+                            {platformIcon}
+                            <span>{isWindows ? 'WINDOWS' : 'LINUX'}</span>
+                          </div>
+                        </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
                             <span>v{system.agent_version || '0.0.0'}</span>
@@ -739,7 +856,7 @@ export const DeploymentPage: React.FC<{
         {/* Agent Downloads - Stage binaries from GitHub to local Hub */}
         <section className="deployment-section agent-downloads-panel">
           <h3><Download size={20} /> Agent Downloads</h3>
-          <p style={{ margin: '-12px 0 0 28px', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>Download a release to the Pankha Hub, then push it to Clients from Fleet Maintenance.</p>
+          <p style={{ margin: '-12px 0 0 28px', fontSize: 'var(--font-size-sm2)', color: 'var(--text-secondary)' }}>Download a release to the Pankha Hub, then push it to Clients from Fleet Maintenance.</p>
           <div className="local-prep-widget">
             <div className="prep-status">
               <Server size={14} />
@@ -844,6 +961,9 @@ export const DeploymentPage: React.FC<{
         {/* Rapid Deployment Section */}
         <section className="deployment-section builder-panel">
           <h3><Rocket size={20} /> Deployment AIO</h3>
+          <p style={{ margin: '-12px 0 0 28px', fontSize: 'var(--font-size-sm2)', color: 'var(--text-secondary)' }}>
+            Prepare your Agent Settings before deployment.
+          </p>
 
           <div className="builder-ui">
             {/* Installation Mode Selector - Top Bar */}
@@ -1019,23 +1139,26 @@ export const DeploymentPage: React.FC<{
 
             <div className="deployment-commands-header">
               <h3>Deployment Commands</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm2)', color: 'var(--text-secondary)' }}>
+                Copy and Run any of the following command on Clients to start the Agent
+              </p>
             </div>
 
             <div className="terminal-stack">
-              <TerminalBlock
-                title="CURL"
-                tool="curl"
-                copiedType={copiedType}
-                command={generateCommand('curl')}
-                onCopy={copyToClipboard}
-                isLoading={isLoadingToken}
-              />
-              <div className="terminal-spacer" />
               <TerminalBlock
                 title="WGET"
                 tool="wget"
                 copiedType={copiedType}
                 command={generateCommand('wget')}
+                onCopy={copyToClipboard}
+                isLoading={isLoadingToken}
+              />
+              <div className="terminal-spacer" />
+              <TerminalBlock
+                title="CURL"
+                tool="curl"
+                copiedType={copiedType}
+                command={generateCommand('curl')}
                 onCopy={copyToClipboard}
                 isLoading={isLoadingToken}
               />

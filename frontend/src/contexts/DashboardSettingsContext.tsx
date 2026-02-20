@@ -37,6 +37,150 @@ export interface PerTypeThresholds {
   mobo?: TempThresholds;
 }
 
+export interface UIFontOption<T extends string = string> {
+  value: T;
+  label: string;
+  stack: string;
+  source: 'bundled' | 'google';
+  stylesheetId?: string;
+  googleQuery?: string;
+}
+
+export type UIPrimaryFontChoice =
+  | 'outfit'
+  | 'manrope'
+  | 'source-sans-3'
+  | 'nunito-sans';
+
+export type UISecondaryFontChoice =
+  | 'jetbrains-mono'
+  | 'ibm-plex-mono'
+  | 'fira-code';
+
+const GOOGLE_FONTS_BASE_URL = 'https://fonts.googleapis.com/css2';
+const GOOGLE_PRECONNECT_API_ID = 'fonts-preconnect-api';
+const GOOGLE_PRECONNECT_STATIC_ID = 'fonts-preconnect-static';
+const DEVANAGARI_STYLESHEET_ID = 'font-noto-sans-devanagari';
+const DEVANAGARI_STYLESHEET_QUERY = 'family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap';
+
+export const PRIMARY_FONT_OPTIONS: ReadonlyArray<UIFontOption<UIPrimaryFontChoice>> = [
+  {
+    value: 'outfit',
+    label: 'Outfit (Default)',
+    stack: "'Outfit', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    source: 'bundled',
+  },
+  {
+    value: 'manrope',
+    label: 'Manrope',
+    stack: "'Manrope', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    source: 'google',
+    stylesheetId: 'font-manrope',
+    googleQuery: 'family=Manrope:wght@400;500;600;700;800&display=swap',
+  },
+  {
+    value: 'source-sans-3',
+    label: 'Source Sans 3',
+    stack: "'Source Sans 3', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    source: 'google',
+    stylesheetId: 'font-source-sans-3',
+    googleQuery: 'family=Source+Sans+3:wght@400;500;600;700;800&display=swap',
+  },
+  {
+    value: 'nunito-sans',
+    label: 'Nunito Sans',
+    stack: "'Nunito Sans', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    source: 'google',
+    stylesheetId: 'font-nunito-sans',
+    googleQuery: 'family=Nunito+Sans:wght@400;500;600;700;800&display=swap',
+  },
+];
+
+export const SECONDARY_FONT_OPTIONS: ReadonlyArray<UIFontOption<UISecondaryFontChoice>> = [
+  {
+    value: 'jetbrains-mono',
+    label: 'JetBrains Mono (Default)',
+    stack: "'JetBrains Mono', 'Monaco', 'Courier New', monospace",
+    source: 'bundled',
+  },
+  {
+    value: 'ibm-plex-mono',
+    label: 'IBM Plex Mono',
+    stack: "'IBM Plex Mono', 'JetBrains Mono', 'Monaco', 'Courier New', monospace",
+    source: 'google',
+    stylesheetId: 'font-ibm-plex-mono',
+    googleQuery: 'family=IBM+Plex+Mono:wght@400;500;600;700&display=swap',
+  },
+  {
+    value: 'fira-code',
+    label: 'Fira Code',
+    stack: "'Fira Code', 'JetBrains Mono', 'Monaco', 'Courier New', monospace",
+    source: 'google',
+    stylesheetId: 'font-fira-code',
+    googleQuery: 'family=Fira+Code:wght@400;500;600;700&display=swap',
+  },
+];
+
+const PRIMARY_FONT_MAP = new Map(
+  PRIMARY_FONT_OPTIONS.map((option) => [option.value, option] as const)
+);
+
+const SECONDARY_FONT_MAP = new Map(
+  SECONDARY_FONT_OPTIONS.map((option) => [option.value, option] as const)
+);
+
+const DEFAULT_PRIMARY_FONT: UIPrimaryFontChoice = 'outfit';
+const DEFAULT_SECONDARY_FONT: UISecondaryFontChoice = 'jetbrains-mono';
+
+function normalizeFontChoice<T extends string>(
+  raw: unknown,
+  fallback: T,
+  options: ReadonlyArray<UIFontOption<T>>
+): T {
+  if (typeof raw !== 'string') return fallback;
+  const isValid = options.some((option) => option.value === raw);
+  return isValid ? (raw as T) : fallback;
+}
+
+function ensureGooglePreconnectLinks(): void {
+  if (typeof document === 'undefined') return;
+
+  if (!document.getElementById(GOOGLE_PRECONNECT_API_ID)) {
+    const apiLink = document.createElement('link');
+    apiLink.id = GOOGLE_PRECONNECT_API_ID;
+    apiLink.rel = 'preconnect';
+    apiLink.href = 'https://fonts.googleapis.com';
+    document.head.appendChild(apiLink);
+  }
+
+  if (!document.getElementById(GOOGLE_PRECONNECT_STATIC_ID)) {
+    const staticLink = document.createElement('link');
+    staticLink.id = GOOGLE_PRECONNECT_STATIC_ID;
+    staticLink.rel = 'preconnect';
+    staticLink.href = 'https://fonts.gstatic.com';
+    staticLink.crossOrigin = 'anonymous';
+    document.head.appendChild(staticLink);
+  }
+}
+
+function ensureGoogleStylesheet(stylesheetId: string, googleQuery: string): void {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(stylesheetId)) return;
+
+  ensureGooglePreconnectLinks();
+  const link = document.createElement('link');
+  link.id = stylesheetId;
+  link.rel = 'stylesheet';
+  link.href = `${GOOGLE_FONTS_BASE_URL}?${googleQuery}`;
+  document.head.appendChild(link);
+}
+
+function ensureGoogleFontForOption(option: UIFontOption): void {
+  if (option.source !== 'google') return;
+  if (!option.stylesheetId || !option.googleQuery) return;
+  ensureGoogleStylesheet(option.stylesheetId, option.googleQuery);
+}
+
 export const DEFAULT_TEMP_THRESHOLDS: TempThresholds = { caution: 60, warning: 70, critical: 85 };
 
 export const DEFAULT_TEMP_COLORS: TempColors = {
@@ -57,6 +201,10 @@ interface DashboardSettingsContextType {
   updateAccentColor: (color: string) => Promise<void>;
   hoverTintColor: string;
   updateHoverTintColor: (color: string) => Promise<void>;
+  primaryFont: UIFontChoice;
+  updatePrimaryFont: (font: UIFontChoice) => Promise<void>;
+  secondaryFont: UIFontChoice;
+  updateSecondaryFont: (font: UIFontChoice) => Promise<void>;
   isLoading: boolean;
   timezone: string;
   // Temperature thresholds
@@ -121,6 +269,8 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   const [dataRetentionDays, setDataRetentionDays] = useState<number>(30);
   const [accentColor, setAccentColor] = useState<string>('#B61B4F');
   const [hoverTintColor, setHoverTintColor] = useState<string>('#0FEEEE');
+  const [primaryFont, setPrimaryFont] = useState<UIFontChoice>(DEFAULT_PRIMARY_FONT);
+  const [secondaryFont, setSecondaryFont] = useState<UIFontChoice>(DEFAULT_SECONDARY_FONT);
   const [timezone, setTimezone] = useState<string>('UTC');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -146,6 +296,8 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
         getSetting('per_type_enabled'),
         getSetting('per_type_thresholds'),
         getSetting('hardware_prune_days'),
+        getSetting('ui_font_primary'),
+        getSetting('ui_font_secondary'),
       ]);
 
       // Process graph scale
@@ -189,6 +341,14 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       if (results[9].status === 'fulfilled' && results[9].value?.setting_value) {
         setHardwarePruneDays(parseInt(results[9].value.setting_value, 10));
       }
+
+      // Process font settings
+      if (results[10].status === 'fulfilled' && results[10].value?.setting_value) {
+        setPrimaryFont(normalizeFontChoice(results[10].value.setting_value, DEFAULT_PRIMARY_FONT));
+      }
+      if (results[11].status === 'fulfilled' && results[11].value?.setting_value) {
+        setSecondaryFont(normalizeFontChoice(results[11].value.setting_value, DEFAULT_SECONDARY_FONT));
+      }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
     } finally {
@@ -205,6 +365,12 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     document.documentElement.style.setProperty('--color-accent-dynamic', accentColor);
     document.documentElement.style.setProperty('--color-hover-tint-dynamic', hoverTintColor);
   }, [accentColor, hoverTintColor]);
+
+  // Apply font choices to document root
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-primary', FONT_STACKS[primaryFont]);
+    document.documentElement.style.setProperty('--font-secondary', FONT_STACKS[secondaryFont]);
+  }, [primaryFont, secondaryFont]);
 
   // Apply temperature colors to document root
   useEffect(() => {
@@ -249,6 +415,26 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       await updateSetting('hover_tint_color', color);
     } catch (err) {
       console.error('Failed to update hover tint color:', err);
+      fetchSettings();
+    }
+  };
+
+  const updatePrimaryFont = async (font: UIFontChoice) => {
+    setPrimaryFont(font);
+    try {
+      await updateSetting('ui_font_primary', font);
+    } catch (err) {
+      console.error('Failed to update primary font:', err);
+      fetchSettings();
+    }
+  };
+
+  const updateSecondaryFont = async (font: UIFontChoice) => {
+    setSecondaryFont(font);
+    try {
+      await updateSetting('ui_font_secondary', font);
+    } catch (err) {
+      console.error('Failed to update secondary font:', err);
       fetchSettings();
     }
   };
@@ -353,6 +539,10 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       updateAccentColor,
       hoverTintColor,
       updateHoverTintColor,
+      primaryFont,
+      updatePrimaryFont,
+      secondaryFont,
+      updateSecondaryFont,
       isLoading, 
       timezone,
       tempThresholds,

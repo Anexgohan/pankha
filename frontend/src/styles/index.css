@@ -4,6 +4,7 @@
    =================================== */
 
 /* 1. Design Tokens (Foundation) */
+@import './tokens/fonts.css';
 @import './tokens/colors.css';
 @import './tokens/spacing.css';
 @import './tokens/typography.css';

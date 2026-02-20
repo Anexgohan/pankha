@@ -1689,6 +1689,8 @@ const ALLOWED_SETTINGS = [
   'accent_color',
   'hover_tint_color',
   'hardware_prune_days',
+  'ui_font_primary',
+  'ui_font_secondary',
 ] as const;
 
 type AllowedSettingKey = typeof ALLOWED_SETTINGS[number];

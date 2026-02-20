@@ -280,6 +280,48 @@
 }
 
 /* General Settings UI */
+.settings-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+}
+
+.settings-group {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+}
+
+.settings-group-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.settings-section .settings-group-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+}
+
+.settings-group-info {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm2);
+}
+
+.settings-group .settings-list {
+  margin-top: 0;
+}
+
+@media (max-width: 600px) {
+  .settings-group {
+    padding: var(--spacing-md);
+  }
+}
+
 .settings-list {
   display: flex;
   flex-direction: column;
@@ -532,6 +574,36 @@
     gap: 1rem;
 }
 
+.font-select-wrapper {
+  width: 100%;
+  max-width: 220px;
+}
+
+.font-select {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.font-select:hover {
+  border-color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 4%, var(--bg-secondary));
+}
+
+.font-select:focus {
+  outline: none;
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-dynamic), transparent 80%);
+}
+
 .accent-swatches {
     display: flex;
     gap: 0.5rem;
@@ -695,7 +767,7 @@
   background: var(--bg-tertiary);
   color: var(--text-primary);
   font-size: var(--font-size-base);
-  font-family: monospace;
+  font-family: var(--font-mono);
 }
 
 .license-input::placeholder {
@@ -766,7 +838,7 @@
 }
 
 .license-id-value {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 0.75rem;
 }
 
@@ -1874,23 +1946,23 @@
 }
 
 .version-label {
-  font-size: 10px;
+  font-size: var(--font-size-sm2);
   font-weight: 800;
   color: var(--text-tertiary);
   letter-spacing: 0.05em;
 }
 
 .version-code {
-  font-size: 11px;
+  font-size: var(--font-size-base);
   font-family: var(--font-mono);
   color: var(--color-accent-dynamic);
 }
 
 .about-tagline {
-  font-size: 14px;
+  font-size: var(--font-size-md);
   line-height: 1.6;
   color: var(--text-secondary);
-  max-width: 500px;
+  max-width: 580px;
   margin: 0 auto;
 }
 
@@ -1944,7 +2016,7 @@
 }
 
 .link-desc {
-  font-size: 11px;
+  font-size: var(--font-size-sm2);
   color: var(--text-tertiary);
 }
 
@@ -1975,7 +2047,7 @@
   align-items: center;
   gap: 8px;
   color: var(--text-tertiary);
-  font-size: 11px;
+  font-size: var(--font-size-sm2);
   font-weight: 500;
 }
 
