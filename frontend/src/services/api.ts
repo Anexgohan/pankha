@@ -326,7 +326,8 @@ export const updateGroupVisibility = async (
 // Historical Data
 export const getSensorHistory = async (
   systemId: number,
-  hours: number = 24
+  hours: number = 24,
+  options?: { signal?: AbortSignal }
 ): Promise<HistoryDataPoint[]> => {
   // Align to minute boundaries so equivalent windows share cache keys.
   // Realtime sub-minute points are covered by WebSocket live buffer.
@@ -351,6 +352,7 @@ export const getSensorHistory = async (
         }
       : undefined,
     validateStatus: (status) => (status >= 200 && status < 300) || status === 304,
+    signal: options?.signal,
   });
 
   if (response.status === 304) {

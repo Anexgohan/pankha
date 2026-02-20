@@ -110,6 +110,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   >({});
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const [isCardInView, setIsCardInView] = useState(true);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const fanRpmStateRef = React.useRef<Record<string, { rpm: number; decreasing: boolean }>>({});
 
@@ -137,6 +138,26 @@ const SystemCard: React.FC<SystemCardProps> = ({
     }
   }, [system.current_fan_speeds]);
 
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setIsCardInView(entry ? entry.isIntersecting : true);
+      },
+      { threshold: 0 }
+    );
+
+    observer.observe(element);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   const handleOpenBulkEdit = () => {
     if (cardRef.current) {
       setAnchorRect(cardRef.current.getBoundingClientRect());
@@ -152,7 +173,11 @@ const SystemCard: React.FC<SystemCardProps> = ({
   } = useSensorVisibility();
 
   // 24h Sensor History Hook with real-time WebSocket updates
-  const { history, setExpanded: setHistoryExpanded } = useSensorHistory(system.id, system.agent_id);
+  const { history, setExpanded: setHistoryExpanded } = useSensorHistory(
+    system.id,
+    system.agent_id,
+    isCardInView
+  );
 
   // Track sensor section expansion for history updates
   useEffect(() => {
