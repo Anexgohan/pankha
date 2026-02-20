@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLicense } from '../../license';
-import { FONT_OPTIONS, type UIFontChoice, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
+import { PRIMARY_FONT_OPTIONS, SECONDARY_FONT_OPTIONS, type UIPrimaryFontChoice, type UISecondaryFontChoice, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
 import { formatDate, formatFriendlyDate } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
@@ -1195,9 +1195,9 @@ const Settings: React.FC = () => {
                       <select
                         className="font-select"
                         value={primaryFont}
-                        onChange={(e) => updatePrimaryFont(e.target.value as UIFontChoice)}
+                        onChange={(e) => updatePrimaryFont(e.target.value as UIPrimaryFontChoice)}
                       >
-                        {FONT_OPTIONS.map((option) => (
+                        {PRIMARY_FONT_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
@@ -1212,9 +1212,9 @@ const Settings: React.FC = () => {
                       <select
                         className="font-select"
                         value={secondaryFont}
-                        onChange={(e) => updateSecondaryFont(e.target.value as UIFontChoice)}
+                        onChange={(e) => updateSecondaryFont(e.target.value as UISecondaryFontChoice)}
                       >
-                        {FONT_OPTIONS.map((option) => (
+                        {SECONDARY_FONT_OPTIONS.map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>

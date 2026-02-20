@@ -46,16 +46,8 @@ export interface UIFontOption<T extends string = string> {
   googleQuery?: string;
 }
 
-export type UIPrimaryFontChoice =
-  | 'outfit'
-  | 'manrope'
-  | 'source-sans-3'
-  | 'nunito-sans';
-
-export type UISecondaryFontChoice =
-  | 'jetbrains-mono'
-  | 'ibm-plex-mono'
-  | 'fira-code';
+export type UIPrimaryFontChoice = 'outfit' | 'inter' | 'manrope' | 'figtree' | 'plus-jakarta-sans' | 'dm-sans';
+export type UISecondaryFontChoice = 'jetbrains-mono' | 'fira-code' | 'ibm-plex-mono' | 'roboto-mono';
 
 const GOOGLE_FONTS_BASE_URL = 'https://fonts.googleapis.com/css2';
 const GOOGLE_PRECONNECT_API_ID = 'fonts-preconnect-api';
@@ -71,6 +63,14 @@ export const PRIMARY_FONT_OPTIONS: ReadonlyArray<UIFontOption<UIPrimaryFontChoic
     source: 'bundled',
   },
   {
+    value: 'inter',
+    label: 'Inter',
+    stack: "'Inter', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    source: 'google',
+    stylesheetId: 'font-inter',
+    googleQuery: 'family=Inter:wght@400;500;600;700&display=swap',
+  },
+  {
     value: 'manrope',
     label: 'Manrope',
     stack: "'Manrope', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
@@ -79,20 +79,28 @@ export const PRIMARY_FONT_OPTIONS: ReadonlyArray<UIFontOption<UIPrimaryFontChoic
     googleQuery: 'family=Manrope:wght@400;500;600;700;800&display=swap',
   },
   {
-    value: 'source-sans-3',
-    label: 'Source Sans 3',
-    stack: "'Source Sans 3', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    value: 'figtree',
+    label: 'Figtree',
+    stack: "'Figtree', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
     source: 'google',
-    stylesheetId: 'font-source-sans-3',
-    googleQuery: 'family=Source+Sans+3:wght@400;500;600;700;800&display=swap',
+    stylesheetId: 'font-figtree',
+    googleQuery: 'family=Figtree:wght@400;500;600;700;800&display=swap',
   },
   {
-    value: 'nunito-sans',
-    label: 'Nunito Sans',
-    stack: "'Nunito Sans', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    value: 'plus-jakarta-sans',
+    label: 'Plus Jakarta',
+    stack: "'Plus Jakarta Sans', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
     source: 'google',
-    stylesheetId: 'font-nunito-sans',
-    googleQuery: 'family=Nunito+Sans:wght@400;500;600;700;800&display=swap',
+    stylesheetId: 'font-plus-jakarta',
+    googleQuery: 'family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap',
+  },
+  {
+    value: 'dm-sans',
+    label: 'DM Sans',
+    stack: "'DM Sans', 'Noto Sans Devanagari', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif",
+    source: 'google',
+    stylesheetId: 'font-dm-sans',
+    googleQuery: 'family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap',
   },
 ];
 
@@ -104,20 +112,28 @@ export const SECONDARY_FONT_OPTIONS: ReadonlyArray<UIFontOption<UISecondaryFontC
     source: 'bundled',
   },
   {
-    value: 'ibm-plex-mono',
-    label: 'IBM Plex Mono',
-    stack: "'IBM Plex Mono', 'JetBrains Mono', 'Monaco', 'Courier New', monospace",
-    source: 'google',
-    stylesheetId: 'font-ibm-plex-mono',
-    googleQuery: 'family=IBM+Plex+Mono:wght@400;500;600;700&display=swap',
-  },
-  {
     value: 'fira-code',
     label: 'Fira Code',
     stack: "'Fira Code', 'JetBrains Mono', 'Monaco', 'Courier New', monospace",
     source: 'google',
     stylesheetId: 'font-fira-code',
     googleQuery: 'family=Fira+Code:wght@400;500;600;700&display=swap',
+  },
+  {
+    value: 'roboto-mono',
+    label: 'Roboto Mono',
+    stack: "'Roboto Mono', 'JetBrains Mono', 'Monaco', 'Courier New', monospace",
+    source: 'google',
+    stylesheetId: 'font-roboto-mono',
+    googleQuery: 'family=Roboto+Mono:wght@400;500;600;700&display=swap',
+  },
+  {
+    value: 'ibm-plex-mono',
+    label: 'IBM Plex Mono',
+    stack: "'IBM Plex Mono', 'JetBrains Mono', 'Monaco', 'Courier New', monospace",
+    source: 'google',
+    stylesheetId: 'font-ibm-plex-mono',
+    googleQuery: 'family=IBM+Plex+Mono:wght@400;500;600;700&display=swap',
   },
 ];
 
@@ -163,6 +179,10 @@ function ensureGooglePreconnectLinks(): void {
   }
 }
 
+function ensureDevanagariFallback(): void {
+  ensureGoogleStylesheet(DEVANAGARI_STYLESHEET_ID, DEVANAGARI_STYLESHEET_QUERY);
+}
+
 function ensureGoogleStylesheet(stylesheetId: string, googleQuery: string): void {
   if (typeof document === 'undefined') return;
   if (document.getElementById(stylesheetId)) return;
@@ -201,10 +221,10 @@ interface DashboardSettingsContextType {
   updateAccentColor: (color: string) => Promise<void>;
   hoverTintColor: string;
   updateHoverTintColor: (color: string) => Promise<void>;
-  primaryFont: UIFontChoice;
-  updatePrimaryFont: (font: UIFontChoice) => Promise<void>;
-  secondaryFont: UIFontChoice;
-  updateSecondaryFont: (font: UIFontChoice) => Promise<void>;
+  primaryFont: UIPrimaryFontChoice;
+  updatePrimaryFont: (font: UIPrimaryFontChoice) => Promise<void>;
+  secondaryFont: UISecondaryFontChoice;
+  updateSecondaryFont: (font: UISecondaryFontChoice) => Promise<void>;
   isLoading: boolean;
   timezone: string;
   // Temperature thresholds
@@ -269,8 +289,8 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   const [dataRetentionDays, setDataRetentionDays] = useState<number>(30);
   const [accentColor, setAccentColor] = useState<string>('#B61B4F');
   const [hoverTintColor, setHoverTintColor] = useState<string>('#0FEEEE');
-  const [primaryFont, setPrimaryFont] = useState<UIFontChoice>(DEFAULT_PRIMARY_FONT);
-  const [secondaryFont, setSecondaryFont] = useState<UIFontChoice>(DEFAULT_SECONDARY_FONT);
+  const [primaryFont, setPrimaryFont] = useState<UIPrimaryFontChoice>(DEFAULT_PRIMARY_FONT);
+  const [secondaryFont, setSecondaryFont] = useState<UISecondaryFontChoice>(DEFAULT_SECONDARY_FONT);
   const [timezone, setTimezone] = useState<string>('UTC');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -344,10 +364,10 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
 
       // Process font settings
       if (results[10].status === 'fulfilled' && results[10].value?.setting_value) {
-        setPrimaryFont(normalizeFontChoice(results[10].value.setting_value, DEFAULT_PRIMARY_FONT));
+        setPrimaryFont(normalizeFontChoice(results[10].value.setting_value, DEFAULT_PRIMARY_FONT, PRIMARY_FONT_OPTIONS));
       }
       if (results[11].status === 'fulfilled' && results[11].value?.setting_value) {
-        setSecondaryFont(normalizeFontChoice(results[11].value.setting_value, DEFAULT_SECONDARY_FONT));
+        setSecondaryFont(normalizeFontChoice(results[11].value.setting_value, DEFAULT_SECONDARY_FONT, SECONDARY_FONT_OPTIONS));
       }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
@@ -366,10 +386,23 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     document.documentElement.style.setProperty('--color-hover-tint-dynamic', hoverTintColor);
   }, [accentColor, hoverTintColor]);
 
-  // Apply font choices to document root
+  // Apply font choices to document root and ensure Google Fonts are loaded
   useEffect(() => {
-    document.documentElement.style.setProperty('--font-primary', FONT_STACKS[primaryFont]);
-    document.documentElement.style.setProperty('--font-secondary', FONT_STACKS[secondaryFont]);
+    // Always inject Devanagari fallback globally
+    ensureDevanagariFallback();
+
+    const primaryOpt = PRIMARY_FONT_MAP.get(primaryFont);
+    const secondaryOpt = SECONDARY_FONT_MAP.get(secondaryFont);
+
+    if (primaryOpt) {
+      document.documentElement.style.setProperty('--font-primary', primaryOpt.stack);
+      ensureGoogleFontForOption(primaryOpt);
+    }
+    
+    if (secondaryOpt) {
+      document.documentElement.style.setProperty('--font-secondary', secondaryOpt.stack);
+      ensureGoogleFontForOption(secondaryOpt);
+    }
   }, [primaryFont, secondaryFont]);
 
   // Apply temperature colors to document root
@@ -419,7 +452,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     }
   };
 
-  const updatePrimaryFont = async (font: UIFontChoice) => {
+  const updatePrimaryFont = async (font: UIPrimaryFontChoice) => {
     setPrimaryFont(font);
     try {
       await updateSetting('ui_font_primary', font);
@@ -429,7 +462,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     }
   };
 
-  const updateSecondaryFont = async (font: UIFontChoice) => {
+  const updateSecondaryFont = async (font: UISecondaryFontChoice) => {
     setSecondaryFont(font);
     try {
       await updateSetting('ui_font_secondary', font);
