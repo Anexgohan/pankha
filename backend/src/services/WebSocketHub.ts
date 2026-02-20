@@ -301,13 +301,30 @@ export class WebSocketHub extends EventEmitter {
         // Mark agent as offline in AgentManager (in-memory)
         this.agentManager.markAgentError(agentId, "WebSocket connection lost");
 
-        // Update database immediately (don't wait for health check)
+        // Persist offline presence with the same heartbeat-gated DB policy.
+        // This is a write-throttle for SQL only, not a websocket disconnect detector.
         const Database = (await import("../database/database")).default;
         const db = Database.getInstance();
+        const presenceHeartbeatSeconds = Math.max(
+          5,
+          parseInt(
+            process.env.DB_SYSTEM_PRESENCE_HEARTBEAT_SECONDS ||
+              process.env.DB_TELEMETRY_HEARTBEAT_SECONDS ||
+              "15",
+            10
+          ) || 15
+        );
         await db
           .run(
-            "UPDATE systems SET status = $1, last_seen = CURRENT_TIMESTAMP WHERE agent_id = $2",
-            ["offline", agentId]
+            `UPDATE systems
+             SET status = $1, last_seen = CURRENT_TIMESTAMP
+             WHERE agent_id = $2
+               AND (
+                 status IS DISTINCT FROM $1
+                 OR last_seen IS NULL
+                 OR last_seen < CURRENT_TIMESTAMP - ($3 * INTERVAL '1 second')
+               )`,
+            ["offline", agentId, presenceHeartbeatSeconds]
           )
           .catch((err) => {
             log.error(

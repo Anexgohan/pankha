@@ -21,7 +21,6 @@ import {
   RotateCcw,
   Trash2
 } from 'lucide-react';
-import { useWebSocketData } from '../../hooks/useWebSocketData';
 import { toast } from '../../utils/toast';
 import { uiOptions, getDefault, getOption, interpolateTooltip } from '../../utils/uiOptions';
 import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL, getHubStatus, stageUpdateToHub, clearHubDownloads, getDeploymentHubConfig, type HubStatus, type DeploymentHubConfig } from '../../services/api';
@@ -408,12 +407,12 @@ const MaintenanceSection: React.FC<{
 });
 
 export const DeploymentPage: React.FC<{
+  systems: any[];
   latestVersion: string | null;
   unstableVersion?: string | null;
   stableReleases?: { tag_name: string }[];
   unstableReleases?: { tag_name: string }[];
-}> = ({ latestVersion, unstableVersion, stableReleases = [], unstableReleases = [] }) => {
-  const { systems } = useWebSocketData();
+}> = ({ systems, latestVersion, unstableVersion, stableReleases = [], unstableReleases = [] }) => {
   const [logLevel, setLogLevel] = useState<LogLevel>(getDefault('logLevel'));
   const [failsafe, setFailsafe] = useState<Failsafe>(String(getDefault('failsafeSpeed')) as Failsafe);
   const [pathMode, setPathMode] = useState<PathMode>('standard');

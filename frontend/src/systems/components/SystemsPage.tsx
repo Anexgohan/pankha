@@ -48,6 +48,8 @@ const SystemsPage: React.FC = () => {
 
   // Fetch overview data separately (could be added to WebSocket later)
   React.useEffect(() => {
+    if (activeTab !== 'systems') return;
+
     const fetchOverview = async () => {
       try {
         const data = await getOverview();
@@ -57,9 +59,9 @@ const SystemsPage: React.FC = () => {
       }
     };
     fetchOverview();
-    const interval = setInterval(fetchOverview, 10000); // Every 10 seconds
+    const interval = setInterval(fetchOverview, 10000); // Every 10 seconds while Systems tab is active
     return () => clearInterval(interval);
-  }, []);
+  }, [activeTab]);
 
   // Fetch versions from GitHub API
   React.useEffect(() => {
@@ -308,6 +310,7 @@ const SystemsPage: React.FC = () => {
 
         {activeTab === 'deployment' && (
           <DeploymentPage
+            systems={systems}
             latestVersion={latestVersion}
             unstableVersion={unstableVersion}
             stableReleases={stableReleases}

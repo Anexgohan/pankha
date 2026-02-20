@@ -8,6 +8,26 @@ const api = axios.create({
   timeout: 10000,
 });
 
+interface HistoryClientCacheEntry {
+  etag?: string;
+  data: HistoryDataPoint[];
+}
+
+const HISTORY_CLIENT_CACHE_MAX_ENTRIES = 200;
+const historyClientCache = new Map<string, HistoryClientCacheEntry>();
+
+function setHistoryClientCache(
+  key: string,
+  entry: HistoryClientCacheEntry
+): void {
+  historyClientCache.set(key, entry);
+  while (historyClientCache.size > HISTORY_CLIENT_CACHE_MAX_ENTRIES) {
+    const oldestKey = historyClientCache.keys().next().value;
+    if (!oldestKey) break;
+    historyClientCache.delete(oldestKey);
+  }
+}
+
 export interface DemoLockResponse {
   locked: true;
   message: string;
@@ -308,9 +328,13 @@ export const getSensorHistory = async (
   systemId: number,
   hours: number = 24
 ): Promise<HistoryDataPoint[]> => {
+  // Align to minute boundaries so equivalent windows share cache keys.
+  // Realtime sub-minute points are covered by WebSocket live buffer.
   const endTime = new Date();
-  const startTime = new Date();
-  startTime.setHours(startTime.getHours() - hours);
+  endTime.setUTCSeconds(0, 0);
+  const startTime = new Date(endTime.getTime() - hours * 60 * 60 * 1000);
+  const historyCacheKey = `${systemId}:${hours}:${startTime.toISOString()}:${endTime.toISOString()}`;
+  const cached = historyClientCache.get(historyCacheKey);
 
   // Calculate limit based on hours (5 min interval = 12 points/hour * sensors * hours + buffer)
   // 5000 covers ~24h for 15 sensors/fans, or ~12h for 30 sensors.
@@ -321,8 +345,33 @@ export const getSensorHistory = async (
       start_time: startTime.toISOString(),
       limit: 10000, // Increased from default 1000 to prevent truncation
     },
+    headers: cached?.etag
+      ? {
+          "If-None-Match": cached.etag,
+        }
+      : undefined,
+    validateStatus: (status) => (status >= 200 && status < 300) || status === 304,
   });
-  return response.data.data;
+
+  if (response.status === 304) {
+    if (cached) {
+      return cached.data;
+    }
+    return [];
+  }
+
+  const responseData = response.data;
+  const dataArray = Array.isArray(responseData)
+    ? responseData
+    : responseData?.data || [];
+  const etag = typeof response.headers?.etag === "string" ? response.headers.etag : undefined;
+
+  setHistoryClientCache(historyCacheKey, {
+    etag,
+    data: dataArray,
+  });
+
+  return dataArray;
 };
 
 // Deployment - Token-based Linux installation

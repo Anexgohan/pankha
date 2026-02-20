@@ -17,6 +17,18 @@ import {
   defaultLogLevel,
 } from "../config/uiOptions";
 
+function parseSystemPresenceHeartbeatSeconds(value: string): number {
+  const seconds = parseInt(value.trim(), 10);
+  if (isNaN(seconds) || seconds < 5) {
+    log.warn(
+      `Invalid system presence heartbeat "${value}", minimum is 5s. Using 15s.`,
+      "AgentManager"
+    );
+    return 15;
+  }
+  return seconds;
+}
+
 export class AgentManager extends EventEmitter {
   private static instance: AgentManager;
   private agents: Map<string, AgentConfig> = new Map();
@@ -30,6 +42,7 @@ export class AgentManager extends EventEmitter {
   private agentEnableFanControl: Map<string, boolean> = new Map(); // Track enable fan control
   private db: Database;
   private healthCheckInterval: NodeJS.Timeout | null = null;
+  private systemPresenceHeartbeatSeconds: number;
 
   // Cache for agent registration order (to avoid repeated DB queries)
   private cachedAgentOrder: string[] = []; // agent_ids in registration order
@@ -38,6 +51,11 @@ export class AgentManager extends EventEmitter {
   private constructor() {
     super();
     this.db = Database.getInstance();
+    this.systemPresenceHeartbeatSeconds = parseSystemPresenceHeartbeatSeconds(
+      process.env.DB_SYSTEM_PRESENCE_HEARTBEAT_SECONDS ||
+        process.env.DB_TELEMETRY_HEARTBEAT_SECONDS ||
+        "15"
+    );
     this.startHealthChecking();
   }
 
@@ -46,6 +64,52 @@ export class AgentManager extends EventEmitter {
       AgentManager.instance = new AgentManager();
     }
     return AgentManager.instance;
+  }
+
+  /**
+   * Persist system presence/status with heartbeat-gated DB writes.
+   * This reduces write churn while preserving timely status transitions.
+   * Note: this gates only SQL writes; in-memory health checks/failsafe behavior is unchanged.
+   */
+  private async persistSystemPresence(
+    agentId: string,
+    status: AgentStatus["status"],
+    options: { updateLastDataReceived?: boolean; force?: boolean } = {}
+  ): Promise<number> {
+    const updateLastDataReceived = options.updateLastDataReceived ?? false;
+    const force = options.force ?? false;
+
+    if (updateLastDataReceived) {
+      const result = await this.db.run(
+        `UPDATE systems
+         SET status = $1, last_seen = CURRENT_TIMESTAMP, last_data_received = CURRENT_TIMESTAMP
+         WHERE agent_id = $2
+           AND (
+             $3
+             OR status IS DISTINCT FROM $1
+             OR last_seen IS NULL
+             OR last_seen < CURRENT_TIMESTAMP - ($4 * INTERVAL '1 second')
+             OR last_data_received IS NULL
+             OR last_data_received < CURRENT_TIMESTAMP - ($4 * INTERVAL '1 second')
+           )`,
+        [status, agentId, force, this.systemPresenceHeartbeatSeconds]
+      );
+      return result.rowCount ?? 0;
+    }
+
+    const result = await this.db.run(
+      `UPDATE systems
+       SET status = $1, last_seen = CURRENT_TIMESTAMP
+       WHERE agent_id = $2
+         AND (
+           $3
+           OR status IS DISTINCT FROM $1
+           OR last_seen IS NULL
+           OR last_seen < CURRENT_TIMESTAMP - ($4 * INTERVAL '1 second')
+         )`,
+      [status, agentId, force, this.systemPresenceHeartbeatSeconds]
+    );
+    return result.rowCount ?? 0;
   }
 
   /**
@@ -149,11 +213,8 @@ export class AgentManager extends EventEmitter {
    */
   public async unregisterAgent(agentId: string): Promise<void> {
     try {
-      // Update status in database
-      await this.db.run(
-        "UPDATE systems SET status = $1, last_seen = CURRENT_TIMESTAMP WHERE agent_id = $2",
-        ["offline", agentId]
-      );
+      // Explicit lifecycle event: force immediate DB status transition.
+      await this.persistSystemPresence(agentId, "offline", { force: true });
 
       // Remove from memory
       const agent = this.agents.get(agentId);
@@ -220,13 +281,12 @@ export class AgentManager extends EventEmitter {
         log.debug(`Updating agent status to online`, "AgentManager", {
           agentId,
         });
-        const result = await this.db.run(
-          "UPDATE systems SET status = $1, last_seen = CURRENT_TIMESTAMP, last_data_received = CURRENT_TIMESTAMP WHERE agent_id = $2",
-          ["online", agentId]
-        );
+        const rowsAffected = await this.persistSystemPresence(agentId, "online", {
+          updateLastDataReceived: true,
+        });
         log.trace(`Database status update complete`, "AgentManager", {
           agentId,
-          rowsAffected: result.rowCount,
+          rowsAffected,
         });
       } catch (error) {
         log.error(`Failed to update agent status in database`, "AgentManager", {
@@ -362,11 +422,8 @@ export class AgentManager extends EventEmitter {
         status.status = "offline";
         this.agentStatuses.set(agentId, status);
 
-        // Update database
-        await this.db.run(
-          "UPDATE systems SET status = $1, last_seen = CURRENT_TIMESTAMP WHERE agent_id = $2",
-          ["offline", agentId]
-        );
+        // Status change gets persisted immediately (condition matches on status change).
+        await this.persistSystemPresence(agentId, "offline");
 
         log.info(
           `⚠️  Agent ${agentId} marked as offline (last seen: ${status.lastSeen.toISOString()})`,

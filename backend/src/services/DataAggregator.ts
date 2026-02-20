@@ -42,6 +42,38 @@ function parseAggregationInterval(value: string): number {
   return minutes * 60 * 1000;
 }
 
+/**
+ * Parse DB telemetry heartbeat interval (seconds) used to force periodic timestamp refresh
+ * even when telemetry values are unchanged.
+ */
+function parseDbHeartbeatSeconds(value: string): number {
+  const seconds = parseInt(value.trim(), 10);
+  if (isNaN(seconds) || seconds < 5) {
+    log.warn(
+      `Invalid DB telemetry heartbeat "${value}", minimum is 5s. Using 15s.`,
+      "DataAggregator"
+    );
+    return 15;
+  }
+  return seconds;
+}
+
+/**
+ * Parse fan RPM deadband used for DB write suppression.
+ * Small RPM jitter within this threshold won't trigger DB updates.
+ */
+function parseFanRpmDeadband(value: string): number {
+  const rpm = parseInt(value.trim(), 10);
+  if (isNaN(rpm) || rpm < 0) {
+    log.warn(
+      `Invalid fan RPM deadband "${value}", minimum is 0. Using 50.`,
+      "DataAggregator"
+    );
+    return 50;
+  }
+  return rpm;
+}
+
 // Data buffer for aggregation
 interface DataPoint {
   temperature?: number;
@@ -69,6 +101,8 @@ export class DataAggregator extends EventEmitter {
   private dataBuffer: Map<number, SystemDataBuffer> = new Map(); // system_id -> buffer
   private aggregationInterval: NodeJS.Timeout | null = null;
   private aggregationIntervalMs: number; // Configurable via DATA_AGGREGATION_INTERVAL env var
+  private dbTelemetryHeartbeatSeconds: number;
+  private dbFanRpmDeadband: number;
 
   private constructor() {
     super();
@@ -86,6 +120,12 @@ export class DataAggregator extends EventEmitter {
                         process.env.DATA_AGGREGATION_INTERVAL_MINUTES || 
                         "1m";
     this.aggregationIntervalMs = parseAggregationInterval(intervalEnv);
+    this.dbTelemetryHeartbeatSeconds = parseDbHeartbeatSeconds(
+      process.env.DB_TELEMETRY_HEARTBEAT_SECONDS || "15"
+    );
+    this.dbFanRpmDeadband = parseFanRpmDeadband(
+      process.env.DB_FAN_RPM_DEADBAND || "50"
+    );
 
     // Format interval for display
     const intervalDisplay = this.aggregationIntervalMs >= 60000 
@@ -96,6 +136,8 @@ export class DataAggregator extends EventEmitter {
       `[DataAggregator] Configuration:
   - Retention: ${this.dataRetentionDays} days
   - Aggregation interval: ${intervalDisplay} (${this.aggregationIntervalMs}ms)
+  - DB telemetry heartbeat: ${this.dbTelemetryHeartbeatSeconds}s
+  - DB fan RPM deadband: ${this.dbFanRpmDeadband} RPM
   - Raw data: Sent to dashboard in real-time
   - Stored data: ${intervalDisplay} averages only`,
       "DataAggregator"
@@ -516,8 +558,16 @@ export class DataAggregator extends EventEmitter {
   ): Promise<void> {
     for (const sensor of sensors) {
       await this.db.run(
-        "UPDATE sensors SET current_temp = $1, last_reading = CURRENT_TIMESTAMP WHERE system_id = $2 AND sensor_name = $3",
-        [sensor.temperature, systemId, sensor.id]
+        `UPDATE sensors
+         SET current_temp = $1, last_reading = CURRENT_TIMESTAMP
+         WHERE system_id = $2
+           AND sensor_name = $3
+           AND (
+             current_temp IS DISTINCT FROM $1
+             OR last_reading IS NULL
+             OR last_reading < CURRENT_TIMESTAMP - ($4 * INTERVAL '1 second')
+           )`,
+        [sensor.temperature, systemId, sensor.id, this.dbTelemetryHeartbeatSeconds]
       );
     }
   }
@@ -530,9 +580,29 @@ export class DataAggregator extends EventEmitter {
     fans: AgentDataPacket["fans"]
   ): Promise<void> {
     for (const fan of fans) {
+      // DB write gate only: realtime WS data is still emitted from raw packets every cycle.
       await this.db.run(
-        "UPDATE fans SET current_speed = $1, current_rpm = $2, last_command = CURRENT_TIMESTAMP, last_reported = CURRENT_TIMESTAMP WHERE system_id = $3 AND fan_name = $4",
-        [fan.speed, fan.rpm, systemId, fan.id]
+        `UPDATE fans
+         SET current_speed = $1, current_rpm = $2, last_reported = CURRENT_TIMESTAMP
+         WHERE system_id = $3
+           AND fan_name = $4
+           AND (
+             current_speed IS DISTINCT FROM $1
+             OR current_rpm IS NULL
+             OR (COALESCE(current_rpm, 0) = 0 AND $2 > 0)
+             OR (COALESCE(current_rpm, 0) > 0 AND $2 = 0)
+             OR ABS(current_rpm - $2) >= $5
+             OR last_reported IS NULL
+             OR last_reported < CURRENT_TIMESTAMP - ($6 * INTERVAL '1 second')
+            )`,
+        [
+          fan.speed,
+          fan.rpm,
+          systemId,
+          fan.id,
+          this.dbFanRpmDeadband,
+          this.dbTelemetryHeartbeatSeconds,
+        ]
       );
     }
   }

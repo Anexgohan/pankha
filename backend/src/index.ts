@@ -7,6 +7,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') }); // Load from projec
 import express from 'express';
 import http from 'http';
 import cors from 'cors';
+import compression from 'compression';
 import Database from './database/database';
 import { AgentManager } from './services/AgentManager';
 import { AgentCommunication } from './services/AgentCommunication';
@@ -33,6 +34,37 @@ const app = express();
 // 2. process.env.PANKHA_PORT (set by user in root .env for host access)
 // 3. 3143 (default fallback / brand port)
 const PORT = process.env.PORT || process.env.PANKHA_PORT || 3143;
+
+function parseCompressionThresholdBytes(value: string | undefined): number {
+  if (!value) return 1024;
+  const parsed = parseInt(value.trim(), 10);
+  if (isNaN(parsed) || parsed < 0) {
+    log.warn(
+      `Invalid HTTP_RESPONSE_COMPRESSION_THRESHOLD_BYTES "${value}", using 1024 bytes`,
+      'index'
+    );
+    return 1024;
+  }
+  return parsed;
+}
+
+const COMPRESSED_API_PATHS: RegExp[] = [
+  /^\/api\/systems\/\d+\/history$/,
+  /^\/api\/systems\/\d+\/diagnostics$/,
+  /^\/api\/fan-profiles\/export$/,
+];
+
+function shouldCompressApiResponse(req: express.Request, res: express.Response): boolean {
+  if (req.method !== 'GET') return false;
+  if (req.headers['x-no-compression']) return false;
+  const requestPath = req.originalUrl.split('?')[0];
+  if (!COMPRESSED_API_PATHS.some((pattern) => pattern.test(requestPath))) return false;
+  return true;
+}
+
+const COMPRESSION_THRESHOLD_BYTES = parseCompressionThresholdBytes(
+  process.env.HTTP_RESPONSE_COMPRESSION_THRESHOLD_BYTES
+);
 
 // Initialize services
 let services: {
@@ -115,6 +147,12 @@ async function initializeServices() {
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(
+  compression({
+    threshold: COMPRESSION_THRESHOLD_BYTES,
+    filter: shouldCompressApiResponse,
+  })
+);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

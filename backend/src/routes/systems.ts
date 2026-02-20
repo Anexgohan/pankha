@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { createHash } from "crypto";
 import Database from "../database/database";
 import { AgentManager } from "../services/AgentManager";
 import { CommandDispatcher } from "../services/CommandDispatcher";
@@ -24,6 +25,145 @@ const commandDispatcher = CommandDispatcher.getInstance();
 const dataAggregator = DataAggregator.getInstance();
 const fanProfileController = FanProfileController.getInstance();
 const webSocketHub = WebSocketHub.getInstance();
+
+interface HistoryResponsePayload {
+  system_id: number;
+  start_time: string;
+  end_time: string;
+  data_points: number;
+  limit_applied: number;
+  total_available: string | number;
+  data: any[];
+}
+
+interface HistoryCacheEntry {
+  etag: string;
+  expiresAt: number;
+  payload: HistoryResponsePayload;
+}
+
+function parsePositiveIntEnv(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = parseInt(value.trim(), 10);
+  if (isNaN(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function parseNumericCsv(raw: unknown): number[] | undefined {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
+    return undefined;
+  }
+
+  const values = raw
+    .split(",")
+    .map((entry) => parseInt(entry.trim(), 10))
+    .filter((entry) => !isNaN(entry));
+
+  if (values.length === 0) {
+    return undefined;
+  }
+
+  return values;
+}
+
+function getIfNoneMatchHeader(req: Request): string {
+  const header = req.headers["if-none-match"];
+  if (!header) return "";
+  if (Array.isArray(header)) {
+    return header.join(",");
+  }
+  return header;
+}
+
+function etagMatches(ifNoneMatch: string, etag: string): boolean {
+  if (!ifNoneMatch) return false;
+  return ifNoneMatch
+    .split(",")
+    .map((value) => value.trim())
+    .some((value) => value === "*" || value === etag);
+}
+
+function hashHistoryCacheKey(input: object): string {
+  const serialized = JSON.stringify(input);
+  return createHash("sha1").update(serialized).digest("hex");
+}
+
+function computeHistoryEtag(payload: HistoryResponsePayload): string {
+  const firstTimestamp =
+    payload.data.length > 0 && payload.data[0]?.timestamp
+      ? String(payload.data[0].timestamp)
+      : "";
+  const lastTimestamp =
+    payload.data.length > 0 && payload.data[payload.data.length - 1]?.timestamp
+      ? String(payload.data[payload.data.length - 1].timestamp)
+      : "";
+
+  const etagSource = JSON.stringify({
+    system_id: payload.system_id,
+    start_time: payload.start_time,
+    end_time: payload.end_time,
+    data_points: payload.data_points,
+    limit_applied: payload.limit_applied,
+    first_timestamp: firstTimestamp,
+    last_timestamp: lastTimestamp,
+  });
+
+  return `W/"${createHash("sha1").update(etagSource).digest("hex")}"`;
+}
+
+const HISTORY_CACHE_TTL_SECONDS = parsePositiveIntEnv(
+  process.env.HISTORY_RESPONSE_CACHE_TTL_SECONDS,
+  30
+);
+const HISTORY_CACHE_MAX_ENTRIES = parsePositiveIntEnv(
+  process.env.HISTORY_RESPONSE_CACHE_MAX_ENTRIES,
+  250
+);
+const HISTORY_CACHE_CONTROL = `private, max-age=${HISTORY_CACHE_TTL_SECONDS}, must-revalidate`;
+const historyResponseCache = new Map<string, HistoryCacheEntry>();
+const historyRequestInFlight = new Map<string, Promise<HistoryCacheEntry>>();
+
+function pruneHistoryCache(now: number): void {
+  for (const [key, entry] of historyResponseCache.entries()) {
+    if (entry.expiresAt <= now) {
+      historyResponseCache.delete(key);
+    }
+  }
+
+  while (historyResponseCache.size > HISTORY_CACHE_MAX_ENTRIES) {
+    const oldestKey = historyResponseCache.keys().next().value;
+    if (!oldestKey) break;
+    historyResponseCache.delete(oldestKey);
+  }
+}
+
+async function getOrLoadHistoryCacheEntry(
+  cacheKey: string,
+  loader: () => Promise<HistoryCacheEntry>
+): Promise<HistoryCacheEntry> {
+  const now = Date.now();
+  const cached = historyResponseCache.get(cacheKey);
+  if (cached && cached.expiresAt > now) {
+    return cached;
+  }
+
+  const inFlight = historyRequestInFlight.get(cacheKey);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const next = (async () => {
+    const loaded = await loader();
+    historyResponseCache.set(cacheKey, loaded);
+    pruneHistoryCache(Date.now());
+    return loaded;
+  })().finally(() => {
+    historyRequestInFlight.delete(cacheKey);
+  });
+
+  historyRequestInFlight.set(cacheKey, next);
+  return next;
+}
 
 /**
  * Check if a system can be controlled based on license tier agent limit.
@@ -749,6 +889,10 @@ router.post("/:id/profiles", async (req: Request, res: Response) => {
 router.get("/:id/history", async (req: Request, res: Response) => {
   try {
     const systemId = parseInt(req.params.id);
+    if (isNaN(systemId)) {
+      return res.status(400).json({ error: "Invalid system ID" });
+    }
+
     const {
       start_time,
       end_time,
@@ -786,12 +930,8 @@ router.get("/:id/history", async (req: Request, res: Response) => {
       startTime = retentionCutoff;
     }
 
-    const sensorIdArray = sensor_ids
-      ? (sensor_ids as string).split(",").map((id) => parseInt(id))
-      : undefined;
-    const fanIdArray = fan_ids
-      ? (fan_ids as string).split(",").map((id) => parseInt(id))
-      : undefined;
+    const sensorIdArray = parseNumericCsv(sensor_ids);
+    const fanIdArray = parseNumericCsv(fan_ids);
 
     // Calculate dynamic limit based on counts and requested time window
     // Formula: (sensors + fans) * (hours * 1-min-resolution) * safety-factor
@@ -806,28 +946,57 @@ router.get("/:id/history", async (req: Request, res: Response) => {
       Math.ceil(totalEntities * (hours * 60) * 1.5)
     ));
 
-    const historyData = await dataAggregator.getHistoricalData(
+    const cacheKey = hashHistoryCacheKey({
       systemId,
-      startTime,
-      endTime,
-      sensorIdArray,
-      fanIdArray,
-      calculatedLimit,
-      "DESC" // Fetch latest first
-    );
-
-    // Reverse results to preserve chronological order [oldest -> newest] for the frontend
-    historyData.reverse();
-
-    res.json({
-      system_id: systemId,
       start_time: startTime.toISOString(),
       end_time: endTime.toISOString(),
-      data_points: historyData.length,
-      limit_applied: calculatedLimit,
-      total_available: historyData.length >= calculatedLimit ? "unknown (limited)" : historyData.length,
-      data: historyData,
+      sensor_ids: sensorIdArray ?? [],
+      fan_ids: fanIdArray ?? [],
+      limit: calculatedLimit,
     });
+
+    const cacheEntry = await getOrLoadHistoryCacheEntry(cacheKey, async () => {
+      const historyData = await dataAggregator.getHistoricalData(
+        systemId,
+        startTime,
+        endTime,
+        sensorIdArray,
+        fanIdArray,
+        calculatedLimit,
+        "DESC" // Fetch latest first
+      );
+
+      // Reverse results to preserve chronological order [oldest -> newest] for the frontend
+      historyData.reverse();
+
+      const payload: HistoryResponsePayload = {
+        system_id: systemId,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        data_points: historyData.length,
+        limit_applied: calculatedLimit,
+        total_available:
+          historyData.length >= calculatedLimit
+            ? "unknown (limited)"
+            : historyData.length,
+        data: historyData,
+      };
+
+      return {
+        etag: computeHistoryEtag(payload),
+        expiresAt: Date.now() + HISTORY_CACHE_TTL_SECONDS * 1000,
+        payload,
+      };
+    });
+
+    res.setHeader("Cache-Control", HISTORY_CACHE_CONTROL);
+    res.setHeader("ETag", cacheEntry.etag);
+
+    if (etagMatches(getIfNoneMatchHeader(req), cacheEntry.etag)) {
+      return res.status(304).end();
+    }
+
+    res.json(cacheEntry.payload);
   } catch (error) {
     log.error("Error fetching historical data:", "systems", error);
     res.status(500).json({ error: "Failed to fetch historical data" });
