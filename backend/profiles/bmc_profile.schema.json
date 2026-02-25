@@ -1,0 +1,318 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pankha.app/schemas/bmc_profile.schema.json",
+  "title": "Pankha BMC Profile",
+  "description": "Schema for BMC fan control profiles used by the Pankha IPMI/Redfish agents. Defines how Pankha interacts with specific server hardware for sensor reading and fan control.",
+  "type": "object",
+  "properties": {
+    "extends": {
+      "type": "string",
+      "description": "Path to a base profile to inherit from (e.g. '_bases/dell_ipmi'). The profile loader deep-merges the base with this profile's overrides.",
+      "pattern": "^_bases/[a-z_]+$"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "protocols": {
+      "$ref": "#/$defs/protocols"
+    }
+  },
+  "required": ["metadata"],
+  "if": {
+    "required": ["extends"]
+  },
+  "then": {
+    "properties": {
+      "metadata": {
+        "required": ["model_family"]
+      }
+    }
+  },
+  "else": {
+    "required": ["metadata", "protocols"]
+  },
+
+  "$defs": {
+    "metadata": {
+      "type": "object",
+      "description": "Profile identification and classification.",
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "2.0",
+          "description": "Schema version. Must be '2.0'."
+        },
+        "vendor": {
+          "type": "string",
+          "description": "Hardware vendor name.",
+          "enum": ["Dell", "Supermicro", "HP"]
+        },
+        "model_family": {
+          "type": "array",
+          "description": "Server models this profile applies to.",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
+        "supported_protocols": {
+          "type": "array",
+          "description": "Which protocol sections this profile provides.",
+          "items": {
+            "type": "string",
+            "enum": ["ipmi_local", "ipmi_lanplus", "redfish"]
+          },
+          "minItems": 1
+        },
+        "author": {
+          "type": "string",
+          "description": "Profile author (username or 'Pankha Official')."
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this profile covers."
+        }
+      },
+      "required": ["schema_version", "vendor"]
+    },
+
+    "protocols": {
+      "type": "object",
+      "description": "Protocol-keyed sections. Agent reads only the section matching its connection type.",
+      "properties": {
+        "ipmi": { "$ref": "#/$defs/ipmi_protocol" },
+        "redfish": { "$ref": "#/$defs/redfish_protocol" }
+      },
+      "minProperties": 1,
+      "additionalProperties": false
+    },
+
+    "ipmi_protocol": {
+      "type": "object",
+      "description": "IPMI protocol block. Used by both local (/dev/ipmi0) and lanplus (network) agents.",
+      "properties": {
+        "parsing": {
+          "type": "object",
+          "properties": {
+            "sdr_format": {
+              "type": "string",
+              "const": "csv",
+              "description": "Always 'csv'. Agent uses ipmitool -c for CSV output."
+            },
+            "fan_match_token": {
+              "type": "string",
+              "description": "Token to match fan sensors in SDR unit column (e.g. 'RPM')."
+            },
+            "temp_match_token": {
+              "type": "string",
+              "description": "Token to match temperature sensors in SDR unit column (e.g. 'degrees C')."
+            }
+          },
+          "required": ["sdr_format", "fan_match_token", "temp_match_token"]
+        },
+        "fan_zones": {
+          "type": "array",
+          "description": "Fan zone definitions with speed control commands.",
+          "items": { "$ref": "#/$defs/ipmi_fan_zone" },
+          "minItems": 1
+        },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" }
+      },
+      "required": ["parsing", "fan_zones", "lifecycle"]
+    },
+
+    "redfish_protocol": {
+      "type": "object",
+      "description": "Redfish REST API protocol block. Used by the Go network agent.",
+      "properties": {
+        "parsing": {
+          "type": "object",
+          "properties": {
+            "fan_json_path": {
+              "type": "string",
+              "description": "JSONPath query to extract fan RPM readings from the Thermal endpoint."
+            },
+            "temp_json_path": {
+              "type": "string",
+              "description": "JSONPath query to extract temperature readings from the Thermal endpoint."
+            }
+          },
+          "required": ["fan_json_path", "temp_json_path"]
+        },
+        "fan_zones": {
+          "type": "array",
+          "description": "Fan zone definitions with REST API control commands.",
+          "items": { "$ref": "#/$defs/redfish_fan_zone" },
+          "minItems": 1
+        },
+        "lifecycle": { "$ref": "#/$defs/lifecycle" }
+      },
+      "required": ["parsing", "fan_zones", "lifecycle"]
+    },
+
+    "ipmi_fan_zone": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique zone identifier (e.g. 'all_fans', 'cpu_zone', 'peripheral_zone').",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable zone name for the UI."
+        },
+        "speed_translation": { "$ref": "#/$defs/speed_translation" },
+        "commands": {
+          "type": "object",
+          "properties": {
+            "set_speed": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "ipmitool_raw"
+                },
+                "bytes": {
+                  "type": "string",
+                  "description": "Raw hex bytes with {{SPEED_HEX}} placeholder.",
+                  "pattern": "^0x[0-9a-fA-F]{2}(\\s+0x[0-9a-fA-F]{2}|\\s+\\{\\{SPEED_HEX\\}\\})*$"
+                }
+              },
+              "required": ["type", "bytes"]
+            }
+          },
+          "required": ["set_speed"]
+        }
+      },
+      "required": ["id", "name", "speed_translation", "commands"]
+    },
+
+    "redfish_fan_zone": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "name": { "type": "string" },
+        "speed_translation": { "$ref": "#/$defs/speed_translation" },
+        "commands": {
+          "type": "object",
+          "properties": {
+            "set_speed": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "http_rest"
+                },
+                "method": {
+                  "type": "string",
+                  "enum": ["GET", "POST", "PATCH", "PUT"]
+                },
+                "endpoint": {
+                  "type": "string",
+                  "description": "Redfish API endpoint path."
+                },
+                "headers": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                },
+                "payload": {
+                  "type": "object",
+                  "description": "JSON payload with {{SPEED}} placeholder for interpolation."
+                }
+              },
+              "required": ["type", "method", "endpoint", "payload"]
+            }
+          },
+          "required": ["set_speed"]
+        }
+      },
+      "required": ["id", "name", "speed_translation", "commands"]
+    },
+
+    "speed_translation": {
+      "type": "object",
+      "description": "Defines how UI percentage (0-100) maps to the hardware command value.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["byte_scale", "decimal_hex", "integer"],
+          "description": "byte_scale: 0-100% → 0-255 byte. decimal_hex: percentage → hex literal (50 → 0x32). integer: passthrough (for Redfish REST)."
+        },
+        "input_min": { "type": "integer", "default": 0 },
+        "input_max": { "type": "integer", "default": 100 },
+        "output_min": { "type": "integer" },
+        "output_max": { "type": "integer" },
+        "min": { "type": "integer" },
+        "max": { "type": "integer" }
+      },
+      "required": ["type"]
+    },
+
+    "lifecycle": {
+      "type": "object",
+      "description": "Commands for profile activation and deactivation.",
+      "properties": {
+        "initialization": {
+          "type": "array",
+          "description": "Commands run when agent starts or profile activates. Disables factory thermal loops.",
+          "items": { "$ref": "#/$defs/lifecycle_command" }
+        },
+        "reset_to_factory": {
+          "type": "array",
+          "description": "Commands run on shutdown/crash. Restores factory auto-control. MUST contain at least one critical command.",
+          "items": { "$ref": "#/$defs/lifecycle_command" },
+          "minItems": 1,
+          "contains": {
+            "type": "object",
+            "properties": { "critical": { "const": true } },
+            "required": ["critical"]
+          }
+        }
+      },
+      "required": ["initialization", "reset_to_factory"]
+    },
+
+    "lifecycle_command": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable command name for logging."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["ipmitool_raw", "http_rest"],
+          "description": "Execution method."
+        },
+        "bytes": {
+          "type": "string",
+          "description": "For ipmitool_raw: hex byte string."
+        },
+        "method": {
+          "type": "string",
+          "description": "For http_rest: HTTP method."
+        },
+        "endpoint": {
+          "type": "string",
+          "description": "For http_rest: Redfish API path."
+        },
+        "headers": {
+          "type": "object",
+          "description": "For http_rest: HTTP headers."
+        },
+        "payload": {
+          "type": "object",
+          "description": "For http_rest: JSON payload."
+        },
+        "critical": {
+          "type": "boolean",
+          "description": "If true, agent aborts profile activation on failure. Default false.",
+          "default": false
+        }
+      },
+      "required": ["name", "type", "critical"]
+    }
+  }
+}

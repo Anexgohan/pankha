@@ -1,0 +1,22 @@
+{
+  "extends": "_bases/dell_ipmi",
+  "metadata": {
+    "model_family": ["PowerEdge R720", "PowerEdge R720xd"],
+    "author": "Pankha Official",
+    "description": "Dell R720/R720xd. Adds 3rd-party PCIe card fan panic disable (prevents 100% fans when non-Dell GPUs/NICs are installed)."
+  },
+  "protocols": {
+    "ipmi": {
+      "lifecycle": {
+        "initialization": [
+          {
+            "name": "Disable 3rd-Party PCIe Card Fan Panic",
+            "type": "ipmitool_raw",
+            "bytes": "0x30 0xce 0x00 0x16 0x05 0x00 0x00 0x00 0x05 0x00 0x01 0x00 0x00",
+            "critical": false
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "schema_version": "2.0",
+    "vendor": "Dell",
+    "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
+    "author": "Pankha Official",
+    "description": "Dell PowerEdge base profile for IPMI fan control. Covers iDRAC 7, 8, and early iDRAC 9 (firmware < 3.30.30.30). Uses byte_scale translation (0-255). Model-specific profiles extend this base."
+  },
+  "protocols": {
+    "ipmi": {
+      "parsing": {
+        "sdr_format": "csv",
+        "fan_match_token": "RPM",
+        "temp_match_token": "degrees C"
+      },
+      "fan_zones": [
+        {
+          "id": "all_fans",
+          "name": "All Fans",
+          "speed_translation": {
+            "type": "byte_scale",
+            "input_min": 0,
+            "input_max": 100,
+            "output_min": 0,
+            "output_max": 255
+          },
+          "commands": {
+            "set_speed": {
+              "type": "ipmitool_raw",
+              "bytes": "0x30 0x30 0x02 0xff {{SPEED_HEX}}"
+            }
+          }
+        }
+      ],
+      "lifecycle": {
+        "initialization": [
+          {
+            "name": "Disable Auto Fan Control",
+            "type": "ipmitool_raw",
+            "bytes": "0x30 0x30 0x01 0x00",
+            "critical": true
+          }
+        ],
+        "reset_to_factory": [
+          {
+            "name": "Enable Auto Fan Control",
+            "type": "ipmitool_raw",
+            "bytes": "0x30 0x30 0x01 0x01",
+            "critical": true
+          }
+        ]
+      }
+    }
+  }
+}

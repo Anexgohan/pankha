@@ -1,0 +1,48 @@
+{
+  "extends": "_bases/supermicro_ipmi",
+  "metadata": {
+    "model_family": ["X9DRi-LN4F+", "X9SRL-F", "X9SCL"],
+    "author": "Pankha Official",
+    "description": "Supermicro X9 series. Overrides fan_zones with X9-specific hex codes (0x30 0x91 sequence instead of X10/X11 0x30 0x70). Uses byte_scale (0-255) instead of decimal_hex."
+  },
+  "protocols": {
+    "ipmi": {
+      "fan_zones": [
+        {
+          "id": "cpu_zone",
+          "name": "Zone 0 - CPU Fans",
+          "speed_translation": {
+            "type": "byte_scale",
+            "input_min": 0,
+            "input_max": 100,
+            "output_min": 0,
+            "output_max": 255
+          },
+          "commands": {
+            "set_speed": {
+              "type": "ipmitool_raw",
+              "bytes": "0x30 0x91 0x5A 0x03 0x00 {{SPEED_HEX}}"
+            }
+          }
+        },
+        {
+          "id": "peripheral_zone",
+          "name": "Zone 1 - Peripheral Fans",
+          "speed_translation": {
+            "type": "byte_scale",
+            "input_min": 0,
+            "input_max": 100,
+            "output_min": 0,
+            "output_max": 255
+          },
+          "commands": {
+            "set_speed": {
+              "type": "ipmitool_raw",
+              "bytes": "0x30 0x91 0x5A 0x03 0x01 {{SPEED_HEX}}"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
