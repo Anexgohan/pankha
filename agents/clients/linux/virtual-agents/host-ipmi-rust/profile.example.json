@@ -1,0 +1,72 @@
+{
+  "metadata": {
+    "schema_version": "2.0",
+    "vendor": "Supermicro",
+    "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
+    "author": "Pankha Official",
+    "description": "Supermicro base profile for IPMI fan control."
+  },
+  "protocols": {
+    "ipmi": {
+      "parsing": {
+        "sdr_format": "csv",
+        "fan_match_token": "RPM",
+        "temp_match_token": "degrees C"
+      },
+      "fan_zones": [
+        {
+          "id": "cpu_zone",
+          "name": "Zone 0 - CPU Fans",
+          "speed_translation": {
+            "type": "decimal_hex",
+            "input_min": 0,
+            "input_max": 100,
+            "output_min": 0,
+            "output_max": 100
+          },
+          "commands": {
+            "set_speed": {
+              "type": "ipmitool_raw",
+              "bytes": "0x30 0x70 0x66 0x01 0x00 {{SPEED_HEX}}"
+            }
+          }
+        },
+        {
+          "id": "peripheral_zone",
+          "name": "Zone 1 - Peripheral Fans",
+          "speed_translation": {
+            "type": "decimal_hex",
+            "input_min": 0,
+            "input_max": 100,
+            "output_min": 0,
+            "output_max": 100
+          },
+          "commands": {
+            "set_speed": {
+              "type": "ipmitool_raw",
+              "bytes": "0x30 0x70 0x66 0x01 0x01 {{SPEED_HEX}}"
+            }
+          }
+        }
+      ],
+      "lifecycle": {
+        "initialization": [
+          {
+            "name": "Set Full Speed Mode (disables BIOS thermal override)",
+            "type": "ipmitool_raw",
+            "bytes": "0x30 0x45 0x01 0x01",
+            "critical": true
+          }
+        ],
+        "reset_to_factory": [
+          {
+            "name": "Restore Optimal Fan Mode",
+            "type": "ipmitool_raw",
+            "bytes": "0x30 0x45 0x01 0x02",
+            "critical": true
+          }
+        ]
+      }
+    }
+  }
+}

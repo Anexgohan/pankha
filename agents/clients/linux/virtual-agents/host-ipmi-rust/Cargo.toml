@@ -1,0 +1,57 @@
+[package]
+name = "pankha-agent-ipmi"
+version = "1.0.0"
+edition = "2021"
+authors = ["Pankha Development Team"]
+description = "IPMI host agent for Pankha - BMC fan control via ipmitool"
+license = "AGPL-3.0"
+
+[[bin]]
+name = "pankha-agent-ipmi-linux"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+tokio-tungstenite = { version = "0.21", features = ["rustls-tls-webpki-roots"] }
+futures-util = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+
+# Logging and error handling
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "json", "time", "local-time"] }
+anyhow = "1.0"
+thiserror = "1.0"
+atty = "0.2"
+
+# Async traits
+async-trait = "0.1"
+
+# Command-line parsing
+clap = { version = "4.4", features = ["derive"] }
+
+# System information
+hostname = "0.3"
+
+# UUID generation
+uuid = { version = "1.6", features = ["v4"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+time = { version = "0.3", features = ["local-offset", "formatting"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific dependencies
+libc = "0.2"
+
+[build-dependencies]
+serde_json = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true

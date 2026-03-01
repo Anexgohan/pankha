@@ -1,0 +1,28 @@
+{
+  "agent": {
+    "id": "linux-hostname-randomhash",
+    "name": "hostname-or-custom-name",
+    "update_interval": 3.0,
+    "log_level": "INFO"
+  },
+  "backend": {
+    "server_url": "ws://[YOUR_HUB_IP]:3143/websocket",
+    "reconnect_interval": 5.0,
+    "max_reconnect_attempts": -1,
+    "connection_timeout": 10.0
+  },
+  "hardware": {
+    "enable_fan_control": true,
+    "enable_sensor_monitoring": true,
+    "failsafe_speed": 70,
+    "fan_step_percent": 5,
+    "hysteresis_temp": 3.0,
+    "emergency_temp": 80.0
+  },
+  "logging": {
+    "enable_file_logging": true,
+    "log_file": "/var/log/pankha-agent/agent.log",
+    "max_log_size_mb": 10,
+    "log_retention_days": 7
+  }
+}
