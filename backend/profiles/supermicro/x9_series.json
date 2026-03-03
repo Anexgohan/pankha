@@ -11,6 +11,7 @@
         {
           "id": "cpu_zone",
           "name": "Zone 0 - CPU Fans",
+          "members": ["FAN1", "FAN2", "FAN3", "FAN4"],
           "speed_translation": {
             "type": "byte_scale",
             "input_min": 0,
@@ -28,6 +29,7 @@
         {
           "id": "peripheral_zone",
           "name": "Zone 1 - Peripheral Fans",
+          "members": ["FANA", "FANB"],
           "speed_translation": {
             "type": "byte_scale",
             "input_min": 0,

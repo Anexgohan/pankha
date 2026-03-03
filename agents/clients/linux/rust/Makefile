@@ -2,6 +2,8 @@
 
 # Version can be passed as: make VERSION=0.1.7 all
 # 4-part versions (0.1.7.2) will be auto-converted to 3-part (0.1.72)
+# example:
+# cd /path/to/agents/clients/linux/rust/ && make clean && make VERSION=0.2.19-dev all
 VERSION ?=
 DEFAULT_VERSION := 1.0.0
 

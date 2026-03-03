@@ -338,12 +338,12 @@ export class DataAggregator extends EventEmitter {
 
     for (const fan of fans) {
       // Use ON CONFLICT to handle race conditions
-      // On conflict: update last_reported and clear is_stale (reactivation if hardware returns)
+      // On conflict: update last_reported, clear is_stale, and update zone_id (reactivation if hardware returns)
       await this.db.run(
-        `INSERT INTO fans (system_id, fan_name, fan_label, is_controllable)
-         VALUES ($1, $2, $3, true)
-         ON CONFLICT (system_id, fan_name) DO UPDATE SET last_reported = CURRENT_TIMESTAMP, is_stale = false`,
-        [systemId, fan.id, fan.id]
+        `INSERT INTO fans (system_id, fan_name, fan_label, is_controllable, zone_id)
+         VALUES ($1, $2, $3, true, $4)
+         ON CONFLICT (system_id, fan_name) DO UPDATE SET last_reported = CURRENT_TIMESTAMP, is_stale = false, zone_id = COALESCE($4, fans.zone_id)`,
+        [systemId, fan.id, fan.id, (fan as any).zone || null]
       );
     }
   }
@@ -651,7 +651,7 @@ export class DataAggregator extends EventEmitter {
     // Enrich fan data
     for (const fan of data.fans) {
       const fanInfo = await this.db.get(
-        "SELECT id, fan_label, target_speed FROM fans WHERE system_id = $1 AND fan_name = $2",
+        "SELECT id, fan_label, target_speed, zone_id FROM fans WHERE system_id = $1 AND fan_name = $2",
         [data.systemId, fan.id]
       );
 
@@ -665,6 +665,9 @@ export class DataAggregator extends EventEmitter {
         fan.label = fanInfo.fan_label || fan.id;
         if (fanInfo.target_speed !== null) {
           fan.targetSpeed = fanInfo.target_speed;
+        }
+        if (fanInfo.zone_id) {
+          fan.zone = fanInfo.zone_id;
         }
       } else {
         log.warn(
@@ -774,6 +777,7 @@ export class DataAggregator extends EventEmitter {
               : fan.status === "stopped"
               ? ("stopped" as const)
               : ("ok" as const),
+          ...(fan.zone ? { zone: fan.zone } : {}),
         })) || [];
 
       // Update aggregated data

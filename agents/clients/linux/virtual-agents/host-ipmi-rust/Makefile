@@ -2,6 +2,8 @@
 
 # Version can be passed as: make VERSION=0.1.7 all
 # 4-part versions (0.1.7.2) will be auto-converted to 3-part (0.1.72)
+# example:
+# cd /path/to/agents/clients/linux/virtual-agents/host-ipmi-rust/ && make clean && make VERSION=0.2.19-dev all
 VERSION ?=
 DEFAULT_VERSION := 1.0.0
 
@@ -33,15 +35,17 @@ ifdef VERSION
 	@head -5 Cargo.toml
 endif
 
-all: inject-version x86_64 aarch64
-
+# TODO: enable this when we have aarch64 support
+# all: inject-version x86_64 aarch64
+# For now we only build for x86_64
+all: inject-version x86_64
 x86_64: inject-version
 	@echo "Building x86_64..."
 	cargo build --release
 #	Optional: Copy to custom output directory
 	mkdir -p output/
-	cp target/release/pankha-agent-linux output/pankha-agent-linux_x86_64
-	@echo "✓ Copied to: output/pankha-agent-linux_x86_64"
+	cp target/release/pankha-agent-ipmi-linux output/pankha-agent-ipmi-linux_x86_64
+	@echo "✓ Copied to: output/pankha-agent-ipmi-linux_x86_64"
 ifdef VERSION
 	@echo "✓ Version: $(VERSION)"
 endif
@@ -51,8 +55,8 @@ aarch64: inject-version
 	cargo build --release --target aarch64-unknown-linux-gnu
 #	Optional: Copy to custom output directory
 	mkdir -p output/
-	cp target/aarch64-unknown-linux-gnu/release/pankha-agent-linux output/pankha-agent-linux_arm64
-	@echo "✓ Copied to: output/pankha-agent-linux_arm64"
+	cp target/aarch64-unknown-linux-gnu/release/pankha-agent-ipmi-linux output/pankha-agent-ipmi-linux_arm64
+	@echo "✓ Copied to: output/pankha-agent-ipmi-linux_arm64"
 ifdef VERSION
 	@echo "✓ Version: $(VERSION)"
 endif
@@ -64,7 +68,7 @@ clean:
 	# rm -rf output
 
 help:
-	@echo "Pankha Agent Build System"
+	@echo "Pankha IPMI Agent Build System"
 	@echo ""
 	@echo "Usage:"
 	@echo "  make all                    - Build both x86_64 and aarch64 binaries"
@@ -76,7 +80,7 @@ help:
 	@echo "  make help                   - Show this help message"
 	@echo ""
 	@echo "Output locations:"
-	@echo "  x86_64:  output/pankha-agent-linux_x86_64"
-	@echo "  aarch64: output/pankha-agent-linux_arm64"
+	@echo "  x86_64:  output/pankha-agent-ipmi-linux_x86_64"
+	@echo "  aarch64: output/pankha-agent-ipmi-linux_arm64"
 	@echo ""
 

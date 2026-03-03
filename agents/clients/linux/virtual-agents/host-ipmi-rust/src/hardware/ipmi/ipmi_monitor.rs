@@ -1,6 +1,7 @@
 //! IPMI Hardware Monitor — implements HardwareMonitor trait using ipmitool commands.
 //! All hardware logic is driven by JSON profiles; this binary contains zero hardcoded hex values.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
@@ -163,6 +164,48 @@ impl IpmiHardwareMonitor {
         Ok(csv)
     }
 
+    /// Build a map from fan sensor name → zone ID using the profile's fan_zones[].members.
+    /// If no zone defines members and there's exactly one zone, all fans are assigned to it.
+    fn build_zone_map(&self) -> HashMap<String, String> {
+        let mut map = HashMap::new();
+        let ipmi = match self.ipmi_protocol() {
+            Ok(p) => p,
+            Err(_) => return map,
+        };
+
+        let has_any_members = ipmi.fan_zones.iter()
+            .any(|z| z.members.as_ref().map_or(false, |m| !m.is_empty()));
+
+        if has_any_members {
+            // Explicit mapping: use members arrays
+            for zone in &ipmi.fan_zones {
+                if let Some(members) = &zone.members {
+                    for fan_name in members {
+                        map.insert(fan_name.clone(), zone.id.clone());
+                    }
+                }
+            }
+        } else if ipmi.fan_zones.len() == 1 {
+            // Single zone without members: handled post-parse (tag all fans with this zone)
+            // We can't pre-populate the map since we don't know fan names yet.
+            // Instead, return a special marker that discover_fans() will handle.
+        }
+
+        map
+    }
+
+    /// Get the single-zone fallback ID, if applicable.
+    fn single_zone_id(&self) -> Option<String> {
+        let ipmi = self.ipmi_protocol().ok()?;
+        let has_any_members = ipmi.fan_zones.iter()
+            .any(|z| z.members.as_ref().map_or(false, |m| !m.is_empty()));
+        if !has_any_members && ipmi.fan_zones.len() == 1 {
+            Some(ipmi.fan_zones[0].id.clone())
+        } else {
+            None
+        }
+    }
+
     /// Get the hardware name from profile metadata.
     fn hardware_name(&self) -> String {
         self.profile.as_ref()
@@ -200,7 +243,18 @@ impl HardwareMonitor for IpmiHardwareMonitor {
         let has_control = self.settings.enable_fan_control && !ipmi.fan_zones.is_empty();
 
         let csv = self.get_sdr_csv().await?;
-        let fans = parser::parse_fans(&csv, &ipmi.parsing, has_control);
+        let zone_map = self.build_zone_map();
+        let mut fans = parser::parse_fans(&csv, &ipmi.parsing, has_control, &zone_map);
+
+        // Single-zone fallback: if no zone defined members and there's exactly one zone,
+        // tag all discovered fans with that zone.
+        if let Some(zone_id) = self.single_zone_id() {
+            for fan in &mut fans {
+                if fan.zone.is_none() {
+                    fan.zone = Some(zone_id.clone());
+                }
+            }
+        }
 
         debug!("Discovered {} fans via IPMI SDR", fans.len());
         Ok(fans)

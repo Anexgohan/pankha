@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
-    println!("cargo:rerun-if-changed=../../../../../../frontend/src/config/ui-options.json");
+    println!("cargo:rerun-if-changed=../../../../../frontend/src/config/ui-options.json");
     println!("cargo:rerun-if-changed=build.rs");
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
@@ -16,7 +16,7 @@ fn main() {
     // Try to find ui-options.json relative to the build script
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set");
     let ui_options_path = Path::new(&manifest_dir)
-        .join("../../../../../../frontend/src/config/ui-options.json");
+        .join("../../../../../frontend/src/config/ui-options.json");
 
     let generated_code = if ui_options_path.exists() {
         match generate_from_json(&ui_options_path) {

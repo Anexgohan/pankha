@@ -14,6 +14,7 @@ interface FanAssignment {
   system_id: number;
   agent_id: string;
   fan_name: string;
+  zone_id: string | null;
   fan_min_speed: number;
   fan_max_speed: number;
   profile_name: string;
@@ -138,6 +139,7 @@ export class FanProfileController {
           f.system_id,
           s.agent_id,
           f.fan_name,
+          f.zone_id,
           f.min_speed as fan_min_speed,
           f.max_speed as fan_max_speed,
           fp.profile_name,
@@ -363,9 +365,24 @@ export class FanProfileController {
         return;
       }
 
+      // Zone deduplication: when multiple fans share a zone_id, only process once per zone.
+      // The zone is the atomic control unit for IPMI agents — sending setFanSpeed to the zone
+      // sets all member fans at once.
+      const processedZones = new Set<string>();
+
       // Process each assignment
       for (const assignment of assignments) {
         try {
+          // Zone deduplication: skip if we already processed this zone for this agent
+          const zoneKey = assignment.zone_id ? `${assignment.agent_id}:zone:${assignment.zone_id}` : null;
+          if (zoneKey && processedZones.has(zoneKey)) {
+            log.trace(`Zone ${assignment.zone_id} already processed for agent ${assignment.agent_id}, skipping fan ${assignment.fan_name}`, 'FanProfileController');
+            continue;
+          }
+
+          // For zone-based fans, use zone_id as the command target; otherwise use fan_name
+          const commandTarget = assignment.zone_id || assignment.fan_name;
+
           // Check if fan is currently reported by the agent (immediate availability check)
           const systemData = this.dataAggregator.getSystemData(assignment.agent_id);
           const fanCurrentlyReported = systemData?.fans?.some(f => f.id === assignment.fan_name);
@@ -382,7 +399,7 @@ export class FanProfileController {
           );
 
           // Track sensor availability state to avoid log spam
-          const stateKey = `${assignment.agent_id}:${assignment.sensor_name || assignment.sensor_identifier || assignment.sensor_id}:${assignment.fan_name}`;
+          const stateKey = `${assignment.agent_id}:${assignment.sensor_name || assignment.sensor_identifier || assignment.sensor_id}:${commandTarget}`;
           const wasAvailable = this.sensorAvailabilityState.get(stateKey);
 
           if (temperature === null) {
@@ -390,7 +407,7 @@ export class FanProfileController {
             if (wasAvailable !== false) {
               log.warn(
                 `Sensor ${assignment.sensor_name || assignment.sensor_identifier || assignment.sensor_id} unavailable, ` +
-                `skipping fan ${assignment.fan_name}`,
+                `skipping fan ${commandTarget}`,
                 'FanProfileController'
               );
               this.sensorAvailabilityState.set(stateKey, false);
@@ -402,7 +419,7 @@ export class FanProfileController {
           if (wasAvailable === false) {
             log.info(
               `Sensor ${assignment.sensor_name || assignment.sensor_identifier || assignment.sensor_id} available, ` +
-              `resuming fan ${assignment.fan_name}`,
+              `resuming fan ${commandTarget}`,
               'FanProfileController'
             );
           }
@@ -414,14 +431,14 @@ export class FanProfileController {
           if (curvePoints.length === 0) {
             log.warn(
               `No curve points for profile ${assignment.profile_name}, ` +
-              `skipping fan ${assignment.fan_name}`,
+              `skipping fan ${commandTarget}`,
               'FanProfileController'
             );
             continue;
           }
 
           // Determine temperature to use for target calculation (hysteresis logic)
-          const fanKey = `${assignment.agent_id}:${assignment.fan_name}`;
+          const fanKey = `${assignment.agent_id}:${commandTarget}`;
           const hysteresis = this.agentManager.getAgentHysteresis(assignment.agent_id);
           const lastSignificantTemp = this.lastSignificantTemp.get(fanKey);
           const lastTargetSpeed = this.lastTargetSpeeds.get(fanKey);
@@ -460,12 +477,18 @@ export class FanProfileController {
           );
 
           // Apply fan control with stepping (hysteresis already handled above)
+          // Use commandTarget (zone_id for IPMI, fan_name for OS agents)
           await this.applyFanControl(
             assignment.agent_id,
-            assignment.fan_name,
+            commandTarget,
             temperature,
             constrainedSpeed
           );
+
+          // Mark zone as processed so we don't send duplicate commands
+          if (zoneKey) {
+            processedZones.add(zoneKey);
+          }
 
         } catch (error) {
           log.error(`Error processing fan assignment ${assignment.assignment_id}`, 'FanProfileController', error);

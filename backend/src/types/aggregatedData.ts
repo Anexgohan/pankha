@@ -28,6 +28,7 @@ export interface FanReading {
   targetSpeed: number;
   status: 'ok' | 'error' | 'stopped';
   dbId?: number;
+  zone?: string; // Fan zone ID for IPMI agents (e.g., "cpu_zone", "peripheral_zone")
 }
 
 export interface SystemHealth {

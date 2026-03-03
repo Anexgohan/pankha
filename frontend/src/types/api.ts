@@ -56,6 +56,7 @@ export interface FanReading {
   targetSpeed: number;
   status: "ok" | "error" | "stopped";
   dbId?: number; // Database record ID for fan_profile_assignments
+  zone?: string; // Fan zone ID for IPMI agents (e.g., "cpu_zone", "peripheral_zone")
 }
 
 export interface SystemOverview {

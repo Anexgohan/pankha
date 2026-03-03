@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS fans (
   fan_name VARCHAR(255) NOT NULL,
   fan_label VARCHAR(255),                   -- User-friendly display name
   fan_id INTEGER,                           -- Physical fan ID (1-5)
+  zone_id VARCHAR(100),                     -- Fan zone ID for IPMI agents (e.g., "cpu_zone")
   pwm_path VARCHAR(500),                    -- PWM control path
   pwm_enable_path VARCHAR(500),             -- PWM enable control path
   rpm_path VARCHAR(500),                    -- RPM reading path
@@ -333,5 +334,17 @@ BEGIN
   ) THEN
     ALTER TABLE systems DROP COLUMN auth_token;
     RAISE NOTICE 'Migration: Removed unused auth_token column from systems table';
+  END IF;
+END $$;
+
+-- Migration: Add zone_id column to fans table (IPMI zone-aware fan control)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'fans' AND column_name = 'zone_id'
+  ) THEN
+    ALTER TABLE fans ADD COLUMN zone_id VARCHAR(100);
+    RAISE NOTICE 'Migration: Added zone_id column to fans table for IPMI zone-aware fan control';
   END IF;
 END $$;

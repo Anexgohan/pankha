@@ -66,6 +66,7 @@ export interface AgentDataPacket {
     rpm: number; // Current RPM
     targetSpeed: number; // Requested speed
     status: "ok" | "error" | "stopped";
+    zone?: string; // Fan zone ID for IPMI agents (e.g., "cpu_zone", "peripheral_zone")
   }>;
   systemHealth: {
     cpuUsage: number;

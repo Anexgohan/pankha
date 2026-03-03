@@ -2,6 +2,8 @@
 //! Converts ipmitool -c sdr output into Sensor and Fan structs
 //! using dynamically provided match tokens from the active JSON profile.
 
+use std::collections::HashMap;
+
 use crate::hardware::types::{Sensor, Fan};
 use crate::profiles::types::Parsing;
 
@@ -34,14 +36,16 @@ pub fn parse_sensors(csv: &str, parsing: &Parsing, hardware_name: &str) -> Vec<S
 }
 
 /// Parse CSV SDR output into Fan structs.
-/// Filter: rows where unit column contains `fan_match_token` ("RPM")
-pub fn parse_fans(csv: &str, parsing: &Parsing, has_control: bool) -> Vec<Fan> {
+/// Filter: rows where unit column contains `fan_match_token` ("RPM").
+/// `zone_map` maps fan sensor name → zone_id (e.g., "FAN1" → "cpu_zone").
+pub fn parse_fans(csv: &str, parsing: &Parsing, has_control: bool, zone_map: &HashMap<String, String>) -> Vec<Fan> {
     csv.lines()
         .filter_map(|line| {
             let cols: Vec<&str> = line.split(',').collect();
             if cols.len() >= 4 && cols[2].contains(&parsing.fan_match_token) {
                 let name = cols[0].trim().to_string();
                 let rpm: u32 = cols[1].trim().parse().ok()?;
+                let zone = zone_map.get(&name).cloned();
                 Some(Fan {
                     id: name.clone(),
                     name,
@@ -51,6 +55,7 @@ pub fn parse_fans(csv: &str, parsing: &Parsing, has_control: bool) -> Vec<Fan> {
                     status: if rpm > 0 { "ok".to_string() } else { "stopped".to_string() },
                     has_pwm_control: has_control,
                     pwm_file: None,   // Not applicable for IPMI
+                    zone,
                 })
             } else {
                 None

@@ -51,6 +51,10 @@ pub struct Parsing {
 pub struct FanZone {
     pub id: String,                  // e.g., "all_fans", "zone0_cpu"
     pub name: String,                // e.g., "All Fans", "CPU Zone"
+    /// SDR fan sensor names belonging to this zone (e.g., ["FAN1", "FAN2"]).
+    /// Optional: if omitted and only one zone exists, all fans are assigned to it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub members: Option<Vec<String>>,
     pub speed_translation: SpeedTranslation,
     pub commands: FanZoneCommands,
 }

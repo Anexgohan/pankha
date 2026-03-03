@@ -48,17 +48,19 @@ router.post('/sensor', async (req: Request, res: Response) => {
     log.info(` Fan configuration updated: Fan ${fan_id} -> Sensor ${sensorIdentifier || sensorDbId || 'none'}`, 'fanConfigurations');
 
     // Clear cached hysteresis/stepping state for this fan so the new sensor takes effect immediately
-    // Look up the fan details to get agent_id and fan_name
+    // Look up the fan details to get agent_id, fan_name, and zone_id
+    // For IPMI zone-based fans, the control loop keys on zone_id instead of fan_name
     const fanDetails = await db.get(`
-      SELECT f.fan_name, s.agent_id
+      SELECT f.fan_name, f.zone_id, s.agent_id
       FROM fans f
       JOIN systems s ON f.system_id = s.id
       WHERE f.id = $1
     `, [fan_id]);
-    
+
     if (fanDetails) {
       const fanProfileController = FanProfileController.getInstance();
-      fanProfileController.clearFanState(fanDetails.agent_id, fanDetails.fan_name);
+      const commandTarget = fanDetails.zone_id || fanDetails.fan_name;
+      fanProfileController.clearFanState(fanDetails.agent_id, commandTarget);
     }
 
     res.json({

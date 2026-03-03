@@ -686,6 +686,92 @@ const SystemCard: React.FC<SystemCardProps> = ({
     onUpdate();
   };
 
+  // Format zone ID for display (e.g., "cpu_zone" → "CPU Zone")
+  const formatZoneName = (zoneId: string): string => {
+    return zoneId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  // Handle sensor change for all fans in a zone (IPMI zone-level control)
+  const handleZoneSensorChange = async (zoneFans: FanReading[], newSensorId: string) => {
+    // Update state for all fans in zone
+    const updates: Record<string, string> = {};
+    for (const f of zoneFans) {
+      updates[f.id] = newSensorId;
+    }
+    setSelectedSensors(prev => ({ ...prev, ...updates }));
+
+    // Save to backend for all fans in zone
+    for (const f of zoneFans) {
+      if (f.dbId) {
+        try {
+          let sensorDbId: number | string | null = null;
+          if (newSensorId && newSensorId !== "") {
+            if (newSensorId.startsWith("__")) {
+              sensorDbId = newSensorId;
+            } else {
+              const sensor = system.current_temperatures?.find(s => s.id === newSensorId);
+              sensorDbId = sensor?.dbId || null;
+            }
+          }
+          await setFanSensor(f.dbId, sensorDbId);
+        } catch (error) {
+          console.error("Failed to save zone sensor selection:", error);
+        }
+      }
+    }
+  };
+
+  // Handle profile assignment for all fans in a zone (IPMI zone-level control)
+  const handleZoneProfileAssignment = async (zoneFans: FanReading[], profileId: number) => {
+    const zoneId = zoneFans[0]?.zone || zoneFans[0]?.id;
+    try {
+      setLoading(`zone-profile-${zoneId}`);
+
+      const selectedSensorId = selectedSensors[zoneFans[0]?.id];
+      let sensorDbId: number | string | undefined = undefined;
+      if (selectedSensorId) {
+        if (selectedSensorId.startsWith("__")) {
+          sensorDbId = selectedSensorId;
+        } else {
+          const sensor = system.current_temperatures?.find(s => s.id === selectedSensorId);
+          if (sensor?.dbId) {
+            sensorDbId = sensor.dbId;
+          } else {
+            toast.error("Please select a sensor first.");
+            setLoading(null);
+            return;
+          }
+        }
+      }
+
+      // Update state for all fans in zone
+      const updates: Record<string, number> = {};
+      for (const f of zoneFans) {
+        updates[f.id] = profileId;
+      }
+      setSelectedProfiles(prev => ({ ...prev, ...updates }));
+
+      // Assign profile to all fans in zone
+      for (const f of zoneFans) {
+        if (f.dbId) {
+          await assignProfileToFan({
+            fan_id: f.dbId,
+            profile_id: profileId,
+            sensor_id: sensorDbId,
+          });
+        }
+      }
+      onUpdate();
+    } catch (error) {
+      toast.error(
+        "Failed to assign zone profile: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+    } finally {
+      setLoading(null);
+    }
+  };
+
   // Filter visible sensors for dashboard stats (exclude hidden sensors and groups)
   const visibleSensors =
     system.current_temperatures?.filter(
@@ -1208,7 +1294,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
             className="section-header clickable"
             onClick={() => onToggleFans(!expandedFans)}
           >
-            <h4>Fans</h4>
+            <h4>{system.current_fan_speeds.some((f: FanReading) => f.zone) ? 'Fan Zones' : 'Fans'}</h4>
             <span className="expand-icon">
               {expandedFans ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </span>
@@ -1216,7 +1302,276 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
           {expandedFans && (
             <div className="fans-list">
-              {system.current_fan_speeds.map((fan: FanReading) => (
+              {/* Zone-grouped rendering for IPMI agents (fans with zone field) */}
+              {(() => {
+                const hasZones = system.current_fan_speeds.some((f: FanReading) => f.zone);
+                if (!hasZones) return null;
+
+                // Group fans by zone
+                const zoneGroups = new Map<string, FanReading[]>();
+                for (const fan of system.current_fan_speeds) {
+                  const z = fan.zone || '__ungrouped__';
+                  if (!zoneGroups.has(z)) zoneGroups.set(z, []);
+                  zoneGroups.get(z)!.push(fan);
+                }
+
+                return Array.from(zoneGroups.entries()).map(([zoneId, zoneFans]) => {
+                  const representativeFan = zoneFans[0];
+                  const zoneLoadingKey = `zone-profile-${zoneId}`;
+
+                  return (
+                    <div key={`zone-${zoneId}`} className="zone-group">
+                      <div className="zone-header-bar">
+                        <span className="zone-name">{formatZoneName(zoneId)}</span>
+                        <span className="zone-fan-count">
+                          {zoneFans.length} fan{zoneFans.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+
+                      {/* Zone member fans - metrics only */}
+                      {zoneFans.map(fan => {
+                        const rpmDecreasing = fanRpmStateRef.current[fan.id]?.decreasing ?? false;
+                        const flowDir = fan.rpm === 0 ? '' : rpmDecreasing ? 'ccw' : 'cw';
+
+                        let speedClass: string;
+                        if (fan.speed > 95) speedClass = 'critical';
+                        else if (fan.speed > 75) speedClass = 'warning';
+                        else if (rpmDecreasing) speedClass = 'caution';
+                        else speedClass = 'normal';
+
+                        const ringColor = `var(--temp-${speedClass}-border)`;
+                        const circumference = 2 * Math.PI * 25;
+                        const dashOffset = circumference * (1 - fan.speed / 100);
+
+                        return (
+                          <div key={fan.id} className="fan-item zone-member">
+                            <div className="fan-header">
+                              <div className="fan-info">
+                                <div className="fan-title">
+                                  <span className="fan-icon">
+                                    <AnimatedFanIcon size={28} speed={fan.speed} />
+                                  </span>
+                                  <div className="fan-name">
+                                    <InlineEdit
+                                      value={getFanDisplayName(fan.id, fan.name, fan.label)}
+                                      hardwareId={fan.id}
+                                      onSave={async (newLabel) => {
+                                        if (!fan.dbId) throw new Error("Fan not registered in database");
+                                        await updateFanLabel(system.id, fan.dbId, newLabel);
+                                        onUpdate();
+                                      }}
+                                      className="fan-name-edit"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="fan-metrics">
+                                  <span className="fan-rpm">{fan.rpm} RPM</span>
+                                  <span className={`status-indicator ${fan.status}`}>
+                                    {fan.status}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="speed-display">
+                                <div className="speed-circle">
+                                  <svg width="60" height="60" className="speed-gauge">
+                                    <circle cx="30" cy="30" r="25" fill="none" className="speed-track" strokeWidth="5" />
+                                    <circle
+                                      cx="30" cy="30" r="25" fill="none"
+                                      stroke={ringColor} strokeWidth="5"
+                                      strokeDasharray={`${circumference}`}
+                                      strokeDashoffset={`${dashOffset}`}
+                                      transform="rotate(-90 30 30)"
+                                    />
+                                  </svg>
+                                  {flowDir && (
+                                    <div
+                                      className="speed-flow-mask"
+                                      style={{ '--arc-deg': `${fan.speed * 3.6}deg` } as React.CSSProperties}
+                                    >
+                                      <div className={`speed-flow-pattern flow-${flowDir}`}>
+                                        <svg viewBox="0 0 60 60" width="60" height="60">
+                                          {Array.from({ length: 16 }, (_, i) => (
+                                            <polygon
+                                              key={i}
+                                              points={flowDir === 'cw' ? '27,2.5 33,5 27,7.5' : '33,2.5 27,5 33,7.5'}
+                                              fill="var(--speed-flow-color)"
+                                              opacity="0.35"
+                                              transform={`rotate(${i * 22.5}, 30, 30)`}
+                                            />
+                                          ))}
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <span className="speed-value" style={{ color: ringColor }}>{fan.speed}%</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Zone-level controls (shared by all fans in zone) */}
+                      <div className="fan-controls zone-controls">
+                        {/* Sensor Selection Dropdown */}
+                        <div className="fan-control-row">
+                          <label className="control-label">Control Sensor:</label>
+                          <div className="stealth-select-wrapper sensor-select">
+                            <div className="select-display sensor-select-display">
+                              {(() => {
+                                const val = selectedSensors[representativeFan.id] || "";
+                                if (!val) return <span className="sensor-select-name">Select Sensor...</span>;
+                                if (val === "__highest__") return (
+                                  <>
+                                    <span className="sensor-select-name">Highest</span>
+                                    <span className="sensor-select-temp">({formatTemperature(highestTemperature, '0.0°C')})</span>
+                                  </>
+                                );
+                                if (val.startsWith("__group__")) {
+                                  const groupId = val.replace("__group__", "");
+                                  const visibleSensorsForGroups = system.current_temperatures?.filter(
+                                    (s: SensorReading) => !isSensorOrGroupHidden(s)
+                                  ) || [];
+                                  const groups = groupSensorsByChip(visibleSensorsForGroups);
+                                  const groupSensors = groups[groupId] || [];
+                                  const temp = groupSensors.length > 0
+                                    ? Math.max(...groupSensors.map(s => s.temperature))
+                                    : null;
+                                  return (
+                                    <>
+                                      <span className="sensor-select-name">{getChipDisplayName(groupId, groupSensors)}</span>
+                                      {temp !== null && <span className="sensor-select-temp">({formatTemperature(temp)})</span>}
+                                    </>
+                                  );
+                                }
+                                const sensor = system.current_temperatures?.find((s: SensorReading) => s.id === val);
+                                if (sensor) return (
+                                  <>
+                                    <span className="sensor-select-name">{getSensorDisplayName(sensor.id, sensor.name, sensor.label)}</span>
+                                    <span className="sensor-select-temp">({formatTemperature(sensor.temperature)})</span>
+                                  </>
+                                );
+                                return <span className="sensor-select-name">{val}</span>;
+                              })()}
+                            </div>
+                            <select
+                              className="select-engine"
+                              value={selectedSensors[representativeFan.id] || ""}
+                              onChange={async (e) => {
+                                await handleZoneSensorChange(zoneFans, e.target.value);
+                              }}
+                              disabled={system.status !== "online" || isReadOnly}
+                            >
+                              <option value="">Select Sensor...</option>
+                              <option value="__highest__" title="Use the Highest Temperature on the system">
+                                Highest ({formatTemperature(highestTemperature, '0.0°C')})
+                              </option>
+                              <option disabled>────────────────────</option>
+                              {(() => {
+                                const visibleSensors = system.current_temperatures?.filter(
+                                  (sensor: SensorReading) => !isSensorOrGroupHidden(sensor)
+                                ) || [];
+                                const sensorGroups = groupSensorsByChip(visibleSensors);
+                                const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
+                                const groupsWithMultipleSensors = sortedGroupIds.filter(
+                                  (groupId) => sensorGroups[groupId].length > 1
+                                );
+                                if (groupsWithMultipleSensors.length === 0) return null;
+                                return (
+                                  <>
+                                    <option disabled>(Groups)</option>
+                                    {groupsWithMultipleSensors.map((groupId) => {
+                                      const groupSensors = sensorGroups[groupId];
+                                      const highestTemp = Math.max(...groupSensors.map((s) => s.temperature));
+                                      return (
+                                        <option key={`group-${groupId}`} value={`__group__${groupId}`}
+                                          title="Selecting a group uses the Highest Temperature of that group"
+                                        >
+                                          {getChipDisplayName(groupId, groupSensors)} ({formatTemperature(highestTemp)})
+                                        </option>
+                                      );
+                                    })}
+                                    <option disabled>────────────────────</option>
+                                  </>
+                                );
+                              })()}
+                              <option disabled>(Sensors)</option>
+                              {system.current_temperatures
+                                ?.filter((sensor: SensorReading) => !isSensorOrGroupHidden(sensor))
+                                .sort((a: SensorReading, b: SensorReading) => {
+                                  const groupA = deriveSensorGroupId(a);
+                                  const groupB = deriveSensorGroupId(b);
+                                  if (groupA !== groupB) return groupA.localeCompare(groupB);
+                                  return a.id.localeCompare(b.id);
+                                })
+                                .map((sensor: SensorReading) => (
+                                  <option key={sensor.id} value={sensor.id}>
+                                    {getSensorDisplayName(sensor.id, sensor.name, sensor.label)}{" "}
+                                    ({formatTemperature(sensor.temperature)})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Profile Selection Dropdown */}
+                        <div className="fan-control-row">
+                          <label className="control-label">Fan Profile:</label>
+                          <div className="stealth-select-wrapper fan-profile-select">
+                            <div className="select-display">
+                              {fanProfiles.find(p => p.id === selectedProfiles[representativeFan.id])?.profile_name || 'No Profile'}
+                            </div>
+                            <select
+                              className="select-engine"
+                              value={selectedProfiles[representativeFan.id] || ""}
+                              onChange={(e) => {
+                                const profileId = e.target.value;
+                                if (profileId) {
+                                  handleZoneProfileAssignment(zoneFans, parseInt(profileId));
+                                } else {
+                                  // Clear profile for all fans in zone
+                                  const updates: Record<string, number> = {};
+                                  for (const f of zoneFans) {
+                                    delete updates[f.id];
+                                  }
+                                  setSelectedProfiles(prev => {
+                                    const updated = { ...prev };
+                                    for (const f of zoneFans) {
+                                      delete updated[f.id];
+                                    }
+                                    return updated;
+                                  });
+                                }
+                              }}
+                              disabled={
+                                loading === zoneLoadingKey ||
+                                system.status !== "online" ||
+                                isReadOnly
+                              }
+                            >
+                              <option value="">No Profile (Manual)</option>
+                              {fanProfiles.map((profile: FanProfile) => (
+                                <option key={profile.id} value={profile.id}
+                                  title={profile.description || profile.profile_name}
+                                >
+                                  {profile.profile_name} ({profile.created_by === 'system' ? 'default' : 'custom'})
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          {loading === zoneLoadingKey && (
+                            <Loader2 className="animate-spin" size={14} />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* Per-fan rendering for OS agents (existing layout, no zones) */}
+              {!system.current_fan_speeds.some((f: FanReading) => f.zone) && system.current_fan_speeds.map((fan: FanReading) => (
                 <div key={fan.id} className="fan-item">
                   <div className="fan-header">
                     <div className="fan-info">

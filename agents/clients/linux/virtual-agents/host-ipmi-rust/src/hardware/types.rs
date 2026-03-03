@@ -34,6 +34,10 @@ pub struct Fan {
     pub has_pwm_control: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pwm_file: Option<String>,
+    /// Fan zone ID for IPMI agents (e.g., "cpu_zone", "peripheral_zone").
+    /// OS agents always set this to None (omitted from JSON).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub zone: Option<String>,
 }
 
 /// System health metrics

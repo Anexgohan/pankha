@@ -122,8 +122,9 @@ export class CommandDispatcher extends EventEmitter {
     }
 
     // Get fan limits from database
+    // Match by fan_name (OS agents) or zone_id (IPMI agents where fanId is a zone like "cpu_zone")
     const fan = await this.db.get(
-      "SELECT min_speed, max_speed, is_controllable FROM fans f JOIN systems s ON f.system_id = s.id WHERE s.agent_id = $1 AND f.fan_name = $2",
+      "SELECT min_speed, max_speed, is_controllable FROM fans f JOIN systems s ON f.system_id = s.id WHERE s.agent_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2) LIMIT 1",
       [agentId, fanId]
     );
 
