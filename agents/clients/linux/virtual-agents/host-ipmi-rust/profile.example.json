@@ -29,6 +29,10 @@
             "set_speed": {
               "type": "ipmitool_raw",
               "bytes": "0x30 0x70 0x66 0x01 0x00 {{SPEED_HEX}}"
+            },
+            "read_speed": {
+              "type": "ipmitool_raw",
+              "bytes": "0x30 0x70 0x66 0x00 0x00"
             }
           }
         },
@@ -47,6 +51,10 @@
             "set_speed": {
               "type": "ipmitool_raw",
               "bytes": "0x30 0x70 0x66 0x01 0x01 {{SPEED_HEX}}"
+            },
+            "read_speed": {
+              "type": "ipmitool_raw",
+              "bytes": "0x30 0x70 0x66 0x00 0x01"
             }
           }
         }

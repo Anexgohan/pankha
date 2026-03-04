@@ -32,6 +32,39 @@ pub fn translate_speed(percent: u8, translation: &SpeedTranslation) -> String {
     }
 }
 
+/// Reverse-translate a BMC response byte back to a percentage (0-100).
+/// Used by Tier 2 read_speed: the BMC returns a raw value, and we convert
+/// it back using the zone's speed_translation rules in reverse.
+///
+/// `raw_byte` is the numeric value from the BMC response (e.g., 0x32 = 50 for decimal_hex).
+pub fn reverse_translate_speed(raw_byte: u8, translation: &SpeedTranslation) -> u8 {
+    match translation.translation_type.as_str() {
+        "byte_scale" => {
+            // Reverse of: value = (percent / 100) * range + output_min
+            // So: percent = ((value - output_min) / range) * 100
+            let output_min = translation.params.get("output_min")
+                .and_then(|v| v.as_u64()).unwrap_or(0) as f64;
+            let output_max = translation.params.get("output_max")
+                .and_then(|v| v.as_u64()).unwrap_or(255) as f64;
+            let range = output_max - output_min;
+            if range == 0.0 {
+                return 0;
+            }
+            let percent = ((raw_byte as f64 - output_min) / range * 100.0).round();
+            percent.clamp(0.0, 100.0) as u8
+        }
+        "decimal_hex" => {
+            // The raw byte IS the percentage (0x32 = 50%)
+            raw_byte.min(100)
+        }
+        "integer" => {
+            // Same as decimal_hex — raw value is the percentage
+            raw_byte.min(100)
+        }
+        _ => raw_byte.min(100),
+    }
+}
+
 /// Substitute {{SPEED_HEX}} or {{SPEED}} in command bytes string.
 pub fn interpolate_command(template: &str, speed_value: &str) -> String {
     template

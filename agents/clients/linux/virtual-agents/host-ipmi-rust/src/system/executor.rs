@@ -85,6 +85,26 @@ pub async fn run_ipmitool_mc_info() -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
+/// Execute `ipmitool sensor get "<name>"` to retrieve thresholds for a single sensor.
+/// Returns the full text output which is then parsed for threshold values.
+pub async fn run_ipmitool_sensor_get(sensor_name: &str) -> Result<String> {
+    let mut cmd = build_ipmitool_command();
+    cmd.args(["sensor", "get", sensor_name]);
+
+    debug!("Executing: ipmitool sensor get \"{}\"", sensor_name);
+
+    let output = tokio::process::Command::from(cmd)
+        .output()
+        .await
+        .context("Failed to execute ipmitool sensor get")?;
+
+    if !output.status.success() {
+        return Err(anyhow!("ipmitool sensor get failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
 /// Execute `ipmitool fru print` to get hardware inventory.
 pub async fn run_ipmitool_fru() -> Result<String> {
     let mut cmd = build_ipmitool_command();

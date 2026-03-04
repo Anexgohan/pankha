@@ -19,7 +19,7 @@ use crate::hardware::types::{
 };
 use crate::profiles::types::BmcProfile;
 use crate::profiles::loader::load_profile;
-use crate::profiles::interpolator::{translate_speed, interpolate_command};
+use crate::profiles::interpolator::{translate_speed, reverse_translate_speed, interpolate_command};
 use crate::system::executor;
 use crate::system::parser;
 
@@ -33,6 +33,12 @@ pub struct IpmiHardwareMonitor {
     /// Cache for last SDR CSV output to avoid double-querying within the same cycle
     last_sdr_cache: Mutex<Option<String>>,
     cache_from_sdr: AtomicBool,
+    /// Track last commanded speed per zone (zone_id → speed%).
+    /// IPMI SDR only reports RPM, not duty cycle — this lets telemetry report the actual speed we set.
+    commanded_speeds: Mutex<HashMap<String, u8>>,
+    /// Cached sensor thresholds (SDR name → (max_temp, crit_temp)).
+    /// Queried once at init — thresholds don't change at runtime.
+    sensor_thresholds: Mutex<HashMap<String, (Option<f64>, Option<f64>)>>,
 }
 
 impl IpmiHardwareMonitor {
@@ -72,6 +78,7 @@ impl IpmiHardwareMonitor {
             start_time: Instant::now(),
             last_sdr_cache: Mutex::new(None),
             cache_from_sdr: AtomicBool::new(false),
+            commanded_speeds: Mutex::new(HashMap::new()),
         }
     }
 
@@ -146,15 +153,19 @@ impl IpmiHardwareMonitor {
             }
         }
 
+        // Clear commanded speeds — BMC is back in control, our duty-cycle values are stale
+        self.commanded_speeds.lock().await.clear();
+
         info!("Reset to factory complete — fans returned to BMC auto-control");
         Ok(())
     }
 
     /// Fetch SDR CSV data, using cache if available in this cycle.
+    /// Only updates cache_from_sdr on cache miss (fresh fetch) — matching the
+    /// original agent where discover_fans() doesn't touch the flag.
     async fn get_sdr_csv(&self) -> Result<String> {
         let mut cache = self.last_sdr_cache.lock().await;
         if let Some(ref cached) = *cache {
-            self.cache_from_sdr.store(true, Ordering::SeqCst);
             return Ok(cached.clone());
         }
 
@@ -256,6 +267,91 @@ impl HardwareMonitor for IpmiHardwareMonitor {
             }
         }
 
+        // === 3-Tier Fan Speed % Resolution ===
+        // IPMI SDR reports RPM but not PWM duty cycle.
+        // We resolve speed% using a cascading fallback:
+
+        // Tier 1: SDR percent sensors (Dell iDRAC, HP iLO, some Lenovo)
+        // Some BMCs expose duty cycle as a separate sensor with unit "percent".
+        let percent_sensors = parser::parse_fan_percent_sensors(&csv);
+        if !percent_sensors.is_empty() {
+            let fan_names: Vec<String> = fans.iter().map(|f| f.name.clone()).collect();
+            for (pct_name, speed) in &percent_sensors {
+                if let Some(fan_name) = parser::match_percent_to_fan(pct_name, &fan_names) {
+                    for fan in &mut fans {
+                        if fan.name == fan_name && fan.speed == 0 {
+                            fan.speed = *speed;
+                            fan.target_speed = *speed;
+                        }
+                    }
+                }
+            }
+            debug!("Tier 1: Injected speed from {} SDR percent sensors", percent_sensors.len());
+        }
+
+        // Tier 2: Profile read_speed command (Supermicro, ASRockRack)
+        // Query the BMC for current duty cycle per zone via vendor-specific OEM command.
+        for zone in &ipmi.fan_zones {
+            // Skip if all fans in this zone already have speed (from Tier 1)
+            let zone_needs_speed = fans.iter()
+                .any(|f| f.zone.as_deref() == Some(&zone.id) && f.speed == 0);
+            if !zone_needs_speed {
+                continue;
+            }
+
+            if let Some(ref read_cmd) = zone.commands.read_speed {
+                if let Some(ref bytes) = read_cmd.bytes {
+                    if self.dry_run {
+                        debug!("Tier 2: [DRY RUN] Would query read_speed for zone {}: {}", zone.id, bytes);
+                    } else {
+                        match executor::run_ipmitool_raw(bytes).await {
+                            Ok(response) => {
+                                // Parse response — typically a single hex byte like " 32" (= 0x32)
+                                let trimmed = response.trim();
+                                if let Ok(raw_byte) = u8::from_str_radix(trimmed.trim_start_matches("0x"), 16) {
+                                    let speed = reverse_translate_speed(raw_byte, &zone.speed_translation);
+                                    for fan in &mut fans {
+                                        if fan.zone.as_deref() == Some(&zone.id) && fan.speed == 0 {
+                                            fan.speed = speed;
+                                            fan.target_speed = speed;
+                                        }
+                                    }
+                                    debug!("Tier 2: Zone {} read_speed -> {}% (raw: 0x{:02x})", zone.id, speed, raw_byte);
+                                }
+                            }
+                            Err(e) => {
+                                debug!("Tier 2: read_speed failed for zone {}: {}", zone.id, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Tier 3: Commanded speed tracking (universal fallback)
+        // Use the last speed we commanded per zone. Not a true readback
+        // but the best we can do when Tier 1 and 2 are unavailable.
+        let speeds = self.commanded_speeds.lock().await;
+        for fan in &mut fans {
+            if fan.speed == 0 {
+                if let Some(zone) = &fan.zone {
+                    if let Some(&spd) = speeds.get(zone) {
+                        fan.speed = spd;
+                        fan.target_speed = spd;
+                    }
+                }
+            }
+        }
+
+        // Clear SDR cache after fans are parsed — both consumers (sensors + fans)
+        // have used this cycle's CSV. Next cycle will fetch fresh readings.
+        // (Mirrors the original sysfs agent: cache stores *paths*, not *values*;
+        // here the SDR CSV contains live readings, so it must refresh each cycle.)
+        {
+            let mut cache = self.last_sdr_cache.lock().await;
+            *cache = None;
+        }
+
         debug!("Discovered {} fans via IPMI SDR", fans.len());
         Ok(fans)
     }
@@ -303,6 +399,10 @@ impl HardwareMonitor for IpmiHardwareMonitor {
                 } else {
                     executor::run_ipmitool_raw(&bytes).await?;
                 }
+
+                // Track commanded speed so telemetry can report it
+                // (IPMI SDR only reports RPM, not duty cycle)
+                self.commanded_speeds.lock().await.insert(zone.id.clone(), speed);
             }
         }
 

@@ -7,6 +7,20 @@ use std::collections::HashMap;
 use crate::hardware::types::{Sensor, Fan};
 use crate::profiles::types::Parsing;
 
+/// Normalize an SDR sensor name into a stable, underscore-separated ID.
+/// "CPU Temp" → "ipmi_cpu_temp", "Peripheral Temp" → "ipmi_peripheral_temp"
+/// The "ipmi_" prefix ensures deriveChipName() groups all BMC sensors together,
+/// matching the original agent's chip-based grouping (e.g., "coretemp_0_temp1").
+fn normalize_sensor_id(sdr_name: &str) -> String {
+    let normalized: String = sdr_name
+        .trim()
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '_' })
+        .collect();
+    format!("ipmi_{}", normalized)
+}
+
 /// Parse CSV SDR output into Sensor structs.
 /// Input:  "CPU Temp,42,degrees C,ok\nFAN1,1800,RPM,ok\n..."
 /// Filter: rows where unit column contains `temp_match_token` ("degrees C")
@@ -18,7 +32,7 @@ pub fn parse_sensors(csv: &str, parsing: &Parsing, hardware_name: &str) -> Vec<S
                 let name = cols[0].trim().to_string();
                 let value: f64 = cols[1].trim().parse().ok()?;
                 Some(Sensor {
-                    id: name.clone(),
+                    id: normalize_sensor_id(&name),
                     name,
                     temperature: value,
                     sensor_type: "temperature".to_string(),
@@ -33,6 +47,82 @@ pub fn parse_sensors(csv: &str, parsing: &Parsing, hardware_name: &str) -> Vec<S
             }
         })
         .collect()
+}
+
+/// Parse `ipmitool sensor get` output for threshold values.
+/// Returns (max_temp, crit_temp) extracted from "Upper non-critical" and "Upper critical" lines.
+/// Format: " Upper critical        : 90.000\n Upper non-critical    : 85.000\n"
+/// Returns None for thresholds that are missing or marked "na".
+pub fn parse_sensor_thresholds(output: &str) -> (Option<f64>, Option<f64>) {
+    let mut max_temp = None;
+    let mut crit_temp = None;
+
+    for line in output.lines() {
+        let line = line.trim();
+        if let Some((key, val)) = line.split_once(':') {
+            let key = key.trim().to_lowercase();
+            let val = val.trim();
+            if val == "na" || val == "Unspecified" || val.is_empty() {
+                continue;
+            }
+            if key == "upper non-critical" {
+                max_temp = val.parse::<f64>().ok();
+            } else if key == "upper critical" {
+                crit_temp = val.parse::<f64>().ok();
+            }
+        }
+    }
+
+    (max_temp, crit_temp)
+}
+
+/// Parse CSV SDR output for fan duty cycle percentage sensors (Tier 1).
+/// Some BMCs (Dell iDRAC, HP iLO) report fan duty cycle as separate SDR sensors
+/// with unit "percent" (e.g., "Fan 1,39.20,percent,ok").
+/// Returns a map of sensor name → speed percentage (0-100).
+///
+/// Matching strategy: for each "percent" sensor, we try to correlate it to
+/// an RPM fan by normalized name prefix (strip non-alphanumeric, compare).
+/// If no correlation is found, the entry is keyed by exact sensor name.
+pub fn parse_fan_percent_sensors(csv: &str) -> HashMap<String, u8> {
+    const PERCENT_TOKEN: &str = "percent";
+
+    csv.lines()
+        .filter_map(|line| {
+            let cols: Vec<&str> = line.split(',').collect();
+            if cols.len() >= 4 && cols[2].contains(PERCENT_TOKEN) {
+                let name = cols[0].trim().to_string();
+                let value: f64 = cols[1].trim().parse().ok()?;
+                let speed = value.round().clamp(0.0, 100.0) as u8;
+                Some((name, speed))
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// Try to match a percent sensor name to an RPM fan name.
+/// Strips non-alphanumeric characters and compares case-insensitively.
+/// Examples: "Fan 1" matches "FAN1", "Fan1 Duty" matches "FAN1".
+pub fn match_percent_to_fan(percent_name: &str, fan_names: &[String]) -> Option<String> {
+    let normalized_pct: String = percent_name.chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect::<String>()
+        .to_lowercase();
+
+    for fan_name in fan_names {
+        let normalized_fan: String = fan_name.chars()
+            .filter(|c| c.is_alphanumeric())
+            .collect::<String>()
+            .to_lowercase();
+
+        // Check if either name starts with the other (handles "Fan1" vs "Fan1 Duty")
+        if normalized_pct.starts_with(&normalized_fan) || normalized_fan.starts_with(&normalized_pct) {
+            return Some(fan_name.clone());
+        }
+    }
+    None
 }
 
 /// Parse CSV SDR output into Fan structs.

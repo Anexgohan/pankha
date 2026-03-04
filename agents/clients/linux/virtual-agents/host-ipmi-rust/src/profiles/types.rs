@@ -70,6 +70,11 @@ pub struct SpeedTranslation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FanZoneCommands {
     pub set_speed: Command,
+    /// Optional OEM raw command to read back current duty cycle (Tier 2).
+    /// Response is a single hex byte (e.g., "32" = 50% for decimal_hex).
+    /// Reverse-translated using the zone's speed_translation rules.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_speed: Option<Command>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
