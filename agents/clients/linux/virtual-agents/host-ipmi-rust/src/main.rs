@@ -10,8 +10,9 @@ mod websocket;
 
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
+use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use app::cli::{Args, HELP_TEXT};
@@ -264,6 +265,28 @@ async fn main() -> Result<()> {
     // Create IPMI hardware monitor (keep concrete type for reset_to_factory on shutdown)
     let ipmi_monitor = Arc::new(IpmiHardwareMonitor::new(config.hardware.clone()));
     let hardware_monitor: Arc<dyn HardwareMonitor> = ipmi_monitor.clone();
+
+    // Generate hardware-info.json diagnostic dump on startup (matches original agent behavior)
+    match ipmi_monitor.dump_hardware_info().await {
+        Ok(dump) => {
+            let dump_path = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.join("hardware-info.json")))
+                .unwrap_or_else(|| PathBuf::from("hardware-info.json"));
+
+            match serde_json::to_string_pretty(&dump) {
+                Ok(json) => {
+                    if let Err(e) = std::fs::write(&dump_path, json) {
+                        warn!("Failed to write hardware-info.json: {}", e);
+                    } else {
+                        info!("Saved hardware dump to {:?}", dump_path);
+                    }
+                }
+                Err(e) => warn!("Failed to serialize hardware dump: {}", e),
+            }
+        }
+        Err(e) => warn!("Failed to generate hardware dump: {}", e),
+    }
 
     // Test mode
     if args.test {

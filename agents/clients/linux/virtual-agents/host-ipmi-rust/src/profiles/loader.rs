@@ -7,23 +7,31 @@ use anyhow::{anyhow, Context, Result};
 use tracing::info;
 
 use super::types::BmcProfile;
-use super::merger::resolve_extends;
+use super::merger::resolve_extends_value;
 
 /// Load a BMC profile from a JSON file, resolve `extends` inheritance,
 /// and validate safety constraints.
+///
+/// Loads as raw JSON Value first so partial child profiles (e.g., only fan_zones)
+/// can be merged with their base before typed deserialization.
 pub fn load_profile(path: &Path) -> Result<BmcProfile> {
     let content = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read profile: {:?}", path))?;
 
-    let mut profile: BmcProfile = serde_json::from_str(&content)
+    let value: serde_json::Value = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse profile JSON: {:?}", path))?;
 
-    // Resolve extends inheritance if present
-    if profile.extends.is_some() {
+    // Resolve extends inheritance if present (merge as raw Values, then deserialize)
+    let final_value = if value.get("extends").and_then(|v| v.as_str()).is_some() {
         let base_dir = path.parent()
             .ok_or_else(|| anyhow!("Cannot determine profile directory"))?;
-        profile = resolve_extends(profile, base_dir)?;
-    }
+        resolve_extends_value(value, base_dir)?
+    } else {
+        value
+    };
+
+    let profile: BmcProfile = serde_json::from_value(final_value)
+        .with_context(|| format!("Failed to deserialize profile after merge: {:?}", path))?;
 
     // Validate: profile must have protocols.ipmi after resolution
     let ipmi = profile.protocols.as_ref()

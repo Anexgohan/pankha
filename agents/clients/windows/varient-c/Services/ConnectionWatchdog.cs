@@ -40,7 +40,8 @@ public class ConnectionWatchdog : BackgroundService
         if (_failsafeModeActive)
         {
             _logger.LogInformation("✅ EXITING FAILSAFE MODE - Backend connection restored");
-            _logger.LogInformation("Backend will resume fan control");
+            _logger.LogInformation("Clearing fan PWM cache - backend will resume control");
+            _hardware.ClearFanPwmCache();
             _failsafeModeActive = false;
         }
     }

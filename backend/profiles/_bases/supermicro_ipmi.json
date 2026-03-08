@@ -4,7 +4,7 @@
     "vendor": "Supermicro",
     "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
     "author": "Pankha Official",
-    "description": "Supermicro base profile for IPMI fan control. Covers X10/X11 series boards with dual-zone support (CPU + Peripheral). Uses decimal_hex translation (percentage → hex literal). X9 boards use different hex codes and should override fan_zones."
+    "description": "Supermicro base profile. Contains only what is shared across all Supermicro generations (parsing tokens, lifecycle commands). Fan zones with generation-specific hex codes belong in child profiles (x9_series, x10_series, etc.)."
   },
   "protocols": {
     "ipmi": {
@@ -13,52 +13,6 @@
         "fan_match_token": "RPM",
         "temp_match_token": "degrees C"
       },
-      "fan_zones": [
-        {
-          "id": "cpu_zone",
-          "name": "Zone 0 - CPU Fans",
-          "members": ["FAN1", "FAN2", "FAN3", "FAN4"],
-          "speed_translation": {
-            "type": "decimal_hex",
-            "input_min": 0,
-            "input_max": 100,
-            "output_min": 0,
-            "output_max": 100
-          },
-          "commands": {
-            "set_speed": {
-              "type": "ipmitool_raw",
-              "bytes": "0x30 0x70 0x66 0x01 0x00 {{SPEED_HEX}}"
-            },
-            "read_speed": {
-              "type": "ipmitool_raw",
-              "bytes": "0x30 0x70 0x66 0x00 0x00"
-            }
-          }
-        },
-        {
-          "id": "peripheral_zone",
-          "name": "Zone 1 - Peripheral Fans",
-          "members": ["FANA", "FANB"],
-          "speed_translation": {
-            "type": "decimal_hex",
-            "input_min": 0,
-            "input_max": 100,
-            "output_min": 0,
-            "output_max": 100
-          },
-          "commands": {
-            "set_speed": {
-              "type": "ipmitool_raw",
-              "bytes": "0x30 0x70 0x66 0x01 0x01 {{SPEED_HEX}}"
-            },
-            "read_speed": {
-              "type": "ipmitool_raw",
-              "bytes": "0x30 0x70 0x66 0x00 0x01"
-            }
-          }
-        }
-      ],
       "lifecycle": {
         "initialization": [
           {

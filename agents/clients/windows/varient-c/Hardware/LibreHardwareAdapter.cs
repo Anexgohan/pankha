@@ -782,6 +782,19 @@ public class LibreHardwareAdapter : IHardwareMonitor
         return false;
     }
 
+    /// <summary>
+    /// Clear cached PWM values so next setFanSpeed is not deduplicated.
+    /// Called on reconnection to ensure backend commands are applied immediately.
+    /// </summary>
+    public void ClearFanPwmCache()
+    {
+        foreach (var fan in _fanCache.Values)
+        {
+            fan.LastPwmValue = -1;  // Force next write to go through
+        }
+        _logger.Information("Cleared fan PWM cache ({Count} fans) - backend commands will apply immediately", _fanCache.Count);
+    }
+
     public async Task<HardwareDumpRoot> DumpFullHardwareInfoAsync()
     {
         await UpdateAsync();

@@ -13,13 +13,13 @@ use std::path::Path;
 use anyhow::{anyhow, Context, Result};
 use tracing::info;
 
-use super::types::BmcProfile;
-
-/// Resolve `extends` by loading the base profile and merging.
-/// Operates on serde_json::Value trees before final deserialization.
-pub fn resolve_extends(profile: BmcProfile, base_dir: &Path) -> Result<BmcProfile> {
-    let extends = profile.extends.as_ref()
-        .ok_or_else(|| anyhow!("resolve_extends called on profile without extends"))?;
+/// Resolve `extends` by loading the base profile and merging raw JSON Values.
+/// Both base and child are raw Values — no typed deserialization until after merge.
+/// This allows partial child profiles (e.g., only fan_zones) to work correctly.
+pub fn resolve_extends_value(child: serde_json::Value, base_dir: &Path) -> Result<serde_json::Value> {
+    let extends = child.get("extends")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| anyhow!("resolve_extends_value called on profile without extends"))?;
 
     // Resolve base path: extends value is like "_bases/dell_ipmi" → "_bases/dell_ipmi.json"
     let base_path = base_dir.join(format!("{}.json", extends));
@@ -31,18 +31,14 @@ pub fn resolve_extends(profile: BmcProfile, base_dir: &Path) -> Result<BmcProfil
     let base_value: serde_json::Value = serde_json::from_str(&base_content)
         .with_context(|| format!("Failed to parse base profile: {:?}", base_path))?;
 
-    let override_value = serde_json::to_value(&profile)
-        .context("Failed to serialize override profile")?;
-
-    let merged = deep_merge(base_value, override_value);
-
-    let mut resolved: BmcProfile = serde_json::from_value(merged)
-        .context("Failed to deserialize merged profile")?;
+    let mut merged = deep_merge(base_value, child);
 
     // Clear extends since we've resolved it
-    resolved.extends = None;
+    if let Some(obj) = merged.as_object_mut() {
+        obj.remove("extends");
+    }
 
-    Ok(resolved)
+    Ok(merged)
 }
 
 /// Deep merge base + override according to profile merge rules.

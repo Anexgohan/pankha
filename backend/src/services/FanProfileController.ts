@@ -64,6 +64,12 @@ export class FanProfileController {
     this.dataAggregator = DataAggregator.getInstance();
     this.commandDispatcher = CommandDispatcher.getInstance();
     this.agentManager = AgentManager.getInstance();
+
+    // Clear all fan state when agent reconnects so control loop reinitializes cleanly.
+    // This is the automatic equivalent of the user manually resetting the fan profile.
+    this.agentManager.on('agentRegistered', (agentConfig: { agentId: string }) => {
+      this.clearFanStateForAgent(agentConfig.agentId);
+    });
   }
 
   public static getInstance(): FanProfileController {
@@ -645,5 +651,32 @@ export class FanProfileController {
     // - lastAppliedSpeeds (current fan speed - needed for smooth stepping)
     // - lastSpeedChangeTime (timing info - harmless to keep)
     log.info(`Cleared target state for fan ${fanName} on agent ${agentId} (current speed preserved)`, 'FanProfileController');
+  }
+
+  /**
+   * Clear ALL fan state for a specific agent (used on reconnection).
+   * Unlike clearFanState() which preserves lastAppliedSpeeds for smooth stepping,
+   * this clears everything — after reconnection the fan is likely at failsafe speed
+   * and the controller must reinitialize from scratch.
+   */
+  private clearFanStateForAgent(agentId: string): void {
+    const prefix = `${agentId}:`;
+    let cleared = 0;
+
+    for (const key of this.lastAppliedSpeeds.keys()) {
+      if (key.startsWith(prefix)) {
+        this.lastAppliedSpeeds.delete(key);
+        this.lastSignificantTemp.delete(key);
+        this.lastTargetSpeeds.delete(key);
+        this.lastSpeedChangeTime.delete(key);
+        this.emergencyState.delete(key);
+        this.sensorAvailabilityState.delete(key);
+        cleared++;
+      }
+    }
+
+    if (cleared > 0) {
+      log.info(`Cleared all fan state for reconnected agent ${agentId} (${cleared} fans reset)`, 'FanProfileController');
+    }
   }
 }

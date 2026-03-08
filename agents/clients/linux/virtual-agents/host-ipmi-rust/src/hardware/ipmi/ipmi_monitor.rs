@@ -79,6 +79,7 @@ impl IpmiHardwareMonitor {
             last_sdr_cache: Mutex::new(None),
             cache_from_sdr: AtomicBool::new(false),
             commanded_speeds: Mutex::new(HashMap::new()),
+            sensor_thresholds: Mutex::new(HashMap::new()),
         }
     }
 
@@ -116,6 +117,44 @@ impl IpmiHardwareMonitor {
         }
 
         self.initialized.store(true, Ordering::SeqCst);
+
+        // Query sensor thresholds once at init — they don't change at runtime.
+        // Uses `ipmitool sensor get "<name>"` per temperature sensor found in SDR.
+        match executor::run_ipmitool_sdr_csv().await {
+            Ok(csv) => {
+                let temp_names: Vec<String> = csv.lines()
+                    .filter_map(|line| {
+                        let cols: Vec<&str> = line.split(',').collect();
+                        if cols.len() >= 4 && cols[2].contains(&ipmi.parsing.temp_match_token) {
+                            Some(cols[0].trim().to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                let mut thresholds = self.sensor_thresholds.lock().await;
+                for name in &temp_names {
+                    match executor::run_ipmitool_sensor_get(name).await {
+                        Ok(output) => {
+                            let (max_temp, crit_temp) = parser::parse_sensor_thresholds(&output);
+                            if max_temp.is_some() || crit_temp.is_some() {
+                                debug!("Thresholds for '{}': max={:?} crit={:?}", name, max_temp, crit_temp);
+                            }
+                            thresholds.insert(name.clone(), (max_temp, crit_temp));
+                        }
+                        Err(e) => {
+                            debug!("Could not query thresholds for '{}': {}", name, e);
+                        }
+                    }
+                }
+                info!("Queried thresholds for {} temperature sensors", thresholds.len());
+            }
+            Err(e) => {
+                warn!("Could not query SDR for threshold init: {}", e);
+            }
+        }
+
         info!("IPMI initialization complete");
         Ok(())
     }
@@ -243,7 +282,16 @@ impl HardwareMonitor for IpmiHardwareMonitor {
         }
 
         let csv = self.get_sdr_csv().await?;
-        let sensors = parser::parse_sensors(&csv, &ipmi.parsing, &self.hardware_name());
+        let mut sensors = parser::parse_sensors(&csv, &ipmi.parsing, &self.hardware_name());
+
+        // Inject cached thresholds (queried once at init)
+        let thresholds = self.sensor_thresholds.lock().await;
+        for sensor in &mut sensors {
+            if let Some((max_temp, crit_temp)) = thresholds.get(&sensor.name) {
+                sensor.max_temp = *max_temp;
+                sensor.crit_temp = *crit_temp;
+            }
+        }
 
         debug!("Discovered {} temperature sensors via IPMI SDR", sensors.len());
         Ok(sensors)

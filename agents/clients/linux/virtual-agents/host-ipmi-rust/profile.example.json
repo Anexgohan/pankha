@@ -2,9 +2,10 @@
   "metadata": {
     "schema_version": "2.0",
     "vendor": "Supermicro",
+    "model_family": ["X10SRL-F"],
     "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
     "author": "Pankha Official",
-    "description": "Supermicro base profile for IPMI fan control."
+    "description": "Supermicro X10 series profile."
   },
   "protocols": {
     "ipmi": {

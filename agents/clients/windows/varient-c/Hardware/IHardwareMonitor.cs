@@ -71,4 +71,10 @@ public interface IHardwareMonitor : IDisposable
     /// Check if full hardware rediscovery is needed (periodic or forced)
     /// </summary>
     bool NeedsFullRediscovery();
+
+    /// <summary>
+    /// Clear cached PWM values so next setFanSpeed is not deduplicated.
+    /// Called on reconnection to ensure backend commands are applied immediately.
+    /// </summary>
+    void ClearFanPwmCache();
 }
