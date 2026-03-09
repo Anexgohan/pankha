@@ -351,7 +351,7 @@ public class WebSocketClient : IDisposable
                 _lastMessageReceived = DateTime.UtcNow; // Update health timestamp
                 _watchdog?.ReportSuccessfulConnection(); // Notify watchdog of healthy connection
 
-                _logger.Debug("📬 Received: Type={Type}, Count={Count}, EndOfMessage={End}",
+                _logger.Debug("Received: Type={Type}, Count={Count}, EndOfMessage={End}",
                     result.MessageType, result.Count, result.EndOfMessage);
 
                 if (result.MessageType == WebSocketMessageType.Close)
