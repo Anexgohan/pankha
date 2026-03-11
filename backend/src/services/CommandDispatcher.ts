@@ -349,6 +349,43 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
+   * Execute raw ipmitool command on agent (for profile builder testing)
+   */
+  public async executeRawIpmi(
+    agentId: string,
+    bytes: string
+  ): Promise<any> {
+    const trimmed = bytes.trim();
+    if (!trimmed) {
+      throw new Error("Empty bytes string");
+    }
+
+    log.info(
+      `Executing raw IPMI command on agent ${agentId}: ${trimmed}`,
+      "CommandDispatcher"
+    );
+
+    return this.sendCommand(
+      agentId,
+      "executeRawIpmi",
+      { bytes: trimmed },
+      "high"
+    );
+  }
+
+  /**
+   * Reload BMC profile on agent (fetches from backend API)
+   */
+  public async reloadProfile(agentId: string): Promise<any> {
+    log.info(
+      `Triggering profile reload on agent ${agentId}`,
+      "CommandDispatcher"
+    );
+
+    return this.sendCommand(agentId, "reloadProfile", {}, "normal");
+  }
+
+  /**
    * Apply a fan profile to a system
    */
   public async applyFanProfile(

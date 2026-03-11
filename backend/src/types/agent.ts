@@ -2,8 +2,10 @@
 export interface AgentConfig {
   agentId: string;
   name: string;
+  agentType?: string; // "os_linux", "os_windows", "ipmi_host", "ipmi_network"
   version: string;
   platform?: string; // "linux", "windows", "macos"
+  architecture?: string; // "x64", "arm64"
   apiEndpoint: string; // 'http://192.168.1.100:8080'
   websocketEndpoint: string; // 'ws://192.168.1.100:8081'
   updateInterval: number; // milliseconds
@@ -95,7 +97,9 @@ export interface FanControlCommand {
     | "setEnableFanControl"
     | "setAgentName"
     | "selfUpdate"
-    | "getDiagnostics";
+    | "getDiagnostics"
+    | "executeRawIpmi"
+    | "reloadProfile";
   payload: {
     fanId?: string;
     speed?: number;
@@ -115,6 +119,7 @@ export interface FanControlCommand {
     enabled?: boolean; // For setEnableFanControl command
     name?: string; // For setAgentName command
     version?: string | null; // For selfUpdate command (hub version, e.g., "v0.3.2")
+    bytes?: string; // For executeRawIpmi command (hex bytes like "0x30 0x70 0x66")
   };
   timestamp: number;
   priority: "low" | "normal" | "high" | "emergency";

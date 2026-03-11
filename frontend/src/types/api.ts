@@ -3,8 +3,10 @@ export interface SystemData {
   id: number;
   name: string;
   agent_id: string;
+  agent_type?: string; // "os_linux", "os_windows", "ipmi_host", "ipmi_network"
   agent_version?: string;
   platform?: string; // "linux", "windows", "macos"
+  architecture?: string; // "x64", "arm64"
   ip_address?: string;
   api_endpoint: string;
   websocket_endpoint: string;

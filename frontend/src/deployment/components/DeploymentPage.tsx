@@ -23,12 +23,17 @@ import {
 import { toast } from '../../utils/toast';
 import { uiOptions, getDefault, getOption, interpolateTooltip } from '../../utils/uiOptions';
 import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL, getHubStatus, stageUpdateToHub, clearHubDownloads, getDeploymentHubConfig, type HubStatus, type DeploymentHubConfig } from '../../services/api';
+import IpmiInstallerCards from './IpmiInstallerCards';
+import IpmiProfileSelector from './IpmiProfileSelector';
+import ProfileBuilder from './ProfileBuilder';
 import '../styles/deployment.css';
 
 type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 type Failsafe = '30' | '50' | '100';
 type PathMode = 'standard' | 'portable';
 type UrlMode = 'internal' | 'external';
+type AgentMode = 'os' | 'ipmi';
+type ProfileMode = 'catalog' | 'custom';
 type MaintenanceSortKey = 'name' | 'agentId' | 'platform' | 'version' | 'status' | 'maintenance';
 type SortDirection = 'asc' | 'desc';
 
@@ -96,31 +101,80 @@ const InstallerSection: React.FC<{
   latestVersion: string | null;
   unstableVersion: string | null;
   githubRepo: string;
-}> = React.memo(({ latestVersion, unstableVersion, githubRepo }) => (
+  agentMode: AgentMode;
+  onAgentModeChange: (mode: AgentMode) => void;
+}> = React.memo(({ latestVersion, unstableVersion, githubRepo, agentMode, onAgentModeChange }) => (
   <section className="deployment-section">
-    <h3><Download size={20} /> Official Installers</h3>
-    <div className="download-options">
-      <div className="installer-card">
-        <h4>
-          <img src="/icons/windows_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Windows Agent
-          <div className="version-tags-row">
-            {latestVersion && <span className="version-tag stable">S {latestVersion}</span>}
-            {unstableVersion && <span className="version-tag unstable">U {unstableVersion}</span>}
-            {!latestVersion && !unstableVersion && <span className="version-tag">Detecting</span>}
+    <div className="installer-header">
+      <h3><Download size={20} /> Official Installers</h3>
+      <div className="toggle-presets agent-mode-toggle">
+        <button
+          className={`toggle-item ${agentMode === 'os' ? 'active' : ''}`}
+          onClick={() => onAgentModeChange('os')}
+        >
+          OS Agents
+        </button>
+        <button
+          className={`toggle-item ${agentMode === 'ipmi' ? 'active' : ''}`}
+          onClick={() => onAgentModeChange('ipmi')}
+        >
+          IPMI Agents
+        </button>
+      </div>
+    </div>
+
+    {agentMode === 'os' ? (
+      <div className="download-options">
+        <div className="installer-card">
+          <h4>
+            <img src="/icons/windows_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Windows Agent
+            <div className="version-tags-row">
+              {latestVersion && <span className="version-tag stable">S {latestVersion}</span>}
+              {unstableVersion && <span className="version-tag unstable">U {unstableVersion}</span>}
+              {!latestVersion && !unstableVersion && <span className="version-tag">Detecting</span>}
+            </div>
+          </h4>
+          <p>Native Windows service with Tray App. Supports Windows 10/11 x64. Self-contained .NET 8.0 execution.</p>
+          <div className="card-actions-row">
+            <a
+              href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`}
+              className="btn-primary-tactical"
+              style={{ flex: 1 }}
+              download
+            >
+              <Download size={16} /> Get Latest Release
+            </a>
+            <a
+              href={`${PANKHA_SITE}/docs/wiki/agents-windows/`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-outline-tactical"
+            >
+              <Server size={16} /> DOCUMENTATION
+            </a>
           </div>
-        </h4>
-        <p>Native Windows service with Tray App. Supports Windows 10/11 x86_64. Self-contained .NET 8.0 execution.</p>
-        <div className="card-actions-row">
+        </div>
+
+        <div className="installer-card">
+          <h4>
+            <img src="/icons/linux_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Linux Setup
+            <div className="version-tags-row">
+              <span className="version-tag stable">STABLE</span>
+              {unstableVersion && <span className="version-tag unstable">PRE-RELEASE</span>}
+            </div>
+          </h4>
+          <p>Systemd service with Rust-based hardware monitoring. Supports Debian, Ubuntu, Proxmox, and RPI.</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
+              <div className="coming-soon-badge">
+                  <span className="badge-dot" />
+                  STANDALONE GUI AGENT COMING SOON
+              </div>
+              <p className="subtitle-note">
+                  Use script-based installation below for current deployments.
+              </p>
+          </div>
           <a
-            href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`}
-            className="btn-primary-tactical"
-            style={{ flex: 1 }}
-            download
-          >
-            <Download size={16} /> Get Latest Release
-          </a>
-          <a
-            href={`${PANKHA_SITE}/docs/wiki/agents-windows/`}
+            href={`${PANKHA_SITE}/docs/wiki/agents-linux/`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-outline-tactical"
@@ -129,35 +183,9 @@ const InstallerSection: React.FC<{
           </a>
         </div>
       </div>
-
-      <div className="installer-card">
-        <h4>
-          <img src="/icons/linux_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Linux Setup
-          <div className="version-tags-row">
-            <span className="version-tag stable">STABLE</span>
-            {unstableVersion && <span className="version-tag unstable">PRE-RELEASE</span>}
-          </div>
-        </h4>
-        <p>Systemd service with Rust-based hardware monitoring. Supports Debian, Ubuntu, Proxmox, and RPI.</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-            <div className="coming-soon-badge">
-                <span className="badge-dot" />
-                STANDALONE GUI AGENT COMING SOON
-            </div>
-            <p className="subtitle-note">
-                Use script-based installation below for current deployments.
-            </p>
-        </div>
-        <a
-          href={`${PANKHA_SITE}/docs/wiki/agents-linux/`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-outline-tactical"
-        >
-          <Server size={16} /> DOCUMENTATION
-        </a>
-      </div>
-    </div>
+    ) : (
+      <IpmiInstallerCards />
+    )}
   </section>
 ));
 
@@ -538,6 +566,9 @@ export const DeploymentPage: React.FC<{
   const [fanStep, setFanStep] = useState(String(getDefault('fanStep')));
   const [hysteresis, setHysteresis] = useState(String(getDefault('hysteresis')));
   const [copiedType, setCopiedType] = useState<'curl' | 'wget' | null>(null);
+  const [agentMode, setAgentMode] = useState<AgentMode>('os');
+  const [profileMode, setProfileMode] = useState<ProfileMode>('catalog');
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
   // Hub URL Configuration - fetched from backend
   const [hubConfig, setHubConfig] = useState<DeploymentHubConfig | null>(null);
@@ -683,10 +714,16 @@ export const DeploymentPage: React.FC<{
 
   // Handle token generation when config changes (debounced)
   useEffect(() => {
+    // Skip token generation for IPMI mode when no profile is selected
+    if (agentMode === 'ipmi' && !selectedProfileId) {
+      setDeploymentToken(null);
+      return;
+    }
+
     const refreshToken = async () => {
       setIsLoadingToken(true);
       try {
-        const config = {
+        const config: Record<string, any> = {
           log_level: logLevel,
           failsafe_speed: parseInt(failsafe),
           emergency_temp: parseFloat(emergency),
@@ -696,6 +733,12 @@ export const DeploymentPage: React.FC<{
           path_mode: pathMode,
           base_url: hubUrl  // User-editable Hub URL for agent connections
         };
+
+        if (agentMode === 'ipmi') {
+          config.agent_type = 'ipmi';
+          config.profile_id = selectedProfileId;
+        }
+
         const response = await createDeploymentTemplate(config);
         setDeploymentToken(response.token);
       } catch (error) {
@@ -708,7 +751,7 @@ export const DeploymentPage: React.FC<{
 
     const timer = setTimeout(refreshToken, 500); // Debounce 500ms
     return () => clearTimeout(timer);
-  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode, hubUrl]);
+  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode, hubUrl, agentMode, selectedProfileId]);
 
   // Clear updating state when agent reconnects
   useEffect(() => {
@@ -731,7 +774,8 @@ export const DeploymentPage: React.FC<{
   const generateCommand = (tool: 'curl' | 'wget') => {
     if (!deploymentToken) return '';
 
-    const url = `${hubUrl}/api/deploy/linux?token=${deploymentToken}`;
+    const endpoint = agentMode === 'ipmi' ? 'ipmi' : 'linux';
+    const url = `${hubUrl}/api/deploy/${endpoint}?token=${deploymentToken}`;
 
     if (tool === 'curl') {
       return `curl -sSL "${url}" | bash`;
@@ -845,10 +889,12 @@ export const DeploymentPage: React.FC<{
       </div>
 
       <div className="deployment-content-grid">
-        <InstallerSection 
-          latestVersion={latestVersion} 
+        <InstallerSection
+          latestVersion={latestVersion}
           unstableVersion={unstableVersion || null}
-          githubRepo={GITHUB_REPO} 
+          githubRepo={GITHUB_REPO}
+          agentMode={agentMode}
+          onAgentModeChange={setAgentMode}
         />
 
         <ActionButton githubRepo={GITHUB_REPO} />
@@ -1043,6 +1089,41 @@ export const DeploymentPage: React.FC<{
               </div>
             </div>
 
+            {agentMode === 'ipmi' && (
+              <div className="profile-selector-section">
+                <div className="builder-group">
+                  <span className="builder-label">BMC Profile</span>
+                  <div className="toggle-presets">
+                    <button
+                      className={`toggle-item ${profileMode === 'catalog' ? 'active' : ''}`}
+                      onClick={() => setProfileMode('catalog')}
+                    >
+                      Select from Catalog
+                    </button>
+                    <button
+                      className={`toggle-item ${profileMode === 'custom' ? 'active' : ''}`}
+                      onClick={() => { setProfileMode('custom'); setSelectedProfileId(null); }}
+                    >
+                      Build Custom Profile
+                    </button>
+                  </div>
+                </div>
+
+                {profileMode === 'catalog' && (
+                  <IpmiProfileSelector
+                    selectedProfileId={selectedProfileId}
+                    onProfileSelect={setSelectedProfileId}
+                  />
+                )}
+
+                {profileMode === 'custom' && (
+                  <p className="profile-builder-hint">
+                    No profile needed for deployment. A bare agent will connect to the hub but won't control fans. Use the Profile Builder below to test commands and create a profile.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="builder-main-grid">
               {/* Row 1: Log Level | Emergency C | Failsafe Speed */}
               <div className="builder-group" title={interpolateTooltip(getOption('logLevel').tooltip, tooltipContext)}>
@@ -1165,6 +1246,10 @@ export const DeploymentPage: React.FC<{
             </div>
           </div>
         </section>
+
+        {agentMode === 'ipmi' && profileMode === 'custom' && (
+          <ProfileBuilder systems={systems} />
+        )}
 
         <MaintenanceSection
           isExpanded={isMaintenanceExpanded}

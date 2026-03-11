@@ -16,6 +16,7 @@ import { CommandDispatcher } from './services/CommandDispatcher';
 import { WebSocketHub } from './services/WebSocketHub';
 import { FanProfileController } from './services/FanProfileController';
 import { DownsamplingService } from './services/DownsamplingService';
+import { ProfileService } from './services/ProfileService';
 
 // Import routes
 import systemsRouter from './routes/systems';
@@ -96,6 +97,10 @@ async function initializeServices() {
 
     // Load existing agents from database
     await agentManager.loadAgentsFromDatabase();
+
+    // Initialize BMC profile catalog (scans backend/profiles/ directory)
+    const profileService = ProfileService.getInstance();
+    profileService.initialize();
 
     // Initialize license manager
     await licenseManager.initialize();

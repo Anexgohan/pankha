@@ -584,8 +584,10 @@ export class WebSocketHub extends EventEmitter {
       const agentConfig = {
         agentId: agentId,
         name: registrationData.name || agentId,
+        agentType: registrationData.agent_type, // "os_linux", "os_windows", "ipmi_host", "ipmi_network"
         version: registrationData.agent_version || "1.0.0-websocket",
         platform: registrationData.platform || "unknown", // "linux", "windows", "macos"
+        architecture: registrationData.architecture, // "x64", "arm64"
         apiEndpoint: `http://${client?.metadata.ip || "unknown"}:8080`, // Mock endpoint
         websocketEndpoint: `ws://${client?.metadata.ip || "unknown"}:8081`, // Mock endpoint
         updateInterval: registrationData.update_interval || 3000, // From client config or default

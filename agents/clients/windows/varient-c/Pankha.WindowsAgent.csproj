@@ -30,6 +30,18 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!-- Compile-time architecture constants derived from RuntimeIdentifier -->
+  <!-- Mirrors Rust's std::env::consts::ARCH — value baked into binary at build time -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.Contains('x64'))">
+    <DefineConstants>$(DefineConstants);ARCH_X86_64</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(RuntimeIdentifier.Contains('arm64'))">
+    <DefineConstants>$(DefineConstants);ARCH_AARCH64</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="$(RuntimeIdentifier.Contains('x86')) AND !$(RuntimeIdentifier.Contains('x64'))">
+    <DefineConstants>$(DefineConstants);ARCH_X86</DefineConstants>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- Hardware Monitoring -->
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.4" />

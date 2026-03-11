@@ -23,8 +23,10 @@ impl super::client::WebSocketClient {
             "data": {
                 "agentId": config.agent.id,
                 "name": config.agent.name,
+                "agent_type": "os_linux",
                 "agent_version": env!("CARGO_PKG_VERSION"),
                 "platform": std::env::consts::OS, // "linux", "macos", "windows", etc.
+                "architecture": crate::app::platform::project_arch(),
                 "update_interval": config.agent.update_interval as u64, // Send in seconds to match frontend/backend format
                 "fan_step_percent": config.hardware.fan_step_percent,
                 "hysteresis_temp": config.hardware.hysteresis_temp,

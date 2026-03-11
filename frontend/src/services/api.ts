@@ -385,6 +385,9 @@ export interface DeploymentConfig {
   fan_step: number;
   hysteresis: number;
   path_mode: 'standard' | 'portable';
+  agent_type?: 'os' | 'ipmi';
+  profile_id?: string;
+  [key: string]: unknown;
 }
 
 export interface DeploymentTemplate {
@@ -393,7 +396,7 @@ export interface DeploymentTemplate {
 }
 
 export const createDeploymentTemplate = async (
-  config: DeploymentConfig
+  config: DeploymentConfig | Record<string, unknown>
 ): Promise<DeploymentTemplate> => {
   const response = await api.post("/api/deploy/templates", { config });
   return response.data;
@@ -410,8 +413,8 @@ export interface HubStatus {
   version: string | null;
   timestamp: string | null;
   files: {
-    x86_64: boolean;
-    aarch64: boolean;
+    x64: boolean;
+    arm64: boolean;
   };
 }
 
@@ -453,5 +456,80 @@ export interface DeploymentHubConfig {
 
 export const getDeploymentHubConfig = async (): Promise<DeploymentHubConfig> => {
   const response = await api.get("/api/config/deployment");
+  return response.data;
+};
+
+// BMC Profile Catalog (IPMI deployment)
+export interface ProfileCatalogZone {
+  id: string;
+  name: string;
+  members?: string[];
+}
+
+export interface ProfileCatalogEntry {
+  vendor: string;
+  model_family: string[];
+  profile_id: string;
+  description: string;
+  author: string;
+  zones: ProfileCatalogZone[];
+  has_read_speed: boolean;
+  speed_translation_type: string;
+}
+
+export interface ProfileCatalog {
+  vendors: {
+    name: string;
+    base_profile: string;
+    models: ProfileCatalogEntry[];
+  }[];
+}
+
+export const getProfileCatalog = async (): Promise<ProfileCatalog> => {
+  const response = await api.get("/api/deploy/profiles");
+  return response.data;
+};
+
+export interface ProfileDetails {
+  matched: boolean;
+  profile_id: string;
+  description: string;
+  author: string;
+  vendor: string;
+  model_family: string[];
+  zones: ProfileCatalogZone[];
+  has_read_speed: boolean;
+  speed_translation_type: string;
+}
+
+export const getProfileDetails = async (vendor: string, model: string): Promise<ProfileDetails> => {
+  const response = await api.get(`/api/deploy/profiles/${vendor}/${model}`);
+  return response.data;
+};
+
+// ─── Profile Builder APIs ───────────────────────────────────────────
+
+export interface RawIpmiResult {
+  success: boolean;
+  data?: {
+    output: string;
+    elapsed_ms: number;
+    bytes: string;
+  };
+  error?: string;
+}
+
+export const executeRawIpmi = async (systemId: number, bytes: string): Promise<RawIpmiResult> => {
+  const response = await api.post(`/api/systems/${systemId}/execute-raw-ipmi`, { bytes });
+  return response.data;
+};
+
+export const saveCustomProfile = async (profile: Record<string, unknown>, filename: string): Promise<{ success: boolean; profile_id: string }> => {
+  const response = await api.post('/api/deploy/profiles/custom', { profile, filename });
+  return response.data;
+};
+
+export const assignProfileToAgent = async (agentId: string, profileId: string): Promise<{ success: boolean }> => {
+  const response = await api.put(`/api/deploy/profiles/assign/${agentId}`, { profile_id: profileId });
   return response.data;
 };

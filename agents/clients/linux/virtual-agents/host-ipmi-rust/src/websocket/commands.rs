@@ -14,6 +14,7 @@ use crate::config::sst::{
     VALID_EMERGENCY_TEMPS, VALID_FAILSAFE_SPEEDS, VALID_FAN_STEPS,
     VALID_HYSTERESIS, VALID_LOG_LEVELS, VALID_UPDATE_INTERVALS,
 };
+use crate::system::executor;
 
 use super::client::WsSink;
 
@@ -163,6 +164,73 @@ impl super::client::WebSocketClient {
                     }
                 });
                 (true, None, serde_json::json!({"message": "Update initiated"}))
+            }
+            "reloadProfile" => {
+                // Fetch fresh profile from backend API and restart hardware monitor
+                let config = self.config.read().await;
+                let result = if let Some(ref ipmi_settings) = config.ipmi {
+                    let profile_url = ipmi_settings.profile_url.clone();
+                    drop(config);
+
+                    let install_dir = std::env::current_exe()
+                        .ok()
+                        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+                        .unwrap_or_else(|| std::path::PathBuf::from("."));
+
+                    match super::profile_fetch::fetch_and_cache_profile(&profile_url, &install_dir).await {
+                        Ok(path) => {
+                            info!("Profile reloaded from API to {:?}. Restart agent to apply.", path);
+                            (true, None, serde_json::json!({"message": "Profile fetched. Restart agent to apply."}))
+                        }
+                        Err(e) => (false, Some(format!("Failed to reload profile: {}", e)), serde_json::json!({})),
+                    }
+                } else {
+                    drop(config);
+                    (false, Some("No IPMI settings configured (missing ipmi section in config.json)".to_string()), serde_json::json!({}))
+                };
+                result
+            }
+            "executeRawIpmi" => {
+                // Execute arbitrary ipmitool raw command for profile builder testing.
+                // Payload: { "bytes": "0x30 0x70 0x66 0x01 0x00 0x32" }
+                if let Some(bytes) = payload.get("bytes").and_then(|v| v.as_str()) {
+                    let trimmed = bytes.trim();
+                    if trimmed.is_empty() {
+                        (false, Some("Empty bytes string".to_string()), serde_json::json!({}))
+                    } else {
+                        // Validate format: must be space-separated hex tokens (0xNN or NN)
+                        let valid = trimmed.split_whitespace().all(|token| {
+                            let hex = token.strip_prefix("0x").or_else(|| token.strip_prefix("0X")).unwrap_or(token);
+                            hex.len() <= 2 && hex.chars().all(|c| c.is_ascii_hexdigit())
+                        });
+                        if !valid {
+                            (false, Some("Invalid hex format. Expected space-separated hex bytes like: 0x30 0x70 0x66".to_string()), serde_json::json!({}))
+                        } else {
+                            let start = std::time::Instant::now();
+                            match executor::run_ipmitool_raw(trimmed).await {
+                                Ok(output) => {
+                                    let elapsed_ms = start.elapsed().as_millis();
+                                    info!("executeRawIpmi OK: {} -> {:?} ({}ms)", trimmed, output.trim(), elapsed_ms);
+                                    (true, None, serde_json::json!({
+                                        "output": output.trim(),
+                                        "elapsed_ms": elapsed_ms,
+                                        "bytes": trimmed
+                                    }))
+                                }
+                                Err(e) => {
+                                    let elapsed_ms = start.elapsed().as_millis();
+                                    warn!("executeRawIpmi FAILED: {} -> {} ({}ms)", trimmed, e, elapsed_ms);
+                                    (false, Some(e.to_string()), serde_json::json!({
+                                        "elapsed_ms": elapsed_ms,
+                                        "bytes": trimmed
+                                    }))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    (false, Some("Missing 'bytes' in payload".to_string()), serde_json::json!({}))
+                }
             }
             "ping" => (true, None, serde_json::json!({"pong": true})),
             "getDiagnostics" => {

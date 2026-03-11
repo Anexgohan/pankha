@@ -348,3 +348,44 @@ BEGIN
     RAISE NOTICE 'Migration: Added zone_id column to fans table for IPMI zone-aware fan control';
   END IF;
 END $$;
+
+-- Migration: Add agent_type column to systems table (OS vs IPMI agent detection)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'systems' AND column_name = 'agent_type'
+  ) THEN
+    ALTER TABLE systems ADD COLUMN agent_type VARCHAR(20) DEFAULT 'os';
+    RAISE NOTICE 'Migration: Added agent_type column to systems table';
+  END IF;
+END $$;
+
+-- Migration: Add profile_id column to systems table (BMC profile assignment for IPMI agents)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'systems' AND column_name = 'profile_id'
+  ) THEN
+    ALTER TABLE systems ADD COLUMN profile_id VARCHAR(100);
+    RAISE NOTICE 'Migration: Added profile_id column to systems table for BMC profile assignment';
+  END IF;
+END $$;
+
+-- Migration: Add architecture column to systems table (CPU architecture reported by agent)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'systems' AND column_name = 'architecture'
+  ) THEN
+    ALTER TABLE systems ADD COLUMN architecture VARCHAR(20);
+    RAISE NOTICE 'Migration: Added architecture column to systems table';
+  END IF;
+END $$;
+
+-- Migration: Normalize legacy agent_type values ('os' → 'os_linux', 'ipmi' → 'ipmi_host')
+-- Old agents reported no type; backend defaulted to 'os' or 'ipmi'. New agents self-report full type.
+UPDATE systems SET agent_type = 'os_linux' WHERE agent_type = 'os' AND (platform = 'linux' OR platform = 'unknown');
+UPDATE systems SET agent_type = 'os_windows' WHERE agent_type = 'os' AND platform = 'windows';
+UPDATE systems SET agent_type = 'ipmi_host' WHERE agent_type = 'ipmi';

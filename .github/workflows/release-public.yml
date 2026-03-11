@@ -30,7 +30,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: x86_64
+          - arch: x64
             target: x86_64-unknown-linux-gnu
             runner: ubuntu-22.04
           - arch: arm64
@@ -231,11 +231,11 @@ jobs:
           fi
 
       # Download all artifacts
-      - name: Download x86_64 agent
+      - name: Download x64 agent
         uses: actions/download-artifact@v4
         with:
-          name: pankha-agent-x86_64
-          path: artifacts/x86_64
+          name: pankha-agent-x64
+          path: artifacts/x64
 
       - name: Download ARM64 agent
         uses: actions/download-artifact@v4
@@ -358,7 +358,7 @@ jobs:
         run: |
           mkdir -p agents/releases/linux
 
-          cp release-assets/pankha-agent-linux_x86_64 agents/releases/linux/
+          cp release-assets/pankha-agent-linux_x64 agents/releases/linux/
           cp release-assets/pankha-agent-linux_arm64 agents/releases/linux/
           cp release-assets/config.example.json agents/releases/linux/
 
@@ -393,7 +393,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           generate_release_notes: true
           files: |
-            release-assets/pankha-agent-linux_x86_64
+            release-assets/pankha-agent-linux_x64
             release-assets/pankha-agent-linux_arm64
             release-assets/pankha-agent-windows_x64.msi
             release-assets/config.example.json
@@ -431,9 +431,9 @@ jobs:
             ## Quick Start (Pankha Agents)
             
             ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agents
-            #### ![Intel x86_64](https://img.shields.io/badge/CPU-x86__64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x86_64](https://img.shields.io/badge/CPU-x86__64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x86_64 systems:
+            #### ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x64 systems:
             ```bash
-            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x86_64
+            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x64
             chmod +x pankha-agent
             ./pankha-agent --setup
             ./pankha-agent --start
@@ -498,7 +498,7 @@ jobs:
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Release Assets:**" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ pankha-agent-linux_x86_64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ pankha-agent-linux_x64" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ pankha-agent-linux_arm64" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ pankha-agent-windows_x64.msi" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ config.example.json" >> $GITHUB_STEP_SUMMARY
@@ -511,6 +511,6 @@ jobs:
           echo "- [Docker Hub](https://hub.docker.com/r/anexgohan/pankha)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ⚡ Build Performance:" >> $GITHUB_STEP_SUMMARY
-          echo "- Rust agents: Native builds (x86_64 + ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- Rust agents: Native builds (x64 + ARM64)" >> $GITHUB_STEP_SUMMARY
           echo "- Docker images: Native builds (NO QEMU!)" >> $GITHUB_STEP_SUMMARY
           echo "- Windows agent: Native build" >> $GITHUB_STEP_SUMMARY

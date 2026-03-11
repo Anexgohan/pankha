@@ -118,11 +118,14 @@ export class AgentManager extends EventEmitter {
   public async registerAgent(agentConfig: AgentConfig): Promise<void> {
     try {
       // Store agent configuration in database
+      // Use self-reported agent_type if provided, otherwise detect from capabilities
+      const agentType = agentConfig.agentType || this.detectAgentType(agentConfig.capabilities);
+
       const sql = `
         INSERT INTO systems (
           name, agent_id, ip_address, api_endpoint, websocket_endpoint,
-          agent_version, platform, status, capabilities, last_seen
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'online', $8, CURRENT_TIMESTAMP)
+          agent_version, platform, architecture, status, capabilities, agent_type, last_seen
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'online', $9, $10, CURRENT_TIMESTAMP)
         ON CONFLICT (agent_id) DO UPDATE SET
           name = EXCLUDED.name,
           ip_address = EXCLUDED.ip_address,
@@ -130,8 +133,10 @@ export class AgentManager extends EventEmitter {
           websocket_endpoint = EXCLUDED.websocket_endpoint,
           agent_version = EXCLUDED.agent_version,
           platform = EXCLUDED.platform,
+          architecture = EXCLUDED.architecture,
           status = 'online',
           capabilities = EXCLUDED.capabilities,
+          agent_type = EXCLUDED.agent_type,
           last_seen = CURRENT_TIMESTAMP
       `;
 
@@ -145,7 +150,9 @@ export class AgentManager extends EventEmitter {
         agentConfig.websocketEndpoint,
         agentConfig.version,
         agentConfig.platform || 'unknown',
+        agentConfig.architecture || null,
         JSON.stringify(agentConfig.capabilities),
+        agentType,
       ]);
 
       // Store in memory
@@ -491,6 +498,22 @@ export class AgentManager extends EventEmitter {
     } catch {
       return "unknown";
     }
+  }
+
+  /**
+   * Detect agent type from capabilities (fallback when agent doesn't self-report).
+   * IPMI agents report sensors with source: "ipmi_sdr".
+   * OS agents use sysfs/WMI and don't have this field.
+   */
+  private detectAgentType(capabilities: any): string {
+    if (!capabilities) return 'os_linux';
+
+    const sensors = capabilities.sensors || [];
+    const hasIpmiSensor = sensors.some(
+      (s: any) => s.source === 'ipmi_sdr'
+    );
+
+    return hasIpmiSensor ? 'ipmi_host' : 'os_linux';
   }
 
   /**

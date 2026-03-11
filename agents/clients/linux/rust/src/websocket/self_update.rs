@@ -43,7 +43,7 @@ impl super::client::WebSocketClient {
             info!("🚀 Starting self-update (no version specified, forcing reinstall)");
         }
 
-        let arch = std::env::consts::ARCH;
+        let arch = crate::app::platform::project_arch();
         let server_url = self.config.read().await.backend.server_url.clone();
 
         // Convert ws://host:port/websocket to http://host:port

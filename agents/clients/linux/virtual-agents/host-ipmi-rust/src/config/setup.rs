@@ -186,6 +186,7 @@ pub async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
             emergency_temp: 85.0,
             failsafe_speed,
         },
+        ipmi: None,
         logging: LoggingSettings {
             enable_file_logging: true,
             log_file: "/var/log/pankha-agent/agent.log".to_string(),

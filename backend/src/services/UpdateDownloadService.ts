@@ -8,8 +8,8 @@ export interface UpdateStatus {
   version: string | null;
   timestamp: string | null;
   files: {
-    x86_64: boolean;
-    aarch64: boolean;
+    x64: boolean;
+    arm64: boolean;
   };
   checksums: {
     [key: string]: string;
@@ -60,8 +60,8 @@ export class UpdateDownloadService {
       version: null,
       timestamp: null,
       files: {
-        x86_64: this.fileExists('pankha-agent-linux_x86_64'),
-        aarch64: this.fileExists('pankha-agent-linux_arm64')
+        x64: this.fileExists('pankha-agent-linux_x64'),
+        arm64: this.fileExists('pankha-agent-linux_arm64')
       },
       checksums: {}
     };
@@ -78,8 +78,8 @@ export class UpdateDownloadService {
     const baseUrl = `https://github.com/Anexgohan/pankha/releases/download/${tag}/`;
 
     const targets = [
-      { arch: 'x86_64', filename: 'pankha-agent-linux_x86_64' },
-      { arch: 'aarch64', filename: 'pankha-agent-linux_arm64' }
+      { arch: 'x64', filename: 'pankha-agent-linux_x64' },
+      { arch: 'arm64', filename: 'pankha-agent-linux_arm64' }
     ];
 
     try {
@@ -129,8 +129,8 @@ export class UpdateDownloadService {
         version: tag,
         timestamp: new Date().toISOString(),
         files: {
-          x86_64: true,
-          aarch64: true
+          x64: true,
+          arm64: true
         },
         checksums: checksumMap
       };
@@ -145,7 +145,7 @@ export class UpdateDownloadService {
   }
 
   public getBinaryPath(arch: string): string | null {
-    const filename = arch === 'x86_64' ? 'pankha-agent-linux_x86_64' : 'pankha-agent-linux_arm64';
+    const filename = `pankha-agent-linux_${arch}`;
     const filePath = path.join(this.updatesDir, filename);
     return fs.existsSync(filePath) ? filePath : null;
   }
@@ -244,7 +244,7 @@ export class UpdateDownloadService {
       const emptyStatus: UpdateStatus = {
         version: null,
         timestamp: null,
-        files: { x86_64: false, aarch64: false },
+        files: { x64: false, arm64: false },
         checksums: {}
       };
       fs.writeFileSync(this.statusFile, JSON.stringify(emptyStatus, null, 2));

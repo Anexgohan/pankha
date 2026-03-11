@@ -34,9 +34,9 @@ stateDiagram-v2
 
 Download the binary for your architecture from the [Releases Page](https://github.com/Anexgohan/pankha/releases).
 
-**x86_64 (Intel/AMD)**:
+**x64 (Intel/AMD)**:
 ```bash
-wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
 chmod +x pankha-agent
 ```
 

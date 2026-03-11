@@ -4,9 +4,31 @@ import Database from '../database/database';
 import crypto from 'crypto';
 import fs from 'fs';
 import UpdateDownloadService from '../services/UpdateDownloadService';
+import deployProfilesRouter from './deploy-profiles';
 
 const router = Router();
 const db = Database.getInstance();
+
+/**
+ * Shell snippet: detects uname -m and maps to project vocabulary (x64, arm64, etc.)
+ * Sets RAW_ARCH and ARCH variables. Single source of truth for install scripts.
+ */
+const SHELL_ARCH_DETECT = `# Detect architecture and map to project vocabulary
+RAW_ARCH=$(uname -m)
+case "$RAW_ARCH" in
+    x86_64)  ARCH="x64" ;;
+    aarch64) ARCH="arm64" ;;
+    i686|i386) ARCH="x86" ;;
+    armv7l)  ARCH="arm32" ;;
+    *)
+        echo "ERROR: Unsupported architecture: $RAW_ARCH"
+        echo "Supported: x86_64 (x64), aarch64 (arm64)"
+        exit 1
+        ;;
+esac`;
+
+// Mount profiles sub-router at /api/deploy/profiles/*
+router.use('/profiles', deployProfilesRouter);
 
 /**
  * POST /api/deploy/templates
@@ -188,7 +210,7 @@ router.get('/binaries/:arch', (req, res) => {
     } else {
       message += `Version ${status.version} is staged, but the "${arch}" binary is missing.\n\n`;
       message += `FIX: Re-stage the version in the Pankha dashboard → Deployment → "Agent Downloads".\n`;
-      message += `     Ensure both x86_64 and aarch64 binaries are downloaded.\n`;
+      message += `     Ensure both x64 and arm64 binaries are downloaded.\n`;
     }
 
     return res.status(404).type('text/plain').send(message);
@@ -196,6 +218,270 @@ router.get('/binaries/:arch', (req, res) => {
 
   res.download(filePath, `pankha-agent-linux_${arch}`);
 });
+
+/**
+ * GET /api/deploy/ipmi
+ * Returns dynamic install.sh script for IPMI agents
+ */
+router.get('/ipmi', async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return res.status(400).send('Error: Token is required');
+    }
+
+    const result = await db.all(
+      'SELECT config FROM deployment_templates WHERE token = $1 AND expires_at > NOW()',
+      [token]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).send('Error: Invalid or expired token');
+    }
+
+    const config = result[0].config;
+    await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
+
+    // Determine the Hub address (same logic as /linux endpoint)
+    const hubIp = process.env.PANKHA_HUB_IP;
+    const requestHost = req.headers.host;
+    const protocol = req.headers['x-forwarded-proto'] || 'http';
+
+    const externalPort = process.env.PANKHA_PORT;
+    const hostParts = requestHost?.split(':');
+    const requestPort = hostParts && hostParts.length > 1 ? hostParts[1] : null;
+    const activePort = externalPort || requestPort;
+
+    let hubHost: string;
+    if (hubIp) {
+      hubHost = activePort ? `${hubIp}:${activePort}` : hubIp;
+    } else if (config.base_url) {
+      const url = new URL(config.base_url);
+      hubHost = url.host;
+    } else if (requestHost && !requestHost.includes('localhost') && !requestHost.includes('127.0.0.1')) {
+      hubHost = requestHost;
+    } else {
+      hubHost = `[YOUR_SERVER_IP]${activePort ? `:${activePort}` : ''}`;
+    }
+
+    const backendUrl = `${protocol}://${hubHost}`;
+    const wsUrl = `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hubHost}/websocket`;
+    const localBinaryBase = `${backendUrl}/api/deploy/binaries`;
+
+    const script = generateIpmiInstallScript(config, backendUrl, wsUrl, localBinaryBase);
+
+    res.setHeader('Content-Type', 'text/x-shellscript');
+    res.send(script);
+  } catch (error) {
+    log.error('Failed to serve IPMI install script:', 'deploy', error);
+    res.status(500).send('Error: Internal server error');
+  }
+});
+
+function generateIpmiInstallScript(config: any, backendUrl: string, wsUrl: string, localBinaryBase: string): string {
+  const {
+    path_mode,
+    log_level,
+    failsafe_speed,
+    emergency_temp,
+    update_interval,
+    fan_step,
+    hysteresis,
+    profile_id
+  } = config;
+
+  const isPortable = path_mode === 'portable';
+  const installDirValue = isPortable ? '$(pwd)' : '/opt/pankha-agent';
+  const logFileValue = isPortable ? '$(pwd)/agent.log' : '/var/log/pankha-agent/agent.log';
+
+  return `#!/bin/bash
+# Pankha IPMI Agent Automated Installer
+# Generated dynamically by Pankha Backend
+
+set -e
+
+echo "==============================================="
+echo "  Pankha IPMI Agent Installer"
+echo "==============================================="
+echo ""
+
+INSTALL_DIR="${installDirValue}"
+LOG_LEVEL="${log_level || 'INFO'}"
+FAILSAFE_SPEED="${failsafe_speed || 70}"
+EMERGENCY_TEMP="${emergency_temp || 80}"
+UPDATE_INTERVAL="${update_interval || 3.0}"
+FAN_STEP="${fan_step || 5}"
+HYSTERESIS="${hysteresis || 3.0}"
+WS_URL="${wsUrl}"
+BACKEND_URL="${backendUrl}"
+LOG_FILE="${logFileValue}"
+PROFILE_ID="${profile_id || ''}"
+
+# Helper for conditional sudo
+run_as_root() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        echo "Warning: 'sudo' not found and not root. Attempting command anyway..."
+        "$@"
+    fi
+}
+
+echo "[1/6] Install directory: $INSTALL_DIR"
+echo "      WebSocket URL: $WS_URL"
+echo "      BMC Profile: $PROFILE_ID"
+echo ""
+
+# Create directories if not portable
+if [ "$INSTALL_DIR" != "$(pwd)" ]; then
+    echo "[2/6] Creating directories..."
+    run_as_root mkdir -p "$INSTALL_DIR"
+    run_as_root mkdir -p /var/log/pankha-agent
+    run_as_root mkdir -p /run/pankha-agent
+    run_as_root chown -R "$(whoami)" /var/log/pankha-agent 2>/dev/null || true
+else
+    echo "[2/6] Portable mode - using current directory"
+fi
+
+${SHELL_ARCH_DETECT}
+
+BINARY_URL="${localBinaryBase}/$ARCH"
+
+echo "[3/6] Detected architecture: $RAW_ARCH → $ARCH"
+
+echo "      Downloading from local server: $BINARY_URL"
+echo ""
+
+# Download binary
+DOWNLOAD_RESPONSE=$(mktemp)
+HTTP_CODE=$(curl -sSL -w "%{http_code}" "$BINARY_URL" -o "$DOWNLOAD_RESPONSE" 2>&1)
+
+if [ "$HTTP_CODE" != "200" ]; then
+    echo ""
+    echo "ERROR: Failed to download agent binary (HTTP $HTTP_CODE)"
+    echo ""
+    cat "$DOWNLOAD_RESPONSE" 2>/dev/null
+    rm -f "$DOWNLOAD_RESPONSE"
+    exit 1
+fi
+
+if [ "$INSTALL_DIR" = "$(pwd)" ]; then
+    mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
+    chmod +x "$INSTALL_DIR/pankha-agent"
+else
+    run_as_root mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
+    run_as_root chmod +x "$INSTALL_DIR/pankha-agent"
+fi
+
+echo "[4/6] Generating IPMI configuration..."
+
+# Generate unique agent ID
+AGENT_ID="ipmi-$(hostname)-$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)"
+
+# Write config.json (IPMI agent config includes profile_id)
+CONFIG_CONTENT='{
+  "agent": {
+    "name": "'$(hostname)'",
+    "id": "'$AGENT_ID'",
+    "agent_type": "ipmi",
+    "update_interval": '$UPDATE_INTERVAL',
+    "log_level": "'$LOG_LEVEL'"
+  },
+  "backend": {
+    "server_url": "'$WS_URL'",
+    "api_url": "'$BACKEND_URL'",
+    "reconnect_interval": 5.0,
+    "max_reconnect_attempts": -1,
+    "connection_timeout": 10.0
+  },
+  "hardware": {
+    "enable_fan_control": true,
+    "enable_sensor_monitoring": true,
+    "fan_step_percent": '$FAN_STEP',
+    "hysteresis_temp": '$HYSTERESIS',
+    "emergency_temp": '$EMERGENCY_TEMP',
+    "failsafe_speed": '$FAILSAFE_SPEED'
+  },
+  "ipmi": {
+    "profile_id": "'$PROFILE_ID'",
+    "profile_url": "'$BACKEND_URL'/api/deploy/profiles/assigned/'$AGENT_ID'"
+  },
+  "logging": {
+    "enable_file_logging": true,
+    "log_file": "'$LOG_FILE'",
+    "max_log_size_mb": 10,
+    "log_retention_days": 7
+  }
+}'
+
+if [ "$INSTALL_DIR" = "$(pwd)" ]; then
+    echo "$CONFIG_CONTENT" > "$INSTALL_DIR/config.json"
+else
+    echo "$CONFIG_CONTENT" | run_as_root tee "$INSTALL_DIR/config.json" > /dev/null
+fi
+
+echo "      Agent ID: $AGENT_ID"
+echo "      Profile: $PROFILE_ID"
+echo ""
+
+# Setup systemd service
+echo "[5/6] Setting up systemd service..."
+if command -v systemctl >/dev/null 2>&1; then
+    run_as_root "$INSTALL_DIR/pankha-agent" --install-service
+    run_as_root systemctl daemon-reload
+    run_as_root systemctl enable pankha-agent
+    run_as_root systemctl restart pankha-agent
+else
+    echo "  Systemd not found. Start agent manually after profile assignment:"
+    echo "    $INSTALL_DIR/pankha-agent --start"
+fi
+
+# Assign BMC profile to agent via backend API
+echo "[6/6] Assigning BMC profile..."
+ASSIGN_OK=false
+for i in 1 2 3 4 5; do
+    sleep 2
+    ASSIGN_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \\
+      "$BACKEND_URL/api/deploy/profiles/assign/$AGENT_ID" \\
+      -H "Content-Type: application/json" \\
+      -d '{"profile_id":"'$PROFILE_ID'"}')
+    if [ "$ASSIGN_CODE" = "200" ]; then
+        ASSIGN_OK=true
+        break
+    fi
+    echo "      Waiting for agent registration... (attempt $i/5)"
+done
+
+echo ""
+echo "==============================================="
+echo "  IPMI Agent Installation Complete!"
+echo "==============================================="
+echo ""
+echo "  Install path:  $INSTALL_DIR"
+echo "  Agent ID:      $AGENT_ID"
+echo "  BMC Profile:   $PROFILE_ID"
+echo "  Backend:       $WS_URL"
+
+if [ "$ASSIGN_OK" = "true" ]; then
+    echo "  Profile:       Assigned successfully"
+else
+    echo "  Profile:       Assignment pending (assign manually in dashboard)"
+fi
+
+echo ""
+if command -v systemctl >/dev/null 2>&1; then
+    echo "  Commands:"
+    echo "    Status:   systemctl status pankha-agent"
+    echo "    Logs:     journalctl -u pankha-agent -f"
+    echo "    Stop:     systemctl stop pankha-agent"
+    echo "    Restart:  systemctl restart pankha-agent"
+    echo ""
+fi
+`;
+}
 
 function generateInstallScript(config: any, backendUrl: string, wsUrl: string, localBinaryBase: string): string {
   const {
@@ -260,21 +546,11 @@ else
     echo "[2/5] Portable mode - using current directory"
 fi
 
-# Detect architecture
-ARCH=$(uname -m)
-BINARY_URL=""
+${SHELL_ARCH_DETECT}
 
-echo "[3/5] Detecting architecture: $ARCH"
+BINARY_URL="${localBinaryBase}/$ARCH"
 
-if [ "$ARCH" = "x86_64" ]; then
-    BINARY_URL="${localBinaryBase}/x86_64"
-elif [ "$ARCH" = "aarch64" ]; then
-    BINARY_URL="${localBinaryBase}/aarch64"
-else
-    echo "ERROR: Unsupported architecture: $ARCH"
-    echo "Supported: x86_64, aarch64"
-    exit 1
-fi
+echo "[3/5] Detected architecture: $RAW_ARCH → $ARCH"
 
 echo "      Downloading from local server: $BINARY_URL"
 echo ""

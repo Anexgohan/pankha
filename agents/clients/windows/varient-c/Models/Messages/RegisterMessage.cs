@@ -25,11 +25,25 @@ public class RegisterData
     [JsonProperty("name")]
     public string Name { get; set; } = string.Empty;
 
+    [JsonProperty("agent_type")]
+    public string AgentType { get; set; } = "os_windows";
+
     [JsonProperty("agent_version")]
     public string AgentVersion { get; set; } = "1.0.0-windows";
 
     [JsonProperty("platform")]
     public string Platform { get; set; } = "windows";
+
+    [JsonProperty("architecture")]
+#if ARCH_X86_64
+    public string Architecture { get; set; } = "x64";
+#elif ARCH_AARCH64
+    public string Architecture { get; set; } = "arm64";
+#elif ARCH_X86
+    public string Architecture { get; set; } = "x86";
+#else
+    public string Architecture { get; set; } = "unknown";
+#endif
 
     [JsonProperty("update_interval")]
     public double UpdateInterval { get; set; } // milliseconds

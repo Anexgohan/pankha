@@ -1764,4 +1764,45 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
   }
 });
 
+// ============================================================
+// Profile Builder: Execute raw IPMI command on agent
+// ============================================================
+router.post("/:id/execute-raw-ipmi", async (req: Request, res: Response) => {
+  try {
+    const system = await db.get(
+      "SELECT agent_id FROM systems WHERE id = $1",
+      [req.params.id]
+    );
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+
+    const { bytes } = req.body;
+    if (!bytes || typeof bytes !== "string" || !bytes.trim()) {
+      return res.status(400).json({ error: "Missing or empty 'bytes' field" });
+    }
+
+    log.info(
+      `Profile Builder: executing raw IPMI on ${system.agent_id}: ${bytes}`,
+      "systems"
+    );
+
+    const result = await commandDispatcher.executeRawIpmi(
+      system.agent_id,
+      bytes.trim()
+    );
+
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    log.error(
+      `Raw IPMI execution failed on system ${req.params.id}:`,
+      "systems",
+      error
+    );
+    res.status(500).json({
+      error: error.message || "Failed to execute raw IPMI command",
+    });
+  }
+});
+
 export default router;

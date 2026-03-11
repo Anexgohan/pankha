@@ -4,7 +4,7 @@ use clap::Parser;
 
 pub const HELP_TEXT: &str = "
 Pankha Cross-Platform Hardware Monitoring Agent
-Usage: pankha-agent-linux_x86_64 [OPTIONS]
+Usage: pankha-agent [OPTIONS]
 
 Options:
   -h, --help                    Print help

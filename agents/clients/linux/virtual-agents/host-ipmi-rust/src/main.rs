@@ -262,6 +262,23 @@ async fn main() -> Result<()> {
     // Load configuration
     let config = load_config(None).await?;
 
+    // If IPMI settings exist with a profile_url, fetch the profile from backend API
+    // before creating the hardware monitor (so it loads the fresh profile from disk)
+    if let Some(ref ipmi_settings) = config.ipmi {
+        let install_dir = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .to_path_buf();
+
+        match websocket::profile_fetch::fetch_and_cache_profile(
+            &ipmi_settings.profile_url,
+            &install_dir,
+        ).await {
+            Ok(path) => info!("BMC profile ready at {:?}", path),
+            Err(e) => warn!("Profile fetch failed: {}. Agent will use --profile flag or existing profile.json", e),
+        }
+    }
+
     // Create IPMI hardware monitor (keep concrete type for reset_to_factory on shutdown)
     let ipmi_monitor = Arc::new(IpmiHardwareMonitor::new(config.hardware.clone()));
     let hardware_monitor: Arc<dyn HardwareMonitor> = ipmi_monitor.clone();

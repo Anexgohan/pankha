@@ -144,15 +144,15 @@ That's it! The backend is now running with:
 ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agent (Rust)
 **Performance**: Single binary, <10MB RAM, <1% CPU. Zero dependencies.
 
-## ![Intel x86_64](https://img.shields.io/badge/CPU-x86__64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x86_64](https://img.shields.io/badge/CPU-x86__64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x86_64 systems:
+## ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x64 systems:
   - With wget
     ```bash
-    wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+    wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
     chmod +x pankha-agent
     ```
   - Or, With curl
     ```bash
-    curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x86_64
+    curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
     chmod +x pankha-agent
     ```
   ***Configure and manage the agent using the following commands:***
