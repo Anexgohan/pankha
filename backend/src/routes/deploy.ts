@@ -189,26 +189,24 @@ router.delete('/hub/clear', async (req, res) => {
 });
 
 /**
- * GET /api/deploy/binaries/:arch
- * Serves the locally cached agent binary
+ * Shared binary serving logic for both new and legacy routes
  */
-router.get('/binaries/:arch', (req, res) => {
-  const { arch } = req.params;
+function serveBinary(req: any, res: any, agentType: string, arch: string): void {
   const updateService = UpdateDownloadService.getInstance();
-  const filePath = updateService.getBinaryPath(arch);
+  const filePath = updateService.getBinaryPath(agentType, arch);
 
   if (!filePath || !fs.existsSync(filePath)) {
     const status = updateService.getLocalStatus();
     const hasAnyVersion = status && status.version;
 
-    let message = `ERROR: Agent binary not found for architecture "${arch}".\n\n`;
+    let message = `ERROR: Agent binary not found for type "${agentType}", architecture "${arch}".\n\n`;
     if (!hasAnyVersion) {
       message += `No agent version has been staged on this Hub server yet.\n\n`;
       message += `FIX: Open the Pankha dashboard → Deployment page → "Agent Downloads" section,\n`;
       message += `     then click "Stable" or "Unstable" to download the agent binary to the Hub.\n`;
       message += `     After staging completes, re-run this install command.\n`;
     } else {
-      message += `Version ${status.version} is staged, but the "${arch}" binary is missing.\n\n`;
+      message += `Version ${status.version} is staged, but the "${agentType}/${arch}" binary is missing.\n\n`;
       message += `FIX: Re-stage the version in the Pankha dashboard → Deployment → "Agent Downloads".\n`;
       message += `     Ensure both x64 and arm64 binaries are downloaded.\n`;
     }
@@ -216,7 +214,24 @@ router.get('/binaries/:arch', (req, res) => {
     return res.status(404).type('text/plain').send(message);
   }
 
-  res.download(filePath, `pankha-agent-linux_${arch}`);
+  res.download(filePath, `pankha-agent-${agentType}_${arch}`);
+}
+
+/**
+ * GET /api/deploy/binaries/:agentType/:arch
+ * Serves the correct binary for a specific agent type and architecture
+ */
+router.get('/binaries/:agentType/:arch', (req, res) => {
+  const { agentType, arch } = req.params;
+  serveBinary(req, res, agentType, arch);
+});
+
+/**
+ * GET /api/deploy/binaries/:arch
+ * Legacy route — defaults to os_linux for backward compatibility with older agents
+ */
+router.get('/binaries/:arch', (req, res) => {
+  serveBinary(req, res, 'os_linux', req.params.arch);
 });
 
 /**

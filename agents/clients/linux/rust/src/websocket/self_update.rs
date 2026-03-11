@@ -48,7 +48,7 @@ impl super::client::WebSocketClient {
 
         // Convert ws://host:port/websocket to http://host:port
         let base_url = server_url.replace("ws://", "http://").replace("/websocket", "");
-        let download_url = format!("{}/api/deploy/binaries/{}", base_url, arch);
+        let download_url = format!("{}/api/deploy/binaries/os_linux/{}", base_url, arch);
 
         let current_exe = std::env::current_exe()?;
         let exe_dir = current_exe.parent()

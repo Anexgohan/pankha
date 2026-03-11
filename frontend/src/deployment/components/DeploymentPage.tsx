@@ -267,17 +267,51 @@ const MaintenanceSection: React.FC<{
   const getStatusLabel = (system: any) =>
     updatingAgents.has(system.id) ? 'UPDATING' : (system.status === 'online' ? 'ONLINE' : 'OFFLINE');
 
-  const normalizeVersion = (version?: string) => (version || '0.0.0').replace(/^v/, '').replace(/-.*$/, '');
+  /**
+   * Parse pre-release tag into a comparable number based on GitHub workflow definition.
+   * Ranks: stable (Infinity) > rc > beta > alpha > dev/nightly/etc.
+   */
+  const parsePreRelease = (version: string): number => {
+    // No pre-release suffix = stable release, ranks highest
+    if (!version.includes('-')) return Infinity;
+
+    const suffix = version.split('-')[1]?.toLowerCase() || '';
+
+    // Extract any trailing numbers (e.g., rc2 -> 2)
+    const numMatch = suffix.match(/\d+$/);
+    const num = numMatch ? parseInt(numMatch[0], 10) : 0;
+
+    // Base weights for different types of pre-releases
+    let weight = 0;
+    if (suffix.startsWith('rc')) weight = 8000;
+    else if (suffix.startsWith('beta')) weight = 7000;
+    else if (suffix.startsWith('alpha')) weight = 6000;
+    else if (suffix.startsWith('pre') || suffix.startsWith('preview')) weight = 5000;
+    else if (suffix.startsWith('insiders')) weight = 4000;
+    else if (suffix.startsWith('experimental')) weight = 3000;
+    else if (suffix.startsWith('canary')) weight = 2000;
+    else if (suffix.startsWith('dev')) weight = 1000;
+    else if (suffix.startsWith('nightly')) weight = 500;
+    else weight = 100; // any other unknown suffix
+
+    return weight + num;
+  };
+
+  const stripPreRelease = (version: string): string =>
+    (version || '0.0.0').replace(/^v/, '').replace(/-.*$/, '');
 
   const compareSemver = (a: string, b: string): number => {
-    const pa = a.split('.').map(Number);
-    const pb = b.split('.').map(Number);
+    const cleanA = (a || '0.0.0').replace(/^v/, '');
+    const cleanB = (b || '0.0.0').replace(/^v/, '');
+    const pa = stripPreRelease(cleanA).split('.').map(Number);
+    const pb = stripPreRelease(cleanB).split('.').map(Number);
     for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
       const na = pa[i] || 0;
       const nb = pb[i] || 0;
       if (na !== nb) return na - nb;
     }
-    return 0;
+    // Base versions equal — compare pre-release: rc2 < rc3 < stable
+    return parsePreRelease(cleanA) - parsePreRelease(cleanB);
   };
 
   const getMaintenanceLabel = (system: any) => {
@@ -285,8 +319,8 @@ const MaintenanceSection: React.FC<{
     const hubVer = hubStatus?.version?.replace('v', '') || '';
     const stableVer = stableVersion?.replace('v', '') || '';
     const cleanTarget = isWindows ? stableVer : (hubVer || stableVer);
-    const isMismatch = cleanTarget && system.agent_version && !system.agent_version.includes(cleanTarget);
-    const isDowngrade = isMismatch && compareSemver(cleanTarget, normalizeVersion(system.agent_version)) < 0;
+    const isMismatch = cleanTarget && system.agent_version && compareSemver(cleanTarget, system.agent_version) !== 0;
+    const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
     const isOutdated = isMismatch && !isDowngrade;
     const isUpdating = updatingAgents.has(system.id);
     const isOnline = system.status === 'online';
@@ -335,7 +369,7 @@ const MaintenanceSection: React.FC<{
       if (!s.agent_version) return false;
       const isWindows = isWindowsSystem(s);
       const target = isWindows ? windowsTarget : linuxTarget;
-      return target && !s.agent_version.includes(target);
+      return target && compareSemver(target, s.agent_version) !== 0;
     }).length;
   }, [systems, stableVersion, hubStatus]);
 
@@ -354,7 +388,7 @@ const MaintenanceSection: React.FC<{
           return pa.localeCompare(pb, undefined, { sensitivity: 'base' });
         }
         case 'version':
-          return compareSemver(normalizeVersion(a.agent_version), normalizeVersion(b.agent_version));
+          return compareSemver(a.agent_version, b.agent_version);
         case 'status': {
           const rank: Record<string, number> = { OFFLINE: 0, ONLINE: 1, UPDATING: 2 };
           return (rank[getStatusLabel(a)] ?? 0) - (rank[getStatusLabel(b)] ?? 0);
@@ -441,11 +475,9 @@ const MaintenanceSection: React.FC<{
                     const stableVer = stableVersion?.replace('v', '') || '';
                     const cleanTarget = isWindows ? stableVer : (hubVer || stableVer);
                     const targetVersion = cleanTarget ? `v${cleanTarget}` : null;
-                    const isMismatch = cleanTarget && system.agent_version &&
-                                      !system.agent_version.includes(cleanTarget);
+                    const isMismatch = cleanTarget && system.agent_version && compareSemver(cleanTarget, system.agent_version) !== 0;
                     // Determine if this is an upgrade or downgrade (semver-aware comparison)
-                    const agentVer = normalizeVersion(system.agent_version);
-                    const isDowngrade = isMismatch && compareSemver(cleanTarget, agentVer) < 0;
+                    const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
                     const isOutdated = isMismatch && !isDowngrade;
                     const isUpdating = updatingAgents.has(system.id);
                     const isOnline = system.status === 'online';

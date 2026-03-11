@@ -144,8 +144,42 @@ export class UpdateDownloadService {
     }
   }
 
-  public getBinaryPath(arch: string): string | null {
-    const filename = `pankha-agent-linux_${arch}`;
+  /**
+   * Maps agent_type to the binary filename prefix.
+   * Single source of truth for binary naming across the project.
+   *
+   * Pattern: pankha-agent-{prefix}_{arch}
+   */
+  private static readonly BINARY_PREFIX: Record<string, string> = {
+    'os_linux':      'linux',          // → pankha-agent-linux_{arch}
+    'os_windows':    'windows',        // → pankha-agent-windows_{arch}
+    'ipmi_host':     'ipmi-linux',     // → pankha-agent-ipmi-linux_{arch}  (TBD)
+  };
+
+  /**
+   * Normalizes legacy architecture names to project vocabulary.
+   * Keeps backward compat with older agents that send raw uname values
+   * (x86_64, aarch64) during self-update.
+   *
+   * Mirrors: agents/clients/linux/rust/src/app/platform.rs → project_arch()
+   */
+  private normalizeArch(arch: string): string {
+    const ARCH_MAP: Record<string, string> = {
+      'x86_64': 'x64',
+      'aarch64': 'arm64',
+      'arm': 'arm32',
+    };
+    return ARCH_MAP[arch] || arch;
+  }
+
+  public getBinaryPath(agentType: string = 'os_linux', arch: string): string | null {
+    const normalized = this.normalizeArch(arch);
+    const prefix = UpdateDownloadService.BINARY_PREFIX[agentType];
+    if (!prefix) {
+      log.warn(`Unknown agent type: ${agentType}`, 'UpdateService');
+      return null;
+    }
+    const filename = `pankha-agent-${prefix}_${normalized}`;
     const filePath = path.join(this.updatesDir, filename);
     return fs.existsSync(filePath) ? filePath : null;
   }
