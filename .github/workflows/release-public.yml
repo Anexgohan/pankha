@@ -256,9 +256,8 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # Copy agent binaries
-          cp artifacts/x64/pankha-agent-linux_x64 release-assets/
-          cp artifacts/arm64/pankha-agent-linux_arm64 release-assets/
+          # Find and copy agent binaries
+          find artifacts -name "pankha-agent-linux_*" -exec cp {} release-assets/ \;
 
           # Copy Windows MSI
           cp artifacts/windows/*.msi release-assets/
