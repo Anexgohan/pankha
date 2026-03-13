@@ -363,11 +363,11 @@ fi
 
 ${SHELL_ARCH_DETECT}
 
-BINARY_URL="${localBinaryBase}/$ARCH"
+BINARY_URL="${localBinaryBase}/ipmi_host/$ARCH"
 
 echo "[3/6] Detected architecture: $RAW_ARCH → $ARCH"
 
-echo "      Downloading from local server: $BINARY_URL"
+echo "      Downloading IPMI agent from: $BINARY_URL"
 echo ""
 
 # Download binary

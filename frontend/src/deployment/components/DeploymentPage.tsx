@@ -34,7 +34,7 @@ type PathMode = 'standard' | 'portable';
 type UrlMode = 'internal' | 'external';
 type AgentMode = 'os' | 'ipmi';
 type ProfileMode = 'catalog' | 'custom';
-type MaintenanceSortKey = 'name' | 'agentId' | 'platform' | 'version' | 'status' | 'maintenance';
+type MaintenanceSortKey = 'name' | 'agentId' | 'platform' | 'agentType' | 'version' | 'status' | 'maintenance';
 type SortDirection = 'asc' | 'desc';
 
 interface TerminalBlockProps {
@@ -387,6 +387,8 @@ const MaintenanceSection: React.FC<{
           const pb = isWindowsSystem(b) ? 'WINDOWS' : 'LINUX';
           return pa.localeCompare(pb, undefined, { sensitivity: 'base' });
         }
+        case 'agentType':
+          return (a.agent_type || '').localeCompare((b.agent_type || ''), undefined, { sensitivity: 'base' });
         case 'version':
           return compareSemver(a.agent_version, b.agent_version);
         case 'status': {
@@ -443,6 +445,11 @@ const MaintenanceSection: React.FC<{
                     </button>
                   </th>
                   <th>
+                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'agentType' ? 'active' : ''}`} onClick={() => handleSort('agentType')}>
+                      Agent Type <span className="sort-indicator">{getSortIndicator('agentType')}</span>
+                    </button>
+                  </th>
+                  <th>
                     <button type="button" className={`maintenance-sort-btn ${sortKey === 'version' ? 'active' : ''}`} onClick={() => handleSort('version')}>
                       Version <span className="sort-indicator">{getSortIndicator('version')}</span>
                     </button>
@@ -462,7 +469,7 @@ const MaintenanceSection: React.FC<{
               <tbody>
                 {systems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: 'center', padding: 'var(--spacing-2xl) 0', color: 'var(--text-tertiary)' }}>
+                    <td colSpan={7} style={{ textAlign: 'center', padding: 'var(--spacing-2xl) 0', color: 'var(--text-tertiary)' }}>
                       NO REMOTE NODES DISCOVERED
                     </td>
                   </tr>
@@ -509,6 +516,17 @@ const MaintenanceSection: React.FC<{
                             {platformIcon}
                             <span>{isWindows ? 'WINDOWS' : 'LINUX'}</span>
                           </div>
+                        </td>
+                        <td>
+                          <span>{
+                            ({
+                              os_linux: 'OS Agent Linux',
+                              os_windows: 'OS Agent Windows',
+                              ipmi_host: 'IPMI Agent Host',
+                              ipmi_network: 'IPMI Agent Network',
+                              unknown: 'Unknown Agent',
+                            } as Record<string, string>)[system.agent_type || ''] || system.agent_type || '—'
+                          }</span>
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
@@ -598,7 +616,8 @@ export const DeploymentPage: React.FC<{
   const [fanStep, setFanStep] = useState(String(getDefault('fanStep')));
   const [hysteresis, setHysteresis] = useState(String(getDefault('hysteresis')));
   const [copiedType, setCopiedType] = useState<'curl' | 'wget' | null>(null);
-  const [agentMode, setAgentMode] = useState<AgentMode>('os');
+  const [installerMode, setInstallerMode] = useState<AgentMode>('os');
+  const [aioAgentMode, setAioAgentMode] = useState<AgentMode>('os');
   const [profileMode, setProfileMode] = useState<ProfileMode>('catalog');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
@@ -747,7 +766,7 @@ export const DeploymentPage: React.FC<{
   // Handle token generation when config changes (debounced)
   useEffect(() => {
     // Skip token generation for IPMI mode when no profile is selected
-    if (agentMode === 'ipmi' && !selectedProfileId) {
+    if (aioAgentMode === 'ipmi' && !selectedProfileId) {
       setDeploymentToken(null);
       return;
     }
@@ -766,7 +785,7 @@ export const DeploymentPage: React.FC<{
           base_url: hubUrl  // User-editable Hub URL for agent connections
         };
 
-        if (agentMode === 'ipmi') {
+        if (aioAgentMode === 'ipmi') {
           config.agent_type = 'ipmi';
           config.profile_id = selectedProfileId;
         }
@@ -783,7 +802,7 @@ export const DeploymentPage: React.FC<{
 
     const timer = setTimeout(refreshToken, 500); // Debounce 500ms
     return () => clearTimeout(timer);
-  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode, hubUrl, agentMode, selectedProfileId]);
+  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode, hubUrl, aioAgentMode, selectedProfileId]);
 
   // Clear updating state when agent reconnects
   useEffect(() => {
@@ -806,7 +825,7 @@ export const DeploymentPage: React.FC<{
   const generateCommand = (tool: 'curl' | 'wget') => {
     if (!deploymentToken) return '';
 
-    const endpoint = agentMode === 'ipmi' ? 'ipmi' : 'linux';
+    const endpoint = aioAgentMode === 'ipmi' ? 'ipmi' : 'linux';
     const url = `${hubUrl}/api/deploy/${endpoint}?token=${deploymentToken}`;
 
     if (tool === 'curl') {
@@ -925,8 +944,8 @@ export const DeploymentPage: React.FC<{
           latestVersion={latestVersion}
           unstableVersion={unstableVersion || null}
           githubRepo={GITHUB_REPO}
-          agentMode={agentMode}
-          onAgentModeChange={setAgentMode}
+          agentMode={installerMode}
+          onAgentModeChange={setInstallerMode}
         />
 
         <ActionButton githubRepo={GITHUB_REPO} />
@@ -1044,8 +1063,26 @@ export const DeploymentPage: React.FC<{
           </p>
 
           <div className="builder-ui">
-            {/* Installation Mode Selector - Top Bar */}
+            {/* Agent Type + Installation Mode - Top Bar */}
             <div className="builder-top-bar">
+              <div className="builder-group" title="Select OS Agent for sysfs/LHM-based monitoring or IPMI Agent for BMC-based fan control.">
+                <span className="builder-label">Agent Type</span>
+                <div className="toggle-presets agent-mode-toggle">
+                  <button
+                    className={`toggle-item ${aioAgentMode === 'os' ? 'active' : ''}`}
+                    onClick={() => { setAioAgentMode('os'); setSelectedProfileId(null); }}
+                  >
+                    OS Agents
+                  </button>
+                  <button
+                    className={`toggle-item ${aioAgentMode === 'ipmi' ? 'active' : ''}`}
+                    onClick={() => setAioAgentMode('ipmi')}
+                  >
+                    IPMI Agents
+                  </button>
+                </div>
+              </div>
+
               <div className="builder-group path-group" title="Choose where the agent will be installed. Standard uses system paths, Portable installs to current directory.">
                 <span className="builder-label">Installation Mode</span>
                 <div className="toggle-presets path-toggles">
@@ -1121,7 +1158,7 @@ export const DeploymentPage: React.FC<{
               </div>
             </div>
 
-            {agentMode === 'ipmi' && (
+            {aioAgentMode === 'ipmi' && (
               <div className="profile-selector-section">
                 <div className="builder-group">
                   <span className="builder-label">BMC Profile</span>
@@ -1279,7 +1316,7 @@ export const DeploymentPage: React.FC<{
           </div>
         </section>
 
-        {agentMode === 'ipmi' && profileMode === 'custom' && (
+        {aioAgentMode === 'ipmi' && profileMode === 'custom' && (
           <ProfileBuilder systems={systems} />
         )}
 

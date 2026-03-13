@@ -33,6 +33,8 @@ class MockAgent:
         self.agent_id: str = config["agent_id"]
         self.name: str = config["agent_name"]
         self.platform: str = config.get("platform", "linux")
+        self.agent_type: str = config.get("agent_type", "os_linux" if self.platform == "linux" else "os_windows")
+        self.architecture: str = config.get("architecture", "x64")
         self.fake_ip: str = config.get("fake_ip", "127.0.0.1")
         self.server_url: str = config["server_url"]
         self.update_interval: float = config.get("update_interval", 3.0)
@@ -119,8 +121,10 @@ class MockAgent:
             "data": {
                 "agentId": self.agent_id,
                 "name": self.name,
+                "agent_type": self.agent_type,
                 "agent_version": self.version,
                 "platform": self.platform,
+                "architecture": self.architecture,
                 "update_interval": self.update_interval,
                 "fan_step_percent": self.fan_step_percent,
                 "hysteresis_temp": self.hysteresis_temp,
@@ -318,7 +322,9 @@ class MockAgent:
                 result_data = {
                     "agentId": self.agent_id,
                     "agentName": self.name,
+                    "agentType": self.agent_type,
                     "platform": self.platform,
+                    "architecture": self.architecture,
                     "version": self.version,
                     "connected": self.connected,
                     "updateInterval": self.update_interval,
@@ -338,7 +344,9 @@ class MockAgent:
                 result_data = {
                     "agentId": self.agent_id,
                     "agentName": self.name,
+                    "agentType": self.agent_type,
                     "platform": self.platform,
+                    "architecture": self.architecture,
                     "version": self.version,
                     "sensors": hw_export["sensors"],
                     "fans": hw_export["fans"],

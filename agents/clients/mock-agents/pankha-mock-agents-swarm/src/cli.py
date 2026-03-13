@@ -201,10 +201,14 @@ def _new_agent(
     hw = MockHardware(hw_config)
     hw_defs = hw.export_hardware()
 
+    agent_type = "os_linux" if platform == "linux" else "os_windows"
+
     return {
         "agent_id": f"{platform}-{name.lower()}-{uuid.uuid4().hex[:8]}",
         "agent_name": name,
         "platform": platform,
+        "agent_type": agent_type,
+        "architecture": "x64",
         "fake_ip": _generate_fake_ip(index),
         "server_url": server_url,
         "update_interval": 3.0,
@@ -552,11 +556,14 @@ def show_status():
     for i, agent in enumerate(agents[:20]):
         name = agent["agent_name"]
         platform = agent.get("platform", "linux")
+        agent_type = agent.get("agent_type", "unknown")
+        arch = agent.get("architecture", "?")
         plat_tag = colorize("[L]", Colors.CYAN) if platform == "linux" else colorize("[W]", Colors.YELLOW)
         sensors = agent["sensor_count"]
         fans = agent["fan_count"]
+        type_info = colorize(f"{agent_type}/{arch}", Colors.GRAY)
         hw_info = colorize(f"S:{sensors} F:{fans}", Colors.GRAY)
-        print(f"  {plat_tag} {name:20s}  {hw_info}")
+        print(f"  {plat_tag} {name:20s}  {type_info:30s}  {hw_info}")
     
     if len(agents) > 20:
         print(colorize(f"  ... and {len(agents) - 20} more agents", Colors.GRAY))

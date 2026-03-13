@@ -842,11 +842,26 @@ const SystemCard: React.FC<SystemCardProps> = ({
     };
 
     const platformLabel = getPlatformLabel();
-    
+    const archLabel = system.architecture;
+    const agentTypeMap: Record<string, string> = {
+      os_linux: 'OS Agent Linux',
+      os_windows: 'OS Agent Windows',
+      ipmi_host: 'IPMI Agent Host',
+      ipmi_network: 'IPMI Agent Network',
+      unknown: 'Unknown Agent',
+    };
+    const agentTypeLabel = system.agent_type ? (agentTypeMap[system.agent_type] || system.agent_type) : null;
+    const tooltip = [platformLabel, agentTypeLabel, archLabel].filter(Boolean).join(' · ');
+
     // Option B: Minimalist larger icon without background container
     return (
-      <div className="platform-icon-minimal" title={platformLabel}>
+      <div className="platform-icon-minimal" title={tooltip}>
         <img src={`/icons/${isWindows ? 'windows_01.svg' : 'linux_01.svg'}`} alt={platformLabel} width="20" height="20" />
+        {(agentTypeLabel || archLabel) && (
+          <span className="arch-badge">
+            {[agentTypeLabel, archLabel].filter(Boolean).join(' · ')}
+          </span>
+        )}
       </div>
     );
   };

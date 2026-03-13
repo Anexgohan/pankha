@@ -110,6 +110,182 @@ const DEFAULT_LIFECYCLE: LifecycleCommand = {
   result: null,
 };
 
+// ─── Vendor Hints (real-world IPMI command patterns) ─────────────────
+
+interface VendorHints {
+  zones: string;
+  members: string;
+  speedTranslation: string;
+  setSpeed: string;
+  readSpeed: string;
+  init: string;
+  reset: string;
+  notes?: string;
+  unsupported?: boolean;
+  placeholders: {
+    setSpeed: string;
+    readSpeed: string;
+    init: string;
+    reset: string;
+    members: string;
+  };
+}
+
+const KNOWN_VENDORS = ['Dell', 'Supermicro', 'ASRock Rack', 'Tyan', 'Lenovo', 'HP/HPE', 'Gigabyte', 'Fujitsu', 'ASUS'] as const;
+
+const VENDOR_HINTS: Record<string, VendorHints> = {
+  Dell: {
+    zones: 'Dell PowerEdge typically uses a single zone (0xFF = all fans). Some R-series models support per-zone control.',
+    members: 'Common fan names: Fan1, Fan2, Fan3, Fan4, Fan5, Fan6.',
+    speedTranslation: 'Dell uses byte_scale — 0x00 (0%) to 0xFF (100%), 256 steps.',
+    setSpeed: 'Typical: 0x30 0x30 0x02 0xff {{SPEED_HEX}} — the 0xff targets all fans.',
+    readSpeed: 'Dell fans are read via SDR (no OEM read command). Leave blank to use SDR auto-detection.',
+    init: 'Disable auto fan control: 0x30 0x30 0x01 0x00 — required before manual control. Some models also need PCIe panic disable: 0x30 0xce 0x00 0x16 0x05 0x00 0x00 0x00 0x05 0x00 0x01 0x00 0x00',
+    reset: 'Re-enable auto fan control: 0x30 0x30 0x01 0x01',
+    notes: 'Supports iDRAC 7, 8, and early 9 (firmware < 3.30.30.30). Newer iDRAC 9 may require Redfish instead of raw IPMI.',
+    placeholders: {
+      setSpeed: '0x30 0x30 0x02 0xff {{SPEED_HEX}}',
+      readSpeed: '',
+      init: '0x30 0x30 0x01 0x00',
+      reset: '0x30 0x30 0x01 0x01',
+      members: 'Fan1, Fan2, Fan3, Fan4, Fan5, Fan6',
+    },
+  },
+  Supermicro: {
+    zones: 'Supermicro uses 2 zones: Zone 0 (CPU fans) and Zone 1 (Peripheral/System fans). The zone byte is the 5th byte in the set_speed command.',
+    members: 'CPU zone: FAN1, FAN2, FAN3, FAN4. Peripheral zone: FANA, FANB.',
+    speedTranslation: 'X9 boards: byte_scale (0x00–0xFF). X10/X11/X12 boards: decimal_hex — percentage 0–100 maps to 0x00–0x64.',
+    setSpeed: 'X10/X11 Zone 0: 0x30 0x70 0x66 0x01 0x00 {{SPEED_HEX}}. Zone 1: 0x30 0x70 0x66 0x01 0x01 {{SPEED_HEX}}. X9 Zone 0: 0x30 0x91 0x5A 0x03 0x00 {{SPEED_HEX}}.',
+    readSpeed: 'X10/X11: 0x30 0x70 0x66 0x00 0x00 (Zone 0) / 0x30 0x70 0x66 0x00 0x01 (Zone 1). X9: no OEM read command, uses SDR.',
+    init: 'Set "Full Speed" mode first: 0x30 0x45 0x01 0x01 — required before manual override, otherwise BIOS fights the set_speed command.',
+    reset: 'Restore "Standard" mode: 0x30 0x45 0x01 0x00. Alternative "Optimal" mode: 0x30 0x45 0x01 0x02.',
+    placeholders: {
+      setSpeed: '0x30 0x70 0x66 0x01 0x00 {{SPEED_HEX}}',
+      readSpeed: '0x30 0x70 0x66 0x00 0x00',
+      init: '0x30 0x45 0x01 0x01',
+      reset: '0x30 0x45 0x01 0x00',
+      members: 'FAN1, FAN2, FAN3, FAN4',
+    },
+  },
+  'ASRock Rack': {
+    zones: 'ASRock Rack has no zone abstraction. Each fan header is individually addressed as a byte position in the set_speed command (up to 6 fans + 2 reserved bytes).',
+    members: 'Typical: CPU_FAN1, CPU_FAN2, REAR_FAN1, REAR_FAN2, FRNT_FAN1, FRNT_FAN2. Byte-to-fan mapping varies per board — verify by toggling one fan at a time.',
+    speedTranslation: 'ASRock Rack uses decimal_hex — 0–100% maps to 0x00–0x64.',
+    setSpeed: 'All fans at once: 0x3a 0x01 [F1] [F2] [F3] [F4] [F5] [F6] 0x00 0x00 — each byte is a fan duty (0x00–0x64). The speed value replaces the first fan byte.',
+    readSpeed: 'Read current duty: 0x3a 0x06 0x01 0x00',
+    init: 'No separate init command needed. Sending the set_speed command (0x3a 0x01) overrides automatic control.',
+    reset: 'Restore fan curve: 0x3a 0x05 0x01 0x00 30 55 60 65 70 75 80 85 90 95 100 (sets default duty-cycle curve). Or use BMC web UI.',
+    notes: 'Byte-to-fan-header mapping varies between board models (E3C246D4U, X470D4U, ROMED8-2T). Must be verified per board by toggling one fan at a time.',
+    placeholders: {
+      setSpeed: '0x3a 0x01 {{SPEED_HEX}} {{SPEED_HEX}} {{SPEED_HEX}} {{SPEED_HEX}} {{SPEED_HEX}} {{SPEED_HEX}} 0x00 0x00',
+      readSpeed: '0x3a 0x06 0x01 0x00',
+      init: '',
+      reset: '0x3a 0x05 0x01 0x00',
+      members: 'CPU_FAN1, CPU_FAN2, REAR_FAN1, REAR_FAN2, FRNT_FAN1, FRNT_FAN2',
+    },
+  },
+  Tyan: {
+    zones: 'Tyan has no zone abstraction. Each fan is addressed individually by PWM ID: 0x00=CPU_FAN, 0x01=SYS_FAN_1, 0x02=SYS_FAN_2, 0x03=SYS_FAN_3, 0x04=SYS_FAN_4.',
+    members: 'Typical: CPU_FAN, SYS_FAN_1, SYS_FAN_2, SYS_FAN_3, SYS_FAN_4.',
+    speedTranslation: 'Tyan uses decimal_hex — 0–100% encoded as 0x00–0x64. Read quirk: actual duty = response byte - 128.',
+    setSpeed: 'Per-fan: 0x2e 0x05 0xfd 0x19 0x00 <PWM_ID> {{SPEED_HEX}} — 0xfd 0x19 is the Tyan/MiTAC IANA identifier (required in every command).',
+    readSpeed: 'Read duty: 0x2e 0x05 0xfd 0x19 0x00 <PWM_ID> 0xfe — response byte minus 128 = actual duty %.',
+    init: 'Disable smart fan: 0x2e 0x06 0xfd 0x19 0x00 0x00 — must be done before setting manual PWM values.',
+    reset: 'Re-enable smart fan: 0x2e 0x06 0xfd 0x19 0x00 0x01. Per-fan auto: 0x2e 0x05 0xfd 0x19 0x00 <PWM_ID> 0xff.',
+    notes: 'Verified on S8036. Other Tyan boards (S7106, S5553, S8030) with AST2500 BMC likely use the same commands but should be tested.',
+    placeholders: {
+      setSpeed: '0x2e 0x05 0xfd 0x19 0x00 0x00 {{SPEED_HEX}}',
+      readSpeed: '0x2e 0x05 0xfd 0x19 0x00 0x00 0xfe',
+      init: '0x2e 0x06 0xfd 0x19 0x00 0x00',
+      reset: '0x2e 0x06 0xfd 0x19 0x00 0x01',
+      members: 'CPU_FAN, SYS_FAN_1, SYS_FAN_2, SYS_FAN_3, SYS_FAN_4',
+    },
+  },
+  Lenovo: {
+    zones: 'IMM2 (x3650 M4/M5): 2 zones — Zone 0x01 (front: Fan 1A, 1B), Zone 0x02 (rear: Fan 2A, 2B). XCC (ThinkSystem): per-fan by number (2–7).',
+    members: 'IMM2: Fan 1A Tach, Fan 1B Tach, Fan 2A Tach, Fan 2B Tach. XCC: Fan 1 Tach, Fan 2 Tach, Fan 3 Tach, etc.',
+    speedTranslation: 'IMM2: Non-linear hex scale (NOT a direct percentage — 0x00≈20%, 0x50≈50%, 0xff=100%). XCC: integer 0–100 direct percentage.',
+    setSpeed: 'IMM2: 0x3a 0x07 0xff {{SPEED_HEX}} 0x01 (all zones, 0x01=manual). XCC: 0x3c 0x14 <fan_num> {{SPEED_HEX}}.',
+    readSpeed: 'No standard OEM read command. Use SDR for fan RPM readings.',
+    init: 'IMM2: the trailing 0x01 in set_speed enables manual override. XCC: 0x3c 0x0b to disable cooling manager.',
+    reset: 'IMM2: 0x3a 0x07 0xff 0x00 0x00 (restore automatic). XCC: re-enable cooling manager or reboot BMC.',
+    notes: 'Two different command sets for IMM2 vs XCC. IMM2 sometimes reclaims fan control — scripts must re-send commands periodically. Each Lenovo system has its own command set — verify per model.',
+    placeholders: {
+      setSpeed: '0x3a 0x07 0xff {{SPEED_HEX}} 0x01',
+      readSpeed: '',
+      init: '',
+      reset: '0x3a 0x07 0xff 0x00 0x00',
+      members: 'Fan 1A Tach, Fan 1B Tach, Fan 2A Tach, Fan 2B Tach',
+    },
+  },
+  'HP/HPE': {
+    zones: 'HP ProLiant iLO aggressively controls fans. Standard IPMI raw commands do not override HP fan control.',
+    members: 'Fan names vary: Fan 1, Fan 2, etc. Readable via SDR.',
+    speedTranslation: 'Not applicable — HP does not support granular fan speed control via raw IPMI.',
+    setSpeed: 'No known raw IPMI set_speed command. iLO 4 (Gen8/Gen9) requires community-patched firmware. iLO 5/6 (Gen10+) only exposes predefined cooling policies via Redfish.',
+    readSpeed: 'Fan RPM readable via SDR. No OEM read command needed.',
+    init: 'No init command — HP manages fans entirely through iLO firmware.',
+    reset: 'No reset command needed — iLO retains control at all times.',
+    notes: 'HP ProLiant is effectively monitor-only via IPMI. Fan control requires iLO firmware modifications (unsupported) or Redfish API with limited preset options.',
+    unsupported: true,
+    placeholders: { setSpeed: '', readSpeed: '', init: '', reset: '', members: 'Fan 1, Fan 2, Fan 3, Fan 4' },
+  },
+  Gigabyte: {
+    zones: 'Fan zones are managed via the BMC web interface only.',
+    members: 'Typical SDR names: FAN0, FAN1, FAN2, FAN3, FAN4, FAN5.',
+    speedTranslation: 'Not applicable — no raw IPMI fan control.',
+    setSpeed: 'Not available. Gigabyte BMCs do not expose OEM raw commands for fan speed. Use the BMC web interface (Gigabyte Management Console) instead.',
+    readSpeed: 'Fan RPM readable via SDR.',
+    init: 'Not available via IPMI.',
+    reset: 'Not available via IPMI.',
+    notes: 'Gigabyte server BMCs (AMI MegaRAC SP-X) do not support raw IPMI fan control. This has been officially confirmed by Gigabyte. Fan profiles can only be configured through the BMC web interface.',
+    unsupported: true,
+    placeholders: { setSpeed: '', readSpeed: '', init: '', reset: '', members: 'FAN0, FAN1, FAN2, FAN3' },
+  },
+  Fujitsu: {
+    zones: 'Fan zones are managed internally by iRMC.',
+    members: 'Varies by model. Readable via SDR.',
+    speedTranslation: 'Not applicable — no raw IPMI fan control.',
+    setSpeed: 'Not available. iRMC does not expose fan control via raw IPMI. Standard Dell/Supermicro commands return "Request data length invalid".',
+    readSpeed: 'Fan RPM readable via SDR.',
+    init: 'Not available via IPMI.',
+    reset: 'Not available via IPMI.',
+    notes: 'Fujitsu PRIMERGY iRMC does not support raw IPMI fan control. Fan management is only available through the iRMC web interface or Redfish API.',
+    unsupported: true,
+    placeholders: { setSpeed: '', readSpeed: '', init: '', reset: '', members: '' },
+  },
+  ASUS: {
+    zones: 'Fan zones managed via BIOS settings or ASMB9-iKVM web interface.',
+    members: 'Typical: CPU_FAN1, CPU_FAN2, CHA_FAN1, CHA_FAN2, CHA_FAN3.',
+    speedTranslation: 'Not applicable — no known raw IPMI fan control commands.',
+    setSpeed: 'No publicly documented raw IPMI commands for fan speed control. Use BIOS settings or the ASMB9-iKVM "Fan Customized Mode" in the BMC web interface.',
+    readSpeed: 'Fan RPM readable via SDR.',
+    init: 'Not available via IPMI.',
+    reset: 'Not available via IPMI.',
+    notes: 'ASUS server boards with ASMB8/ASMB9-iKVM have no known raw IPMI fan control. Multiple users report BMC web UI settings sometimes have no effect.',
+    unsupported: true,
+    placeholders: { setSpeed: '', readSpeed: '', init: '', reset: '', members: 'CPU_FAN1, CPU_FAN2, CHA_FAN1, CHA_FAN2' },
+  },
+};
+
+function getVendorHints(vendorName: string): VendorHints | null {
+  if (!vendorName) return null;
+  // Exact match first
+  if (VENDOR_HINTS[vendorName]) return VENDOR_HINTS[vendorName];
+  // Case-insensitive fuzzy match
+  const lower = vendorName.toLowerCase();
+  if (lower.includes('dell')) return VENDOR_HINTS['Dell'];
+  if (lower.includes('supermicro')) return VENDOR_HINTS['Supermicro'];
+  if (lower.includes('asrock')) return VENDOR_HINTS['ASRock Rack'];
+  if (lower.includes('tyan')) return VENDOR_HINTS['Tyan'];
+  if (lower.includes('lenovo') || lower.includes('ibm')) return VENDOR_HINTS['Lenovo'];
+  if (lower.includes('hp') || lower.includes('hpe') || lower.includes('proliant')) return VENDOR_HINTS['HP/HPE'];
+  if (lower.includes('gigabyte')) return VENDOR_HINTS['Gigabyte'];
+  if (lower.includes('fujitsu')) return VENDOR_HINTS['Fujitsu'];
+  if (lower.includes('asus')) return VENDOR_HINTS['ASUS'];
+  return null;
+}
+
 // ─── Component ──────────────────────────────────────────────────────
 
 const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
@@ -119,7 +295,11 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
   const [selectedSystemId, setSelectedSystemId] = useState<number | null>(null);
 
   // Step 2: Metadata
-  const [vendor, setVendor] = useState('');
+  const [vendorSelection, setVendorSelection] = useState('');
+  const [customVendor, setCustomVendor] = useState('');
+  const vendor = vendorSelection === '__custom__' ? customVendor : vendorSelection;
+  const hints = getVendorHints(vendor);
+  const isUnsupported = hints?.unsupported === true;
   const [modelFamily, setModelFamily] = useState('');
   const [description, setDescription] = useState('');
   const [author, setAuthor] = useState('');
@@ -463,13 +643,47 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
             <span className="builder-label">Profile Metadata</span>
             <div className="profile-builder-metadata-grid">
               <div className="builder-group">
-                <span className="builder-label">Vendor Name</span>
-                <input
-                  className="hub-url-input"
-                  value={vendor}
-                  onChange={(e) => setVendor(e.target.value)}
-                  placeholder="e.g. ASRock"
-                />
+                <span className="builder-label">Vendor</span>
+                <div className="stealth-select-wrapper profile-select-wrapper">
+                  <select
+                    className="select-engine"
+                    value={vendorSelection}
+                    onChange={(e) => { setVendorSelection(e.target.value); if (e.target.value !== '__custom__') setCustomVendor(''); }}
+                  >
+                    <option value="">Select vendor...</option>
+                    {KNOWN_VENDORS.map(v => (
+                      <option key={v} value={v}>
+                        {v}{VENDOR_HINTS[v]?.unsupported ? ' (unsupported)' : ''}
+                      </option>
+                    ))}
+                    <option value="__custom__">Custom...</option>
+                  </select>
+                  <div className="select-display">
+                    {vendorSelection === '__custom__'
+                      ? (customVendor || 'Custom...')
+                      : vendorSelection
+                        ? `${vendorSelection}${hints?.unsupported ? ' (unsupported)' : ''}`
+                        : 'Select vendor...'}
+                  </div>
+                </div>
+                {vendorSelection === '__custom__' && (
+                  <input
+                    className="hub-url-input"
+                    value={customVendor}
+                    onChange={(e) => setCustomVendor(e.target.value)}
+                    placeholder="e.g. ASRock Rack, Gigabyte, Lenovo"
+                    style={{ marginTop: 'var(--spacing-sm)' }}
+                  />
+                )}
+                {hints?.unsupported && (
+                  <div className="profile-unsupported-warning">
+                    <AlertCircle size={14} />
+                    <span>This vendor does not support raw IPMI fan control. Fan RPM monitoring via SDR may still work, but manual speed control is not possible.</span>
+                  </div>
+                )}
+                {hints?.notes && !hints.unsupported && (
+                  <p className="profile-vendor-hint">{hints.notes}</p>
+                )}
               </div>
               <div className="builder-group">
                 <span className="builder-label">Model Family (comma-sep)</span>
@@ -502,8 +716,9 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
           </div>
 
           {/* ── Step 3: Fan Zones ────────────────────────────── */}
-          <div className="profile-builder-step">
-            <span className="builder-label">Fan Zones</span>
+          <div className={`profile-builder-step${isUnsupported ? ' profile-step-disabled' : ''}`}>
+            <span className="builder-label" title="Fan zones group fans that share the same speed command. Check your vendor's IPMI documentation or BMC web interface for zone layout.">Fan Zones</span>
+            {hints && <p className="profile-vendor-hint">{hints.zones}</p>}
 
             {zones.map((zone, zi) => (
               <div key={zi} className="profile-zone-card">
@@ -540,20 +755,21 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
                     />
                   </div>
                   <div className="builder-group">
-                    <span className="builder-label">Members (comma-sep)</span>
+                    <span className="builder-label" title="Run 'ipmitool sdr list full' on your server to see all sensor names including fans. Use the exact names from SDR output.">Members (comma-sep)</span>
                     <input
                       className="hub-url-input"
                       value={zone.members}
                       onChange={(e) => updateZone(zi, { members: e.target.value })}
-                      placeholder="FAN1, FAN2, FAN3"
+                      placeholder={hints?.placeholders.members || 'FAN1, FAN2, FAN3'}
                     />
+                    {hints && <p className="profile-vendor-hint">{hints.members}</p>}
                   </div>
                 </div>
 
                 {/* Speed Translation */}
                 <div className="profile-zone-fields">
                   <div className="builder-group">
-                    <span className="builder-label">Speed Translation</span>
+                    <span className="builder-label" title="How fan speed percentages are encoded into IPMI bytes. Most modern boards use decimal_hex (0-100%). Older Dell/Supermicro X9 use byte_scale (0-255).">Speed Translation</span>
                     <div className="toggle-presets">
                       {(['decimal_hex', 'byte_scale', 'integer'] as const).map((t) => (
                         <button
@@ -574,6 +790,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
                         </button>
                       ))}
                     </div>
+                    {hints && <p className="profile-vendor-hint">{hints.speedTranslation}</p>}
                   </div>
                   <div className="builder-group">
                     <span className="builder-label">Output Min</span>
@@ -613,9 +830,10 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
 
                 {/* Set Speed Command */}
                 <div className="profile-command-group">
-                  <span className="builder-label">
-                    Set Speed Command (use {'{{SPEED_HEX}}'} placeholder)
+                  <span className="builder-label" title="The raw IPMI bytes for setting fan speed. Use {{SPEED_HEX}} where the speed value should go — Pankha replaces it with the calculated hex value at runtime. Check vendor docs, ServeTheHome forums, or TrueNAS community for your hardware's commands.">
+                    Set Speed Command
                   </span>
+                  {hints && <p className="profile-vendor-hint">{hints.setSpeed}</p>}
                   <div className="profile-command-row">
                     <input
                       className="hub-url-input"
@@ -623,7 +841,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
                       onChange={(e) =>
                         updateZone(zi, { set_speed_bytes: e.target.value })
                       }
-                      placeholder="0x30 0x70 0x66 0x01 0x00 {{SPEED_HEX}}"
+                      placeholder={hints?.placeholders.setSpeed || '0x30 0x70 0x66 0x01 0x00 {{SPEED_HEX}}'}
                       style={{ flex: 1 }}
                     />
                     <div className="profile-test-controls">
@@ -653,7 +871,8 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
 
                 {/* Read Speed Command */}
                 <div className="profile-command-group">
-                  <span className="builder-label">Read Speed Command (optional)</span>
+                  <span className="builder-label" title="Optional OEM command to read current fan duty cycle. If left blank, Pankha reads fan RPM from SDR instead. Most vendors don't need this — only Supermicro X10+ and Tyan have OEM read commands.">Read Speed Command (optional)</span>
+                  {hints && <p className="profile-vendor-hint">{hints.readSpeed}</p>}
                   <div className="profile-command-row">
                     <input
                       className="hub-url-input"
@@ -661,7 +880,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
                       onChange={(e) =>
                         updateZone(zi, { read_speed_bytes: e.target.value })
                       }
-                      placeholder="0x30 0x70 0x66 0x00 0x00"
+                      placeholder={hints?.placeholders.readSpeed || '0x30 0x70 0x66 0x00 0x00'}
                       style={{ flex: 1 }}
                     />
                     <button
@@ -684,10 +903,11 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
           </div>
 
           {/* ── Step 4: Lifecycle Commands ────────────────────── */}
-          <div className="profile-builder-step">
-            <span className="builder-label">
+          <div className={`profile-builder-step${isUnsupported ? ' profile-step-disabled' : ''}`}>
+            <span className="builder-label" title="Commands to disable automatic fan control before Pankha takes over. Required for most vendors — without this, the BMC fights manual speed commands. Run once on agent startup.">
               Initialization Commands (run before fan control)
             </span>
+            {hints && <p className="profile-vendor-hint">{hints.init}</p>}
 
             {initCommands.map((cmd, ci) => (
               <div key={ci} className="profile-lifecycle-card">
@@ -711,7 +931,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
                         bytes: e.target.value,
                       })
                     }
-                    placeholder="0x30 0x45 0x01 0x01"
+                    placeholder={hints?.placeholders.init || '0x30 0x45 0x01 0x01'}
                     style={{ flex: 1 }}
                   />
                   <label className="profile-critical-toggle">
@@ -754,10 +974,11 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
             </button>
           </div>
 
-          <div className="profile-builder-step">
-            <span className="builder-label">
+          <div className={`profile-builder-step${isUnsupported ? ' profile-step-disabled' : ''}`}>
+            <span className="builder-label" title="Commands to restore factory fan control when Pankha disconnects or shuts down. Ensures fans return to automatic mode so the server stays safe.">
               Reset to Factory Commands (run on shutdown/disconnect)
             </span>
+            {hints && <p className="profile-vendor-hint">{hints.reset}</p>}
 
             {resetCommands.map((cmd, ci) => (
               <div key={ci} className="profile-lifecycle-card">
@@ -781,7 +1002,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
                         bytes: e.target.value,
                       })
                     }
-                    placeholder="0x30 0x45 0x01 0x00"
+                    placeholder={hints?.placeholders.reset || '0x30 0x45 0x01 0x00'}
                     style={{ flex: 1 }}
                   />
                   <label className="profile-critical-toggle">
@@ -825,7 +1046,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
           </div>
 
           {/* ── Step 5: Review & Export ───────────────────────── */}
-          <div className="profile-builder-step">
+          <div className={`profile-builder-step${isUnsupported ? ' profile-step-disabled' : ''}`}>
             <span className="builder-label">Review &amp; Export</span>
             <div className="profile-json-preview">
               <pre>{JSON.stringify(buildProfileJson(), null, 2)}</pre>

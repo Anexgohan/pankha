@@ -506,14 +506,14 @@ export class AgentManager extends EventEmitter {
    * OS agents use sysfs/WMI and don't have this field.
    */
   private detectAgentType(capabilities: any): string {
-    if (!capabilities) return 'os_linux';
+    if (!capabilities) return 'unknown';
 
     const sensors = capabilities.sensors || [];
     const hasIpmiSensor = sensors.some(
       (s: any) => s.source === 'ipmi_sdr'
     );
 
-    return hasIpmiSensor ? 'ipmi_host' : 'os_linux';
+    return hasIpmiSensor ? 'ipmi_host' : 'unknown';
   }
 
   /**
