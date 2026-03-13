@@ -256,8 +256,9 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # Find and copy agent binaries
-          find artifacts -name "pankha-agent-linux_*" -exec cp {} release-assets/ \;
+          # Copy agent binaries
+          cp artifacts/x64/pankha-agent-linux_x64 release-assets/
+          cp artifacts/arm64/pankha-agent-linux_arm64 release-assets/
 
           # Copy Windows MSI
           cp artifacts/windows/*.msi release-assets/
@@ -274,7 +275,7 @@ jobs:
 
           # Generate checksums
           cd release-assets
-          sha256sum * > checksums.txt
+          sha256sum * | sort -k2 > checksums.txt
 
           echo "📦 Release assets prepared:"
           ls -lh
