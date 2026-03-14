@@ -161,6 +161,13 @@ router.post('/custom', async (req, res) => {
       return res.status(400).json({ error: 'Profile must have metadata.vendor' });
     }
 
+    if (!profile.metadata || typeof profile.metadata !== 'object') {
+      return res.status(400).json({ error: 'Profile must have metadata' });
+    }
+
+    // Builder-created profiles always start as experimental until curated.
+    profile.metadata.profile_tier = 'experimental';
+
     // Sanitize vendor and filename to prevent path traversal
     const safeVendor = vendor.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
     const safeFilename = filename.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
@@ -217,6 +224,10 @@ router.get('/:vendor/:model', (req, res) => {
       (z: any) => z.commands?.read_speed
     );
     const firstZone = ipmi?.fan_zones?.[0];
+    const profileTier =
+      profile.metadata?.profile_tier ||
+      (profileId.includes('/custom_') ? 'experimental' : 'official');
+    const isMonitorOnly = (ipmi?.fan_zones || []).length === 0;
 
     res.json({
       matched: true,
@@ -225,6 +236,8 @@ router.get('/:vendor/:model', (req, res) => {
       author: profile.metadata?.author || 'Unknown',
       vendor: profile.metadata?.vendor || vendor,
       model_family: profile.metadata?.model_family || [],
+      profile_tier: profileTier,
+      is_monitor_only: isMonitorOnly,
       zones,
       has_read_speed: hasReadSpeed,
       speed_translation_type: firstZone?.speed_translation?.type || 'unknown',

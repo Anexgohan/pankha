@@ -472,6 +472,8 @@ export interface ProfileCatalogEntry {
   profile_id: string;
   description: string;
   author: string;
+  profile_tier: 'official' | 'experimental';
+  is_monitor_only: boolean;
   zones: ProfileCatalogZone[];
   has_read_speed: boolean;
   speed_translation_type: string;
@@ -497,6 +499,8 @@ export interface ProfileDetails {
   author: string;
   vendor: string;
   model_family: string[];
+  profile_tier: 'official' | 'experimental';
+  is_monitor_only: boolean;
   zones: ProfileCatalogZone[];
   has_read_speed: boolean;
   speed_translation_type: string;

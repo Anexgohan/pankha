@@ -455,6 +455,7 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
       metadata: {
         schema_version: '2.0',
         vendor: vendor.trim(),
+        profile_tier: 'experimental' as const,
         model_family: modelFamily
           .split(',')
           .map((s) => s.trim())
@@ -641,6 +642,9 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
           {/* ── Step 2: Metadata ─────────────────────────────── */}
           <div className="profile-builder-step">
             <span className="builder-label">Profile Metadata</span>
+            <p className="profile-vendor-hint">
+              Builder-created profiles are saved as experimental until they are curated into the official profile set.
+            </p>
             <div className="profile-builder-metadata-grid">
               <div className="builder-group">
                 <span className="builder-label">Vendor</span>

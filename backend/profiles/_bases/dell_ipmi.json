@@ -2,6 +2,7 @@
   "metadata": {
     "schema_version": "2.0",
     "vendor": "Dell",
+    "profile_tier": "official",
     "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
     "author": "Pankha Official",
     "description": "Dell PowerEdge base profile for IPMI fan control. Covers iDRAC 7, 8, and early iDRAC 9 (firmware < 3.30.30.30). Uses byte_scale translation (0-255). Model-specific profiles extend this base."

@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "schema_version": "2.0",
+    "vendor": "HP",
+    "profile_tier": "official",
+    "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
+    "author": "Pankha Official",
+    "description": "HP ProLiant monitor-only IPMI base profile. Supports SDR/FRU-based telemetry but intentionally declares no raw fan-control zones."
+  },
+  "protocols": {
+    "ipmi": {
+      "parsing": {
+        "sdr_format": "csv",
+        "fan_match_token": "RPM",
+        "temp_match_token": "degrees C"
+      },
+      "fan_zones": [],
+      "lifecycle": {
+        "initialization": [],
+        "reset_to_factory": []
+      }
+    }
+  }
+}

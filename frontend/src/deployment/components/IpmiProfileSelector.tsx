@@ -39,6 +39,11 @@ const IpmiProfileSelector: React.FC<IpmiProfileSelectorProps> = ({ selectedProfi
     onProfileSelect(profileId);
   };
 
+  const getTierLabel = (model: ProfileCatalogEntry) =>
+    model.profile_tier === 'official' ? 'Official' : 'Experimental';
+  const getTierClassName = (model: ProfileCatalogEntry) =>
+    model.profile_tier === 'official' ? 'status-tag current' : 'status-tag outdated';
+
   if (error) {
     return (
       <div className="profile-error">
@@ -82,13 +87,14 @@ const IpmiProfileSelector: React.FC<IpmiProfileSelectorProps> = ({ selectedProfi
               <option value="">Select model...</option>
               {models.map(m => (
                 <option key={m.profile_id} value={m.profile_id}>
-                  {m.model_family.join(', ') || m.profile_id.split('/')[1]}
+                  {(m.model_family.join(', ') || m.profile_id.split('/')[1])}
+                  {` [${getTierLabel(m)}${m.is_monitor_only ? ', Monitor-only' : ''}]`}
                 </option>
               ))}
             </select>
             <div className="select-display">
               {selectedModel
-                ? (selectedModel.model_family.join(', ') || selectedModel.profile_id.split('/')[1])
+                ? `${selectedModel.model_family.join(', ') || selectedModel.profile_id.split('/')[1]} [${getTierLabel(selectedModel)}${selectedModel.is_monitor_only ? ', Monitor-only' : ''}]`
                 : 'Select model...'}
             </div>
           </div>
@@ -104,15 +110,25 @@ const IpmiProfileSelector: React.FC<IpmiProfileSelectorProps> = ({ selectedProfi
           <div className="profile-match-details">
             <div className="profile-match-row">
               <span className="profile-detail-label">Zones</span>
-              <span>{selectedModel.zones.map(z => z.name).join(', ')}</span>
+              <span>{selectedModel.is_monitor_only ? 'Monitor-only (no write zones)' : selectedModel.zones.map(z => z.name).join(', ')}</span>
             </div>
             <div className="profile-match-row">
               <span className="profile-detail-label">Speed Type</span>
-              <span>{selectedModel.speed_translation_type}</span>
+              <span>{selectedModel.is_monitor_only ? 'Not applicable' : selectedModel.speed_translation_type}</span>
             </div>
             <div className="profile-match-row">
               <span className="profile-detail-label">Read Speed</span>
               <span>{selectedModel.has_read_speed ? 'Supported' : 'Not available'}</span>
+            </div>
+            <div className="profile-match-row">
+              <span className="profile-detail-label">Tier</span>
+              <span className={getTierClassName(selectedModel)}>
+                {getTierLabel(selectedModel)}
+              </span>
+            </div>
+            <div className="profile-match-row">
+              <span className="profile-detail-label">Control</span>
+              <span>{selectedModel.is_monitor_only ? 'Monitor-only' : 'Fan control'}</span>
             </div>
             <div className="profile-match-row">
               <span className="profile-detail-label">Author</span>

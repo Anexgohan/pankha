@@ -19,6 +19,7 @@ export interface ProfileMetadata {
   supported_protocols?: string[];
   author?: string;
   description?: string;
+  profile_tier?: 'official' | 'experimental';
 }
 
 export interface ProfileCatalogEntry {
@@ -27,6 +28,8 @@ export interface ProfileCatalogEntry {
   profile_id: string;               // e.g., "supermicro/x10_series"
   description: string;
   author: string;
+  profile_tier: 'official' | 'experimental';
+  is_monitor_only: boolean;
   zones: { id: string; name: string; members?: string[] }[];
   has_read_speed: boolean;
   speed_translation_type: string;    // "decimal_hex" | "byte_scale" | "integer"
@@ -222,6 +225,10 @@ export class ProfileService {
           }));
 
           const firstZone = ipmi?.fan_zones?.[0];
+          const profileTier =
+            resolved.metadata?.profile_tier ||
+            (profileId.includes('/custom_') ? 'experimental' : 'official');
+          const isMonitorOnly = (ipmi?.fan_zones || []).length === 0;
           const hasReadSpeed = (ipmi?.fan_zones || []).some(
             (z: any) => z.commands?.read_speed
           );
@@ -232,6 +239,8 @@ export class ProfileService {
             profile_id: profileId,
             description: resolved.metadata?.description || '',
             author: resolved.metadata?.author || 'Unknown',
+            profile_tier: profileTier,
+            is_monitor_only: isMonitorOnly,
             zones,
             has_read_speed: hasReadSpeed,
             speed_translation_type: firstZone?.speed_translation?.type || 'unknown',
@@ -242,6 +251,15 @@ export class ProfileService {
       }
 
       if (models.length > 0) {
+        models.sort((a, b) => {
+          if (a.profile_tier !== b.profile_tier) {
+            return a.profile_tier === 'official' ? -1 : 1;
+          }
+
+          const aName = a.model_family[0] || a.profile_id;
+          const bName = b.model_family[0] || b.profile_id;
+          return aName.localeCompare(bName);
+        });
         vendorMap.set(entry.name, models);
       }
     }

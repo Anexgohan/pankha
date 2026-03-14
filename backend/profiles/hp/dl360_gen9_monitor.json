@@ -1,0 +1,8 @@
+{
+  "extends": "_bases/hp_ipmi_monitor",
+  "metadata": {
+    "model_family": ["ProLiant DL360 Gen9"],
+    "author": "Pankha Official",
+    "description": "HP ProLiant DL360 Gen9 monitor-only profile. Enables SDR-based thermal/fan telemetry without exposing unsupported raw IPMI fan writes."
+  }
+}

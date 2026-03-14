@@ -69,6 +69,11 @@
         "description": {
           "type": "string",
           "description": "Human-readable description of what this profile covers."
+        },
+        "profile_tier": {
+          "type": "string",
+          "description": "Confidence classification for deployment UI and builder flows.",
+          "enum": ["official", "experimental"]
         }
       },
       "required": ["schema_version", "vendor"]
@@ -110,13 +115,43 @@
         },
         "fan_zones": {
           "type": "array",
-          "description": "Fan zone definitions with speed control commands.",
-          "items": { "$ref": "#/$defs/ipmi_fan_zone" },
-          "minItems": 1
+          "description": "Fan zone definitions with speed control commands. Empty array means monitor-only IPMI profile (telemetry without manual fan control).",
+          "items": { "$ref": "#/$defs/ipmi_fan_zone" }
         },
         "lifecycle": { "$ref": "#/$defs/lifecycle" }
       },
-      "required": ["parsing", "fan_zones", "lifecycle"]
+      "required": ["parsing", "fan_zones", "lifecycle"],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "fan_zones": {
+                "minItems": 1
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "lifecycle": {
+                "properties": {
+                  "reset_to_factory": {
+                    "minItems": 1,
+                    "contains": {
+                      "type": "object",
+                      "properties": {
+                        "critical": {
+                          "const": true
+                        }
+                      },
+                      "required": ["critical"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
     },
 
     "redfish_protocol": {
@@ -267,14 +302,8 @@
         },
         "reset_to_factory": {
           "type": "array",
-          "description": "Commands run on shutdown/crash. Restores factory auto-control. MUST contain at least one critical command.",
-          "items": { "$ref": "#/$defs/lifecycle_command" },
-          "minItems": 1,
-          "contains": {
-            "type": "object",
-            "properties": { "critical": { "const": true } },
-            "required": ["critical"]
-          }
+          "description": "Commands run on shutdown/crash. Restores factory auto-control. Write-capable profiles should contain at least one critical command; monitor-only profiles may leave this empty.",
+          "items": { "$ref": "#/$defs/lifecycle_command" }
         }
       },
       "required": ["initialization", "reset_to_factory"]

@@ -2,6 +2,7 @@
   "metadata": {
     "schema_version": "2.0",
     "vendor": "Supermicro",
+    "profile_tier": "official",
     "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
     "author": "Pankha Official",
     "description": "Supermicro base profile. Contains only what is shared across all Supermicro generations (parsing tokens, lifecycle commands). Fan zones with generation-specific hex codes belong in child profiles (x9_series, x10_series, etc.)."

@@ -38,11 +38,15 @@ pub fn load_profile(path: &Path) -> Result<BmcProfile> {
         .and_then(|p| p.ipmi.as_ref())
         .ok_or_else(|| anyhow!("Profile has no IPMI protocol section after resolution"))?;
 
-    // Validate: reset_to_factory must have at least one critical command
+    let is_monitor_only = ipmi.fan_zones.is_empty();
+
+    // Validate: write-capable profiles must have at least one critical reset command.
+    // Monitor-only profiles are allowed to omit reset commands because they never
+    // take over BMC fan control in the first place.
     let has_critical_reset = ipmi.lifecycle.reset_to_factory.iter()
         .any(|cmd| cmd.critical);
 
-    if !has_critical_reset {
+    if !is_monitor_only && !has_critical_reset {
         return Err(anyhow!(
             "Safety violation: reset_to_factory must contain at least one critical: true command. \
              Profile rejected to prevent BMC lockout on agent crash."
@@ -50,12 +54,13 @@ pub fn load_profile(path: &Path) -> Result<BmcProfile> {
     }
 
     info!(
-        "Loaded profile: {} ({}) — {} fan zones, {} init commands, {} reset commands",
+        "Loaded profile: {} ({}) — {} fan zones, {} init commands, {} reset commands{}",
         profile.metadata.vendor,
         profile.metadata.description.as_deref().unwrap_or("no description"),
         ipmi.fan_zones.len(),
         ipmi.lifecycle.initialization.len(),
         ipmi.lifecycle.reset_to_factory.len(),
+        if is_monitor_only { " [monitor-only]" } else { "" },
     );
 
     Ok(profile)
