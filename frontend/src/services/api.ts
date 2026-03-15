@@ -415,6 +415,7 @@ export interface HubStatus {
   files: {
     x64: boolean;
     arm64: boolean;
+    ipmi_x64: boolean;
   };
 }
 

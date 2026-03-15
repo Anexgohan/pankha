@@ -10,6 +10,7 @@ export interface UpdateStatus {
   files: {
     x64: boolean;
     arm64: boolean;
+    ipmi_x64: boolean;
   };
   checksums: {
     [key: string]: string;
@@ -61,7 +62,8 @@ export class UpdateDownloadService {
       timestamp: null,
       files: {
         x64: this.fileExists('pankha-agent-linux_x64'),
-        arm64: this.fileExists('pankha-agent-linux_arm64')
+        arm64: this.fileExists('pankha-agent-linux_arm64'),
+        ipmi_x64: this.fileExists('pankha-agent-ipmi-linux_x64'),
       },
       checksums: {}
     };
@@ -77,9 +79,10 @@ export class UpdateDownloadService {
     const tag = version.startsWith('v') ? version : `v${version}`;
     const baseUrl = `https://github.com/Anexgohan/pankha/releases/download/${tag}/`;
 
-    const targets = [
-      { arch: 'x64', filename: 'pankha-agent-linux_x64' },
-      { arch: 'arm64', filename: 'pankha-agent-linux_arm64' }
+    const targets: { arch: string; filename: string; required: boolean }[] = [
+      { arch: 'x64', filename: 'pankha-agent-linux_x64', required: true },
+      { arch: 'arm64', filename: 'pankha-agent-linux_arm64', required: true },
+      { arch: 'ipmi_x64', filename: 'pankha-agent-ipmi-linux_x64', required: false },
     ];
 
     try {
@@ -104,24 +107,32 @@ export class UpdateDownloadService {
       for (const target of targets) {
         const url = `${baseUrl}${target.filename}`;
         const dest = path.join(this.updatesDir, target.filename);
-        
-        log.info(`Downloading ${target.arch} binary from ${url}...`, 'UpdateService');
-        await this.downloadFile(url, dest);
 
-        // Verify checksum
-        const expectedHash = checksumMap[target.filename];
-        if (expectedHash) {
-          log.info(`Verifying checksum for ${target.filename}...`, 'UpdateService');
-          const isValid = await this.verifyChecksum(dest, expectedHash);
-          if (!isValid) {
-            throw new Error(`Checksum verification failed for ${target.filename}`);
+        try {
+          log.info(`Downloading ${target.arch} binary from ${url}...`, 'UpdateService');
+          await this.downloadFile(url, dest);
+
+          // Verify checksum
+          const expectedHash = checksumMap[target.filename];
+          if (expectedHash) {
+            log.info(`Verifying checksum for ${target.filename}...`, 'UpdateService');
+            const isValid = await this.verifyChecksum(dest, expectedHash);
+            if (!isValid) {
+              throw new Error(`Checksum verification failed for ${target.filename}`);
+            }
+            log.success(`Checksum verified for ${target.filename}`, 'UpdateService');
+          } else {
+            log.warn(`No checksum found for ${target.filename} in checksums.txt`, 'UpdateService');
           }
-          log.success(`Checksum verified for ${target.filename}`, 'UpdateService');
-        } else {
-          log.warn(`No checksum found for ${target.filename} in checksums.txt`, 'UpdateService');
-        }
 
-        fs.chmodSync(dest, 0o755); // Ensure executable
+          fs.chmodSync(dest, 0o755); // Ensure executable
+        } catch (err) {
+          if (!target.required) {
+            log.warn(`Optional binary ${target.filename} not found in release ${tag} — skipping`, 'UpdateService');
+            continue;
+          }
+          throw err;
+        }
       }
 
       // Update status file
@@ -130,7 +141,8 @@ export class UpdateDownloadService {
         timestamp: new Date().toISOString(),
         files: {
           x64: true,
-          arm64: true
+          arm64: true,
+          ipmi_x64: this.fileExists('pankha-agent-ipmi-linux_x64'),
         },
         checksums: checksumMap
       };
@@ -153,7 +165,7 @@ export class UpdateDownloadService {
   private static readonly BINARY_PREFIX: Record<string, string> = {
     'os_linux':      'linux',          // → pankha-agent-linux_{arch}
     'os_windows':    'windows',        // → pankha-agent-windows_{arch}
-    'ipmi_host':     'ipmi-linux',     // → pankha-agent-ipmi-linux_{arch}  (TBD)
+    'ipmi_host':     'ipmi-linux',     // → pankha-agent-ipmi-linux_{arch}
   };
 
   /**
@@ -278,7 +290,7 @@ export class UpdateDownloadService {
       const emptyStatus: UpdateStatus = {
         version: null,
         timestamp: null,
-        files: { x64: false, arm64: false },
+        files: { x64: false, arm64: false, ipmi_x64: false },
         checksums: {}
       };
       fs.writeFileSync(this.statusFile, JSON.stringify(emptyStatus, null, 2));

@@ -692,9 +692,16 @@
   .local-prep-widget {
     width: 100%;
     box-sizing: border-box;
-    flex-direction: column;
-    align-items: stretch !important; /* Override default center */
     gap: var(--spacing-md) !important;
+  }
+
+  .prep-row {
+    flex-wrap: wrap;
+    gap: var(--spacing-sm);
+  }
+
+  .prep-binary-badges {
+    margin-left: 0;
   }
 
   .prep-actions-group {
@@ -1066,14 +1073,56 @@
 /* Local Hub/Prep Widget */
 .local-prep-widget {
   display: flex;
-  align-items: center;
-  gap: var(--spacing-xl);
+  flex-direction: column;
+  gap: var(--spacing-sm);
   padding: var(--spacing-md) var(--spacing-xl);
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   margin: 0 var(--spacing-xl);
-  justify-content: space-between;
+}
+
+.prep-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xl);
+  width: 100%;
+}
+
+.prep-status-row {
+  justify-content: flex-start;
+}
+
+.prep-actions-row {
+  justify-content: flex-start;
+}
+
+/* Binary availability badges */
+.prep-binary-badges {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.prep-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.prep-badge.ready {
+  background: color-mix(in srgb, var(--color-success), transparent 88%);
+  color: var(--color-success);
+}
+
+.prep-badge.missing {
+  background: var(--bg-hover);
+  color: var(--text-tertiary);
 }
 
 .prep-status {

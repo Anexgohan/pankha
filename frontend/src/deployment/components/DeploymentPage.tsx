@@ -955,102 +955,120 @@ export const DeploymentPage: React.FC<{
           <h3><Download size={20} /> Agent Downloads</h3>
           <p style={{ margin: '-12px 0 0 28px', fontSize: 'var(--font-size-sm2)', color: 'var(--text-secondary)' }}>Download a release to the Pankha Hub, then push it to Clients from Fleet Maintenance.</p>
           <div className="local-prep-widget">
-            <div className="prep-status">
-              <Server size={14} />
-              <span className="prep-label">Pankha Hub:</span>
-              {hubStatus?.version ? (
-                <span className="prep-version success">{hubStatus.version} Ready</span>
-              ) : (
-                <span className="prep-version empty">No Cache</span>
-              )}
-              {latestVersion && hubStatus?.version && hubStatus.version !== latestVersion && (
-                <span className="prep-version available">{latestVersion} Available</span>
-              )}
-            </div>
-
-            <div className="prep-actions-group">
-              <div className="stealth-select-wrapper version-picker-wrapper">
-                <div className="select-display">{pickerDisplay}</div>
-                <select
-                  className="select-engine"
-                  value=""
-                  onChange={(e) => {
-                    const ver = e.target.value;
-                    const isStable = stableReleases.some(r => r.tag_name === ver);
-                    if (isStable) {
-                      setSelectedStableVersion(ver);
-                      sessionStorage.setItem('pankha-picker-stable', ver);
-                    } else {
-                      setSelectedUnstableVersion(ver);
-                      sessionStorage.setItem('pankha-picker-unstable', ver);
-                    }
-                    const label = isStable ? `Stable ${ver}` : `Unstable ${ver}`;
-                    setPickerDisplay(label);
-                    sessionStorage.setItem('pankha-picker-display', label);
-                  }}
-                  disabled={isStaging}
-                >
-                  <option value="" disabled>Pick a version</option>
-                  {stableReleases.length > 0 && (
-                    <optgroup label="Stable">
-                      {stableReleases.map(r => (
-                        <option key={r.tag_name} value={r.tag_name}>
-                          {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {unstableReleases.length > 0 && (
-                    <optgroup label="Unstable">
-                      {unstableReleases.map(r => (
-                        <option key={r.tag_name} value={r.tag_name}>
-                          {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
+            {/* Row 1: Status + Binary badges + Clear */}
+            <div className="prep-row prep-status-row">
+              <div className="prep-status">
+                <Server size={14} />
+                <span className="prep-label">Pankha Hub:</span>
+                {hubStatus?.version ? (
+                  <span className="prep-version success">{hubStatus.version} Ready</span>
+                ) : (
+                  <span className="prep-version empty">No Cache</span>
+                )}
+                {latestVersion && hubStatus?.version && hubStatus.version !== latestVersion && (
+                  <span className="prep-version available">{latestVersion} Available</span>
+                )}
               </div>
 
-              {latestVersion && (
-                <button
-                  className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedStableVersion ? 'current' : ''}`}
-                  onClick={() => handleStageUpdate(selectedStableVersion)}
-                  disabled={isStaging || hubStatus?.version === selectedStableVersion}
-                  title={hubStatus?.version === selectedStableVersion
-                    ? `Stable Version ${selectedStableVersion} is Ready to Deploy.`
-                    : `Download Stable Version ${selectedStableVersion} \nSafe & Reliable.`}
-                >
-                  <Download size={12} />
-                  <span>Stable {selectedStableVersion}</span>
-                </button>
-              )}
+              <div className="prep-binary-badges">
+                <span className={`prep-badge ${hubStatus?.files?.x64 ? 'ready' : 'missing'}`} title="OS Linux x64 binary">
+                  OS x64 {hubStatus?.files?.x64 ? '✓' : '✗'}
+                </span>
+                <span className={`prep-badge ${hubStatus?.files?.arm64 ? 'ready' : 'missing'}`} title="OS Linux arm64 binary">
+                  OS arm64 {hubStatus?.files?.arm64 ? '✓' : '✗'}
+                </span>
+                <span className={`prep-badge ${hubStatus?.files?.ipmi_x64 ? 'ready' : 'missing'}`} title="IPMI Host x64 binary">
+                  IPMI x64 {hubStatus?.files?.ipmi_x64 ? '✓' : '✗'}
+                </span>
+              </div>
 
-              {unstableVersion && (
+              <div className="prep-manual-actions">
                 <button
-                  className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedUnstableVersion ? 'current' : ''}`}
-                  onClick={() => handleStageUpdate(selectedUnstableVersion)}
-                  disabled={isStaging || hubStatus?.version === selectedUnstableVersion}
-                  title={hubStatus?.version === selectedUnstableVersion
-                    ? `Experimental Version ${selectedUnstableVersion} is Ready to Deploy.`
-                    : `Download Experimental Version ${selectedUnstableVersion} \nNewest Features & Fixes, may have bugs.`}
+                  className="btn-clear-cache"
+                  onClick={handleClearDownloads}
+                  disabled={!hubStatus?.version || isStaging}
+                  title="Clear all cached agent binaries from Hub server"
                 >
-                  <Activity size={12} />
-                  <span>Unstable {selectedUnstableVersion}</span>
+                  <Trash2 size={14} />
+                  <span>Clear Cache</span>
                 </button>
-              )}
+              </div>
             </div>
 
-            <div className="prep-manual-actions">
-              <button
-                className="btn-clear-cache"
-                onClick={handleClearDownloads}
-                disabled={!hubStatus?.version || isStaging}
-                title="Clear all cached agent binaries from Hub server"
-              >
-                <Trash2 size={14} />
-                <span>Clear Cache</span>
-              </button>
+            {/* Row 2: Version picker + Download buttons */}
+            <div className="prep-row prep-actions-row">
+              <div className="prep-actions-group">
+                <div className="stealth-select-wrapper version-picker-wrapper">
+                  <div className="select-display">{pickerDisplay}</div>
+                  <select
+                    className="select-engine"
+                    value=""
+                    onChange={(e) => {
+                      const ver = e.target.value;
+                      const isStable = stableReleases.some(r => r.tag_name === ver);
+                      if (isStable) {
+                        setSelectedStableVersion(ver);
+                        sessionStorage.setItem('pankha-picker-stable', ver);
+                      } else {
+                        setSelectedUnstableVersion(ver);
+                        sessionStorage.setItem('pankha-picker-unstable', ver);
+                      }
+                      const label = isStable ? `Stable ${ver}` : `Unstable ${ver}`;
+                      setPickerDisplay(label);
+                      sessionStorage.setItem('pankha-picker-display', label);
+                    }}
+                    disabled={isStaging}
+                  >
+                    <option value="" disabled>Pick a version</option>
+                    {stableReleases.length > 0 && (
+                      <optgroup label="Stable">
+                        {stableReleases.map(r => (
+                          <option key={r.tag_name} value={r.tag_name}>
+                            {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {unstableReleases.length > 0 && (
+                      <optgroup label="Unstable">
+                        {unstableReleases.map(r => (
+                          <option key={r.tag_name} value={r.tag_name}>
+                            {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                </div>
+
+                {latestVersion && (
+                  <button
+                    className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedStableVersion ? 'current' : ''}`}
+                    onClick={() => handleStageUpdate(selectedStableVersion)}
+                    disabled={isStaging || hubStatus?.version === selectedStableVersion}
+                    title={hubStatus?.version === selectedStableVersion
+                      ? `Stable Version ${selectedStableVersion} is Ready to Deploy.`
+                      : `Download Stable Version ${selectedStableVersion} \nSafe & Reliable.`}
+                  >
+                    <Download size={12} />
+                    <span>Stable {selectedStableVersion}</span>
+                  </button>
+                )}
+
+                {unstableVersion && (
+                  <button
+                    className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedUnstableVersion ? 'current' : ''}`}
+                    onClick={() => handleStageUpdate(selectedUnstableVersion)}
+                    disabled={isStaging || hubStatus?.version === selectedUnstableVersion}
+                    title={hubStatus?.version === selectedUnstableVersion
+                      ? `Experimental Version ${selectedUnstableVersion} is Ready to Deploy.`
+                      : `Download Experimental Version ${selectedUnstableVersion} \nNewest Features & Fixes, may have bugs.`}
+                  >
+                    <Activity size={12} />
+                    <span>Unstable {selectedUnstableVersion}</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </section>
