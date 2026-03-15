@@ -3,7 +3,7 @@ import { Branding } from './components/Branding';
 import { Toaster } from './components/ui/Toaster';
 import { GraphPatternDefs } from './components/GraphPatternDefs';
 import { ThemeProvider } from './contexts/ThemeContext';
-import { SensorVisibilityProvider } from './contexts/SensorVisibilityContext';
+import { VisibilityProvider } from './contexts/VisibilityContext';
 import { DashboardSettingsProvider } from './contexts/DashboardSettingsContext';
 import { LicenseProvider } from './license';
 
@@ -12,14 +12,14 @@ function App() {
     <ThemeProvider>
       <LicenseProvider>
         <DashboardSettingsProvider>
-          <SensorVisibilityProvider>
+          <VisibilityProvider>
             <GraphPatternDefs />
             <div className="App">
               <SystemsPage />
               <Branding />
               <Toaster />
             </div>
-          </SensorVisibilityProvider>
+          </VisibilityProvider>
         </DashboardSettingsProvider>
       </LicenseProvider>
     </ThemeProvider>

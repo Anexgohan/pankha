@@ -15,8 +15,9 @@ import {
   updateAgentName,
   updateSensorVisibility,
   updateGroupVisibility,
+  updateFanVisibility,
 } from "../../services/api";
-import { useSensorVisibility } from "../../contexts/SensorVisibilityContext";
+import { useVisibility } from "../../contexts/VisibilityContext";
 import {
   getFanProfiles,
   assignProfileToFan,
@@ -100,7 +101,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [enableFanControl, setEnableFanControlLocal] = useState<boolean>(
     system.enable_fan_control ?? getDefault<boolean>('fanControl')
   );
-  const [showHiddenSensors, setShowHiddenSensors] = useState(false);
+  const [showHidden, setShowHidden] = useState(false);
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);
   const [selectedSensors, setSelectedSensors] = useState<
     Record<string, string>
@@ -170,7 +171,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
     isSensorHidden,
     toggleGroupVisibility,
     isGroupHidden,
-  } = useSensorVisibility();
+    toggleFanVisibility,
+    isFanHidden,
+  } = useVisibility();
 
   // 24h Sensor History Hook with real-time WebSocket updates
   const { history, setExpanded: setHistoryExpanded } = useSensorHistory(
@@ -379,6 +382,23 @@ const SystemCard: React.FC<SystemCardProps> = ({
       await updateGroupVisibility(system.id, groupId, isHidden);
     } catch (error) {
       console.error("Failed to sync group visibility to backend:", error);
+    }
+  };
+
+  // Wrapper to toggle fan visibility (updates both localStorage and backend)
+  const handleToggleFanVisibility = async (
+    fanId: string,
+    fanDbId?: number
+  ) => {
+    toggleFanVisibility(fanId);
+
+    if (fanDbId) {
+      try {
+        const isHidden = !isFanHidden(fanId);
+        await updateFanVisibility(system.id, fanDbId, isHidden);
+      } catch (error) {
+        console.error("Failed to sync fan visibility to backend:", error);
+      }
     }
   };
 
@@ -1174,14 +1194,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
           system.current_temperatures.length > 0 && (
             <button
               className="system-stats-button"
-              onClick={() => setShowHiddenSensors(!showHiddenSensors)}
+              onClick={() => setShowHidden(!showHidden)}
               title={
-                showHiddenSensors
-                  ? "Hide hidden sensors"
-                  : "Show hidden sensors"
+                showHidden
+                  ? "Hide hidden sensors and fans"
+                  : "Show hidden sensors and fans"
               }
             >
-              {showHiddenSensors ? "Hide" : "Show"}
+              {showHidden ? "Hide" : "Show"}
             </button>
           )}
 
@@ -1220,7 +1240,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   {(() => {
                     const filteredSensors = system.current_temperatures.filter(
                       (sensor: SensorReading) =>
-                        showHiddenSensors ||
+                        showHidden ||
                         (!isSensorHidden(sensor.id) && !sensor.isHidden)
                     );
 
@@ -1229,9 +1249,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     // Sort groups for consistent display order
                     const sortedGroups = sortSensorGroups(sensorGroups);
 
-                    // Filter out hidden groups unless showHiddenSensors is true
+                    // Filter out hidden groups unless showHidden is true
                     const visibleGroups = sortedGroups.filter(
-                      ([chipId]) => showHiddenSensors || !isGroupHidden(chipId)
+                      ([chipId]) => showHidden || !isGroupHidden(chipId)
                     );
 
                     return visibleGroups.map(([chipId, chipSensors]) => {
@@ -1330,21 +1350,30 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   zoneGroups.get(z)!.push(fan);
                 }
 
-                return Array.from(zoneGroups.entries()).map(([zoneId, zoneFans]) => {
+                return Array.from(zoneGroups.entries())
+                  .filter(([, zoneFans]) => {
+                    // Hide zone if all fans in it are hidden (unless showHidden)
+                    if (showHidden) return true;
+                    return zoneFans.some(f => !isFanHidden(f.id) && !f.isHidden);
+                  })
+                  .map(([zoneId, zoneFans]) => {
                   const representativeFan = zoneFans[0];
                   const zoneLoadingKey = `zone-profile-${zoneId}`;
+                  const visibleZoneFans = showHidden
+                    ? zoneFans
+                    : zoneFans.filter(f => !isFanHidden(f.id) && !f.isHidden);
 
                   return (
                     <div key={`zone-${zoneId}`} className="zone-group">
                       <div className="zone-header-bar">
                         <span className="zone-name">{formatZoneName(zoneId)}</span>
                         <span className="zone-fan-count">
-                          {zoneFans.length} fan{zoneFans.length !== 1 ? 's' : ''}
+                          {visibleZoneFans.length} fan{visibleZoneFans.length !== 1 ? 's' : ''}
                         </span>
                       </div>
 
                       {/* Zone member fans - metrics only */}
-                      {zoneFans.map(fan => {
+                      {(showHidden ? zoneFans : visibleZoneFans).map(fan => {
                         const rpmDecreasing = fanRpmStateRef.current[fan.id]?.decreasing ?? false;
                         const flowDir = fan.rpm === 0 ? '' : rpmDecreasing ? 'ccw' : 'cw';
 
@@ -1359,7 +1388,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         const dashOffset = circumference * (1 - fan.speed / 100);
 
                         return (
-                          <div key={fan.id} className="fan-item zone-member">
+                          <div key={fan.id} className={`fan-item zone-member ${isFanHidden(fan.id) || fan.isHidden ? 'fan-hidden' : ''}`}>
                             <div className="fan-header">
                               <div className="fan-info">
                                 <div className="fan-title">
@@ -1386,6 +1415,18 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                   </span>
                                 </div>
                               </div>
+
+                              <button
+                                className="fan-visibility-toggle"
+                                onClick={() => handleToggleFanVisibility(fan.id, fan.dbId)}
+                                title={isFanHidden(fan.id) ? "Show fan" : "Hide fan"}
+                              >
+                                {isFanHidden(fan.id) ? (
+                                  <img src="/icons/toggle-off-01.png" width={18} height={18} alt="Hidden" />
+                                ) : (
+                                  <img src="/icons/toggle-on-01.png" width={18} height={18} alt="Visible" />
+                                )}
+                              </button>
 
                               <div className="speed-display">
                                 <div className="speed-circle">
@@ -1586,8 +1627,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
               })()}
 
               {/* Per-fan rendering for OS agents (existing layout, no zones) */}
-              {!system.current_fan_speeds.some((f: FanReading) => f.zone) && system.current_fan_speeds.map((fan: FanReading) => (
-                <div key={fan.id} className="fan-item">
+              {!system.current_fan_speeds.some((f: FanReading) => f.zone) && system.current_fan_speeds
+                .filter((fan: FanReading) => showHidden || (!isFanHidden(fan.id) && !fan.isHidden))
+                .map((fan: FanReading) => (
+                <div key={fan.id} className={`fan-item ${isFanHidden(fan.id) || fan.isHidden ? 'fan-hidden' : ''}`}>
                   <div className="fan-header">
                     <div className="fan-info">
                       <div className="fan-title">
@@ -1627,6 +1670,18 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         </span>
                       </div>
                     </div>
+
+                    <button
+                      className="fan-visibility-toggle"
+                      onClick={() => handleToggleFanVisibility(fan.id, fan.dbId)}
+                      title={isFanHidden(fan.id) ? "Show fan" : "Hide fan"}
+                    >
+                      {isFanHidden(fan.id) ? (
+                        <img src="/icons/toggle-off-01.png" width={18} height={18} alt="Hidden" />
+                      ) : (
+                        <img src="/icons/toggle-on-01.png" width={18} height={18} alt="Visible" />
+                      )}
+                    </button>
 
                     {(() => {
                       const rpmDecreasing = fanRpmStateRef.current[fan.id]?.decreasing ?? false;

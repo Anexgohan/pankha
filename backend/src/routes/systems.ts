@@ -1552,6 +1552,48 @@ router.put("/:id/name", async (req: Request, res: Response) => {
   }
 });
 
+// PUT /api/systems/:id/fans/:fanId/visibility - Toggle individual fan visibility
+router.put(
+  "/:id/fans/:fanId/visibility",
+  async (req: Request, res: Response) => {
+    try {
+      const systemId = parseInt(req.params.id);
+      const fanId = parseInt(req.params.fanId);
+      const { is_hidden } = req.body;
+
+      if (typeof is_hidden !== "boolean") {
+        return res.status(400).json({ error: "is_hidden must be a boolean" });
+      }
+
+      const system = await db.get("SELECT id FROM systems WHERE id = $1", [
+        systemId,
+      ]);
+      if (!system) {
+        return res.status(404).json({ error: "System not found" });
+      }
+
+      await db.run(
+        "UPDATE fans SET is_hidden = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 AND system_id = $3",
+        [is_hidden, fanId, systemId]
+      );
+
+      log.info(
+        `Fan ${fanId} visibility updated: is_hidden=${is_hidden}`,
+        "systems"
+      );
+
+      res.json({
+        message: "Fan visibility updated successfully",
+        fan_id: fanId,
+        is_hidden,
+      });
+    } catch (error) {
+      log.error("Error updating fan visibility:", "systems", error);
+      res.status(500).json({ error: "Failed to update fan visibility" });
+    }
+  }
+);
+
 // PUT /api/systems/:id/sensors/:sensorId/visibility - Toggle individual sensor visibility
 router.put(
   "/:id/sensors/:sensorId/visibility",

@@ -247,6 +247,9 @@ export class DeltaComputer {
     if (prev.label !== current.label) {
       delta.label = current.label;
     }
+    if (prev.isHidden !== current.isHidden) {
+      delta.isHidden = current.isHidden;
+    }
 
     return Object.keys(delta).length > 0 ? delta : null;
   }

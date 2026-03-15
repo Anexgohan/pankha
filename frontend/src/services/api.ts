@@ -302,6 +302,17 @@ export const updateSetting = async (key: string, value: string | number) => {
   return response.data;
 };
 
+// Fan Visibility
+export const updateFanVisibility = async (
+  systemId: number,
+  fanId: number,
+  isHidden: boolean
+): Promise<void> => {
+  await api.put(`/api/systems/${systemId}/fans/${fanId}/visibility`, {
+    is_hidden: isHidden,
+  });
+};
+
 // Sensor Visibility
 export const updateSensorVisibility = async (
   systemId: number,

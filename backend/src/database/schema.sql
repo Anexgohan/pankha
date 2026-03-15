@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS fans (
   target_speed INTEGER,
   is_controllable BOOLEAN DEFAULT true,     -- Can PWM be controlled
   enabled BOOLEAN DEFAULT true,
+  is_hidden BOOLEAN DEFAULT false,              -- User has hidden this fan from display
   is_stale BOOLEAN DEFAULT false,             -- Auto-pruning flag (separate from user's enabled toggle)
   last_command TIMESTAMPTZ,                   -- Last control command sent
   last_reported TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, -- Last time agent reported this fan

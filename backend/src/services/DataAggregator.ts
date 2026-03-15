@@ -651,7 +651,7 @@ export class DataAggregator extends EventEmitter {
     // Enrich fan data
     for (const fan of data.fans) {
       const fanInfo = await this.db.get(
-        "SELECT id, fan_label, target_speed, zone_id FROM fans WHERE system_id = $1 AND fan_name = $2",
+        "SELECT id, fan_label, target_speed, zone_id, is_hidden FROM fans WHERE system_id = $1 AND fan_name = $2",
         [data.systemId, fan.id]
       );
 
@@ -669,6 +669,7 @@ export class DataAggregator extends EventEmitter {
         if (fanInfo.zone_id) {
           fan.zone = fanInfo.zone_id;
         }
+        fan.isHidden = fanInfo.is_hidden || false;
       } else {
         log.warn(
           `[DataAggregator] No fan info found for fan ${fan.id} in system ${data.systemId}`,
