@@ -115,7 +115,62 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Job 2: Build Windows Agent
+  # Job 2: Build IPMI agent (x64 only — enterprise BMC servers)
+  build-ipmi-agent:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: agents/clients/linux/virtual-agents/host-ipmi-rust
+          shared-key: rust-cache-ipmi-x64
+
+      - name: Inject version into Cargo.toml
+        working-directory: agents/clients/linux/virtual-agents/host-ipmi-rust
+        run: |
+          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix
+
+          # Convert 4-part version to SemVer prerelease format: 0.1.7.1 → 0.1.7-1
+          DOTS=$(echo "$VERSION_NUM" | grep -o '\.' | wc -l)
+          if [ "$DOTS" -ge 3 ]; then
+            CARGO_VER=$(echo "$VERSION_NUM" | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\.\([0-9]*\)/\1-\2/')
+            echo "⚠️  Converting: $VERSION_NUM → $CARGO_VER (SemVer prerelease format)"
+          else
+            CARGO_VER="$VERSION_NUM"
+            echo "📝 Using version: $CARGO_VER"
+          fi
+
+          sed -i "s/^version = \".*\"/version = \"$CARGO_VER\"/" Cargo.toml
+          cat Cargo.toml | head -5
+
+      - name: Build IPMI agent (x64)
+        working-directory: agents/clients/linux/virtual-agents/host-ipmi-rust
+        run: |
+          echo "🦀 Building IPMI agent for x64..."
+          cargo build --release
+          mv target/release/pankha-agent-ipmi-linux target/release/pankha-agent-ipmi-linux_x64
+          echo "✅ IPMI x64 agent built"
+          ls -lh target/release/pankha-agent-ipmi-linux_x64
+
+      - name: Upload IPMI agent binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pankha-agent-ipmi-x64
+          path: agents/clients/linux/virtual-agents/host-ipmi-rust/target/release/pankha-agent-ipmi-linux_x64
+          if-no-files-found: error
+          retention-days: 1
+
+  # Job 3: Build Windows agent
   build-windows-agent:
     runs-on: windows-latest
     steps:
@@ -147,7 +202,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Job 3: Build Docker images (parallel with FREE ARM64 runner - NO QEMU!)
+  # Job 4: Build Docker images
   build-docker:
     strategy:
       matrix:
@@ -196,9 +251,9 @@ jobs:
           cache-from: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }}
           cache-to: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }},mode=max
 
-  # Job 4: Create multi-arch manifest and release
+  # Job 5: Create multi-arch manifest and release
   release:
-    needs: [build-rust-agents, build-windows-agent, build-docker]
+    needs: [build-rust-agents, build-ipmi-agent, build-windows-agent, build-docker]
     runs-on: ubuntu-22.04
 
     steps:
@@ -245,6 +300,12 @@ jobs:
           name: pankha-agent-arm64
           path: artifacts/arm64
 
+      - name: Download IPMI x64 agent
+        uses: actions/download-artifact@v4
+        with:
+          name: pankha-agent-ipmi-x64
+          path: artifacts/ipmi
+
       - name: Download Windows MSI
         uses: actions/download-artifact@v4
         with:
@@ -256,8 +317,9 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # Find and copy agent binaries
+          # Find and copy agent binaries (OS + IPMI)
           find artifacts -name "pankha-agent-linux_*" -exec cp {} release-assets/ \;
+          find artifacts -name "pankha-agent-ipmi-linux_*" -exec cp {} release-assets/ \;
 
           # Copy Windows MSI
           cp artifacts/windows/*.msi release-assets/
@@ -270,7 +332,7 @@ jobs:
           cp example.env release-assets/
 
           # Make binaries executable
-          chmod +x release-assets/pankha-agent-linux_* 2>/dev/null || true
+          chmod +x release-assets/pankha-agent-*linux_* 2>/dev/null || true
 
           # Generate checksums
           cd release-assets
@@ -359,12 +421,15 @@ jobs:
       - name: Update agent releases in repo
         run: |
           mkdir -p agents/releases/linux
+          mkdir -p agents/releases/ipmi-linux
 
           cp release-assets/pankha-agent-linux_x64 agents/releases/linux/
           cp release-assets/pankha-agent-linux_arm64 agents/releases/linux/
           cp release-assets/config.example.json agents/releases/linux/
+          cp release-assets/pankha-agent-ipmi-linux_x64 agents/releases/ipmi-linux/
 
           chmod +x agents/releases/linux/pankha-agent-linux_*
+          chmod +x agents/releases/ipmi-linux/pankha-agent-ipmi-linux_*
 
           git config user.name "Anexgohan"
           git config user.email "monish05m@gmail.com"
@@ -397,6 +462,7 @@ jobs:
           files: |
             release-assets/pankha-agent-linux_x64
             release-assets/pankha-agent-linux_arm64
+            release-assets/pankha-agent-ipmi-linux_x64
             release-assets/pankha-agent-windows_x64.msi
             release-assets/config.example.json
             release-assets/compose.yml
@@ -502,6 +568,7 @@ jobs:
           echo "**Release Assets:**" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ pankha-agent-linux_x64" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ pankha-agent-linux_arm64" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ pankha-agent-ipmi-linux_x64" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ pankha-agent-windows_x64.msi" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ config.example.json" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ compose.yml" >> $GITHUB_STEP_SUMMARY
@@ -514,5 +581,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### ⚡ Build Performance:" >> $GITHUB_STEP_SUMMARY
           echo "- Rust agents: Native builds (x64 + ARM64)" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker images: Native builds (NO QEMU!)" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker images: Native builds (amd64 + arm64)" >> $GITHUB_STEP_SUMMARY
           echo "- Windows agent: Native build" >> $GITHUB_STEP_SUMMARY
