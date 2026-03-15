@@ -303,9 +303,11 @@ function generateIpmiInstallScript(config: any, backendUrl: string, wsUrl: strin
     update_interval,
     fan_step,
     hysteresis,
-    profile_id
+    profile_id,
+    agent_type
   } = config;
 
+  const agentType = agent_type || 'ipmi_host';
   const isPortable = path_mode === 'portable';
   const installDirValue = isPortable ? '$(pwd)' : '/opt/pankha-agent';
   const logFileValue = isPortable ? '$(pwd)/agent.log' : '/var/log/pankha-agent/agent.log';
@@ -322,6 +324,7 @@ echo "==============================================="
 echo ""
 
 INSTALL_DIR="${installDirValue}"
+AGENT_TYPE="${agentType}"
 LOG_LEVEL="${log_level || 'INFO'}"
 FAILSAFE_SPEED="${failsafe_speed || 70}"
 EMERGENCY_TEMP="${emergency_temp || 80}"
@@ -346,6 +349,7 @@ run_as_root() {
 }
 
 echo "[1/6] Install directory: $INSTALL_DIR"
+echo "      Agent Type: $AGENT_TYPE"
 echo "      WebSocket URL: $WS_URL"
 echo "      BMC Profile: $PROFILE_ID"
 echo ""
@@ -363,11 +367,11 @@ fi
 
 ${SHELL_ARCH_DETECT}
 
-BINARY_URL="${localBinaryBase}/ipmi_host/$ARCH"
+BINARY_URL="${localBinaryBase}/$AGENT_TYPE/$ARCH"
 
 echo "[3/6] Detected architecture: $RAW_ARCH → $ARCH"
 
-echo "      Downloading IPMI agent from: $BINARY_URL"
+echo "      Downloading IPMI agent ($AGENT_TYPE) from: $BINARY_URL"
 echo ""
 
 # Download binary
@@ -391,23 +395,21 @@ else
     run_as_root chmod +x "$INSTALL_DIR/pankha-agent"
 fi
 
-echo "[4/6] Generating IPMI configuration..."
+echo "[4/6] Generating configuration..."
 
 # Generate unique agent ID
-AGENT_ID="ipmi-$(hostname)-$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)"
+AGENT_ID="linux-$(hostname)-$(head /dev/urandom | tr -dc a-z0-9 | head -c 8)"
 
-# Write config.json (IPMI agent config includes profile_id)
+# Write config.json
 CONFIG_CONTENT='{
   "agent": {
     "name": "'$(hostname)'",
     "id": "'$AGENT_ID'",
-    "agent_type": "ipmi",
     "update_interval": '$UPDATE_INTERVAL',
     "log_level": "'$LOG_LEVEL'"
   },
   "backend": {
     "server_url": "'$WS_URL'",
-    "api_url": "'$BACKEND_URL'",
     "reconnect_interval": 5.0,
     "max_reconnect_attempts": -1,
     "connection_timeout": 10.0
@@ -439,7 +441,6 @@ else
 fi
 
 echo "      Agent ID: $AGENT_ID"
-echo "      Profile: $PROFILE_ID"
 echo ""
 
 # Setup systemd service

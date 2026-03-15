@@ -786,7 +786,7 @@ export const DeploymentPage: React.FC<{
         };
 
         if (aioAgentMode === 'ipmi') {
-          config.agent_type = 'ipmi';
+          config.agent_type = 'ipmi_host';  // Future: 'ipmi_network' when network toggle is enabled
           config.profile_id = selectedProfileId;
         }
 

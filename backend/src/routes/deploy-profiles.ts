@@ -125,7 +125,7 @@ router.put('/assign/:agentId', async (req, res) => {
 
     // Update systems table
     const result = await db.run(
-      `UPDATE systems SET profile_id = $1, agent_type = 'ipmi' WHERE agent_id = $2`,
+      `UPDATE systems SET profile_id = $1, agent_type = 'ipmi_host' WHERE agent_id = $2`,
       [profile_id, agentId]
     );
 
