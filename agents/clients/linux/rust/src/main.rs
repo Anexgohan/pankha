@@ -266,6 +266,20 @@ async fn main() -> Result<()> {
     // Load configuration
     let config = load_config(None).await?;
 
+    // Apply config file log level if no CLI flag or env override was provided
+    // Priority: 1. --log-level flag, 2. LOG_LEVEL env, 3. config file, 4. default (info)
+    if args.log_level.is_none() && std::env::var("LOG_LEVEL").is_err() {
+        let config_level = config.agent.log_level.to_lowercase();
+        let filter = match config_level.as_str() {
+            "critical" => "error",
+            "trace" | "debug" | "info" | "warn" | "error" => config_level.as_str(),
+            _ => "info",
+        };
+        if let Some(handle) = RELOAD_HANDLE.get() {
+            let _ = handle.reload(EnvFilter::new(filter));
+        }
+    }
+
     // Create platform-specific hardware monitor
     #[cfg(target_os = "linux")]
     let hardware_monitor: Arc<dyn HardwareMonitor> = Arc::new(LinuxHardwareMonitor::new(config.hardware.clone()));

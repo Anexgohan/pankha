@@ -124,7 +124,11 @@ export class ProfileService {
   private catalog: ProfileCatalog | null = null;
 
   private constructor() {
-    this.profilesDir = path.join(__dirname, '../../profiles');
+    // Compiled JS: backend/services/ → ../profiles → backend/profiles/
+    // ts-node dev: backend/src/services/ → ../../profiles → backend/profiles/
+    const compiled = path.join(__dirname, '../profiles');
+    const source = path.join(__dirname, '../../profiles');
+    this.profilesDir = fs.existsSync(compiled) ? compiled : source;
   }
 
   public static getInstance(): ProfileService {

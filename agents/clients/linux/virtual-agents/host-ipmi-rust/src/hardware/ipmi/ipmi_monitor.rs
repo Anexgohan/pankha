@@ -17,7 +17,7 @@ use crate::hardware::types::{
     Sensor, Fan, SystemHealth,
     HardwareDumpRoot, HardwareDumpMetadata, HardwareDumpItem, HardwareDumpSensor,
 };
-use crate::profiles::types::BmcProfile;
+use crate::profiles::types::{BmcProfile, Parsing};
 use crate::profiles::loader::load_profile;
 use crate::profiles::interpolator::{translate_speed, reverse_translate_speed, interpolate_command};
 use crate::system::executor;
@@ -64,7 +64,7 @@ impl IpmiHardwareMonitor {
                 Some(p)
             }
             Err(e) => {
-                warn!("No BMC profile loaded from {:?}: {}. Sensor discovery will fail until a profile is provided.", profile_path, e);
+                warn!("No BMC profile loaded from {:?}: {}. Running in monitor-only mode (no fan control).", profile_path, e);
                 None
             }
         };
@@ -83,18 +83,34 @@ impl IpmiHardwareMonitor {
         }
     }
 
-    /// Get the IPMI protocol section from the loaded profile, or error.
-    fn ipmi_protocol(&self) -> Result<&crate::profiles::types::IpmiProtocol> {
+    /// Get the IPMI protocol section from the loaded profile, or None.
+    fn ipmi_protocol(&self) -> Option<&crate::profiles::types::IpmiProtocol> {
         self.profile.as_ref()
             .and_then(|p| p.protocols.as_ref())
             .and_then(|p| p.ipmi.as_ref())
-            .ok_or_else(|| anyhow!("No IPMI protocol loaded. Provide a valid --profile <path>"))
+    }
+
+    /// Default parsing config for profile-less monitor-only mode.
+    /// Uses standard IPMI SDR unit strings — universal across all BMC vendors.
+    fn default_parsing() -> Parsing {
+        Parsing {
+            sdr_format: "csv".to_string(),
+            fan_match_token: "RPM".to_string(),
+            temp_match_token: "degrees C".to_string(),
+        }
     }
 
     /// Run initialization commands (disable BIOS thermal override).
     /// Called once on first sensor discovery.
     async fn run_initialization(&self) -> Result<()> {
-        let ipmi = self.ipmi_protocol()?;
+        let ipmi = match self.ipmi_protocol() {
+            Some(p) => p,
+            None => {
+                info!("No profile loaded — skipping initialization (monitor-only mode)");
+                self.initialized.store(true, Ordering::SeqCst);
+                return Ok(());
+            }
+        };
 
         info!("Running {} initialization commands...", ipmi.lifecycle.initialization.len());
         for cmd in &ipmi.lifecycle.initialization {
@@ -163,8 +179,8 @@ impl IpmiHardwareMonitor {
     /// Called on shutdown, disconnect, or emergency.
     pub async fn run_reset_to_factory(&self) -> Result<()> {
         let ipmi = match self.ipmi_protocol() {
-            Ok(p) => p,
-            Err(_) => {
+            Some(p) => p,
+            None => {
                 warn!("No profile loaded, skipping reset_to_factory");
                 return Ok(());
             }
@@ -219,8 +235,8 @@ impl IpmiHardwareMonitor {
     fn build_zone_map(&self) -> HashMap<String, String> {
         let mut map = HashMap::new();
         let ipmi = match self.ipmi_protocol() {
-            Ok(p) => p,
-            Err(_) => return map,
+            Some(p) => p,
+            None => return map,
         };
 
         let has_any_members = ipmi.fan_zones.iter()
@@ -246,7 +262,7 @@ impl IpmiHardwareMonitor {
 
     /// Get the single-zone fallback ID, if applicable.
     fn single_zone_id(&self) -> Option<String> {
-        let ipmi = self.ipmi_protocol().ok()?;
+        let ipmi = self.ipmi_protocol()?;
         let has_any_members = ipmi.fan_zones.iter()
             .any(|z| z.members.as_ref().map_or(false, |m| !m.is_empty()));
         if !has_any_members && ipmi.fan_zones.len() == 1 {
@@ -274,7 +290,10 @@ impl IpmiHardwareMonitor {
 #[async_trait]
 impl HardwareMonitor for IpmiHardwareMonitor {
     async fn discover_sensors(&self) -> Result<Vec<Sensor>> {
-        let ipmi = self.ipmi_protocol()?;
+        let default_parsing = Self::default_parsing();
+        let parsing = self.ipmi_protocol()
+            .map(|p| &p.parsing)
+            .unwrap_or(&default_parsing);
 
         // Run initialization on first call
         if !self.initialized.load(Ordering::SeqCst) {
@@ -282,7 +301,7 @@ impl HardwareMonitor for IpmiHardwareMonitor {
         }
 
         let csv = self.get_sdr_csv().await?;
-        let mut sensors = parser::parse_sensors(&csv, &ipmi.parsing, &self.hardware_name());
+        let mut sensors = parser::parse_sensors(&csv, parsing, &self.hardware_name());
 
         // Inject cached thresholds (queried once at init)
         let thresholds = self.sensor_thresholds.lock().await;
@@ -298,12 +317,14 @@ impl HardwareMonitor for IpmiHardwareMonitor {
     }
 
     async fn discover_fans(&self) -> Result<Vec<Fan>> {
-        let ipmi = self.ipmi_protocol()?;
-        let has_control = self.settings.enable_fan_control && !ipmi.fan_zones.is_empty();
+        let default_parsing = Self::default_parsing();
+        let ipmi = self.ipmi_protocol();
+        let parsing = ipmi.map(|p| &p.parsing).unwrap_or(&default_parsing);
+        let has_control = ipmi.map_or(false, |p| self.settings.enable_fan_control && !p.fan_zones.is_empty());
 
         let csv = self.get_sdr_csv().await?;
         let zone_map = self.build_zone_map();
-        let mut fans = parser::parse_fans(&csv, &ipmi.parsing, has_control, &zone_map);
+        let mut fans = parser::parse_fans(&csv, parsing, has_control, &zone_map);
 
         // Single-zone fallback: if no zone defined members and there's exactly one zone,
         // tag all discovered fans with that zone.
@@ -339,7 +360,9 @@ impl HardwareMonitor for IpmiHardwareMonitor {
 
         // Tier 2: Profile read_speed command (Supermicro, ASRockRack)
         // Query the BMC for current duty cycle per zone via vendor-specific OEM command.
-        for zone in &ipmi.fan_zones {
+        // Skipped in monitor-only mode (no profile → no zones).
+        let fan_zones = ipmi.map(|p| p.fan_zones.as_slice()).unwrap_or(&[]);
+        for zone in fan_zones {
             // Skip if all fans in this zone already have speed (from Tier 1)
             let zone_needs_speed = fans.iter()
                 .any(|f| f.zone.as_deref() == Some(&zone.id) && f.speed == 0);
@@ -419,7 +442,8 @@ impl HardwareMonitor for IpmiHardwareMonitor {
     }
 
     async fn set_fan_speed(&self, fan_id: &str, speed: u8) -> Result<()> {
-        let ipmi = self.ipmi_protocol()?;
+        let ipmi = self.ipmi_protocol()
+            .ok_or_else(|| anyhow!("No profile loaded — fan control unavailable in monitor-only mode"))?;
 
         if !self.settings.enable_fan_control {
             return Err(anyhow!("Fan control is disabled in agent settings"));

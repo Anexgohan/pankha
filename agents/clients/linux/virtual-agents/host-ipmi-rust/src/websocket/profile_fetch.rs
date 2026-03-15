@@ -1,16 +1,14 @@
-//! HTTP profile fetch: download BMC profile from backend API, cache to disk.
+//! HTTP profile fetch: download BMC profile from backend API.
 //!
-//! Fallback chain:
-//!   1. HTTP API: GET /api/deploy/profiles/assigned/{agentId}
-//!   2. Local cache: profile.cache.json (written on successful fetch)
-//!   3. CLI flag: --profile <path> (existing behavior in IpmiHardwareMonitor)
+//! Fallback: if fetch fails, agent uses existing profile.json on disk
+//! or the --profile CLI flag.
 
 use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use tracing::{info, warn, debug};
 
 /// Fetch the BMC profile JSON from the backend API and write it to `profile.json`.
-/// On failure, falls back to `profile.cache.json` if it exists.
+/// On failure, falls back to existing profile.json on disk.
 ///
 /// Returns the path to the profile file that should be loaded.
 pub async fn fetch_and_cache_profile(
@@ -18,17 +16,13 @@ pub async fn fetch_and_cache_profile(
     install_dir: &Path,
 ) -> Result<PathBuf> {
     let profile_path = install_dir.join("profile.json");
-    let cache_path = install_dir.join("profile.cache.json");
 
     // Attempt HTTP fetch
     info!("Fetching BMC profile from {}", profile_url);
     match fetch_profile_http(profile_url).await {
         Ok(json) => {
-            // Write to profile.json (active) and profile.cache.json (backup)
             std::fs::write(&profile_path, &json)
                 .with_context(|| format!("Failed to write profile to {:?}", profile_path))?;
-            std::fs::write(&cache_path, &json)
-                .with_context(|| format!("Failed to write profile cache to {:?}", cache_path))?;
 
             info!("BMC profile fetched and saved to {:?}", profile_path);
             Ok(profile_path)
@@ -36,17 +30,11 @@ pub async fn fetch_and_cache_profile(
         Err(e) => {
             warn!("Failed to fetch profile from API: {}", e);
 
-            // Fallback to cache
-            if cache_path.exists() {
-                warn!("Using cached profile from {:?}", cache_path);
-                std::fs::copy(&cache_path, &profile_path)
-                    .with_context(|| "Failed to restore profile from cache")?;
-                Ok(profile_path)
-            } else if profile_path.exists() {
+            if profile_path.exists() {
                 warn!("Using existing profile from {:?}", profile_path);
                 Ok(profile_path)
             } else {
-                Err(e).context("No profile available: API fetch failed and no cache exists")
+                Err(e).context("No profile available: API fetch failed and no local profile exists")
             }
         }
     }

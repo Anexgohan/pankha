@@ -166,29 +166,23 @@ impl super::client::WebSocketClient {
                 (true, None, serde_json::json!({"message": "Update initiated"}))
             }
             "reloadProfile" => {
-                // Fetch fresh profile from backend API and restart hardware monitor
+                // Fetch fresh profile from backend API
                 let config = self.config.read().await;
-                let result = if let Some(ref ipmi_settings) = config.ipmi {
-                    let profile_url = ipmi_settings.profile_url.clone();
-                    drop(config);
+                let profile_url = config.profile_url();
+                drop(config);
 
-                    let install_dir = std::env::current_exe()
-                        .ok()
-                        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-                        .unwrap_or_else(|| std::path::PathBuf::from("."));
+                let install_dir = std::env::current_exe()
+                    .ok()
+                    .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+                    .unwrap_or_else(|| std::path::PathBuf::from("."));
 
-                    match super::profile_fetch::fetch_and_cache_profile(&profile_url, &install_dir).await {
-                        Ok(path) => {
-                            info!("Profile reloaded from API to {:?}. Restart agent to apply.", path);
-                            (true, None, serde_json::json!({"message": "Profile fetched. Restart agent to apply."}))
-                        }
-                        Err(e) => (false, Some(format!("Failed to reload profile: {}", e)), serde_json::json!({})),
+                match super::profile_fetch::fetch_and_cache_profile(&profile_url, &install_dir).await {
+                    Ok(path) => {
+                        info!("Profile reloaded from API to {:?}. Restart agent to apply.", path);
+                        (true, None, serde_json::json!({"message": "Profile fetched. Restart agent to apply."}))
                     }
-                } else {
-                    drop(config);
-                    (false, Some("No IPMI settings configured (missing ipmi section in config.json)".to_string()), serde_json::json!({}))
-                };
-                result
+                    Err(e) => (false, Some(format!("Failed to reload profile: {}", e)), serde_json::json!({})),
+                }
             }
             "executeRawIpmi" => {
                 // Execute arbitrary ipmitool raw command for profile builder testing.

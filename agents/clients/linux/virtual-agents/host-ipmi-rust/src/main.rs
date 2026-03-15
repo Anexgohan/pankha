@@ -262,16 +262,31 @@ async fn main() -> Result<()> {
     // Load configuration
     let config = load_config(None).await?;
 
-    // If IPMI settings exist with a profile_url, fetch the profile from backend API
-    // before creating the hardware monitor (so it loads the fresh profile from disk)
-    if let Some(ref ipmi_settings) = config.ipmi {
+    // Apply config file log level if no CLI flag or env override was provided
+    // Priority: 1. --log-level flag, 2. LOG_LEVEL env, 3. config file, 4. default (info)
+    if args.log_level.is_none() && std::env::var("LOG_LEVEL").is_err() {
+        let config_level = config.agent.log_level.to_lowercase();
+        let filter = match config_level.as_str() {
+            "critical" => "error",
+            "trace" | "debug" | "info" | "warn" | "error" => config_level.as_str(),
+            _ => "info",
+        };
+        if let Some(handle) = RELOAD_HANDLE.get() {
+            let _ = handle.reload(EnvFilter::new(filter));
+        }
+    }
+
+    // Fetch BMC profile from backend API before starting hardware monitor.
+    // URL derived from backend.server_url + agent.id — no extra config needed.
+    {
+        let profile_url = config.profile_url();
         let install_dir = std::env::current_exe()?
             .parent()
             .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
             .to_path_buf();
 
         match websocket::profile_fetch::fetch_and_cache_profile(
-            &ipmi_settings.profile_url,
+            &profile_url,
             &install_dir,
         ).await {
             Ok(path) => info!("BMC profile ready at {:?}", path),

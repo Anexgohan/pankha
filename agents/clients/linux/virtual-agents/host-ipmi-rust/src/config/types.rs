@@ -8,8 +8,6 @@ pub struct AgentConfig {
     pub agent: AgentSettings,
     pub backend: BackendSettings,
     pub hardware: HardwareSettings,
-    #[serde(default)]
-    pub ipmi: Option<IpmiSettings>,
     pub logging: LoggingSettings,
 }
 
@@ -42,10 +40,18 @@ pub struct HardwareSettings {
 
 pub fn default_failsafe_speed() -> u8 { 70 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IpmiSettings {
-    pub profile_id: String,
-    pub profile_url: String,
+impl AgentConfig {
+    /// Derive the profile fetch URL from backend.server_url + agent.id.
+    /// ws(s)://host:port/websocket → http(s)://host:port/api/deploy/profiles/assigned/{id}
+    pub fn profile_url(&self) -> String {
+        let base = self.backend.server_url
+            .replace("wss://", "https://")
+            .replace("ws://", "http://")
+            .trim_end_matches("/websocket")
+            .trim_end_matches('/')
+            .to_string();
+        format!("{}/api/deploy/profiles/assigned/{}", base, self.agent.id)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,7 +96,6 @@ impl Default for AgentConfig {
                 emergency_temp: 85.0,
                 failsafe_speed: 70,
             },
-            ipmi: None,
             logging: LoggingSettings {
                 enable_file_logging: true,
                 log_file: "/var/log/pankha-agent/agent.log".to_string(),
