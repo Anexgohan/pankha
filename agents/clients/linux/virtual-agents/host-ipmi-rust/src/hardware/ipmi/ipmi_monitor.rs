@@ -26,7 +26,7 @@ use crate::system::parser;
 pub struct IpmiHardwareMonitor {
     settings: HardwareSettings,
     profile: Option<BmcProfile>,
-    profile_path: PathBuf,
+    _profile_path: PathBuf,
     initialized: AtomicBool,
     dry_run: bool,
     start_time: Instant,
@@ -72,7 +72,7 @@ impl IpmiHardwareMonitor {
         Self {
             settings,
             profile,
-            profile_path,
+            _profile_path: profile_path,
             initialized: AtomicBool::new(false),
             dry_run,
             start_time: Instant::now(),
