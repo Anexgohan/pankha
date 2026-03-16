@@ -66,13 +66,34 @@ const SystemsPage: React.FC = () => {
               setUnstableVersion(null);
             }
 
+            // Semver-aware descending sort (highest version first)
+            const semverDesc = (a: any, b: any) => {
+              const parse = (v: string) => {
+                const clean = v.replace(/^v/, '');
+                const [base, pre] = clean.split('-');
+                const parts = base.split('.').map(Number);
+                // Pre-release number (e.g., rc9 → 9), no suffix → Infinity (stable ranks highest)
+                const preNum = pre ? parseInt(pre.replace(/\D+/g, '') || '0') : Infinity;
+                return [...parts, preNum];
+              };
+              const pa = parse(a.tag_name);
+              const pb = parse(b.tag_name);
+              for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+                const diff = (pb[i] || 0) - (pa[i] || 0);
+                if (diff !== 0) return diff;
+              }
+              return 0;
+            };
+
             // Collect up to 10 of each type for the version dropdown
             const stables = releases
               .filter((r: any) => !r.prerelease)
+              .sort(semverDesc)
               .slice(0, 10)
               .map((r: any) => ({ tag_name: r.tag_name }));
             const unstables = releases
               .filter((r: any) => r.prerelease)
+              .sort(semverDesc)
               .slice(0, 10)
               .map((r: any) => ({ tag_name: r.tag_name }));
             setStableReleases(stables);
