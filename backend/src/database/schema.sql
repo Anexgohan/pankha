@@ -385,6 +385,17 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- Migration: Add is_hidden column to fans table (user fan visibility toggle)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'fans' AND column_name = 'is_hidden'
+  ) THEN
+    ALTER TABLE fans ADD COLUMN is_hidden BOOLEAN DEFAULT false;
+    RAISE NOTICE 'Migration: Added is_hidden column to fans table';
+  END IF;
+END $$;
+
 -- Migration: Normalize legacy agent_type values ('os' → 'os_linux', 'ipmi' → 'ipmi_host')
 -- Old agents reported no type; backend defaulted to 'os' or 'ipmi'. New agents self-report full type.
 UPDATE systems SET agent_type = 'os_linux' WHERE agent_type = 'os' AND (platform = 'linux' OR platform = 'unknown');
