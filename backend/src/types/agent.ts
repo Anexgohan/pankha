@@ -3,6 +3,7 @@ export interface AgentConfig {
   agentId: string;
   name: string;
   agentType?: string; // "os_linux", "os_windows", "ipmi_host", "ipmi_network"
+  profileId?: string; // BMC profile ID self-reported by IPMI agents (e.g., "supermicro/x10_series")
   version: string;
   platform?: string; // "linux", "windows", "macos"
   architecture?: string; // "x64", "arm64"

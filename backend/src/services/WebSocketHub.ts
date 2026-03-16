@@ -315,7 +315,7 @@ export class WebSocketHub extends EventEmitter {
         );
 
         // Mark agent as offline in AgentManager (in-memory)
-        this.agentManager.markAgentError(agentId, "WebSocket connection lost");
+        this.agentManager.markAgentOffline(agentId);
 
         // Persist offline presence with the same heartbeat-gated DB policy.
         // This is a write-throttle for SQL only, not a websocket disconnect detector.
@@ -585,6 +585,7 @@ export class WebSocketHub extends EventEmitter {
         agentId: agentId,
         name: registrationData.name || agentId,
         agentType: registrationData.agent_type, // "os_linux", "os_windows", "ipmi_host", "ipmi_network"
+        profileId: registrationData.profile_id, // BMC profile ID self-reported by IPMI agents
         version: registrationData.agent_version || "1.0.0-websocket",
         platform: registrationData.platform || "unknown", // "linux", "windows", "macos"
         architecture: registrationData.architecture, // "x64", "arm64"
@@ -746,6 +747,32 @@ export class WebSocketHub extends EventEmitter {
           timestamp: new Date().toISOString(),
           configuration: finalConfig, // Send configuration to agent so it can apply it
         });
+
+        // DB-priority profile sync: if DB has a profile_id that differs from agent's,
+        // tell the agent to reload so it fetches the authoritative profile from the API.
+        if (agentConfig.agentType === 'ipmi_host' || agentConfig.agentType === 'ipmi_network') {
+          const dbSystem = await db.get(
+            'SELECT profile_id FROM systems WHERE agent_id = $1',
+            [agentId]
+          );
+          const dbProfileId = dbSystem?.profile_id;
+          const agentProfileId = agentConfig.profileId;
+
+          if (dbProfileId && dbProfileId !== agentProfileId) {
+            log.info(
+              `Profile mismatch for ${agentId}: DB="${dbProfileId}" vs agent="${agentProfileId || 'none'}". Sending reloadProfile.`,
+              'WebSocketHub'
+            );
+            // Small delay to let the agent finish processing registration before reload
+            setTimeout(() => {
+              this.sendCommandToAgent(agentId, {
+                type: 'reloadProfile',
+                commandId: `profile-sync-${Date.now()}`,
+                payload: {},
+              });
+            }, 2000);
+          }
+        }
 
         // Notify other clients about new agent
         this.broadcast("agentRegistered", agentConfig, ["agents:all"]);

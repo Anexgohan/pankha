@@ -166,7 +166,7 @@ impl super::client::WebSocketClient {
                 (true, None, serde_json::json!({"message": "Update initiated"}))
             }
             "reloadProfile" => {
-                // Fetch fresh profile from backend API
+                // Fetch fresh profile from backend API, save to disk, then hot-reload
                 let config = self.config.read().await;
                 let profile_url = config.profile_url();
                 drop(config);
@@ -178,10 +178,18 @@ impl super::client::WebSocketClient {
 
                 match super::profile_fetch::fetch_and_cache_profile(&profile_url, &install_dir).await {
                     Ok(path) => {
-                        info!("Profile reloaded from API to {:?}. Restart agent to apply.", path);
-                        (true, None, serde_json::json!({"message": "Profile fetched. Restart agent to apply."}))
+                        info!("Profile fetched from API to {:?}, hot-reloading...", path);
+                        match self.hardware_monitor.reload_profile().await {
+                            Ok(()) => {
+                                (true, None, serde_json::json!({"message": "Profile hot-reloaded successfully."}))
+                            }
+                            Err(e) => {
+                                error!("Profile fetched but hot-reload failed: {}", e);
+                                (false, Some(format!("Profile saved but reload failed: {}", e)), serde_json::json!({}))
+                            }
+                        }
                     }
-                    Err(e) => (false, Some(format!("Failed to reload profile: {}", e)), serde_json::json!({})),
+                    Err(e) => (false, Some(format!("Failed to fetch profile: {}", e)), serde_json::json!({})),
                 }
             }
             "executeRawIpmi" => {

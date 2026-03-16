@@ -155,6 +155,17 @@ export class AgentManager extends EventEmitter {
         agentType,
       ]);
 
+      // Sync profile_id: if agent reports a profile and DB has none, accept it.
+      // DB takes priority — if DB already has a profile_id and it differs from agent's,
+      // the agent should update its local copy (handled via reloadProfile command).
+      const agentProfileId = agentConfig.profileId;
+      if (agentProfileId) {
+        await this.db.run(
+          `UPDATE systems SET profile_id = $1 WHERE agent_id = $2 AND (profile_id IS NULL OR profile_id = '')`,
+          [agentProfileId, agentConfig.agentId]
+        );
+      }
+
       // Store in memory
       this.agents.set(agentConfig.agentId, agentConfig);
 
@@ -315,6 +326,19 @@ export class AgentManager extends EventEmitter {
         ).join(", ")}`,
         "AgentManager"
       );
+    }
+  }
+
+  /**
+   * Mark agent as offline (clean disconnect or connection lost).
+   * Does not increment error count or emit agentError.
+   */
+  public markAgentOffline(agentId: string): void {
+    const status = this.agentStatuses.get(agentId);
+    if (status) {
+      status.status = "offline";
+      status.lastSeen = new Date();
+      this.agentStatuses.set(agentId, status);
     }
   }
 

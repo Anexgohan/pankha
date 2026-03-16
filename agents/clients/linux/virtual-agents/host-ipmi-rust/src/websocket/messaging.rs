@@ -24,6 +24,7 @@ impl super::client::WebSocketClient {
                 "agentId": config.agent.id,
                 "name": config.agent.name,
                 "agent_type": "ipmi_host",
+                "profile_id": self.hardware_monitor.profile_id(),
                 "agent_version": env!("CARGO_PKG_VERSION"),
                 "platform": std::env::consts::OS, // "linux", "macos", "windows", etc.
                 "architecture": crate::app::platform::project_arch(),

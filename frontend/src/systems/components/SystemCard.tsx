@@ -30,7 +30,7 @@ import {
 import { getChipDisplayName } from "../../config/sensorLabels";
 import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
-import { getAgentStatusColor, getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
+import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen } from "../../utils/formatters";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
 import {
@@ -833,10 +833,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
     return isGroupHidden(chipName);
   };
 
-  // Helper to check if agent is read-only (over license limit)
-  const isReadOnly = system.read_only === true;
-  const readOnlyTooltip =
-    "This system exceeds your license limit. Upgrade to control this agent. You can still view data.";
+  // Helper to check if agent is read-only (over license limit OR IPMI without profile)
+  const isIpmiNoProfile = (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') && !system.profile_id && system.status === 'online';
+  const isReadOnly = system.read_only === true || isIpmiNoProfile;
+  const readOnlyTooltip = isIpmiNoProfile
+    ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
+    : "This system exceeds your license limit. Upgrade to control this agent. You can still view data.";
 
   // Context for tooltip interpolation
   const tooltipContext = {
@@ -876,7 +878,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
     // Option B: Minimalist larger icon without background container
     return (
       <div className="platform-icon-minimal" title={tooltip}>
-        <img src={`/icons/${isWindows ? 'windows_01.svg' : 'linux_01.svg'}`} alt={platformLabel} width="20" height="20" />
+        <img src={`/icons/${isWindows ? 'windows_01.svg' : 'linux_01.svg'}`} alt={platformLabel} width="22" height="22" />
         {(agentTypeLabel || archLabel) && (
           <span className="arch-badge">
             {[agentTypeLabel, archLabel].filter(Boolean).join(' · ')}
@@ -893,11 +895,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
           <div className="system-title-top">
             <div className="status-group">
               <span
-                className="status-badge"
-                style={{ backgroundColor: getAgentStatusColor(system.status) }}
-                title={`Agent status is currently "${system.status.toUpperCase()}"`}
+                className={`status-badge ${isIpmiNoProfile ? 'read-only' : system.status}`}
+                title={isIpmiNoProfile
+                  ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
+                  : `Agent status is currently "${system.status.toUpperCase()}"`}
               >
-                {system.status}
+                <span className="status-dot" />
+                {isIpmiNoProfile ? 'read only' : system.status}
               </span>
               {getPlatformIcon()}
             </div>
@@ -2029,6 +2033,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.enable_fan_control ===
       nextProps.system.enable_fan_control &&
     prevProps.system.read_only === nextProps.system.read_only && // License limit status
+    prevProps.system.profile_id === nextProps.system.profile_id && // IPMI profile assignment
     // Explicit sensor/fan array checks (reference equality works because mergeDelta creates new arrays)
     prevProps.system.current_temperatures ===
       nextProps.system.current_temperatures &&

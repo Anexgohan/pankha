@@ -1,6 +1,6 @@
 [package]
 name = "pankha-agent-ipmi"
-version = "1.0.0"
+version = "0.2.32-dev"
 edition = "2021"
 authors = ["Pankha Development Team"]
 description = "IPMI host agent for Pankha - BMC fan control via ipmitool"

@@ -25,6 +25,7 @@ export interface SystemData {
   log_level?: string;
   failsafe_speed?: number;
   enable_fan_control?: boolean;
+  profile_id?: string | null; // BMC profile assignment for IPMI agents (null = no profile = monitor-only)
   // License limit fields
   read_only?: boolean; // Agent is over license limit (can view but not control)
   access_status?: "active" | "over_limit";

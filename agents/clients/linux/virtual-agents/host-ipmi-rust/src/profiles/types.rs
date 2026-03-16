@@ -15,6 +15,8 @@ pub struct BmcProfile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Metadata {
     pub schema_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile_id: Option<String>,
     pub vendor: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub model_family: Option<Vec<String>>,

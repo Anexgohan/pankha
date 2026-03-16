@@ -4,14 +4,72 @@
 
 /* Status Badges */
 .status-badge {
-  display: inline-block;
-  padding: var(--spacing-xs) var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px var(--spacing-sm);
   border-radius: 12px;
-  color: white;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
   text-align: center;
+  border: 1px solid transparent;
+}
+
+.status-badge .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-badge.online {
+  background: color-mix(in srgb, var(--color-success), transparent 90%);
+  border-color: color-mix(in srgb, var(--color-success), transparent 85%);
+  color: var(--color-success);
+}
+
+.status-badge.online .status-dot {
+  animation: status-dot-pulse 2s infinite;
+}
+
+.status-badge.offline {
+  background: color-mix(in srgb, var(--color-error), transparent 95%);
+  border-color: color-mix(in srgb, var(--color-error), transparent 90%);
+  color: color-mix(in srgb, var(--color-error), transparent 20%);
+}
+
+.status-badge.error {
+  background: color-mix(in srgb, var(--color-error), transparent 90%);
+  border-color: color-mix(in srgb, var(--color-error), transparent 85%);
+  color: var(--color-error);
+}
+
+.status-badge.error .status-dot {
+  animation: status-dot-pulse 1s infinite;
+}
+
+.status-badge.installing {
+  background: color-mix(in srgb, var(--color-info), transparent 90%);
+  border-color: color-mix(in srgb, var(--color-info), transparent 85%);
+  color: var(--color-info);
+}
+
+.status-badge.installing .status-dot {
+  animation: status-dot-pulse 0.8s infinite;
+}
+
+.status-badge.read-only {
+  background: color-mix(in srgb, var(--color-warning), transparent 90%);
+  border-color: color-mix(in srgb, var(--color-warning), transparent 85%);
+  color: var(--color-warning);
+}
+
+@keyframes status-dot-pulse {
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.2); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* Status Indicators */

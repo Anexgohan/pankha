@@ -35,4 +35,16 @@ pub trait HardwareMonitor: Send + Sync {
 
     /// Generate hardware diagnostic dump (hardware-info.json)
     async fn dump_hardware_info(&self) -> Result<HardwareDumpRoot>;
+
+    /// Reload hardware profile from disk (IPMI agents only).
+    /// Default no-op for agents without profiles.
+    async fn reload_profile(&self) -> Result<()> {
+        Ok(())
+    }
+
+    /// Get the assigned profile ID (IPMI agents only).
+    /// Default None for agents without profiles.
+    fn profile_id(&self) -> Option<String> {
+        None
+    }
 }

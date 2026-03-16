@@ -93,7 +93,12 @@ router.get('/assigned/:agentId', async (req, res) => {
     }
 
     log.debug(`Serving profile "${system.profile_id}" to agent ${agentId}`, 'deploy-profiles');
-    res.json(profile);
+    // Inject profile_id into metadata so the agent can self-report it on registration
+    const enriched = {
+      ...profile,
+      metadata: { ...profile.metadata, profile_id: system.profile_id },
+    };
+    res.json(enriched);
   } catch (error) {
     log.error('Failed to serve assigned profile:', 'deploy-profiles', error);
     res.status(500).json({ error: 'Failed to fetch assigned profile' });

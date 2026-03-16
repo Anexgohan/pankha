@@ -370,7 +370,7 @@ export class AgentCommunication extends EventEmitter {
     this.emit("agentDisconnected", agentId);
 
     // Mark agent as offline
-    this.agentManager.markAgentError(agentId, "Connection lost");
+    this.agentManager.markAgentOffline(agentId);
 
     // Attempt reconnection if within limits
     if (connection.reconnectAttempts < this.maxReconnectAttempts) {
