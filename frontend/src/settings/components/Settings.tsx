@@ -716,7 +716,7 @@ const Settings: React.FC = () => {
   const [pricing, setPricing] = useState<PricingData | null>(null);
 
   // General Settings from Context
-  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone, hardwarePruneDays, updateHardwarePruneDays } = useDashboardSettings();
+  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel } = useDashboardSettings();
   const [isCustomScale, setIsCustomScale] = useState(false);
   const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
   const [isCustomRetention, setIsCustomRetention] = useState(false);
@@ -1131,6 +1131,38 @@ const Settings: React.FC = () => {
                         title={preset.tooltip}
                       >
                         {preset.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Hub Log Level Setting
+                  Controls backend/hub process log verbosity at runtime. */}
+              <div className="setting-item graph-scale-section">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Log Level</span>
+                  <span className="setting-description">
+                    Controls backend log verbosity. Higher levels include all lower levels.
+                  </span>
+                </div>
+
+                <div className="scale-control-wrapper">
+                  <div className="scale-presets">
+                    {(['error', 'warn', 'info', 'debug', 'trace'] as const).map((level) => (
+                      <button
+                        key={level}
+                        className={`scale-preset-btn ${hubLogLevel === level ? 'active' : ''}`}
+                        onClick={() => updateHubLogLevel(level)}
+                        title={
+                          level === 'error' ? 'Errors only' :
+                          level === 'warn' ? 'Warnings and errors' :
+                          level === 'info' ? 'General operational info (default)' :
+                          level === 'debug' ? 'Detailed debug output' :
+                          'Ultra-detailed trace output'
+                        }
+                      >
+                        {level.charAt(0).toUpperCase() + level.slice(1)}
                       </button>
                     ))}
                   </div>

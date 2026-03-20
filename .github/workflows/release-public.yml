@@ -522,6 +522,15 @@ jobs:
             wget -O pankha-agent-windows_x64.msi https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-windows_x64.msi
             ```
 
+            ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) IPMI Host Agent (Enterprise Servers)
+            #### ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For servers with /dev/ipmi0 (Dell, Supermicro, ASRock, Tyan, Lenovo):
+            ```bash
+            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-ipmi-linux_x64
+            chmod +x pankha-agent
+            ./pankha-agent --setup
+            ./pankha-agent --start
+            ```
+
             ### ![SHA256](https://img.shields.io/badge/-SHA256-28A745?logo=gnuprivacyguard&logoColor=white&style=flat-square) Verify Download Integrity
             ```bash
             wget -O checksums.txt https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/checksums.txt

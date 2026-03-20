@@ -8,7 +8,7 @@ import { FanProfileController } from "../services/FanProfileController";
 import { WebSocketHub } from "../services/WebSocketHub";
 import { licenseManager } from "../license/LicenseManager";
 import UpdateDownloadService from "../services/UpdateDownloadService";
-import { log } from "../utils/logger";
+import { log, logger } from "../utils/logger";
 import { createDemoLockResponse, isDemoMode } from "../utils/mode";
 import {
   validFanSteps,
@@ -1733,6 +1733,7 @@ const ALLOWED_SETTINGS = [
   'hardware_prune_days',
   'ui_font_primary',
   'ui_font_secondary',
+  'hub_log_level',
 ] as const;
 
 type AllowedSettingKey = typeof ALLOWED_SETTINGS[number];
@@ -1798,7 +1799,14 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
       [key, value.toString()]
     );
 
-    log.info(`Backend setting updated: ${key}=${value}`, "systems");
+    // Apply runtime side-effects for specific settings
+    if (key === 'hub_log_level') {
+      logger.setLogLevel(value.toString());
+      log.info(`Hub log level changed to: ${logger.getLogLevelString()}`, "systems");
+    } else {
+      log.info(`Backend setting updated: ${key}=${value}`, "systems");
+    }
+
     res.json({ success: true, key, value });
   } catch (error) {
     log.error(`Error updating setting ${req.params.key}:`, "systems", error);

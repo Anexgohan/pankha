@@ -26,7 +26,7 @@ import fanConfigurationsRouter from './routes/fanConfigurations';
 import deployRouter from './routes/deploy';
 import configRouter from './routes/config';
 import { licenseRouter, licenseManager } from './license';
-import { log } from './utils/logger';
+import { log, logger } from './utils/logger';
 import { createDemoLockResponse, isDemoMode } from './utils/mode';
 
 const app = express();
@@ -94,6 +94,15 @@ async function initializeServices() {
     const commandDispatcher = CommandDispatcher.getInstance();
     const webSocketHub = WebSocketHub.getInstance();
     const fanProfileController = FanProfileController.getInstance();
+
+    // Load persisted hub log level (overrides LOG_LEVEL env var if set)
+    const hubLogSetting = await db.get(
+      "SELECT setting_value FROM backend_settings WHERE setting_key = 'hub_log_level'"
+    );
+    if (hubLogSetting?.setting_value) {
+      logger.setLogLevel(hubLogSetting.setting_value);
+      log.info(`Hub log level loaded from database: ${logger.getLogLevelString()}`, 'index');
+    }
 
     // Load existing agents from database
     await agentManager.loadAgentsFromDatabase();

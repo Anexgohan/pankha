@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import type { SystemData, SensorReading, FanReading } from "../../types/api";
 import {
   deleteSystem,
@@ -127,7 +127,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
           const delta = fan.rpm - p.rpm;
           const threshold = Math.max(p.rpm * 0.01, 50);
           if (Math.abs(delta) < threshold) {
-            next[fan.id] = { rpm: p.rpm, decreasing: false };
+            next[fan.id] = { rpm: p.rpm, decreasing: p.decreasing };
           } else if (delta < 0) {
             next[fan.id] = { rpm: fan.rpm, decreasing: true };
           } else {
@@ -187,8 +187,23 @@ const SystemCard: React.FC<SystemCardProps> = ({
     setHistoryExpanded(expandedSensors);
   }, [expandedSensors, setHistoryExpanded]);
 
-  // Load fan profiles, assignments, and configurations on mount
+  // Stable identity keys — reload configs only when the set of fans/sensors changes,
+  // not on every temperature/RPM value update (which fires every agent update interval).
+  // This prevents the useEffect from overwriting user's in-flight dropdown changes.
+  const fanIdsKey = useMemo(
+    () => system.current_fan_speeds?.map(f => f.id).sort().join(',') || '',
+    [system.current_fan_speeds]
+  );
+  const sensorIdsKey = useMemo(
+    () => system.current_temperatures?.map(s => s.id).sort().join(',') || '',
+    [system.current_temperatures]
+  );
+
+  // Load fan profiles, assignments, and configurations on mount and when hardware structure changes
   useEffect(() => {
+    // Skip if no fans/sensors discovered yet — will re-fire when they appear
+    if (!fanIdsKey) return;
+
     const loadProfilesAndAssignments = async () => {
       try {
         // Load profiles
@@ -272,7 +287,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       }
     };
     loadProfilesAndAssignments();
-  }, [system.id, system.current_temperatures, system.current_fan_speeds]);
+  }, [system.id, fanIdsKey, sensorIdsKey]);
 
   // Sync local state with system prop changes (e.g., when dashboard refreshes)
   useEffect(() => {
@@ -649,60 +664,75 @@ const SystemCard: React.FC<SystemCardProps> = ({
     // Apply changes to multiple fans at once
     const fans =
       system.current_fan_speeds?.filter((f) => fanIds.includes(f.id)) || [];
+    let failCount = 0;
 
     for (const fan of fans) {
       if (!fan.dbId) continue;
 
-      // Update sensor if provided
-      if (sensorId) {
-        let sensorDbId: number | string | null = null;
-        if (sensorId.startsWith("__")) {
-          sensorDbId = sensorId; // Special identifier
-        } else {
-          const sensor = system.current_temperatures?.find(
-            (s) => s.id === sensorId
-          );
-          sensorDbId = sensor?.dbId || null;
-        }
-        await setFanSensor(fan.dbId, sensorDbId);
-
-        // Update local state
-        setSelectedSensors((prev) => ({
-          ...prev,
-          [fan.id]: sensorId,
-        }));
-      }
-
-      // Update profile if provided
-      if (profileId) {
-        const selectedSensorId = sensorId || selectedSensors[fan.id];
-        let sensorDbId: number | string | undefined = undefined;
-
-        if (selectedSensorId) {
-          if (selectedSensorId.startsWith("__")) {
-            sensorDbId = selectedSensorId;
+      try {
+        // Update sensor if provided
+        if (sensorId) {
+          let sensorDbId: number | string | null = null;
+          if (sensorId.startsWith("__")) {
+            sensorDbId = sensorId; // Special identifier
           } else {
             const sensor = system.current_temperatures?.find(
-              (s) => s.id === selectedSensorId
+              (s) => s.id === sensorId
             );
-            sensorDbId = sensor?.dbId;
+            sensorDbId = sensor?.dbId || null;
           }
+          await setFanSensor(fan.dbId, sensorDbId);
+
+          // Update local state
+          setSelectedSensors((prev) => ({
+            ...prev,
+            [fan.id]: sensorId,
+          }));
         }
 
-        await assignProfileToFan({
-          fan_id: fan.dbId,
-          profile_id: profileId,
-          sensor_id: sensorDbId,
-        });
+        // Update profile if provided
+        if (profileId) {
+          const selectedSensorId = sensorId || selectedSensors[fan.id];
+          let sensorDbId: number | string | undefined = undefined;
 
-        // Update local state
-        setSelectedProfiles((prev) => ({
-          ...prev,
-          [fan.id]: profileId,
-        }));
+          if (selectedSensorId) {
+            if (selectedSensorId.startsWith("__")) {
+              sensorDbId = selectedSensorId;
+            } else {
+              const sensor = system.current_temperatures?.find(
+                (s) => s.id === selectedSensorId
+              );
+              if (!sensor?.dbId) {
+                toast.error(
+                  "Please select a sensor first or refresh the page to get updated sensor data."
+                );
+                continue;
+              }
+              sensorDbId = sensor.dbId;
+            }
+          }
+
+          await assignProfileToFan({
+            fan_id: fan.dbId,
+            profile_id: profileId,
+            sensor_id: sensorDbId,
+          });
+
+          // Update local state
+          setSelectedProfiles((prev) => ({
+            ...prev,
+            [fan.id]: profileId,
+          }));
+        }
+      } catch (error) {
+        failCount++;
+        console.error(`Failed to apply bulk changes to fan ${fan.id}:`, error);
       }
     }
 
+    if (failCount > 0) {
+      toast.error(`Failed to apply changes to ${failCount} fan(s)`);
+    }
     onUpdate();
   };
 

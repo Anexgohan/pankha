@@ -241,6 +241,9 @@ interface DashboardSettingsContextType {
   // Hardware pruning
   hardwarePruneDays: number;
   updateHardwarePruneDays: (days: number) => Promise<void>;
+  // Hub log level
+  hubLogLevel: string;
+  updateHubLogLevel: (level: string) => Promise<void>;
 }
 
 const DashboardSettingsContext = createContext<DashboardSettingsContextType | undefined>(undefined);
@@ -303,6 +306,9 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   // Hardware pruning state
   const [hardwarePruneDays, setHardwarePruneDays] = useState<number>(7);
 
+  // Hub log level state
+  const [hubLogLevel, setHubLogLevel] = useState<string>('info');
+
   const fetchSettings = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
@@ -318,6 +324,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
         getSetting('hardware_prune_days'),
         getSetting('ui_font_primary'),
         getSetting('ui_font_secondary'),
+        getSetting('hub_log_level'),
       ]);
 
       // Process graph scale
@@ -368,6 +375,11 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       }
       if (results[11].status === 'fulfilled' && results[11].value?.setting_value) {
         setSecondaryFont(normalizeFontChoice(results[11].value.setting_value, DEFAULT_SECONDARY_FONT, SECONDARY_FONT_OPTIONS));
+      }
+
+      // Process hub log level
+      if (results[12].status === 'fulfilled' && results[12].value?.setting_value) {
+        setHubLogLevel(results[12].value.setting_value);
       }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
@@ -522,6 +534,16 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     }
   };
 
+  const updateHubLogLevel = async (level: string) => {
+    setHubLogLevel(level);
+    try {
+      await updateSetting('hub_log_level', level);
+    } catch (err) {
+      console.error('Failed to update hub log level:', err);
+      fetchSettings();
+    }
+  };
+
   const resetTempDefaults = async () => {
     setTempThresholds(DEFAULT_TEMP_THRESHOLDS);
     setTempColors(DEFAULT_TEMP_COLORS);
@@ -590,6 +612,8 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       getThresholdsForType,
       hardwarePruneDays,
       updateHardwarePruneDays,
+      hubLogLevel,
+      updateHubLogLevel,
     }}>
       {children}
     </DashboardSettingsContext.Provider>

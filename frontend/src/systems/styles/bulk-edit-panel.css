@@ -317,6 +317,87 @@
   color: var(--text-secondary);
 }
 
+/* Zone Item (IPMI agents) */
+.bulk-edit-zone-item {
+  padding: 14px;
+  background-color: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.bulk-edit-zone-item:hover {
+  border-color: var(--color-info);
+  background-color: var(--bg-hover);
+}
+
+.bulk-edit-zone-item.selected {
+  border-color: var(--color-info);
+  background-color: var(--bg-hover);
+}
+
+.zone-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.zone-name {
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.zone-fan-count {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.zone-members {
+  margin-left: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zone-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 3px 0;
+}
+
+.zone-member-row svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.zone-member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zone-member-stats {
+  white-space: nowrap;
+  color: var(--text-tertiary);
+}
+
+.zone-member-speed {
+  white-space: nowrap;
+  min-width: 32px;
+  text-align: right;
+  color: var(--text-tertiary);
+}
+
 /* Footer - Fixed */
 .bulk-edit-footer {
   padding: 16px 20px;
