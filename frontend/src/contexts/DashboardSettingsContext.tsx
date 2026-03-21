@@ -244,6 +244,13 @@ interface DashboardSettingsContextType {
   // Hub log level
   hubLogLevel: string;
   updateHubLogLevel: (level: string) => Promise<void>;
+  // Hub connection settings
+  hubIpInternal: string;
+  updateHubIpInternal: (ip: string) => Promise<void>;
+  hubIpExternal: string;
+  updateHubIpExternal: (ip: string) => Promise<void>;
+  hubPort: string;
+  updateHubPort: (port: string) => Promise<void>;
 }
 
 const DashboardSettingsContext = createContext<DashboardSettingsContextType | undefined>(undefined);
@@ -309,6 +316,11 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   // Hub log level state
   const [hubLogLevel, setHubLogLevel] = useState<string>('info');
 
+  // Hub connection settings state
+  const [hubIpInternal, setHubIpInternal] = useState<string>('');
+  const [hubIpExternal, setHubIpExternal] = useState<string>('');
+  const [hubPort, setHubPort] = useState<string>('');
+
   const fetchSettings = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
@@ -325,6 +337,9 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
         getSetting('ui_font_primary'),
         getSetting('ui_font_secondary'),
         getSetting('hub_log_level'),
+        getSetting('hub_ip_internal'),
+        getSetting('hub_ip_external'),
+        getSetting('hub_port'),
       ]);
 
       // Process graph scale
@@ -380,6 +395,17 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       // Process hub log level
       if (results[12].status === 'fulfilled' && results[12].value?.setting_value) {
         setHubLogLevel(results[12].value.setting_value);
+      }
+
+      // Process hub connection settings
+      if (results[13].status === 'fulfilled' && results[13].value?.setting_value) {
+        setHubIpInternal(results[13].value.setting_value);
+      }
+      if (results[14].status === 'fulfilled' && results[14].value?.setting_value) {
+        setHubIpExternal(results[14].value.setting_value);
+      }
+      if (results[15].status === 'fulfilled' && results[15].value?.setting_value) {
+        setHubPort(results[15].value.setting_value);
       }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
@@ -544,6 +570,36 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     }
   };
 
+  const updateHubIpInternal = async (ip: string) => {
+    setHubIpInternal(ip);
+    try {
+      await updateSetting('hub_ip_internal', ip);
+    } catch (err) {
+      console.error('Failed to update hub IP (internal):', err);
+      fetchSettings();
+    }
+  };
+
+  const updateHubIpExternal = async (ip: string) => {
+    setHubIpExternal(ip);
+    try {
+      await updateSetting('hub_ip_external', ip);
+    } catch (err) {
+      console.error('Failed to update hub IP (external):', err);
+      fetchSettings();
+    }
+  };
+
+  const updateHubPort = async (port: string) => {
+    setHubPort(port);
+    try {
+      await updateSetting('hub_port', port);
+    } catch (err) {
+      console.error('Failed to update hub port:', err);
+      fetchSettings();
+    }
+  };
+
   const resetTempDefaults = async () => {
     setTempThresholds(DEFAULT_TEMP_THRESHOLDS);
     setTempColors(DEFAULT_TEMP_COLORS);
@@ -614,6 +670,12 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       updateHardwarePruneDays,
       hubLogLevel,
       updateHubLogLevel,
+      hubIpInternal,
+      updateHubIpInternal,
+      hubIpExternal,
+      updateHubIpExternal,
+      hubPort,
+      updateHubPort,
     }}>
       {children}
     </DashboardSettingsContext.Provider>

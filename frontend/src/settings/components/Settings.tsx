@@ -716,13 +716,18 @@ const Settings: React.FC = () => {
   const [pricing, setPricing] = useState<PricingData | null>(null);
 
   // General Settings from Context
-  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel } = useDashboardSettings();
+  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel, hubIpInternal, updateHubIpInternal, hubIpExternal, updateHubIpExternal, hubPort, updateHubPort } = useDashboardSettings();
   const [isCustomScale, setIsCustomScale] = useState(false);
   const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
   const [isCustomRetention, setIsCustomRetention] = useState(false);
   const [customRetentionInput, setCustomRetentionInput] = useState(dataRetentionDays.toString());
-  
-  const { 
+
+  // Hub connection settings local state (save on blur/Enter)
+  const [localHubIpInternal, setLocalHubIpInternal] = useState(hubIpInternal);
+  const [localHubIpExternal, setLocalHubIpExternal] = useState(hubIpExternal);
+  const [localHubPort, setLocalHubPort] = useState(hubPort);
+
+  const {
     accentColor, updateAccentColor,
     hoverTintColor, updateHoverTintColor,
     primaryFont, updatePrimaryFont,
@@ -753,6 +758,24 @@ const Settings: React.FC = () => {
   useEffect(() => {
     setCustomRetentionInput(dataRetentionDays.toString());
   }, [dataRetentionDays]);
+
+  // Sync hub connection local state when context values load
+  useEffect(() => { setLocalHubIpInternal(hubIpInternal); }, [hubIpInternal]);
+  useEffect(() => { setLocalHubIpExternal(hubIpExternal); }, [hubIpExternal]);
+  useEffect(() => { setLocalHubPort(hubPort); }, [hubPort]);
+
+  const saveHubIpInternal = () => {
+    const trimmed = localHubIpInternal.trim();
+    if (trimmed !== hubIpInternal) updateHubIpInternal(trimmed);
+  };
+  const saveHubIpExternal = () => {
+    const trimmed = localHubIpExternal.trim();
+    if (trimmed !== hubIpExternal) updateHubIpExternal(trimmed);
+  };
+  const saveHubPort = () => {
+    const trimmed = localHubPort.trim();
+    if (trimmed !== hubPort) updateHubPort(trimmed);
+  };
 
   useEffect(() => {
     if (isDemoMode && activeTab === 'license') {
@@ -1166,6 +1189,71 @@ const Settings: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Hub Connection Settings
+                  Controls how agents connect to this hub instance. */}
+              <div className="setting-item graph-scale-section">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Hub IP (Internal)</span>
+                  <span className="setting-description">
+                    LAN/internal IP address agents use to connect to this hub.
+                  </span>
+                </div>
+                <div className="scale-control-wrapper">
+                  <form onSubmit={(e) => { e.preventDefault(); saveHubIpInternal(); }} className="scale-custom-form">
+                    <input
+                      type="text"
+                      value={localHubIpInternal}
+                      onChange={(e) => setLocalHubIpInternal(e.target.value)}
+                      onBlur={saveHubIpInternal}
+                      className="setting-input scale-input"
+                      placeholder="e.g. 192.168.1.100"
+                    />
+                  </form>
+                </div>
+              </div>
+
+              <div className="setting-item graph-scale-section">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Hub IP (External)</span>
+                  <span className="setting-description">
+                    Public/external IP for agents connecting from outside your network. Leave empty if not needed.
+                  </span>
+                </div>
+                <div className="scale-control-wrapper">
+                  <form onSubmit={(e) => { e.preventDefault(); saveHubIpExternal(); }} className="scale-custom-form">
+                    <input
+                      type="text"
+                      value={localHubIpExternal}
+                      onChange={(e) => setLocalHubIpExternal(e.target.value)}
+                      onBlur={saveHubIpExternal}
+                      className="setting-input scale-input"
+                      placeholder="e.g. 203.0.113.50"
+                    />
+                  </form>
+                </div>
+              </div>
+
+              <div className="setting-item graph-scale-section">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Hub Port</span>
+                  <span className="setting-description">
+                    Port number for agent connections. Default is 3000.
+                  </span>
+                </div>
+                <div className="scale-control-wrapper">
+                  <form onSubmit={(e) => { e.preventDefault(); saveHubPort(); }} className="scale-custom-form">
+                    <input
+                      type="text"
+                      value={localHubPort}
+                      onChange={(e) => setLocalHubPort(e.target.value)}
+                      onBlur={saveHubPort}
+                      className="setting-input scale-input"
+                      placeholder="3000"
+                    />
+                  </form>
                 </div>
               </div>
             </div>

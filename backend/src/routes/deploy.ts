@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { log } from '../utils/logger';
+import { getHubConfig } from '../utils/hubConfig';
 import Database from '../database/database';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -87,21 +88,21 @@ router.get('/linux', async (req, res) => {
     await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
 
     // Determine the Hub address for the agent to connect back to
-    const hubIp = process.env.PANKHA_HUB_IP;
+    const hubConfig = await getHubConfig();
+    const hubIp = hubConfig.hubIpInternal;
     const requestHost = req.headers.host;
     const protocol = req.headers['x-forwarded-proto'] || 'http';
-    
+
     // Priority for Hub address:
-    // 1. PANKHA_HUB_IP (explicitly set by user)
+    // 1. hub_ip_internal (DB/env setting)
     // 2. config.base_url (sent by frontend if available)
     // 3. Request headers (derived from browser visit)
     // 4. Fallback to server's local port
-    
-    // Priority: 1. PANKHA_PORT (.env), 2. Request Port (Dectected from URL), 3. Null (Placeholder)
-    const externalPort = process.env.PANKHA_PORT;
+
+    // Priority: 1. hub_port (DB/env), 2. Request Port (Detected from URL), 3. Null (Placeholder)
     const hostParts = requestHost?.split(':');
     const requestPort = hostParts && hostParts.length > 1 ? hostParts[1] : null;
-    const activePort = externalPort || requestPort;
+    const activePort = hubConfig.hubPort || requestPort;
 
     let hubHost: string;
     if (hubIp) {
@@ -259,14 +260,14 @@ router.get('/ipmi', async (req, res) => {
     await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
 
     // Determine the Hub address (same logic as /linux endpoint)
-    const hubIp = process.env.PANKHA_HUB_IP;
+    const hubConfig = await getHubConfig();
+    const hubIp = hubConfig.hubIpInternal;
     const requestHost = req.headers.host;
     const protocol = req.headers['x-forwarded-proto'] || 'http';
 
-    const externalPort = process.env.PANKHA_PORT;
     const hostParts = requestHost?.split(':');
     const requestPort = hostParts && hostParts.length > 1 ? hostParts[1] : null;
-    const activePort = externalPort || requestPort;
+    const activePort = hubConfig.hubPort || requestPort;
 
     let hubHost: string;
     if (hubIp) {

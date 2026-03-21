@@ -461,6 +461,7 @@ export const getDiagnostics = async (systemId: number): Promise<DiagnosticsRespo
 // Deployment Hub Configuration
 export interface DeploymentHubConfig {
   hubIp: string | null;
+  hubIpExternal: string | null;
   hubPort: string;
   pankhaMode?: string | null;
   isDemoMode?: boolean;

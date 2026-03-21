@@ -33,9 +33,8 @@ FROM node:20-alpine AS production
 ARG VERSION=dev
 ENV PANKHA_VERSION=$VERSION
 
-# Runtime dependencies and directory setup
-RUN apk add --no-cache curl && \
-    mkdir -p /app/data /app/backend/data/updates /frontend/src/config
+# Runtime dependencies
+RUN apk add --no-cache curl
 
 WORKDIR /app
 

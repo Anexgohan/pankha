@@ -1734,6 +1734,9 @@ const ALLOWED_SETTINGS = [
   'ui_font_primary',
   'ui_font_secondary',
   'hub_log_level',
+  'hub_ip_internal',
+  'hub_ip_external',
+  'hub_port',
 ] as const;
 
 type AllowedSettingKey = typeof ALLOWED_SETTINGS[number];

@@ -24,7 +24,7 @@ services:
       pankha-postgres:
         condition: service_healthy
     volumes:
-      - ./docker-data/updates:/app/backend/data/updates
+      - ./docker-data/staging:${PANKHA_STAGING_DIR}
     restart: unless-stopped
 
   pankha-postgres:

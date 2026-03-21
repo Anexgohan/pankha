@@ -23,7 +23,7 @@ export class UpdateDownloadService {
   private statusFile: string;
 
   private constructor() {
-    this.updatesDir = process.env.UPDATES_DIR || path.join(__dirname, '../../data/updates');
+    this.updatesDir = process.env.PANKHA_STAGING_DIR || path.join(__dirname, '../../data/staging');
     this.statusFile = path.join(this.updatesDir, 'status.json');
     
     // Ensure directory exists
