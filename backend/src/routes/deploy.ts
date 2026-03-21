@@ -155,12 +155,21 @@ router.post('/hub/stage', async (req, res) => {
     }
 
     const updateService = UpdateDownloadService.getInstance();
-    const success = await updateService.downloadVersion(version);
+    const result = await updateService.downloadVersion(version);
 
-    if (success) {
-      res.json({ message: 'Download to server complete', version });
+    if (result.success) {
+      res.json({
+        message: 'Download to server complete',
+        version: result.version,
+        files: result.files,
+        checksumVerified: result.checksumVerified,
+      });
     } else {
-      res.status(500).json({ error: 'Failed to download to server' });
+      res.status(500).json({
+        error: result.error || 'Failed to download to server',
+        version: result.version,
+        files: result.files,
+      });
     }
   } catch (error) {
     log.error('Failed to stage update:', 'deploy', error);

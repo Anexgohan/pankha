@@ -435,7 +435,7 @@ export const getHubStatus = async (): Promise<HubStatus> => {
   return response.data;
 };
 
-export const stageUpdateToHub = async (version: string): Promise<{ message: string; version: string }> => {
+export const stageUpdateToHub = async (version: string): Promise<{ message: string; version: string; files: { x64: boolean; arm64: boolean; ipmi_x64: boolean }; checksumVerified: boolean }> => {
   const response = await api.post("/api/deploy/hub/stage", { version });
   return response.data;
 };

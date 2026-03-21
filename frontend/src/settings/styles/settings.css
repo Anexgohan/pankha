@@ -58,14 +58,9 @@
   width: 100%;
 }
 
-/* Content area reuses system-card style */
+/* Content area — transparent layout wrapper, individual groups/sections are the cards */
 .settings-content {
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
   padding: var(--spacing-xl);
-  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-  border: 1px solid transparent;
 }
 
 .settings-section {
@@ -291,6 +286,14 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
+  box-shadow: var(--shadow);
+  transition: border-color 0.3s cubic-bezier(0.2, 0, 0, 1),
+              box-shadow 0.3s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.settings-group:hover {
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), 0 0 15px color-mix(in srgb, var(--color-accent-dynamic), transparent 96%);
 }
 
 .settings-group-header {
@@ -398,6 +401,11 @@
   color: var(--text-primary);
   text-align: center;
   font-family: var(--font-mono);
+  color-scheme: dark;
+}
+
+[data-theme="light"] .setting-input {
+  color-scheme: light;
 }
 
 
@@ -532,15 +540,15 @@
     align-items: center;
     justify-content: space-between;
     padding: 0.6rem 0.75rem !important;
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--bg-tertiary);
     border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
     transition: all 0.2s ease;
     position: relative;
 }
 
 .aesthetics-row:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: color-mix(in srgb, var(--color-hover-tint-dynamic) 4%, var(--bg-tertiary));
     border-color: rgba(255, 255, 255, 0.1);
 }
 

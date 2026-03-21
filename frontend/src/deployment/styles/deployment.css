@@ -399,7 +399,6 @@
 }
 
 .builder-top-bar > .builder-group + .builder-group {
-  margin-top: var(--spacing-md);
   padding-top: var(--spacing-lg);
   border-top: 1px solid var(--border-color-dimmed);
 }
@@ -504,8 +503,8 @@
 }
 
 .deployment-commands-header {
-  margin: var(--spacing-md) 0 var(--spacing-md);
-  padding-top: var(--spacing-xl);
+  margin: 0;
+  padding-top: var(--spacing-lg);
   border-top: 1px solid var(--border-color-dimmed);
 }
 

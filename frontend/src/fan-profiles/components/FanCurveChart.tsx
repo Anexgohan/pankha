@@ -220,10 +220,9 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
       const constrainedTemp = Math.max(0, Math.min(100, newTemp));
       const constrainedSpeed = Math.max(minSpeed, Math.min(maxSpeed, newSpeed));
       onPointChange(dragState.pointIndex, constrainedTemp, constrainedSpeed);
-      return;
     }
 
-    // Handle tooltips
+    // Handle tooltips (also during drag so it follows the cursor)
     updateHoverInfo(event.clientX, event.clientY);
   }, [dragState.isDragging, interactive, onPointChange, getSVGCoords, chartWidth, chartHeight, inverseScaleX, inverseScaleY, minSpeed, maxSpeed, updateHoverInfo]);
 

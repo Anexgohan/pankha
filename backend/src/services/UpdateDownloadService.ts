@@ -17,6 +17,14 @@ export interface UpdateStatus {
   };
 }
 
+export interface DownloadResult {
+  success: boolean;
+  version: string;
+  files: { x64: boolean; arm64: boolean; ipmi_x64: boolean };
+  checksumVerified: boolean;
+  error?: string;
+}
+
 export class UpdateDownloadService {
   private static instance: UpdateDownloadService;
   private updatesDir: string;
@@ -72,9 +80,9 @@ export class UpdateDownloadService {
   /**
    * Downloads binaries for a specific version from GitHub
    */
-  public async downloadVersion(version: string): Promise<boolean> {
+  public async downloadVersion(version: string): Promise<DownloadResult> {
     log.info(`Starting manual download of version ${version} to local server...`, 'UpdateService');
-    
+
     // Clean version string (ensure it starts with v for the URL)
     const tag = version.startsWith('v') ? version : `v${version}`;
     const baseUrl = `https://github.com/Anexgohan/pankha/releases/download/${tag}/`;
@@ -84,6 +92,9 @@ export class UpdateDownloadService {
       { arch: 'arm64', filename: 'pankha-agent-linux_arm64', required: true },
       { arch: 'ipmi_x64', filename: 'pankha-agent-ipmi-linux_x64', required: false },
     ];
+
+    const fileResults = { x64: false, arm64: false, ipmi_x64: false };
+    let checksumVerified = true;
 
     try {
       // 1. Download checksums.txt
@@ -123,9 +134,11 @@ export class UpdateDownloadService {
             log.success(`Checksum verified for ${target.filename}`, 'UpdateService');
           } else {
             log.warn(`No checksum found for ${target.filename} in checksums.txt`, 'UpdateService');
+            checksumVerified = false;
           }
 
           fs.chmodSync(dest, 0o755); // Ensure executable
+          fileResults[target.arch as keyof typeof fileResults] = true;
         } catch (err) {
           if (!target.required) {
             log.warn(`Optional binary ${target.filename} not found in release ${tag} — skipping`, 'UpdateService');
@@ -139,20 +152,17 @@ export class UpdateDownloadService {
       const status: UpdateStatus = {
         version: tag,
         timestamp: new Date().toISOString(),
-        files: {
-          x64: true,
-          arm64: true,
-          ipmi_x64: this.fileExists('pankha-agent-ipmi-linux_x64'),
-        },
+        files: fileResults,
         checksums: checksumMap
       };
       fs.writeFileSync(this.statusFile, JSON.stringify(status, null, 2));
-      
+
       log.success(`Successfully downloaded and cached version ${tag} on server.`, 'UpdateService');
-      return true;
+      return { success: true, version: tag, files: fileResults, checksumVerified };
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       log.error(`Failed to download version ${version}`, 'UpdateService', err);
-      return false;
+      return { success: false, version: tag, files: fileResults, checksumVerified: false, error: errorMsg };
     }
   }
 

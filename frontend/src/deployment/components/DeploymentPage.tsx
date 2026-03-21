@@ -738,11 +738,28 @@ export const DeploymentPage: React.FC<{
   const handleStageUpdate = async (version: string) => {
     setIsStaging(true);
     try {
-      await stageUpdateToHub(version);
-      toast.success(`Version ${version} is now ready on local server`);
+      const result = await stageUpdateToHub(version);
+      const files = result.files;
+      const fileParts = [
+        `x64 ${files.x64 ? '✓' : '✗'}`,
+        `arm64 ${files.arm64 ? '✓' : '✗'}`,
+        `ipmi ${files.ipmi_x64 ? '✓' : '✗'}`,
+      ].join(', ');
+      const checksum = result.checksumVerified ? 'checksums verified' : 'checksums unverified';
+      toast.success(`${result.version} staged — ${fileParts} · ${checksum}`);
       await refreshHubStatus();
     } catch (error: any) {
-      toast.error(error?.response?.data?.error || 'Failed to download to server');
+      const data = error?.response?.data;
+      if (data?.files) {
+        const fileParts = [
+          `x64 ${data.files.x64 ? '✓' : '✗'}`,
+          `arm64 ${data.files.arm64 ? '✓' : '✗'}`,
+          `ipmi ${data.files.ipmi_x64 ? '✓' : '✗'}`,
+        ].join(', ');
+        toast.error(`${data.version || version} failed — ${fileParts} · ${data.error}`);
+      } else {
+        toast.error(data?.error || 'Failed to download to server');
+      }
     } finally {
       setIsStaging(false);
     }
@@ -947,8 +964,6 @@ export const DeploymentPage: React.FC<{
           agentMode={installerMode}
           onAgentModeChange={setInstallerMode}
         />
-
-        <ActionButton githubRepo={GITHUB_REPO} />
 
         {/* Agent Downloads - Stage binaries from GitHub to local Hub */}
         <section className="deployment-section agent-downloads-panel">
@@ -1321,7 +1336,6 @@ export const DeploymentPage: React.FC<{
                 onCopy={copyToClipboard}
                 isLoading={isLoadingToken}
               />
-              <div className="terminal-spacer" />
               <TerminalBlock
                 title="CURL"
                 tool="curl"
@@ -1348,6 +1362,8 @@ export const DeploymentPage: React.FC<{
           onApplyUpdate={handleRemoteUpdate}
           hubStatus={hubStatus}
         />
+
+        <ActionButton githubRepo={GITHUB_REPO} />
 
         {/* Resources Section */}
         <ResourcesSection githubRepo={GITHUB_REPO} />
