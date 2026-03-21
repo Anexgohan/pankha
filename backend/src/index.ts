@@ -27,7 +27,6 @@ import deployRouter from './routes/deploy';
 import configRouter from './routes/config';
 import { licenseRouter, licenseManager } from './license';
 import { log, logger } from './utils/logger';
-import { seedHubConfig } from './utils/hubConfig';
 import { createDemoLockResponse, isDemoMode } from './utils/mode';
 
 const app = express();
@@ -104,9 +103,6 @@ async function initializeServices() {
       logger.setLogLevel(hubLogSetting.setting_value);
       log.info(`Hub log level loaded from database: ${logger.getLogLevelString()}`, 'index');
     }
-
-    // Seed hub config from env vars on first boot (DB takes priority on subsequent boots)
-    await seedHubConfig();
 
     // Load existing agents from database
     await agentManager.loadAgentsFromDatabase();

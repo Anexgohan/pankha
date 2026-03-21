@@ -627,11 +627,6 @@ export const DeploymentPage: React.FC<{
 
   // Compute URLs based on mode and config
   const getExternalUrl = () => {
-    // Use configured external IP if available
-    if (hubConfig?.hubIpExternal) {
-      return `http://${hubConfig.hubIpExternal}:${hubConfig.hubPort}`;
-    }
-    // Fallback to API_BASE_URL or window.location
     let baseUrl = API_BASE_URL;
     if (!baseUrl || !baseUrl.startsWith('http')) {
       const host = window.location.host;
@@ -1151,7 +1146,7 @@ export const DeploymentPage: React.FC<{
                       setUrlMode('external');
                       setHubUrl(getExternalUrl());
                     }}
-                    title="Uses the URL you're currently accessing this page from"
+                    title="For remote agents outside your network. Uses the URL you're currently accessing this page from. Ensure your reverse proxy supports WebSocket connections."
                   >
                     <ExternalLink size={14} />{' '}External
                   </button>

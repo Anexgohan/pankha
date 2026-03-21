@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { log } from '../utils/logger';
-import { getHubConfig } from '../utils/hubConfig';
 import Database from '../database/database';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -88,38 +87,38 @@ router.get('/linux', async (req, res) => {
     await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
 
     // Determine the Hub address for the agent to connect back to
-    const hubConfig = await getHubConfig();
-    const hubIp = hubConfig.hubIpInternal;
+    const hubIp = process.env.PANKHA_HUB_IP || null;
     const requestHost = req.headers.host;
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
 
     // Priority for Hub address:
-    // 1. hub_ip_internal (DB/env setting)
-    // 2. config.base_url (sent by frontend if available)
+    // 1. config.base_url (user's explicit choice from Deployment page)
+    // 2. PANKHA_HUB_IP (env var fallback)
     // 3. Request headers (derived from browser visit)
-    // 4. Fallback to server's local port
+    // 4. Fallback placeholder
 
-    // Priority: 1. hub_port (DB/env), 2. Request Port (Detected from URL), 3. Null (Placeholder)
     const hostParts = requestHost?.split(':');
     const requestPort = hostParts && hostParts.length > 1 ? hostParts[1] : null;
-    const activePort = hubConfig.hubPort || requestPort;
+    const activePort = process.env.PANKHA_PORT || requestPort;
 
     let hubHost: string;
-    if (hubIp) {
-      // Use specified IP + our prioritized port
-      hubHost = activePort ? `${hubIp}:${activePort}` : hubIp;
-    } else if (config.base_url) {
+    let protocol: string;
+    if (config.base_url) {
       const url = new URL(config.base_url);
       hubHost = url.host;
+      protocol = url.protocol.replace(':', '');
+    } else if (hubIp) {
+      hubHost = activePort ? `${hubIp}:${activePort}` : hubIp;
+      protocol = (req.headers['x-forwarded-proto'] as string) || 'http';
     } else if (requestHost && !requestHost.includes('localhost') && !requestHost.includes('127.0.0.1')) {
       hubHost = requestHost;
+      protocol = (req.headers['x-forwarded-proto'] as string) || 'http';
     } else {
-      // Fallback for local testing or when no host is recognizable
       hubHost = `[YOUR_SERVER_IP]${activePort ? `:${activePort}` : ''}`;
+      protocol = 'http';
     }
 
     const backendUrl = `${protocol}://${hubHost}`;
-    const wsUrl = `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hubHost}/websocket`;
+    const wsUrl = `${protocol === 'https' ? 'wss' : 'ws'}://${hubHost}/websocket`;
 
     // Local binary distribution URL (hub-and-spoke model)
     const localBinaryBase = `${backendUrl}/api/deploy/binaries`;
@@ -260,29 +259,32 @@ router.get('/ipmi', async (req, res) => {
     await db.run('UPDATE deployment_templates SET used_count = used_count + 1 WHERE token = $1', [token]);
 
     // Determine the Hub address (same logic as /linux endpoint)
-    const hubConfig = await getHubConfig();
-    const hubIp = hubConfig.hubIpInternal;
+    const hubIp = process.env.PANKHA_HUB_IP || null;
     const requestHost = req.headers.host;
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
 
     const hostParts = requestHost?.split(':');
     const requestPort = hostParts && hostParts.length > 1 ? hostParts[1] : null;
-    const activePort = hubConfig.hubPort || requestPort;
+    const activePort = process.env.PANKHA_PORT || requestPort;
 
     let hubHost: string;
-    if (hubIp) {
-      hubHost = activePort ? `${hubIp}:${activePort}` : hubIp;
-    } else if (config.base_url) {
+    let protocol: string;
+    if (config.base_url) {
       const url = new URL(config.base_url);
       hubHost = url.host;
+      protocol = url.protocol.replace(':', '');
+    } else if (hubIp) {
+      hubHost = activePort ? `${hubIp}:${activePort}` : hubIp;
+      protocol = (req.headers['x-forwarded-proto'] as string) || 'http';
     } else if (requestHost && !requestHost.includes('localhost') && !requestHost.includes('127.0.0.1')) {
       hubHost = requestHost;
+      protocol = (req.headers['x-forwarded-proto'] as string) || 'http';
     } else {
       hubHost = `[YOUR_SERVER_IP]${activePort ? `:${activePort}` : ''}`;
+      protocol = 'http';
     }
 
     const backendUrl = `${protocol}://${hubHost}`;
-    const wsUrl = `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hubHost}/websocket`;
+    const wsUrl = `${protocol === 'https' ? 'wss' : 'ws'}://${hubHost}/websocket`;
     const localBinaryBase = `${backendUrl}/api/deploy/binaries`;
 
     const script = generateIpmiInstallScript(config, backendUrl, wsUrl, localBinaryBase);
