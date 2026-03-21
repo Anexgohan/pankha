@@ -373,7 +373,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                     {getStatusIcon(profile.status)}
                   </span>
                   <span className="target-name">{profile.name}</span>
-                  {profile.message && <span className="log-msg"> — {profile.message}</span>}
+                  {profile.message && <span className="log-msg"> - {profile.message}</span>}
                 </div>
               ))}
             </div>

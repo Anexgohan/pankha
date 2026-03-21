@@ -525,7 +525,7 @@ const MaintenanceSection: React.FC<{
                               ipmi_host: 'IPMI Agent Host',
                               ipmi_network: 'IPMI Agent Network',
                               unknown: 'Unknown Agent',
-                            } as Record<string, string>)[system.agent_type || ''] || system.agent_type || '—'
+                            } as Record<string, string>)[system.agent_type || ''] || system.agent_type || '-'
                           }</span>
                         </td>
                         <td>
@@ -739,26 +739,19 @@ export const DeploymentPage: React.FC<{
     setIsStaging(true);
     try {
       const result = await stageUpdateToHub(version);
-      const files = result.files;
-      const fileParts = [
-        `x64 ${files.x64 ? '✓' : '✗'}`,
-        `arm64 ${files.arm64 ? '✓' : '✗'}`,
-        `ipmi ${files.ipmi_x64 ? '✓' : '✗'}`,
-      ].join(', ');
-      const checksum = result.checksumVerified ? 'checksums verified' : 'checksums unverified';
-      toast.success(`${result.version} staged — ${fileParts} · ${checksum}`);
+      const f = result.files;
+      const fileParts = `x64 ${f.x64 ? '✓' : '✗'} arm64 ${f.arm64 ? '✓' : '✗'} ipmi ${f.ipmi_x64 ? '✓' : '✗'}`;
+      const checksum = result.checksumVerified ? 'checksums passed' : 'checksums unverified';
+      toast.success(`Download ready ${result.version} (${fileParts}) ${checksum}`);
       await refreshHubStatus();
     } catch (error: any) {
       const data = error?.response?.data;
       if (data?.files) {
-        const fileParts = [
-          `x64 ${data.files.x64 ? '✓' : '✗'}`,
-          `arm64 ${data.files.arm64 ? '✓' : '✗'}`,
-          `ipmi ${data.files.ipmi_x64 ? '✓' : '✗'}`,
-        ].join(', ');
-        toast.error(`${data.version || version} failed — ${fileParts} · ${data.error}`);
+        const f = data.files;
+        const fileParts = `x64 ${f.x64 ? '✓' : '✗'} arm64 ${f.arm64 ? '✓' : '✗'} ipmi ${f.ipmi_x64 ? '✓' : '✗'}`;
+        toast.error(`Download failed ${data.version || version} (${fileParts}) ${data.error}`);
       } else {
-        toast.error(data?.error || 'Failed to download to server');
+        toast.error(data?.error || 'Download failed');
       }
     } finally {
       setIsStaging(false);
