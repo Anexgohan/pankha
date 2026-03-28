@@ -1,0 +1,62 @@
+Third-Party Software Licenses
+==============================
+
+Pankha Windows Agent includes the following third-party software.
+Each component retains its original license and copyright.
+
+
+LibreHardwareMonitorLib 0.9.4
+-----------------------------
+License: Mozilla Public License 2.0 (MPL-2.0)
+Copyright: LibreHardwareMonitor contributors
+Project: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+License: https://www.mozilla.org/en-US/MPL/2.0/
+
+
+NvAPIWrapper.Net 0.8.1.101
+---------------------------
+License: GNU Lesser General Public License v3.0 (LGPL-3.0)
+Copyright: (c) 2018 Soroush Falahati
+Project: https://github.com/falahati/NvAPIWrapper
+License: https://www.gnu.org/licenses/lgpl-3.0.html
+
+
+Newtonsoft.Json 13.0.3
+----------------------
+License: MIT License
+Copyright: (c) 2007 James Newton-King
+Project: https://github.com/JamesNK/Newtonsoft.Json
+License: https://licenses.nuget.org/MIT
+
+
+Serilog 4.1.0
+--------------
+License: Apache License 2.0
+Copyright: Serilog Contributors
+Project: https://github.com/serilog/serilog
+License: https://www.apache.org/licenses/LICENSE-2.0
+
+Also includes: Serilog.Sinks.File, Serilog.Sinks.Console,
+Serilog.Extensions.Logging, Serilog.Extensions.Hosting
+(all Apache License 2.0, Serilog Contributors)
+
+
+Microsoft.Extensions.Hosting 9.0.0
+-----------------------------------
+License: MIT License
+Copyright: (c) Microsoft Corporation
+Project: https://github.com/dotnet/runtime
+License: https://licenses.nuget.org/MIT
+
+Also includes: Microsoft.Extensions.Configuration,
+Microsoft.Extensions.Configuration.Json,
+Microsoft.Extensions.Hosting.WindowsServices
+(all MIT License, Microsoft Corporation)
+
+
+System.CommandLine 2.0.0-beta4
+------------------------------
+License: MIT License
+Copyright: (c) Microsoft Corporation
+Project: https://github.com/dotnet/command-line-api
+License: https://licenses.nuget.org/MIT
