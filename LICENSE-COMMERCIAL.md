@@ -9,10 +9,8 @@ the obligations of the GNU Affero General Public License v3.0 (AGPL-3.0).
 
 ## License Tiers
 
-| Tier       | Agents | History | Monthly | Yearly | Lifetime |
-| ---------- | ------ | ------- | ------- | ------ | -------- |
-| Pro        | 10     | 30 days | $5/mo   | $49    | $149     |
-| Enterprise | 50     | 1 year  | $25/mo  | $249   | $499     |
+Pankha offers Free, Pro, and Enterprise tiers.
+For current pricing and feature details, visit: https://pankha.app/#pricing
 
 ## Grant of Rights
 
@@ -48,12 +46,12 @@ For critical issues, open a GitHub Issue: https://github.com/Anexgohan/pankha/is
 
 ## Purchase
 
-To purchase a commercial license, visit: https://pankha.dev/pricing
+To purchase a commercial license, visit: https://pankha.app/#pricing
 
 ## Refunds
 
 Refunds are available within 14 days of purchase if the software does not
-meet your requirements. Contact support@pankha.dev.
+meet your requirements. Contact support@pankha.app.
 
 ## Warranty Disclaimer
 
@@ -63,4 +61,4 @@ OTHER LIABILITY ARISING FROM THE SOFTWARE.
 
 ---
 
-For questions about commercial licensing, contact: license@pankha.dev
+For questions about commercial licensing, contact: support@pankha.app

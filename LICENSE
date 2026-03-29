@@ -22,8 +22,13 @@ Purchase a commercial license to:
 - Remove source code disclosure obligations
 - Remove "Powered by Pankha" branding
 
-See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) for details.
-Purchase at: https://pankha.dev/pricing
+A free tier is available at no cost. See [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md) for details.
+Purchase at: https://pankha.app/#pricing
+
+### Distribution
+
+- **Source code** (this repository): Available under the AGPL-3.0 license.
+- **Compiled binaries** (official downloads): Distributed under the Commercial License, which includes a free tier at no cost.
 
 ---
 
