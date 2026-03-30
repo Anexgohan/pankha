@@ -91,11 +91,11 @@ Fully Customizable:
    ```
 2. Download the .env file
    ```bash
-   wget -O .env https://github.com/Anexgohan/pankha/releases/latest/download/example.env
+   wget -O .env https://github.com/Anexgohan/pankha/releases/latest/download/.env
    ```
    or,
    ```bash
-   curl -fsSLo .env https://github.com/Anexgohan/pankha/releases/latest/download/example.env
+   curl -fsSLo .env https://github.com/Anexgohan/pankha/releases/latest/download/.env
    ```
 3. Start Docker Compose
    ```bash
