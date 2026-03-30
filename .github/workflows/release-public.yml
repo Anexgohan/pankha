@@ -29,6 +29,7 @@ jobs:
   # Job 1: Build Rust agents (parallel matrix with FREE ARM64 runner)
   build-rust-agents:
     strategy:
+      fail-fast: true
       matrix:
         include:
           - arch: x64
@@ -206,6 +207,7 @@ jobs:
   # Job 4: Build Docker images
   build-docker:
     strategy:
+      fail-fast: true
       matrix:
         include:
           - platform: linux/amd64
