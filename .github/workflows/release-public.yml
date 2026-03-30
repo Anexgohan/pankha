@@ -1,13 +1,14 @@
 # REPO: pankha (public) | Builds Rust agents, Windows agent, Docker images, and creates GitHub release
 name: release-public
-run-name: "release-public ${{ github.event.client_payload.version || github.event.inputs.version || '' }}"
+run-name: "release-public ${{ github.event.inputs.version || github.ref_name || '' }}"
 
 # This workflow runs on the PUBLIC repo (pankha) to take advantage of FREE ARM64 runners.
-# Triggered by repository_dispatch from pankha-dev when a version tag is pushed.
+# Triggered by v* tag push or manual workflow_dispatch.
 
 on:
-  repository_dispatch:
-    types: [release-build]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:  # Manual trigger for testing
     inputs:
       version:
@@ -66,7 +67,7 @@ jobs:
       - name: Inject version into Cargo.toml
         working-directory: agents/clients/linux/rust
         run: |
-          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
           VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix
           
           # Convert 4-part version to SemVer prerelease format: 0.1.7.1 → 0.1.7-1
@@ -137,7 +138,7 @@ jobs:
       - name: Inject version into Cargo.toml
         working-directory: agents/clients/linux/virtual-agents/host-ipmi-rust
         run: |
-          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
           VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix
 
           # Convert 4-part version to SemVer prerelease format: 0.1.7.1 → 0.1.7-1
@@ -192,7 +193,7 @@ jobs:
 
       - name: Build Windows Installer
         working-directory: agents/clients/windows/varient-c
-        run: .\build.ps1 -Configuration Release -Clean -Publish -BuildInstaller -Version "${{ github.event.client_payload.version || github.event.inputs.version }}"
+        run: .\build.ps1 -Configuration Release -Clean -Publish -BuildInstaller -Version "${{ github.event.inputs.version || github.ref_name }}"
 
       - name: Upload MSI Artifact
         uses: actions/upload-artifact@v4
@@ -232,7 +233,7 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "🐳 Building Docker for ${{ matrix.platform }}: ${VERSION}"
 
@@ -263,12 +264,12 @@ jobs:
       - name: Extract version
         id: version
         run: |
-          VERSION="${{ github.event.client_payload.version || github.event.inputs.version }}"
+          VERSION="${{ github.event.inputs.version || github.ref_name }}"
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "version_number=${VERSION#v}" >> $GITHUB_OUTPUT
           
           # Get pre-release flag from dispatch or auto-detect from version
-          IS_PRERELEASE="${{ github.event.client_payload.is_prerelease || github.event.inputs.is_prerelease || 'auto' }}"
+          IS_PRERELEASE="${{ github.event.inputs.is_prerelease || 'auto' }}"
           if [ "$IS_PRERELEASE" = "auto" ]; then
             # Auto-detect from version string (alpha, beta, rc, dev, preview, etc.)
             # NOTE: The frontend (DeploymentPage.tsx) ranks these in the following order:

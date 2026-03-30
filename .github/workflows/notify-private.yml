@@ -1,0 +1,40 @@
+# REPO: pankha (public) | Notifies pankha-dev to sync after push to main
+name: notify-private
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual sync trigger'
+        required: false
+        default: 'Manual sync trigger'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get commit info
+        id: commit
+        run: |
+          echo "sha=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          echo "message<<EOF" >> $GITHUB_OUTPUT
+          echo "${{ github.event.head_commit.message }}" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Dispatch sync to pankha-dev
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.PANKHA_PUBLIC_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/Anexgohan/pankha-dev/dispatches \
+            -d '{
+              "event_type": "sync-from-public",
+              "client_payload": {
+                "sha": "${{ steps.commit.outputs.sha }}",
+                "triggered_by": "pankha"
+              }
+            }'
+          echo "Dispatched sync to pankha-dev"
