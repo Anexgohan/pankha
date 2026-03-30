@@ -496,3 +496,4 @@ This project is licensed under the AGPL-3.0 License ![License](https://img.shiel
 ---
 
 **Made with ❤️ for the self-hosting community**
+# Sync test - safe to delete this line
