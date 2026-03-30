@@ -332,7 +332,7 @@ jobs:
 
           # Copy Docker deployment files
           cp compose.yml release-assets/
-          cp .env release-assets/
+          cp .env release-assets/example.env
 
           # Make binaries executable
           chmod +x release-assets/pankha-agent-*linux_* 2>/dev/null || true
@@ -469,7 +469,7 @@ jobs:
             release-assets/pankha-agent-windows_x64.msi
             release-assets/config.example.json
             release-assets/compose.yml
-            release-assets/.env
+            release-assets/example.env
             release-assets/checksums.txt
           body: |
             ## Pankha Fan Control (पंखा) ${{ steps.version.outputs.is_prerelease == 'true' && '- Pre-release' || '- Release' }} ${{ steps.version.outputs.version }}
@@ -484,7 +484,7 @@ jobs:
             ```bash
             # Download Docker Compose files from release
             wget -O compose.yml https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/compose.yml
-            wget -O .env https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/.env
+            wget -O .env https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/example.env
 
             # Edit .env with your settings, then start
             docker compose up -d
@@ -584,7 +584,7 @@ jobs:
           echo "- ✅ pankha-agent-windows_x64.msi" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ config.example.json" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ compose.yml" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ .env" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ example.env" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ checksums.txt" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### 🔗 Links:" >> $GITHUB_STEP_SUMMARY
