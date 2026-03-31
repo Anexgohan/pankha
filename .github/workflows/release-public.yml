@@ -420,42 +420,6 @@ jobs:
 
           echo "✅ Tag ${VERSION} created/updated"
 
-      # Copy binaries to repo for direct download
-      - name: Update agent releases in repo
-        run: |
-          mkdir -p agents/releases/linux
-          mkdir -p agents/releases/ipmi-linux
-
-          cp release-assets/pankha-agent-linux_x64 agents/releases/linux/
-          cp release-assets/pankha-agent-linux_arm64 agents/releases/linux/
-          cp release-assets/config.example.json agents/releases/linux/
-          cp release-assets/pankha-agent-ipmi-linux_x64 agents/releases/ipmi-linux/
-
-          chmod +x agents/releases/linux/pankha-agent-linux_*
-          chmod +x agents/releases/ipmi-linux/pankha-agent-ipmi-linux_*
-
-          git config user.name "Anexgohan"
-          git config user.email "monish05m@gmail.com"
-
-          git add agents/releases/
-
-          if ! git diff --cached --quiet; then
-            git commit -m "Update agent binaries for ${{ steps.version.outputs.version }}"
-            
-            # Retry up to 3 times in case of concurrent pushes
-            for i in 1 2 3; do
-              git pull --rebase origin main
-              if git push origin main; then
-                echo "✅ Agent binaries updated in repository"
-                break
-              fi
-              echo "⚠️ Push failed, retrying ($i/3)..."
-              sleep 2
-            done
-          else
-            echo "✅ Agent binaries already up to date"
-          fi
-
       # Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
