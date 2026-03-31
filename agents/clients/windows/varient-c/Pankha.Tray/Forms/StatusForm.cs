@@ -160,7 +160,7 @@ public class StatusForm : Form
                 _agentIdLabel.Text = status.AgentId;
                 _agentNameLabel.Text = status.AgentName;
                 _versionLabel.Text = status.Version;
-                _backendLabel.Text = "Connected"; // TODO: Get actual URL
+                _backendLabel.Text = !string.IsNullOrEmpty(status.ServerUrl) ? status.ServerUrl : "-";
             }
             else
             {

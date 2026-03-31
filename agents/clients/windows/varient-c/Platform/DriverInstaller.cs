@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Serilog;
 
 namespace Pankha.WindowsAgent.Platform;
@@ -41,10 +42,10 @@ public static class DriverInstaller
         Console.WriteLine("  • You can install the driver later by running setup again");
         Console.WriteLine();
         Console.WriteLine("Driver Information:");
-        Console.WriteLine("  • Source: LibreHardwareMonitor (open source)");
-        Console.WriteLine("  • Signed: Yes (Microsoft WHQL)");
-        Console.WriteLine("  • Safety: Used by 100,000+ users worldwide");
-        Console.WriteLine("  • License: MIT Open Source");
+        Console.WriteLine("  • Signed: Yes (digitally signed by namazso)");
+        Console.WriteLine("  • Safety: Used by FanControl, OpenRGB, LHM, ZenTimings");
+        Console.WriteLine("  • License: GPL v2.0 (open source)");
+        Console.WriteLine("  • Source: https://github.com/namazso/PawnIO");
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
         Console.WriteLine();
     }
@@ -63,7 +64,7 @@ public static class DriverInstaller
     }
 
     /// <summary>
-    /// Attempt to install the PawnIO driver
+    /// Attempt to install the PawnIO driver via bundled PawnIO_setup.exe
     /// </summary>
     public static bool TryInstallDriver()
     {
@@ -71,51 +72,50 @@ public static class DriverInstaller
         {
             Logger.Information("Attempting to install PawnIO driver...");
 
-            // LibreHardwareMonitor auto-installs driver on first Computer.Open()
-            // This requires administrator privileges
-            var computer = new LibreHardwareMonitor.Hardware.Computer
+            // Look for bundled PawnIO_setup.exe in install directory
+            var setupPath = Path.Combine(PathResolver.InstallPath, "PawnIO_setup.exe");
+            if (!File.Exists(setupPath))
             {
-                IsMotherboardEnabled = true
-            };
-
-            computer.Open();
-            computer.Close();
-
-            // Check if driver was installed
-            if (IsPawnIOInstalled())
-            {
-                Logger.Information("PawnIO driver installed successfully");
-                Console.WriteLine();
-                Console.WriteLine("Driver installed successfully!");
-                return true;
-            }
-            else
-            {
-                Logger.Warning("Driver installation completed but driver not detected");
-                Console.WriteLine("WARNING: Driver installation completed but driver not detected");
+                Logger.Error("PawnIO_setup.exe not found at {Path}", setupPath);
+                Console.WriteLine("ERROR: PawnIO installer not found.");
+                Console.WriteLine("Download from: https://pawnio.eu");
                 return false;
             }
-        }
-        catch (UnauthorizedAccessException)
-        {
-            Logger.Error("Administrator privileges required to install driver");
-            Console.WriteLine();
-            Console.WriteLine("ERROR: Administrator privileges required!");
-            Console.WriteLine("Please run the installer as Administrator.");
-            Console.WriteLine();
-            Console.WriteLine("Right-click pankha-agent-windows.exe -> Run as Administrator");
-            return false;
+
+            // Run silent install
+            var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = setupPath,
+                Arguments = "-install -silent",
+                UseShellExecute = false,
+                CreateNoWindow = true
+            });
+
+            process?.WaitForExit(30000); // 30s timeout
+            var exitCode = process?.ExitCode ?? -1;
+
+            switch (exitCode)
+            {
+                case 0: // ERROR_SUCCESS
+                    Logger.Information("PawnIO driver installed successfully");
+                    Console.WriteLine("PawnIO driver installed successfully.");
+                    return true;
+
+                case 3010: // ERROR_SUCCESS_REBOOT_REQUIRED
+                    Logger.Information("PawnIO installed — reboot required for full functionality");
+                    Console.WriteLine("PawnIO installed. A reboot is recommended.");
+                    return true;
+
+                default:
+                    Logger.Warning("PawnIO installer returned exit code {Code}", exitCode);
+                    Console.WriteLine($"PawnIO installation returned code: {exitCode}");
+                    return false;
+            }
         }
         catch (Exception ex)
         {
             Logger.Error(ex, "Failed to install PawnIO driver");
-            Console.WriteLine();
-            Console.WriteLine($"ERROR: Driver installation failed: {ex.Message}");
-            Console.WriteLine();
-            Console.WriteLine("Common causes:");
-            Console.WriteLine("  - Antivirus blocking driver installation");
-            Console.WriteLine("  - Windows Secure Boot preventing driver load");
-            Console.WriteLine("  - Incompatible motherboard chipset");
+            Console.WriteLine($"ERROR: {ex.Message}");
             return false;
         }
     }

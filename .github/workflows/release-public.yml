@@ -275,8 +275,8 @@ jobs:
           if [ "$IS_PRERELEASE" = "auto" ]; then
             # Auto-detect from version string (alpha, beta, rc, dev, preview, etc.)
             # NOTE: The frontend (DeploymentPage.tsx) ranks these in the following order:
-            # rc > beta > alpha > pre/preview > insiders > experimental > canary > dev > nightly
-            if [[ "$VERSION" =~ -(alpha|beta|rc|pre|preview|dev|canary|nightly|experimental|insiders) ]]; then
+            # rc > beta > alpha > pre/preview > insiders > experimental > canary > dev > nightly > test/testing
+            if [[ "$VERSION" =~ -(alpha|beta|rc|pre|preview|dev|canary|nightly|experimental|insiders|test|testing) ]]; then
               IS_PRERELEASE="true"
             else
               IS_PRERELEASE="false"
