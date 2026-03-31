@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.Win32;
 using Serilog;
 
 namespace Pankha.WindowsAgent.Platform;
@@ -9,14 +10,56 @@ namespace Pankha.WindowsAgent.Platform;
 public static class DriverInstaller
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(DriverInstaller));
-    private const string PAWN_IO_DRIVER_PATH = @"C:\Windows\System32\drivers\PawnIO.sys";
 
     /// <summary>
-    /// Check if PawnIO driver is installed
+    /// Check if PawnIO driver is installed by querying the Windows service registry.
+    /// PawnIO installs to DriverStore (not System32\drivers), so we resolve the path
+    /// from HKLM\SYSTEM\CurrentControlSet\Services\PawnIO\ImagePath.
     /// </summary>
     public static bool IsPawnIOInstalled()
     {
-        return File.Exists(PAWN_IO_DRIVER_PATH);
+        if (!TryGetPawnIODriverPath(out var driverPath) || string.IsNullOrWhiteSpace(driverPath))
+            return false;
+
+        return File.Exists(driverPath);
+    }
+
+    /// <summary>
+    /// Resolve the actual PawnIO driver path from the service registry entry.
+    /// Returns false if the service is not registered.
+    /// </summary>
+    public static bool TryGetPawnIODriverPath(out string? driverPath)
+    {
+        driverPath = null;
+        try
+        {
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\PawnIO");
+            if (key == null) return false;
+
+            var imagePathRaw = key.GetValue("ImagePath") as string;
+            if (string.IsNullOrWhiteSpace(imagePathRaw)) return false;
+
+            var path = imagePathRaw.Trim().Trim('"');
+
+            // ImagePath typically uses \SystemRoot\ prefix (e.g. \SystemRoot\System32\DriverStore\...)
+            if (path.StartsWith(@"\SystemRoot\", StringComparison.OrdinalIgnoreCase))
+            {
+                var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                path = Path.Combine(windowsDir, path.Substring(@"\SystemRoot\".Length));
+            }
+            else
+            {
+                path = Environment.ExpandEnvironmentVariables(path);
+            }
+
+            driverPath = path;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Logger.Warning(ex, "Failed to query PawnIO service registry");
+            return false;
+        }
     }
 
     /// <summary>

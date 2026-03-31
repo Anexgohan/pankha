@@ -218,7 +218,7 @@ namespace Pankha.WixSharpInstaller
 
             // Bind PawnIO property
             // Check if PawnIO is already installed — show checked+disabled if so
-            bool pawnioInstalled = System.IO.File.Exists(@"C:\Windows\System32\drivers\PawnIO.sys");
+            bool pawnioInstalled = PawnIOHelper.IsPawnIOInstalled();
             string pawnioVal = Runtime.Session["INSTALL_PAWNIO"];
             if (pawnioInstalled)
             {

@@ -13,6 +13,7 @@ using System.Linq;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace Pankha.WixSharpInstaller
 {
@@ -760,8 +761,8 @@ namespace Pankha.WixSharpInstaller
 
                                 if (pawnioExit == 0 || pawnioExit == 3010)
                                 {
-                                    // Verify driver is actually on disk (don't trust exit code alone)
-                                    bool driverPresent = IO.File.Exists(@"C:\Windows\System32\drivers\PawnIO.sys");
+                                    // Verify driver via service registry (PawnIO installs to DriverStore, not System32\drivers)
+                                    bool driverPresent = PawnIOHelper.IsPawnIOInstalled();
                                     if (driverPresent || pawnioExit == 3010)
                                     {
                                         // 3010 = reboot needed, driver may not appear until reboot
@@ -813,7 +814,7 @@ namespace Pankha.WixSharpInstaller
                     else if (installPawnio != "1")
                     {
                         // User opted out or already installed — verify driver is actually present
-                        pawnioOk = IO.File.Exists(@"C:\Windows\System32\drivers\PawnIO.sys");
+                        pawnioOk = PawnIOHelper.IsPawnIOInstalled();
                         if (!pawnioOk)
                         {
                             LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO not present and install was skipped — aborting (rollback)");
@@ -1197,6 +1198,52 @@ namespace Pankha.WixSharpInstaller
             else
             {
                 base.OnLoad(e);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Service-based PawnIO detection. PawnIO installs to DriverStore, not System32\drivers.
+    /// Resolves the actual path from HKLM\SYSTEM\CurrentControlSet\Services\PawnIO\ImagePath.
+    /// </summary>
+    internal static class PawnIOHelper
+    {
+        public static bool IsPawnIOInstalled()
+        {
+            if (!TryGetDriverPath(out string resolvedPath) || string.IsNullOrEmpty(resolvedPath))
+                return false;
+            return IO.File.Exists(resolvedPath);
+        }
+
+        public static bool TryGetDriverPath(out string resolvedPath)
+        {
+            resolvedPath = null;
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\PawnIO"))
+                {
+                    if (key == null) return false;
+                    var imagePathRaw = key.GetValue("ImagePath") as string;
+                    if (string.IsNullOrWhiteSpace(imagePathRaw)) return false;
+
+                    var path = imagePathRaw.Trim().Trim('"');
+                    if (path.StartsWith(@"\SystemRoot\", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                        path = IO.Path.Combine(windowsDir, path.Substring(@"\SystemRoot\".Length));
+                    }
+                    else
+                    {
+                        path = Environment.ExpandEnvironmentVariables(path);
+                    }
+
+                    resolvedPath = path;
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
             }
         }
     }
