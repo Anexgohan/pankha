@@ -353,7 +353,7 @@ public class ConfigForm : Form
                 {
                     var status = await _ipcClient.GetStatusAsync();
                     if (status != null && !string.IsNullOrEmpty(status.Version))
-                        Text = $"Pankha Agent Configuration — v{status.Version}";
+                        Text = $"Pankha Agent Configuration - v{status.Version}";
                 }
                 catch { /* Non-critical — keep default title */ }
 

@@ -741,6 +741,7 @@ namespace Pankha.WixSharpInstaller
                     // Fail closed: if PawnIO install fails, abort the entire installation
                     string installPawnio = GetProperty("INSTALL_PAWNIO");
                     bool pawnioOk = false;
+                    bool rebootRequired = false;
                     if (installPawnio == "1" && !string.IsNullOrEmpty(installDirProp))
                     {
                         try
@@ -767,9 +768,10 @@ namespace Pankha.WixSharpInstaller
                                     {
                                         // 3010 = reboot needed, driver may not appear until reboot
                                         pawnioOk = true;
+                                        rebootRequired = (pawnioExit == 3010);
                                         LogToDebugFile(logBaseDir, logType, pawnioExit == 0
                                             ? "PawnIO driver installed and verified"
-                                            : "PawnIO installed — reboot required, driver will load after restart");
+                                            : "PawnIO installed - reboot required, driver will load after restart");
                                     }
                                     else
                                     {
@@ -802,7 +804,7 @@ namespace Pankha.WixSharpInstaller
                                     "The installation is being aborted.\n\n" +
                                     "Please ensure PawnIO can be installed on this system,\n" +
                                     "then re-run the Pankha installer.",
-                                    "Pankha — Installation Aborted",
+                                    "Pankha - Installation Aborted",
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Error);
                             }
@@ -825,7 +827,7 @@ namespace Pankha.WixSharpInstaller
                                     "Pankha requires PawnIO for hardware sensor access and fan control.\n" +
                                     "The installation is being aborted.\n\n" +
                                     "Please re-run the installer with PawnIO installation enabled.",
-                                    "Pankha — Installation Aborted",
+                                    "Pankha - Installation Aborted",
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Error);
                             }
@@ -835,35 +837,55 @@ namespace Pankha.WixSharpInstaller
                         }
                     }
 
-                     // LAUNCH TRAY APP
-                     try
+                     // REBOOT NOTICE (if PawnIO returned 3010)
+                     if (rebootRequired)
                      {
-                         string agentUiName = GetProperty("AgentUI");
-                         if (!string.IsNullOrEmpty(agentUiName) && !string.IsNullOrEmpty(installDirProp))
+                         LogToDebugFile(logBaseDir, logType, "PawnIO requires reboot - showing notice, skipping tray launch");
+                         try
                          {
-                             string uiPath = IO.Path.Combine(installDirProp, agentUiName);
-                             if (IO.File.Exists(uiPath))
+                             MessageBox.Show(
+                                 "Pankha installed successfully.\n\n" +
+                                 "PawnIO requires a system reboot before it can control hardware.\n" +
+                                 "Please restart your computer to complete the setup.",
+                                 "Pankha - Reboot Required",
+                                 MessageBoxButtons.OK,
+                                 MessageBoxIcon.Information);
+                         }
+                         catch { /* Deferred action - MessageBox may not be available */ }
+                     }
+
+                     // LAUNCH TRAY APP (skip if reboot pending - driver not active yet)
+                     if (!rebootRequired)
+                     {
+                         try
+                         {
+                             string agentUiName = GetProperty("AgentUI");
+                             if (!string.IsNullOrEmpty(agentUiName) && !string.IsNullOrEmpty(installDirProp))
                              {
-                                 LogToDebugFile(logBaseDir, logType, $"Launching Tray App: {uiPath}");
-                                 Process.Start(new ProcessStartInfo
+                                 string uiPath = IO.Path.Combine(installDirProp, agentUiName);
+                                 if (IO.File.Exists(uiPath))
                                  {
-                                     FileName = uiPath,
-                                     UseShellExecute = true
-                                 });
+                                     LogToDebugFile(logBaseDir, logType, $"Launching Tray App: {uiPath}");
+                                     Process.Start(new ProcessStartInfo
+                                     {
+                                         FileName = uiPath,
+                                         UseShellExecute = true
+                                     });
+                                 }
+                                 else
+                                 {
+                                     LogToDebugFile(logBaseDir, logType, $"Tray App not found at {uiPath}");
+                                 }
                              }
                              else
                              {
-                                 LogToDebugFile(logBaseDir, logType, $"Tray App not found at {uiPath}");
+                                  LogToDebugFile(logBaseDir, logType, "Skipping launch: InstallDir or AgentUI property missing.");
                              }
                          }
-                         else
+                         catch (Exception ex)
                          {
-                              LogToDebugFile(logBaseDir, logType, "Skipping launch: InstallDir or AgentUI property missing.");
+                             LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
                          }
-                     }
-                     catch (Exception ex)
-                     {
-                         LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
                      }
 
                      // Note: Service is started by WiX ServiceControl (StartOn = SvcEvent.Install).

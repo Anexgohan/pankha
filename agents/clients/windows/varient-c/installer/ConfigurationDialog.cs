@@ -145,7 +145,7 @@ namespace Pankha.WixSharpInstaller
 
             var pawnioDesc = new Label
             {
-                Text = "Required for LibreHardwareMonitor — provides low-level access for\nmotherboard temperature sensors and PWM fan control.",
+                Text = "Required for LibreHardwareMonitor - provides low-level access for\nmotherboard temperature sensors and PWM fan control.",
                 Font = new Font("Segoe UI", 8.25F),
                 Location = new Point(42, 200),
                 Size = new Size(400, 32),

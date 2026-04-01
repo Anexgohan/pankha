@@ -24,6 +24,7 @@ public class TrayApplicationContext : ApplicationContext
     // State
     private bool _isConnected = false;
     private bool _hasPromptedToStartService = false;
+    private bool _ignoreNextClick = false;
     private AgentStatus? _lastStatus;
     private Icon _connectedIcon = null!;
     private Icon _disconnectedIcon = null!;
@@ -58,8 +59,17 @@ public class TrayApplicationContext : ApplicationContext
             ShowStatusForm();
         };
 
-        _nativeIcon.LeftClick += () => { _singleClickTimer.Start(); };
-        _nativeIcon.DoubleClick += () => { _singleClickTimer.Stop(); ShowConfigForm(); };
+        _nativeIcon.LeftClick += () =>
+        {
+            if (_ignoreNextClick) { _ignoreNextClick = false; return; }
+            _singleClickTimer.Start();
+        };
+        _nativeIcon.DoubleClick += () =>
+        {
+            _singleClickTimer.Stop();
+            _ignoreNextClick = true;
+            ShowConfigForm();
+        };
         _nativeIcon.RightClick += (pos) => _contextMenu.Show(pos);
         _nativeIcon.PopupOpen += OnTrayPopupOpen;
         _nativeIcon.PopupClose += OnTrayPopupClose;
