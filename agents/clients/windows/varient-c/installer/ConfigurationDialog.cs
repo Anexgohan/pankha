@@ -9,11 +9,12 @@ namespace Pankha.WixSharpInstaller
     public class ConfigurationDialog : ManagedForm, IManagedDialog
     {
         private CheckBox resetConfigCheckBox;
+        private CheckBox pawnioCheckBox;
         private Label descriptionLabel;
         private Button backButton;
         private Button nextButton;
         private Button cancelButton;
-        
+
         private PictureBox banner;
         private Label bannerTitle;
         private Label bannerDescription;
@@ -121,6 +122,51 @@ namespace Pankha.WixSharpInstaller
             };
             middlePanel.Controls.Add(resetDesc);
 
+            // --- PawnIO Driver Section ---
+            var pawnioSeparator = new Label
+            {
+                BorderStyle = BorderStyle.Fixed3D,
+                Location = new Point(25, 162),
+                Size = new Size(440, 2),
+                BackColor = Color.White
+            };
+            middlePanel.Controls.Add(pawnioSeparator);
+
+            pawnioCheckBox = new CheckBox
+            {
+                Text = "Install PawnIO Driver",
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Location = new Point(25, 174),
+                Size = new Size(400, 24),
+                Checked = true,
+                BackColor = Color.White
+            };
+            middlePanel.Controls.Add(pawnioCheckBox);
+
+            var pawnioDesc = new Label
+            {
+                Text = "Required for LibreHardwareMonitor - provides low-level access for\nmotherboard temperature sensors and PWM fan control.",
+                Font = new Font("Segoe UI", 8.25F),
+                Location = new Point(42, 200),
+                Size = new Size(400, 32),
+                BackColor = Color.White
+            };
+            middlePanel.Controls.Add(pawnioDesc);
+
+            var pawnioLink = new LinkLabel
+            {
+                Text = "More info: pawnio.eu",
+                Font = new Font("Segoe UI", 8.25F),
+                Location = new Point(42, 234),
+                Size = new Size(200, 16),
+                BackColor = Color.White
+            };
+            pawnioLink.LinkClicked += (s, ev) =>
+            {
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://pawnio.eu") { UseShellExecute = true }); } catch { }
+            };
+            middlePanel.Controls.Add(pawnioLink);
+
             // 3. Bottom Panel (Buttons)
             bottomPanel = new Panel
             {
@@ -159,16 +205,61 @@ namespace Pankha.WixSharpInstaller
             }
             catch { }
 
-            // Bind Property
+            // Bind Reset Config property
             string val = Runtime.Session["RESET_CONFIG"];
             resetConfigCheckBox.Checked = (val == "1");
             UpdateNextButtonText();
 
-            // Save on change
-            resetConfigCheckBox.CheckedChanged += (s, ev) => 
+            resetConfigCheckBox.CheckedChanged += (s, ev) =>
             {
                 Runtime.Session["RESET_CONFIG"] = resetConfigCheckBox.Checked ? "1" : "0";
                 UpdateNextButtonText();
+            };
+
+            // Bind PawnIO property
+            // Check if PawnIO is already installed — show checked+disabled if so
+            bool pawnioInstalled = PawnIOHelper.IsPawnIOInstalled();
+            string pawnioVal = Runtime.Session["INSTALL_PAWNIO"];
+            if (pawnioInstalled)
+            {
+                pawnioCheckBox.Checked = true;
+                pawnioCheckBox.Enabled = false;
+                pawnioCheckBox.Text = "Install PawnIO Driver (already installed)";
+                Runtime.Session["INSTALL_PAWNIO"] = "0"; // Skip install — already present
+            }
+            else
+            {
+                pawnioCheckBox.Checked = (pawnioVal != "0");
+            }
+
+            pawnioCheckBox.CheckedChanged += (s, ev) =>
+            {
+                if (!pawnioCheckBox.Checked)
+                {
+                    // PawnIO is mandatory — warn and either re-check or abort
+                    var result = MessageBox.Show(
+                        "PawnIO is required for Pankha to read hardware sensors and control fans.\n\n" +
+                        "The installation cannot continue without PawnIO.\n\n" +
+                        "Click OK to re-enable PawnIO installation,\n" +
+                        "or Cancel to abort the installer.",
+                        "PawnIO Required",
+                        MessageBoxButtons.OKCancel,
+                        MessageBoxIcon.Warning,
+                        MessageBoxDefaultButton.Button1);
+
+                    if (result == DialogResult.OK)
+                    {
+                        pawnioCheckBox.Checked = true;
+                        return;
+                    }
+                    else
+                    {
+                        // User chose to abort — cancel the entire installer
+                        Shell.Cancel();
+                        return;
+                    }
+                }
+                Runtime.Session["INSTALL_PAWNIO"] = pawnioCheckBox.Checked ? "1" : "0";
             };
         }
 

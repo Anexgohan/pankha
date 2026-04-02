@@ -107,12 +107,8 @@ class Program
             Directory.CreateDirectory(Path.GetDirectoryName(CONFIG_PATH)!);
             Directory.CreateDirectory(Path.GetDirectoryName(LOG_PATH)!);
 
-            // CRITICAL: Set Current Directory to Install Path
-            // Windows Service starts in System32 by default.
-            // LibreHardwareMonitor needs its kernel driver (*.sys) in the same folder as the exe.
-            // The driver filename is derived from the process name (e.g., pankha-agent.exe -> pankha-agent.sys).
-            // LibreHardwareMonitor extracts the driver at RUNTIME from embedded resources on first run.
-            // If CWD is System32 and driver extraction fails, storage sensors (NVMe/SATA) won't be detected.
+            // Set working directory to install path (needed for config/log path resolution)
+            // Windows Service starts in System32 by default — override to install location
             Directory.SetCurrentDirectory(PathResolver.InstallPath);
 
             // Initialize logging
@@ -120,54 +116,15 @@ class Program
             bool isInteractiveMode = foreground || test || setup || logs != null || configShow || status || start || stop || restart;
             InitializeLogging(logLevel, enableConsole: isInteractiveMode);
 
-            // DIAGNOSTICS: Log Environment Details
-            try
+            // Check PawnIO driver presence (required for motherboard sensors and fan control)
+            if (!DriverInstaller.IsPawnIOInstalled())
             {
-                var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
-                var principal = new System.Security.Principal.WindowsPrincipal(identity);
-                var isAdmin = principal.IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator);
-
-                // LibreHardwareMonitor derives driver name from process name
-                // Example: pankha-agent.exe -> pankha-agent.sys
-                var processPath = Environment.ProcessPath ?? System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
-                var processName = Path.GetFileNameWithoutExtension(processPath);
-                var driverFileName = $"{processName}.sys";
-                var driverPath = Path.Combine(Directory.GetCurrentDirectory(), driverFileName);
-                var driverExists = File.Exists(driverPath);
-
-                Log.Information("=== DIAGNOSTICS ===");
-                Log.Information("User Identity: {Name}", identity.Name);
-                Log.Information("Is System: {IsSystem}", identity.IsSystem);
-                Log.Information("Is Admin: {IsAdmin}", isAdmin);
-                Log.Information("Process Name: {Name}", processName);
-                Log.Information("Current Dir: {Dir}", Directory.GetCurrentDirectory());
-                Log.Information("Base Dir: {Dir}", AppContext.BaseDirectory);
-                Log.Information("Driver Check: Looking for {Driver} at {Path}", driverFileName, driverPath);
-                if (driverExists)
-                {
-                    var info = new FileInfo(driverPath);
-                    Log.Information("Driver Status: FOUND (Size: {Size} bytes)", info.Length);
-                }
-                else
-                {
-                    Log.Information("Driver Status: MISSING");
-                }
-                
-                // If missing, check if pankha-agent.sys exists (production name)
-                if (!driverExists && processName != "pankha-agent")
-                {
-                     var prodDriverPath = Path.Combine(Directory.GetCurrentDirectory(), "pankha-agent.sys");
-                     if (File.Exists(prodDriverPath))
-                     {
-                         Log.Information("NOTE: Found production driver 'pankha-agent.sys'. Rename your executable to 'pankha-agent.exe' to use it.");
-                     }
-                }
-                
-                Log.Information("===================");
+                Log.Warning("PawnIO driver not installed — motherboard sensors and fan control unavailable");
+                Log.Warning("Install PawnIO from https://pawnio.eu or run the Pankha installer");
             }
-            catch (Exception ex)
+            else
             {
-                Log.Error(ex, "Failed to log diagnostics");
+                Log.Information("PawnIO driver detected");
             }
 
             try

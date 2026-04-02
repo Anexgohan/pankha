@@ -12,6 +12,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Drawing;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
 
 namespace Pankha.WixSharpInstaller
 {
@@ -149,12 +151,16 @@ namespace Pankha.WixSharpInstaller
                 string artifactPath = IO.Path.Combine("..", Config.Paths.BuildArtifacts.Replace("/", "\\"));
                 string exePath = IO.Path.Combine(artifactPath, Config.Filenames.AgentExe);
                 string uiPath = IO.Path.Combine(artifactPath, Config.Filenames.AgentUI);
-                
+                string pawnioSetupPath = IO.Path.Combine(artifactPath, "PawnIO_setup.exe");
+
                 IO.File.AppendAllText("debug.log", $"DEBUG: Checking AgentExe at '{IO.Path.GetFullPath(exePath)}'\n");
                 if (!IO.File.Exists(exePath)) IO.File.AppendAllText("debug.log", "ERROR: AgentExe not found!\n");
-                
+
                 IO.File.AppendAllText("debug.log", $"DEBUG: Checking AgentUI at '{IO.Path.GetFullPath(uiPath)}'\n");
                 if (!IO.File.Exists(uiPath)) IO.File.AppendAllText("debug.log", "ERROR: AgentUI not found!\n");
+
+                IO.File.AppendAllText("debug.log", $"DEBUG: Checking PawnIO_setup at '{IO.Path.GetFullPath(pawnioSetupPath)}'\n");
+                if (!IO.File.Exists(pawnioSetupPath)) IO.File.AppendAllText("debug.log", "WARNING: PawnIO_setup.exe not found — MSI will not include PawnIO installer\n");
 
                 var agentExe = new WixSharp.File(exePath);
 
@@ -176,15 +182,16 @@ namespace Pankha.WixSharpInstaller
 
                 // 4. Create the project
                 // InstallDir: %ProgramFiles%\<Manufacturer>
-                // NOTE: LibreHardwareMonitor 0.9.4 extracts its kernel driver at runtime
-                // The driver is embedded in LibreHardwareMonitorLib.dll and extracted automatically
-                // No need to ship driver files (.sys) with the installer
+                // NOTE: LibreHardwareMonitor 0.9.6 uses PawnIO as its kernel driver
+                // PawnIO is installed separately via PawnIO_setup.exe (bundled in MSI)
+                // The installer runs PawnIO_setup.exe -install -silent during OnAfterInstall
 
                 var project = new ManagedProject(Config.Product,
                     new Dir($@"%ProgramFiles%\{Config.Manufacturer}",
                         agentExe,
                         new WixSharp.File(uiPath),
-                        
+                        new WixSharp.File(pawnioSetupPath),
+
                         // Removed appsettings.json and config.example.json as they are not needed
                         new Dir("logs"),
 
@@ -296,7 +303,8 @@ namespace Pankha.WixSharpInstaller
                     new Property("AgentExe", Config.Filenames.AgentExe),
                     new Property("AgentUI", Config.Filenames.AgentUI),
                     new Property("ARPINSTALLLOCATION", "[INSTALLDIR]"),
-                    new Property("PREVIOUSINSTALLDIR", "") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } }
+                    new Property("PREVIOUSINSTALLDIR", "") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } },
+                    new Property("INSTALL_PAWNIO", "1") { Attributes = new Dictionary<string, string> { { "Secure", "yes" } } }
                 };
 
                 // Enable full UI for uninstall
@@ -304,7 +312,7 @@ namespace Pankha.WixSharpInstaller
 
                 // CRITICAL: Pass these properties to Deferred Actions
                 // Note: Standard MSI properties like Manufacturer and ProductName must be explicitly included for Deferred actions.
-                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI,UPGRADINGPRODUCTCODE,WIX_UPGRADE_DETECTED,PREVIOUSINSTALLDIR=[PREVIOUSINSTALLDIR]";
+                project.DefaultDeferredProperties += ",KEEP_CONFIG,RESET_CONFIG,KEEP_LOGS,INSTALL_PAWNIO,INSTALLDIR,Manufacturer,ProductName,AgentExe,AgentUI,UPGRADINGPRODUCTCODE,WIX_UPGRADE_DETECTED,PREVIOUSINSTALLDIR=[PREVIOUSINSTALLDIR]";
 
                 // Event handlers
                 project.BeforeInstall += OnBeforeInstall;
@@ -727,35 +735,157 @@ namespace Pankha.WixSharpInstaller
                         catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Migration failed: {ex.Message}"); }
                     }
 
-                     // LAUNCH TRAY APP
-                     try
+                    // INSTALL PAWNIO DRIVER
+                    // PawnIO is the kernel driver used by LibreHardwareMonitor 0.9.6+
+                    // Required for motherboard sensor reading and fan control
+                    // Fail closed: if PawnIO install fails, abort the entire installation
+                    string installPawnio = GetProperty("INSTALL_PAWNIO");
+                    bool pawnioOk = false;
+                    bool rebootRequired = false;
+                    if (installPawnio == "1" && !string.IsNullOrEmpty(installDirProp))
+                    {
+                        try
+                        {
+                            string pawnioPath = IO.Path.Combine(installDirProp, "PawnIO_setup.exe");
+                            if (IO.File.Exists(pawnioPath))
+                            {
+                                LogToDebugFile(logBaseDir, logType, "Installing PawnIO driver...");
+                                var pawnioProc = Process.Start(new ProcessStartInfo
+                                {
+                                    FileName = pawnioPath,
+                                    Arguments = "-install -silent",
+                                    UseShellExecute = false,
+                                    CreateNoWindow = true
+                                });
+                                pawnioProc?.WaitForExit(30000);
+                                int pawnioExit = pawnioProc?.ExitCode ?? -1;
+
+                                if (pawnioExit == 0 || pawnioExit == 3010)
+                                {
+                                    // Verify driver via service registry (PawnIO installs to DriverStore, not System32\drivers)
+                                    bool driverPresent = PawnIOHelper.IsPawnIOInstalled();
+                                    if (driverPresent || pawnioExit == 3010)
+                                    {
+                                        // 3010 = reboot needed, driver may not appear until reboot
+                                        pawnioOk = true;
+                                        rebootRequired = (pawnioExit == 3010);
+                                        LogToDebugFile(logBaseDir, logType, pawnioExit == 0
+                                            ? "PawnIO driver installed and verified"
+                                            : "PawnIO installed - reboot required, driver will load after restart");
+                                    }
+                                    else
+                                    {
+                                        LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO installer reported success but driver not found on disk");
+                                    }
+                                }
+                                else
+                                {
+                                    LogToDebugFile(logBaseDir, logType, $"FATAL: PawnIO installer returned exit code: {pawnioExit}");
+                                }
+                            }
+                            else
+                            {
+                                LogToDebugFile(logBaseDir, logType, $"FATAL: PawnIO_setup.exe not found at {pawnioPath}");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            LogToDebugFile(logBaseDir, logType, $"FATAL: PawnIO install error: {ex.Message}");
+                        }
+
+                        if (!pawnioOk)
+                        {
+                            LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO installation failed — aborting install (rollback)");
+                            try
+                            {
+                                MessageBox.Show(
+                                    "PawnIO driver installation failed.\n\n" +
+                                    "Pankha requires PawnIO for hardware sensor access and fan control.\n" +
+                                    "The installation is being aborted.\n\n" +
+                                    "Please ensure PawnIO can be installed on this system,\n" +
+                                    "then re-run the Pankha installer.",
+                                    "Pankha - Installation Aborted",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error);
+                            }
+                            catch { /* Deferred action — MessageBox may not be available */ }
+                            e.Result = ActionResult.Failure;
+                            return;
+                        }
+                    }
+                    else if (installPawnio != "1")
+                    {
+                        // User opted out or already installed — verify driver is actually present
+                        pawnioOk = PawnIOHelper.IsPawnIOInstalled();
+                        if (!pawnioOk)
+                        {
+                            LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO not present and install was skipped — aborting (rollback)");
+                            try
+                            {
+                                MessageBox.Show(
+                                    "PawnIO driver is not installed on this system.\n\n" +
+                                    "Pankha requires PawnIO for hardware sensor access and fan control.\n" +
+                                    "The installation is being aborted.\n\n" +
+                                    "Please re-run the installer with PawnIO installation enabled.",
+                                    "Pankha - Installation Aborted",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error);
+                            }
+                            catch { }
+                            e.Result = ActionResult.Failure;
+                            return;
+                        }
+                    }
+
+                     // REBOOT NOTICE (if PawnIO returned 3010)
+                     if (rebootRequired)
                      {
-                         string agentUiName = GetProperty("AgentUI");
-                         if (!string.IsNullOrEmpty(agentUiName) && !string.IsNullOrEmpty(installDirProp))
+                         LogToDebugFile(logBaseDir, logType, "PawnIO requires reboot - showing notice, skipping tray launch");
+                         try
                          {
-                             string uiPath = IO.Path.Combine(installDirProp, agentUiName);
-                             if (IO.File.Exists(uiPath))
+                             MessageBox.Show(
+                                 "Pankha installed successfully.\n\n" +
+                                 "PawnIO requires a system reboot before it can control hardware.\n" +
+                                 "Please restart your computer to complete the setup.",
+                                 "Pankha - Reboot Required",
+                                 MessageBoxButtons.OK,
+                                 MessageBoxIcon.Information);
+                         }
+                         catch { /* Deferred action - MessageBox may not be available */ }
+                     }
+
+                     // LAUNCH TRAY APP (skip if reboot pending - driver not active yet)
+                     if (!rebootRequired)
+                     {
+                         try
+                         {
+                             string agentUiName = GetProperty("AgentUI");
+                             if (!string.IsNullOrEmpty(agentUiName) && !string.IsNullOrEmpty(installDirProp))
                              {
-                                 LogToDebugFile(logBaseDir, logType, $"Launching Tray App: {uiPath}");
-                                 Process.Start(new ProcessStartInfo
+                                 string uiPath = IO.Path.Combine(installDirProp, agentUiName);
+                                 if (IO.File.Exists(uiPath))
                                  {
-                                     FileName = uiPath,
-                                     UseShellExecute = true
-                                 });
+                                     LogToDebugFile(logBaseDir, logType, $"Launching Tray App: {uiPath}");
+                                     Process.Start(new ProcessStartInfo
+                                     {
+                                         FileName = uiPath,
+                                         UseShellExecute = true
+                                     });
+                                 }
+                                 else
+                                 {
+                                     LogToDebugFile(logBaseDir, logType, $"Tray App not found at {uiPath}");
+                                 }
                              }
                              else
                              {
-                                 LogToDebugFile(logBaseDir, logType, $"Tray App not found at {uiPath}");
+                                  LogToDebugFile(logBaseDir, logType, "Skipping launch: InstallDir or AgentUI property missing.");
                              }
                          }
-                         else
+                         catch (Exception ex)
                          {
-                              LogToDebugFile(logBaseDir, logType, "Skipping launch: InstallDir or AgentUI property missing.");
+                             LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
                          }
-                     }
-                     catch (Exception ex)
-                     {
-                         LogToDebugFile(logBaseDir, logType, $"Failed to launch Tray App: {ex.Message}");
                      }
 
                      // Note: Service is started by WiX ServiceControl (StartOn = SvcEvent.Install).
@@ -812,11 +942,12 @@ namespace Pankha.WixSharpInstaller
                         // Optimization: Process killing is handled in OnBeforeInstall (Early Kill).
                         // We skip directly to driver cleanup and file removal.
 
-                        // Unload and clean up runtime-extracted driver
-                        // LibreHardwareMonitor 0.9.4 extracts driver at runtime as {processname}.sys
+                        // Unload and clean up legacy WinRing0 runtime-extracted driver
+                        // LibreHardwareMonitor 0.9.4 extracted WinRing0 at runtime as {processname}.sys
+                        // LHM 0.9.6+ uses PawnIO instead — clean up old WinRing0 artifacts
                         string agentExeName = GetProperty("AgentExe");
 
-                        LogToDebugFile(logBaseDir, logType, "Phase: Unloading Runtime Driver...");
+                        LogToDebugFile(logBaseDir, logType, "Phase: Cleaning up legacy WinRing0 driver...");
                         try
                         {
                             // Derive driver service and file name from AgentExe property
@@ -826,16 +957,17 @@ namespace Pankha.WixSharpInstaller
                                 ? agentExeName.Replace(".exe", "")
                                 : "pankha-agent"; // Fallback
 
-                            string driverFileName = driverServiceName + ".sys";
-
                             // Stop and delete driver service
                             Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"stop {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(2000);
                             Process.Start(new ProcessStartInfo { FileName = "sc", Arguments = $"delete {driverServiceName}", UseShellExecute = false, CreateNoWindow = true })?.WaitForExit(2000);
-                            LogToDebugFile(logBaseDir, logType, $"Driver stop/delete executed for service: {driverServiceName}");
-                        }
-                        catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Driver unload error: {ex.Message}"); }
+                            LogToDebugFile(logBaseDir, logType, $"WinRing0 driver stop/delete executed for service: {driverServiceName}");
 
-                        // Delete runtime-extracted driver file
+                            // Wait for SCM to release the driver file handle
+                            System.Threading.Thread.Sleep(1000);
+                        }
+                        catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"WinRing0 driver unload error: {ex.Message}"); }
+
+                        // Delete runtime-extracted WinRing0 driver file
                         try
                         {
                             if (!string.IsNullOrEmpty(dir))
@@ -847,16 +979,25 @@ namespace Pankha.WixSharpInstaller
                                 var driverFile = IO.Path.Combine(dir, driverFileName);
                                 if (IO.File.Exists(driverFile))
                                 {
-                                    IO.File.Delete(driverFile);
-                                    LogToDebugFile(logBaseDir, logType, $"Deleted runtime driver: {driverFile}");
+                                    try
+                                    {
+                                        IO.File.Delete(driverFile);
+                                        LogToDebugFile(logBaseDir, logType, $"Deleted WinRing0 driver: {driverFile}");
+                                    }
+                                    catch (IO.IOException)
+                                    {
+                                        // Driver file locked — schedule deletion on next reboot
+                                        LogToDebugFile(logBaseDir, logType, $"WinRing0 driver locked, scheduling delete on reboot: {driverFile}");
+                                        NativeMethods.MoveFileEx(driverFile, null, NativeMethods.MOVEFILE_DELAY_UNTIL_REBOOT);
+                                    }
                                 }
                                 else
                                 {
-                                    LogToDebugFile(logBaseDir, logType, $"Runtime driver not found: {driverFile}");
+                                    LogToDebugFile(logBaseDir, logType, $"WinRing0 driver not found (already clean): {driverFile}");
                                 }
                             }
                         }
-                        catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"Driver file delete error: {ex.Message}"); }
+                        catch (Exception ex) { LogToDebugFile(logBaseDir, logType, $"WinRing0 driver file delete error: {ex.Message}"); }
                         
                         // 3. Files Cleanup
                         if (isUpgrade && resetConfig != "1")
@@ -1081,5 +1222,59 @@ namespace Pankha.WixSharpInstaller
                 base.OnLoad(e);
             }
         }
+    }
+
+    /// <summary>
+    /// Service-based PawnIO detection. PawnIO installs to DriverStore, not System32\drivers.
+    /// Resolves the actual path from HKLM\SYSTEM\CurrentControlSet\Services\PawnIO\ImagePath.
+    /// </summary>
+    internal static class PawnIOHelper
+    {
+        public static bool IsPawnIOInstalled()
+        {
+            if (!TryGetDriverPath(out string resolvedPath) || string.IsNullOrEmpty(resolvedPath))
+                return false;
+            return IO.File.Exists(resolvedPath);
+        }
+
+        public static bool TryGetDriverPath(out string resolvedPath)
+        {
+            resolvedPath = null;
+            try
+            {
+                using (var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\PawnIO"))
+                {
+                    if (key == null) return false;
+                    var imagePathRaw = key.GetValue("ImagePath") as string;
+                    if (string.IsNullOrWhiteSpace(imagePathRaw)) return false;
+
+                    var path = imagePathRaw.Trim().Trim('"');
+                    if (path.StartsWith(@"\SystemRoot\", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var windowsDir = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                        path = IO.Path.Combine(windowsDir, path.Substring(@"\SystemRoot\".Length));
+                    }
+                    else
+                    {
+                        path = Environment.ExpandEnvironmentVariables(path);
+                    }
+
+                    resolvedPath = path;
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    internal static class NativeMethods
+    {
+        public const int MOVEFILE_DELAY_UNTIL_REBOOT = 0x00000004;
+
+        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool MoveFileEx(string lpExistingFileName, string lpNewFileName, int dwFlags);
     }
 }

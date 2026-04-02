@@ -49,7 +49,7 @@ public class ToolTipForm : Form
         _lastStatus = status;
         
         // Calculate dynamic height based on content
-        int height = 95; // Base: header + status line + counts line + footer + margins
+        int height = 109; // Base: header + version + status line + counts line + footer + margins
         if (status != null)
         {
             height += status.TopSensors.Count * 18 + 15;  // Sensors + separator
@@ -146,7 +146,18 @@ public class ToolTipForm : Form
 
         // Header
         g.DrawString("Pankha Fan Control", headerFont, headerBrush, leftMargin, y);
-        y += 22;
+        y += 18;
+        // Version line
+        string versionText = !string.IsNullOrEmpty(_lastStatus?.Version) ? $"v{_lastStatus.Version}" : "";
+        if (!string.IsNullOrEmpty(versionText))
+        {
+            g.DrawString(versionText, smallFont, dimBrush, leftMargin, y);
+            y += 14;
+        }
+        else
+        {
+            y += 4;
+        }
         g.DrawLine(sepPen, leftMargin, y, rightMargin, y);
         y += 8;
 
@@ -221,7 +232,7 @@ public class ToolTipForm : Form
         // Footer
         y = Height - 22;
         g.DrawLine(sepPen, leftMargin, y - 5, rightMargin, y - 5);
-        g.DrawString("Click for details", smallFont, dimBrush, leftMargin, y);
+        g.DrawString("Click or double-click for more", smallFont, dimBrush, leftMargin, y);
     }
     
     private string TruncateName(string name, int maxLength)

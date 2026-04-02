@@ -495,6 +495,16 @@ if ($Publish) {
     # Copy configuration example
     Copy-Item "config.example.json" "$OutputDir\config.example.json"
 
+    # Copy PawnIO setup executable (required by installer for driver installation)
+    $PawnIOSetup = "$PSScriptRoot\dependencies\PawnIO_setup.exe"
+    if (Test-Path $PawnIOSetup) {
+        Copy-Item $PawnIOSetup -Destination $OutputDir
+        Write-Host "Copied PawnIO_setup.exe to publish directory" -ForegroundColor Green
+    } else {
+        Write-Error "FATAL: PawnIO_setup.exe not found at $PawnIOSetup — cannot build MSI without PawnIO installer"
+        exit 1
+    }
+
     # Note: ui-options.json is embedded as a resource in Pankha.Tray at build-time
     # (from frontend/src/config/ui-options.json) - no runtime file needed
 

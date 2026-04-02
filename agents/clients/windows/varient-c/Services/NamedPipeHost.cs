@@ -194,7 +194,8 @@ public class NamedPipeHost : IDisposable
                     {
                         AgentId = _config.Agent.Id,
                         AgentName = _config.Agent.Name,
-                        Version = version, 
+                        ServerUrl = _config.Backend?.ServerUrl ?? string.Empty,
+                        Version = version,
                         ConnectionState = _wsClient.State.ToString(),
                         SensorsDiscovered = sensors.Count,
                         FansDiscovered = fans.Count,

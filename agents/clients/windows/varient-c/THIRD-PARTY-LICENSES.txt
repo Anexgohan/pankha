@@ -5,12 +5,23 @@ Pankha Windows Agent includes the following third-party software.
 Each component retains its original license and copyright.
 
 
-LibreHardwareMonitorLib 0.9.4
+LibreHardwareMonitorLib 0.9.6
 -----------------------------
 License: Mozilla Public License 2.0 (MPL-2.0)
 Copyright: LibreHardwareMonitor contributors
 Project: https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
 License: https://www.mozilla.org/en-US/MPL/2.0/
+
+
+PawnIO 2.2.0
+-------------
+License: GNU General Public License v2.0 (GPL-2.0) with DeviceIoControl exception
+Copyright: namazso
+Project: https://github.com/namazso/PawnIO
+License: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+Note: System-level driver used by LibreHardwareMonitor for low-level hardware access.
+      Digitally signed by namazso. The DeviceIoControl exception permits non-GPL
+      applications to communicate with the driver via standard Windows DeviceIoControl API.
 
 
 NvAPIWrapper.Net 0.8.1.101

@@ -24,10 +24,12 @@ public class TrayApplicationContext : ApplicationContext
     // State
     private bool _isConnected = false;
     private bool _hasPromptedToStartService = false;
+    private bool _ignoreNextClick = false;
     private AgentStatus? _lastStatus;
     private Icon _connectedIcon = null!;
     private Icon _disconnectedIcon = null!;
     private System.Windows.Forms.Timer? _tooltipShowTimer;
+    private System.Windows.Forms.Timer? _singleClickTimer;
 
     // Menu items that need state updates
     private ToolStripMenuItem _statusHeaderItem = null!;
@@ -47,8 +49,27 @@ public class TrayApplicationContext : ApplicationContext
         _nativeIcon = new NativeNotifyIcon(_disconnectedIcon, "Pankha Agent: Initializing...");
         
         // Wire up events
-        _nativeIcon.LeftClick += () => { _customTooltip?.Hide(); ShowStatusForm(); };
-        _nativeIcon.DoubleClick += () => ShowConfigForm();
+        // Single-click delay: Windows fires WM_LBUTTONUP before WM_LBUTTONDBLCLK,
+        // so we delay single-click action to allow double-click to cancel it.
+        _singleClickTimer = new System.Windows.Forms.Timer { Interval = SystemInformation.DoubleClickTime };
+        _singleClickTimer.Tick += (s, e) =>
+        {
+            _singleClickTimer.Stop();
+            _customTooltip?.Hide();
+            ShowStatusForm();
+        };
+
+        _nativeIcon.LeftClick += () =>
+        {
+            if (_ignoreNextClick) { _ignoreNextClick = false; return; }
+            _singleClickTimer.Start();
+        };
+        _nativeIcon.DoubleClick += () =>
+        {
+            _singleClickTimer.Stop();
+            _ignoreNextClick = true;
+            ShowConfigForm();
+        };
         _nativeIcon.RightClick += (pos) => _contextMenu.Show(pos);
         _nativeIcon.PopupOpen += OnTrayPopupOpen;
         _nativeIcon.PopupClose += OnTrayPopupClose;

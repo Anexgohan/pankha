@@ -292,7 +292,16 @@ public class ConfigForm : Form
                 _agentNameTextBox.Text = _currentConfig.Agent.Name;
                 _agentIdTextBox.Text = _currentConfig.Agent.Id;
 
-                _backendUrlTextBox.Text = _currentConfig.Backend.ServerUrl;
+                // Display as ip:port — strip ws:// or wss:// prefix and /websocket suffix
+                string displayUrl = _currentConfig.Backend.ServerUrl;
+                if (displayUrl.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
+                    displayUrl = displayUrl.Substring(6);
+                else if (displayUrl.StartsWith("ws://", StringComparison.OrdinalIgnoreCase))
+                    displayUrl = displayUrl.Substring(5);
+                if (displayUrl.EndsWith("/websocket", StringComparison.OrdinalIgnoreCase))
+                    displayUrl = displayUrl.Substring(0, displayUrl.Length - "/websocket".Length);
+                displayUrl = displayUrl.TrimEnd('/');
+                _backendUrlTextBox.Text = displayUrl;
                 SetupUrlPlaceholder(); // Apply placeholder logic
                 _reconnectIntervalNumeric.Value = (decimal)_currentConfig.Backend.ReconnectInterval;
 
@@ -338,6 +347,15 @@ public class ConfigForm : Form
                     else if (_logLevelComboBox.Items.Count > 0)
                         _logLevelComboBox.SelectedIndex = 0;
                 }
+
+                // Show version in title bar
+                try
+                {
+                    var status = await _ipcClient.GetStatusAsync();
+                    if (status != null && !string.IsNullOrEmpty(status.Version))
+                        Text = $"Pankha Agent Configuration - v{status.Version}";
+                }
+                catch { /* Non-critical — keep default title */ }
 
                 _statusLabel.Text = "Ready";
                 _saveButton.Enabled = true;
@@ -430,10 +448,17 @@ public class ConfigForm : Form
                 }
             }
             _currentConfig.Backend.ServerUrl = url;
-            // Update the textbox to show the formatted URL (optional, but good UX)
-            if (url != "") 
+            // Keep display as ip:port after save
+            if (url != "")
             {
-                 _backendUrlTextBox.Text = url;
+                 string saved = url;
+                 if (saved.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
+                     saved = saved.Substring(6);
+                 else if (saved.StartsWith("ws://", StringComparison.OrdinalIgnoreCase))
+                     saved = saved.Substring(5);
+                 if (saved.EndsWith("/websocket", StringComparison.OrdinalIgnoreCase))
+                     saved = saved.Substring(0, saved.Length - "/websocket".Length);
+                 _backendUrlTextBox.Text = saved.TrimEnd('/');
                  _backendUrlTextBox.ForeColor = SystemColors.WindowText;
             }
 
