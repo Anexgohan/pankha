@@ -191,15 +191,34 @@ export class ProfileService {
       const vendorDir = path.join(this.profilesDir, entry.name);
       const models: ProfileCatalogEntry[] = [];
 
-      for (const file of fs.readdirSync(vendorDir)) {
-        if (!file.endsWith('.json')) continue;
+      // Collect profile files: top-level vendor .json files + user-profile/ subdir
+      const profileFiles: { filePath: string; profileId: string }[] = [];
 
+      for (const file of fs.readdirSync(vendorDir)) {
+        if (file.endsWith('.json')) {
+          profileFiles.push({
+            filePath: path.join(vendorDir, file),
+            profileId: `${entry.name}/${file.replace('.json', '')}`,
+          });
+        }
+      }
+
+      // Scan user-profile/ subdirectory if it exists
+      const userProfileDir = path.join(vendorDir, 'user-profile');
+      if (fs.existsSync(userProfileDir) && fs.statSync(userProfileDir).isDirectory()) {
+        for (const file of fs.readdirSync(userProfileDir)) {
+          if (!file.endsWith('.json')) continue;
+          profileFiles.push({
+            filePath: path.join(userProfileDir, file),
+            profileId: `${entry.name}/user-profile/${file.replace('.json', '')}`,
+          });
+        }
+      }
+
+      for (const { filePath, profileId } of profileFiles) {
         try {
-          const filePath = path.join(vendorDir, file);
           const content = fs.readFileSync(filePath, 'utf-8');
           const raw = JSON.parse(content);
-
-          const profileId = `${entry.name}/${file.replace('.json', '')}`;
 
           // Resolve extends
           let resolved: any;
@@ -231,7 +250,7 @@ export class ProfileService {
           const firstZone = ipmi?.fan_zones?.[0];
           const profileTier =
             resolved.metadata?.profile_tier ||
-            (profileId.includes('/custom_') ? 'experimental' : 'official');
+            (profileId.includes('/user-profile/') ? 'experimental' : 'official');
           const isMonitorOnly = (ipmi?.fan_zones || []).length === 0;
           const hasReadSpeed = (ipmi?.fan_zones || []).some(
             (z: any) => z.commands?.read_speed
@@ -250,7 +269,7 @@ export class ProfileService {
             speed_translation_type: firstZone?.speed_translation?.type || 'unknown',
           });
         } catch (err) {
-          log.warn(`Failed to parse profile ${file} in ${entry.name}/:`, 'ProfileService', err);
+          log.warn(`Failed to parse profile ${profileId}:`, 'ProfileService', err);
         }
       }
 

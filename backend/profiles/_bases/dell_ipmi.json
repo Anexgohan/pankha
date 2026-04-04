@@ -5,7 +5,7 @@
     "profile_tier": "official",
     "supported_protocols": ["ipmi_local", "ipmi_lanplus"],
     "author": "Pankha Official",
-    "description": "Dell PowerEdge base profile for IPMI fan control. Covers iDRAC 7, 8, and early iDRAC 9 (firmware < 3.30.30.30). Uses byte_scale translation (0-255). Model-specific profiles extend this base."
+    "description": "Dell PowerEdge base profile for IPMI fan control. Covers iDRAC 7, 8, and early iDRAC 9 (firmware < 3.30.30.30). Uses decimal_hex translation (0-100% as 0x00-0x64). Model-specific profiles extend this base."
   },
   "protocols": {
     "ipmi": {
@@ -19,11 +19,7 @@
           "id": "all_fans",
           "name": "All Fans",
           "speed_translation": {
-            "type": "byte_scale",
-            "input_min": 0,
-            "input_max": 100,
-            "output_min": 0,
-            "output_max": 255
+            "type": "decimal_hex"
           },
           "commands": {
             "set_speed": {

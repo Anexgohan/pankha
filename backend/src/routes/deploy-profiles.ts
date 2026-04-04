@@ -177,19 +177,19 @@ router.post('/custom', async (req, res) => {
     const safeVendor = vendor.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
     const safeFilename = filename.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
 
-    // Write to backend/profiles/{vendor}/custom_{filename}.json
-    // Lives alongside official profiles — scanner picks it up without changes
-    const profilesDir = path.join(__dirname, '..', '..', 'profiles', safeVendor);
-    fs.mkdirSync(profilesDir, { recursive: true });
+    // Write to backend/profiles/{vendor}/user-profile/{filename}.json
+    // Separated from official profiles — scanner picks up user-profile/ subdirs
+    const userProfileDir = path.join(__dirname, '..', '..', 'profiles', safeVendor, 'user-profile');
+    fs.mkdirSync(userProfileDir, { recursive: true });
 
-    const filePath = path.join(profilesDir, `custom_${safeFilename}.json`);
+    const filePath = path.join(userProfileDir, `${safeFilename}.json`);
     fs.writeFileSync(filePath, JSON.stringify(profile, null, 2), 'utf-8');
 
     // Refresh catalog so the new profile is immediately available
     const profileService = ProfileService.getInstance();
     profileService.refresh();
 
-    const profileId = `${safeVendor}/custom_${safeFilename}`;
+    const profileId = `${safeVendor}/user-profile/${safeFilename}`;
     log.info(`Custom profile saved: ${profileId} at ${filePath}`, 'deploy-profiles');
 
     res.json({
@@ -231,7 +231,7 @@ router.get('/:vendor/:model', (req, res) => {
     const firstZone = ipmi?.fan_zones?.[0];
     const profileTier =
       profile.metadata?.profile_tier ||
-      (profileId.includes('/custom_') ? 'experimental' : 'official');
+      (profileId.includes('/user-profile/') ? 'experimental' : 'official');
     const isMonitorOnly = (ipmi?.fan_zones || []).length === 0;
 
     res.json({

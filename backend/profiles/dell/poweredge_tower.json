@@ -1,0 +1,8 @@
+{
+  "extends": "_bases/dell_ipmi",
+  "metadata": {
+    "model_family": ["PowerEdge T130", "PowerEdge T630"],
+    "author": "Pankha Official",
+    "description": "Dell PowerEdge tower servers. No PCIe fan panic disable needed — towers typically don't trigger 3rd-party card fan ramp."
+  }
+}
