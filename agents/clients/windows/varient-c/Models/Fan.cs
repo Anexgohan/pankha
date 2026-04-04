@@ -50,21 +50,10 @@ public class Fan
     public int? LastPwmValue { get; set; }
 
     /// <summary>
-    /// Update fan status based on RPM
+    /// Update fan status based on RPM (matches Linux agent logic)
     /// </summary>
     public void UpdateStatus()
     {
-        if (Rpm == 0 && Speed > 0)
-        {
-            Status = "error"; // Fan should be spinning but isn't
-        }
-        else if (Rpm == 0)
-        {
-            Status = "stopped";
-        }
-        else
-        {
-            Status = "ok";
-        }
+        Status = Rpm > 0 ? "ok" : "stopped";
     }
 }

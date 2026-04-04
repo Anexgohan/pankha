@@ -378,11 +378,6 @@ public class LibreHardwareAdapter : IHardwareMonitor
             foreach (var hardware in _computer.Hardware)
             {
                 AddFansFromHardware(hardware, fans);
-
-                foreach (var subHardware in hardware.SubHardware)
-                {
-                    AddFansFromHardware(subHardware, fans);
-                }
             }
         }
 
