@@ -1,0 +1,22 @@
+{
+  "extends": "_bases/dell_ipmi",
+  "metadata": {
+    "model_family": ["PowerEdge R630", "PowerEdge R730", "PowerEdge R730xd"],
+    "author": "Pankha Official",
+    "description": "Dell 13th Gen rack servers (iDRAC 8). Adds 3rd-party PCIe card fan panic disable."
+  },
+  "protocols": {
+    "ipmi": {
+      "lifecycle": {
+        "initialization": [
+          {
+            "name": "Disable 3rd-Party PCIe Card Fan Panic",
+            "type": "ipmitool_raw",
+            "bytes": "0x30 0xce 0x00 0x16 0x05 0x00 0x00 0x00 0x05 0x00 0x01 0x00 0x00",
+            "critical": false
+          }
+        ]
+      }
+    }
+  }
+}

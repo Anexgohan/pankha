@@ -95,3 +95,41 @@ export function formatFriendlyDate(dateStr: string, timezone: string = 'UTC'): s
 
   return `${month} ${day}${suffix}, ${year}`;
 }
+
+/**
+ * Format a model_family array for compact dropdown display.
+ * Collapses a shared prefix so it appears once instead of repeating.
+ *
+ * Examples:
+ *   ["PowerEdge R520", "PowerEdge R620", "PowerEdge R720"] → "PowerEdge — R520, R620, R720"
+ *   ["ThinkSystem SR630", "ThinkSystem SR650"]              → "ThinkSystem — SR630, SR650"
+ *   ["X10SLL-F", "X11SCL-IF"]                               → "X10SLL-F, X11SCL-IF"
+ *   ["PowerEdge R720"]                                       → "PowerEdge R720"
+ */
+export function formatModelFamily(models: string[]): string {
+  if (models.length === 0) return '';
+  if (models.length === 1) return models[0];
+
+  // Find common prefix by whole words
+  const firstWords = models[0].split(' ');
+  let prefixLen = 0;
+  for (let i = 0; i < firstWords.length; i++) {
+    const word = firstWords[i];
+    if (models.every(m => m.split(' ')[i] === word)) {
+      prefixLen = i + 1;
+    } else {
+      break;
+    }
+  }
+
+  // No common prefix or prefix is the entire string — just join
+  if (prefixLen === 0) return models.join(', ');
+
+  const prefix = firstWords.slice(0, prefixLen).join(' ');
+  const suffixes = models.map(m => m.split(' ').slice(prefixLen).join(' ')).filter(Boolean);
+
+  // If stripping the prefix leaves nothing for some entries, don't collapse
+  if (suffixes.length !== models.length) return models.join(', ');
+
+  return `${prefix} — ${suffixes.join(', ')}`;
+}
