@@ -27,4 +27,6 @@ documentation:
 
 devops:
   - changed-files:
-    - any-glob-to-any-file: '.github/**/*'
+    - any-glob-to-any-file:
+      - '.github/**/*'
+      - '!.github/workflows/release-public.yml'
