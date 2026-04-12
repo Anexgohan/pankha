@@ -267,10 +267,16 @@ export class LicenseManager {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
+      // Send token for ownership proof; licenseId kept for logging/correlation
+      const storedToken = await this.getStoredLicenseKey();
+      if (!storedToken) {
+        return { success: true, changed: false };
+      }
+
       const response = await fetch(`${this.LICENSE_API_URL}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licenseId: this.licenseId }),
+        body: JSON.stringify({ token: storedToken, licenseId: this.licenseId }),
         signal: controller.signal
       });
 
