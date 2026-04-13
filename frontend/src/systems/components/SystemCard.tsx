@@ -27,7 +27,7 @@ import {
   setFanSensor,
   getFanConfigurations,
 } from "../../services/fanConfigurationsApi";
-import { getChipDisplayName } from "../../config/sensorLabels";
+import { getChipDisplayName, getSensorLabel } from "../../config/sensorLabels";
 import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
@@ -422,10 +422,28 @@ const SystemCard: React.FC<SystemCardProps> = ({
       case "cpu":
         return <img src="/icons/processor-01.png" width={24} height={24} title="Processor" alt="Processor" />;
       case "gpu":
-        // return <img src="/icons/vga-card-01.png" width={28} height={28} title="GPU" alt="GPU" />;
         return <img src="/icons/video-card-01.png" width={24} height={24} title="GPU" alt="GPU" />;
       case "motherboard":
         return <img src="/icons/motherboard-01.png" width={24} height={24} title="Motherboard" alt="Motherboard" />;
+      case "pch":
+        return <img src="/icons/pch-01.png" width={24} height={24} title="PCH" alt="PCH" />;
+      case "peripheral":
+      case "pcie":
+        return <img src="/icons/pci-e-02.png" width={24} height={24} title="Peripheral / PCIe" alt="Peripheral / PCIe" />;
+      case "system":
+      case "ambient":
+        return <img src="/icons/ambient-04.png" width={24} height={24} title="System / Ambient" alt="System / Ambient" />;
+      case "memory":
+      case "ram":
+      case "dimm":
+        return <img src="/icons/ram-01.png" width={24} height={24} title="Memory" alt="Memory" />;
+      case "vrm":
+        return <img src="/icons/vrm-01.png" width={24} height={24} title="VRM" alt="VRM" />;
+      case "bmc":
+        return <img src="/icons/bmc-01.png" width={24} height={24} title="BMC" alt="BMC" />;
+      case "nic":
+      case "network":
+        return <img src="/icons/nic-01.png" width={24} height={24} title="NIC" alt="NIC" />;
       case "nvme":
       case "storage":
         return <img src="/icons/hdd-01.png" width={24} height={24} title="Storage" alt="Storage" />;
@@ -1288,7 +1306,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       ([chipId]) => showHidden || !isGroupHidden(chipId)
                     );
 
-                    return visibleGroups.map(([chipId, chipSensors]) => {
+                    const isIpmiAgent =
+                      system.agent_type === 'ipmi_host' ||
+                      system.agent_type === 'ipmi_network';
+                    const ipmiHardwareName = isIpmiAgent
+                      ? filteredSensors.find((s) => s.hardwareName)?.hardwareName ?? null
+                      : null;
+
+                    const renderedGroups = visibleGroups.map(([chipId, chipSensors]) => {
                       const isGroupHiddenState = isGroupHidden(chipId);
                       return (
                         <div
@@ -1298,7 +1323,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           }`}
                         >
                           <div className="sensor-group-header">
-                            <h5>{getChipDisplayName(chipId, chipSensors)}</h5>
+                            <h5>{isIpmiAgent ? getSensorLabel(chipId) : getChipDisplayName(chipId, chipSensors)}</h5>
                             <div className="group-header-right">
                               <button
                                 className="visibility-toggle"
@@ -1349,6 +1374,20 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         </div>
                       );
                     });
+
+                    if (isIpmiAgent) {
+                      return (
+                        <div className="ipmi-sensor-banner">
+                          <div className="ipmi-banner-header">
+                            IPMI: {ipmiHardwareName ?? 'BMC'}
+                          </div>
+                          <div className="ipmi-banner-body">
+                            {renderedGroups}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return renderedGroups;
                   })()}
                 </div>
               </>

@@ -270,6 +270,32 @@
   padding-left: var(--spacing-xs);
 }
 
+/* IPMI banner — card-level "IPMI: <hardware name>" header pill sitting
+   above BMC-sourced chip groups. Pill is shifted left via margin-left so
+   it visually anchors outside the groups' left edge; groups themselves
+   receive no IPMI-specific width/height changes. */
+.ipmi-sensor-banner {
+  margin-bottom: var(--spacing-lg);
+}
+
+.ipmi-banner-header {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--bg-tertiary);
+  border-left: 6px solid var(--color-info);
+  border-right: 6px solid var(--color-info);
+  border-radius: var(--radius-sm);
+  margin-left: -10px;
+  margin-bottom: var(--spacing-sm);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.ipmi-banner-body .sensor-group:last-child {
+  margin-bottom: 0;
+}
+
 /* Fans */
 .fans-list {
   display: flex;

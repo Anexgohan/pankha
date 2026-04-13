@@ -30,5 +30,10 @@
   "motherboard": "Motherboard",
   "lpc": "Motherboard Controller",
   "superio": "Motherboard Controller",
-  "batteries": "Battery"
+  "batteries": "Battery",
+  "cpu": "CPU",
+  "system": "System",
+  "peripheral": "Peripheral",
+  "pch": "PCH",
+  "dimm": "Memory"
 }

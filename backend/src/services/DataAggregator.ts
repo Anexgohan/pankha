@@ -306,13 +306,20 @@ export class DataAggregator extends EventEmitter {
     if (!sensors || sensors.length === 0) return;
 
     for (const sensor of sensors) {
-      // Use ON CONFLICT to handle race conditions - if sensor already exists, do nothing
+      // ON CONFLICT DO UPDATE refreshes classification from the agent — agents
+      // may reclassify sensors between releases (e.g. IPMI agent switching from
+      // hardcoded "temperature" to chip-derived "cpu"/"motherboard"). Thresholds
+      // are preserved when agent sends null so we don't clobber DB-sourced values.
       await this.db.run(
         `INSERT INTO sensors (
           system_id, sensor_name, sensor_label, sensor_type, sensor_chip,
           temp_max, temp_crit, is_available
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, true)
-        ON CONFLICT (system_id, sensor_name) DO NOTHING`,
+        ON CONFLICT (system_id, sensor_name) DO UPDATE SET
+          sensor_type = EXCLUDED.sensor_type,
+          temp_max = COALESCE(EXCLUDED.temp_max, sensors.temp_max),
+          temp_crit = COALESCE(EXCLUDED.temp_crit, sensors.temp_crit),
+          is_available = true`,
         [
           systemId,
           sensor.id,
