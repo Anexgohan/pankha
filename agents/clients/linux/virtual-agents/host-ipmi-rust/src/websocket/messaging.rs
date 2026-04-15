@@ -5,7 +5,7 @@ use futures_util::SinkExt;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_tungstenite::tungstenite::protocol::Message;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::config::types::AgentConfig;
 use crate::hardware::HardwareMonitor;
@@ -14,8 +14,26 @@ use super::client::WsSink;
 
 impl super::client::WebSocketClient {
     pub(crate) async fn send_registration(&self, write: &mut WsSink) -> Result<()> {
-        let sensors = self.hardware_monitor.discover_sensors().await?;
-        let fans = self.hardware_monitor.discover_fans().await?;
+        // Tolerate discovery failures so the WebSocket read loop (command channel)
+        // comes up even when hardware init is broken. Without this, a bad BMC
+        // profile makes init fail → discover fails → registration fails → read
+        // loop never starts → the `reloadProfile` command from the backend can
+        // never be delivered, blocking remote recovery. data_sender's retry
+        // logic (P1) will continue to surface the underlying hardware error.
+        let sensors = self.hardware_monitor.discover_sensors().await.unwrap_or_else(|e| {
+            warn!(
+                "Sensor discovery failed during registration: {}. Registering with empty list; data_sender will retry.",
+                e
+            );
+            Vec::new()
+        });
+        let fans = self.hardware_monitor.discover_fans().await.unwrap_or_else(|e| {
+            warn!(
+                "Fan discovery failed during registration: {}. Registering with empty list; data_sender will retry.",
+                e
+            );
+            Vec::new()
+        });
 
         let config = self.config.read().await;
         let registration = serde_json::json!({

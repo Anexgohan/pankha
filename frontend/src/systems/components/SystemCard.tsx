@@ -53,7 +53,9 @@ import { InlineEdit } from "../../components/InlineEdit";
 import AnimatedFanIcon from "../../components/icons/AnimatedFanIcon";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorItem from "./SensorItem";
+import BmcProfilePicker from "./BmcProfilePicker";
 import { useSensorHistory } from "../hooks/useSensorHistory";
+import { assignProfileToAgent } from "../../services/api";
 import { getOption, getValues, getLabel, getCleanLabel, getDefault, interpolateTooltip } from "../../utils/uiOptions";
 
 interface SystemCardProps {
@@ -63,8 +65,10 @@ interface SystemCardProps {
   onRemove: () => void;
   expandedSensors: boolean;
   expandedFans: boolean;
+  expandedBmc: boolean;
   onToggleSensors: (expanded: boolean) => void;
   onToggleFans: (expanded: boolean) => void;
+  onToggleBmc: (expanded: boolean) => void;
 }
 
 const SystemCard: React.FC<SystemCardProps> = ({
@@ -74,8 +78,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onRemove,
   expandedSensors,
   expandedFans,
+  expandedBmc,
   onToggleSensors,
   onToggleFans,
+  onToggleBmc,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const { timezone, tempThresholds } = useDashboardSettings();
@@ -112,6 +118,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const [isCardInView, setIsCardInView] = useState(true);
+  const [stagedBmcProfileId, setStagedBmcProfileId] = useState<string | null>(
+    system.profile_id ?? null
+  );
+  useEffect(() => {
+    setStagedBmcProfileId(system.profile_id ?? null);
+  }, [system.profile_id]);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const fanRpmStateRef = React.useRef<Record<string, { rpm: number; decreasing: boolean }>>({});
 
@@ -508,6 +520,23 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   // handleFilterDuplicatesChange removed (deprecated feature)
   // handleSensorToleranceChange removed (deprecated feature)
+
+  const handleBmcApply = async () => {
+    if (!stagedBmcProfileId || stagedBmcProfileId === (system.profile_id ?? null)) return;
+    try {
+      setLoading("bmc-apply");
+      await assignProfileToAgent(system.agent_id, stagedBmcProfileId);
+      toast.success(`BMC profile assigned: ${stagedBmcProfileId}`);
+      onUpdate();
+    } catch (error) {
+      toast.error(
+        "Failed to assign BMC profile: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleFanStepChange = async (newStep: number) => {
     try {
@@ -2048,6 +2077,55 @@ const SystemCard: React.FC<SystemCardProps> = ({
         </div>
       )}
 
+      {/* BMC Section — IPMI agents only. Profile assignment lives here
+          so the UI sits next to the hardware it affects, not in Fleet Maintenance. */}
+      {(system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') && (
+        <div className="system-section">
+          <div
+            className="section-header clickable"
+            onClick={() => onToggleBmc(!expandedBmc)}
+          >
+            <h4>BMC</h4>
+            <span className="expand-icon">
+              {expandedBmc ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </span>
+          </div>
+
+          {expandedBmc && (
+            <div className="bmc-section-body">
+              <div className="bmc-header-bar">
+                <span className="bmc-current-label">
+                  Current: <span className="bmc-current-value">{system.profile_id ?? 'Not assigned'}</span>
+                </span>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleBmcApply}
+                  disabled={
+                    !stagedBmcProfileId ||
+                    stagedBmcProfileId === (system.profile_id ?? null) ||
+                    loading === 'bmc-apply' ||
+                    isReadOnly
+                  }
+                >
+                  {loading === 'bmc-apply' ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} /> Applying…
+                    </>
+                  ) : (
+                    'Apply'
+                  )}
+                </button>
+              </div>
+              <BmcProfilePicker
+                selectedProfileId={stagedBmcProfileId}
+                onProfileSelect={setStagedBmcProfileId}
+                disabled={loading === 'bmc-apply' || isReadOnly}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* No data message */}
       {(!system.current_temperatures ||
         system.current_temperatures.length === 0) &&
@@ -2110,6 +2188,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
       nextProps.system.current_fan_speeds &&
     prevProps.expandedSensors === nextProps.expandedSensors &&
     prevProps.expandedFans === nextProps.expandedFans &&
+    prevProps.expandedBmc === nextProps.expandedBmc &&
     prevProps.isDemoMode === nextProps.isDemoMode
   );
 });

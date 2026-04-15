@@ -233,21 +233,57 @@ impl WebSocketClient {
         let running = Arc::clone(&self.running);
         let write_clone = Arc::clone(&write);
 
+        // Max consecutive send_data failures before closing the write half to
+        // trigger the outer reconnect loop. At 3s update_interval this is ~30s
+        // of in-place retries before escalation, which preserves the existing
+        // failsafe + exponential-backoff reconnect path.
+        const MAX_CONSECUTIVE_SEND_FAILURES: u32 = 10;
+
         let data_sender = tokio::spawn(async move {
             let mut heartbeat_counter = 0;
+            let mut consecutive_failures: u32 = 0;
             while *running.read().await {
                 let mut w = write_clone.lock().await;
-                if let Err(e) = Self::send_data(&mut *w, &config, &hardware_monitor).await {
-                    error!("Failed to send data: {}", e);
-                    break;
+                match Self::send_data(&mut *w, &config, &hardware_monitor).await {
+                    Ok(_) => {
+                        if consecutive_failures > 0 {
+                            info!(
+                                "Data send recovered after {} failed attempt(s)",
+                                consecutive_failures
+                            );
+                            consecutive_failures = 0;
+                        }
+
+                        // Heartbeat logging: only in DEBUG mode, every 20 cycles (60s at 3s intervals)
+                        heartbeat_counter += 1;
+                        if heartbeat_counter % 20 == 0 {
+                            debug!("Data transmissions: {} completed", heartbeat_counter);
+                        }
+                    }
+                    Err(e) => {
+                        consecutive_failures += 1;
+                        // Dampen log spam: first failure, then every 5th attempt
+                        if consecutive_failures == 1 || consecutive_failures % 5 == 0 {
+                            error!(
+                                "Failed to send data (attempt {}/{}): {}",
+                                consecutive_failures, MAX_CONSECUTIVE_SEND_FAILURES, e
+                            );
+                        }
+                        if consecutive_failures >= MAX_CONSECUTIVE_SEND_FAILURES {
+                            warn!(
+                                "Data send failed {} consecutive times; closing WebSocket to trigger reconnect",
+                                consecutive_failures
+                            );
+                            // Close write half so the read loop exits and the
+                            // outer reconnect+failsafe path takes over. If close
+                            // itself fails, break anyway — the 30s connection
+                            // health timeout is a backstop.
+                            let _ = w.close().await;
+                            break;
+                        }
+                    }
                 }
                 drop(w);
-
-                // Heartbeat logging: only in DEBUG mode, every 20 cycles (60s at 3s intervals)
-                heartbeat_counter += 1;
-                if heartbeat_counter % 20 == 0 {
-                    debug!("Data transmissions: {} completed", heartbeat_counter);
-                }
 
                 let interval = config.read().await.agent.update_interval;
                 time::sleep(Duration::from_secs_f64(interval)).await;
