@@ -26,6 +26,9 @@ pub struct WebSocketClient {
     pub(crate) running: Arc<RwLock<bool>>,
     // Failsafe mode tracking - activates when disconnected from backend
     pub(crate) failsafe_active: Arc<RwLock<bool>>,
+    // Edge-triggered dedup of agent-emitted `{type:"error"}` messages.
+    // Prevents spamming the backend on every retry while init is broken.
+    pub(crate) last_reported_error: Arc<tokio::sync::Mutex<Option<String>>>,
 }
 
 impl WebSocketClient {
@@ -35,6 +38,7 @@ impl WebSocketClient {
             hardware_monitor,
             running: Arc::new(RwLock::new(false)),
             failsafe_active: Arc::new(RwLock::new(false)),
+            last_reported_error: Arc::new(tokio::sync::Mutex::new(None)),
         }
     }
 
@@ -223,6 +227,7 @@ impl WebSocketClient {
         let hardware_monitor = Arc::clone(&self.hardware_monitor);
         let running = Arc::clone(&self.running);
         let write_clone = Arc::clone(&write);
+        let last_reported_error = Arc::clone(&self.last_reported_error);
 
         // Max consecutive send_data failures before closing the write half to
         // trigger the outer reconnect loop. At 3s update_interval this is ~30s
@@ -235,7 +240,7 @@ impl WebSocketClient {
             let mut consecutive_failures: u32 = 0;
             while *running.read().await {
                 let mut w = write_clone.lock().await;
-                match Self::send_data(&mut *w, &config, &hardware_monitor).await {
+                match Self::send_data(&mut *w, &config, &hardware_monitor, &last_reported_error).await {
                     Ok(_) => {
                         if consecutive_failures > 0 {
                             info!(

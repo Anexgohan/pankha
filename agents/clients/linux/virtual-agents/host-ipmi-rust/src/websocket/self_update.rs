@@ -15,6 +15,7 @@ impl super::client::WebSocketClient {
             hardware_monitor: Arc::clone(&self.hardware_monitor),
             running: Arc::clone(&self.running),
             failsafe_active: Arc::clone(&self.failsafe_active),
+            last_reported_error: Arc::clone(&self.last_reported_error),
         }
     }
 
