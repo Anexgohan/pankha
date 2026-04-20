@@ -975,7 +975,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 className={`status-badge ${isIpmiNoProfile ? 'read-only' : system.status}`}
                 title={isIpmiNoProfile
                   ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
-                  : `Agent status is currently "${system.status.toUpperCase()}"`}
+                  : system.status === 'error' && system.last_error
+                    ? `Agent status is currently "ERROR"\n\nReason: ${system.last_error}`
+                    : `Agent status is currently "${system.status.toUpperCase()}"`}
               >
                 <span className="status-dot" />
                 {isIpmiNoProfile ? 'read only' : system.status}
@@ -2167,6 +2169,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.name === nextProps.system.name &&
     prevProps.system.status === nextProps.system.status &&
     prevProps.system.real_time_status === nextProps.system.real_time_status &&
+    prevProps.system.last_error === nextProps.system.last_error &&
     prevProps.system.last_seen === nextProps.system.last_seen &&
     prevProps.system.current_update_interval ===
       nextProps.system.current_update_interval &&

@@ -213,6 +213,9 @@ impl WebSocketClient {
         // Invalidate hardware cache on connection/reconnection to ensure fresh discovery
         self.hardware_monitor.invalidate_cache().await;
 
+        // Reset error dedup so this connection reports errors fresh to the new backend session
+        *self.last_reported_error.lock().await = None;
+
         let (write, read) = ws_stream.split();
         let write = Arc::new(tokio::sync::Mutex::new(write));
 

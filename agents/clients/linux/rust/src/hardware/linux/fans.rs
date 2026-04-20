@@ -70,7 +70,6 @@ impl super::monitor::LinuxHardwareMonitor {
                         status: if rpm.unwrap_or(0) > 0 { "ok" } else { "stopped" }.to_string(),
                         has_pwm_control: true,
                         pwm_file: Some(pwm_path.to_string_lossy().to_string()),
-                        zone: None,
                     };
 
                     // Update or insert fan info, preserving cached state

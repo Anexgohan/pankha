@@ -134,7 +134,7 @@ export class AgentManager extends EventEmitter {
           agent_version = EXCLUDED.agent_version,
           platform = EXCLUDED.platform,
           architecture = EXCLUDED.architecture,
-          status = 'online',
+          status = CASE WHEN systems.status = 'error' THEN systems.status ELSE 'online' END,
           capabilities = EXCLUDED.capabilities,
           agent_type = EXCLUDED.agent_type,
           last_seen = CURRENT_TIMESTAMP
@@ -169,17 +169,21 @@ export class AgentManager extends EventEmitter {
       // Store in memory
       this.agents.set(agentConfig.agentId, agentConfig);
 
-      // Initialize status
+      // Initialize status; preserve 'error' across reconnects so the badge sticks
+      const existingStatus = this.agentStatuses.get(agentConfig.agentId);
+      const preserveError = existingStatus?.status === "error";
+
       const status: AgentStatus = {
         agentId: agentConfig.agentId,
-        status: "online",
+        status: preserveError ? "error" : "online",
         lastSeen: new Date(),
         lastDataReceived: new Date(),
         connectionInfo: {
           apiEndpoint: agentConfig.apiEndpoint,
           websocketEndpoint: agentConfig.websocketEndpoint,
           responseTime: 0,
-          errorCount: 0,
+          errorCount: preserveError ? existingStatus.connectionInfo.errorCount : 0,
+          lastError: preserveError ? existingStatus.connectionInfo.lastError : undefined,
         },
       };
 
@@ -289,10 +293,14 @@ export class AgentManager extends EventEmitter {
   ): Promise<void> {
     const status = this.agentStatuses.get(agentId);
     if (status) {
+      const wasError = status.status === "error";
       status.lastDataReceived = new Date(dataPacket.timestamp);
       status.lastSeen = new Date();
       status.status = "online";
       status.connectionInfo.errorCount = 0;
+      if (wasError) {
+        status.connectionInfo.lastError = undefined;
+      }
 
       // Update database
       try {
@@ -315,6 +323,9 @@ export class AgentManager extends EventEmitter {
 
       this.agentStatuses.set(agentId, status);
       this.emit("agentDataReceived", { agentId, dataPacket });
+      if (wasError) {
+        this.emit("agentRecovered", { agentId });
+      }
     } else {
       log.info(
         `⚠️  Agent status not found in memory for ${agentId}, skipping status update`,
@@ -345,7 +356,7 @@ export class AgentManager extends EventEmitter {
   /**
    * Mark agent as having an error
    */
-  public markAgentError(agentId: string, error: string): void {
+  public async markAgentError(agentId: string, error: string): Promise<void> {
     const status = this.agentStatuses.get(agentId);
     if (status) {
       status.status = "error";
@@ -354,6 +365,7 @@ export class AgentManager extends EventEmitter {
       status.lastSeen = new Date();
 
       this.agentStatuses.set(agentId, status);
+      await this.persistSystemPresence(agentId, "error", { force: true });
       this.emit("agentError", { agentId, error });
     }
   }
@@ -381,10 +393,10 @@ export class AgentManager extends EventEmitter {
 
         this.agents.set(agentConfig.agentId, agentConfig);
 
-        // Initialize status as offline until we hear from them
+        // Initialize status from DB (preserves 'error' across restarts); defaults to 'offline'
         const status: AgentStatus = {
           agentId: system.agent_id,
-          status: "offline",
+          status: system.status || "offline",
           lastSeen: new Date(system.last_seen || Date.now()),
           lastDataReceived: new Date(system.last_data_received || Date.now()),
           connectionInfo: {

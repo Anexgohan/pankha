@@ -29,6 +29,7 @@ export interface SystemData {
   // License limit fields
   read_only?: boolean; // Agent is over license limit (can view but not control)
   access_status?: "active" | "over_limit";
+  last_error?: string | null;
   system_health?: {
     cpuUsage: number;
     memoryUsage: number;
