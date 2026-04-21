@@ -214,6 +214,7 @@ router.get("/", async (req: Request, res: Response) => {
         access_status: accessStatus,
         read_only: isReadOnly,
         real_time_status: agentStatus?.status || "unknown",
+        last_error: agentStatus?.connectionInfo?.lastError ?? null,
         last_data_received: agentStatus?.lastDataReceived || null,
         current_temperatures: systemData?.sensors || [],
         current_fan_speeds: systemData?.fans || [],
@@ -432,6 +433,7 @@ router.get("/:id", async (req: Request, res: Response) => {
         profile_data: p.profile_data || null,
       })),
       real_time_status: agentStatus?.status || "unknown",
+      last_error: agentStatus?.connectionInfo?.lastError ?? null,
       real_time_data: systemData || null,
       current_update_interval: agentManager.getAgentUpdateInterval(
         system.agent_id
@@ -586,8 +588,8 @@ router.get("/:id/diagnostics", async (req: Request, res: Response) => {
     }
 
     const agentStatus = agentManager.getAgentStatus(system.agent_id);
-    if (!agentStatus || agentStatus.status !== "online") {
-      return res.status(503).json({ 
+    if (!agentStatus || (agentStatus.status !== "online" && agentStatus.status !== "error")) {
+      return res.status(503).json({
         error: "Agent is offline",
         agent_id: system.agent_id,
         system_name: system.name,
@@ -1321,7 +1323,7 @@ router.post("/:id/update", async (req: Request, res: Response) => {
 
     // Check if agent is online
     const agentStatus = agentManager.getAgentStatus(system.agent_id);
-    if (!agentStatus || agentStatus.status !== 'online') {
+    if (!agentStatus || (agentStatus.status !== 'online' && agentStatus.status !== 'error')) {
       return res.status(400).json({
         error: "Agent is not online",
         agent_status: agentStatus?.status || 'unknown'

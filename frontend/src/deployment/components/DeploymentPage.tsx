@@ -265,7 +265,7 @@ const MaintenanceSection: React.FC<{
     system.platform === 'windows' || system.agent_id?.toLowerCase().startsWith('windows-');
 
   const getStatusLabel = (system: any) =>
-    updatingAgents.has(system.id) ? 'UPDATING' : (system.status === 'online' ? 'ONLINE' : 'OFFLINE');
+    updatingAgents.has(system.id) ? 'UPDATING' : (system.status === 'error' ? 'ERROR' : (system.status === 'online' ? 'ONLINE' : 'OFFLINE'));
 
   /**
    * Parse pre-release tag into a comparable number based on GitHub workflow definition.
@@ -323,7 +323,7 @@ const MaintenanceSection: React.FC<{
     const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
     const isOutdated = isMismatch && !isDowngrade;
     const isUpdating = updatingAgents.has(system.id);
-    const isOnline = system.status === 'online';
+    const isOnline = system.status === 'online' || system.status === 'error';
 
     if (isWindows) return isOutdated ? 'DOWNLOAD MSI' : 'GET MSI';
     if (!hubStatus?.version) return 'UNAVAILABLE';
@@ -383,16 +383,19 @@ const MaintenanceSection: React.FC<{
         case 'agentId':
           return (a.agent_id || '').localeCompare((b.agent_id || ''), undefined, { sensitivity: 'base', numeric: true });
         case 'platform': {
-          const pa = isWindowsSystem(a) ? 'WINDOWS' : 'LINUX';
-          const pb = isWindowsSystem(b) ? 'WINDOWS' : 'LINUX';
-          return pa.localeCompare(pb, undefined, { sensitivity: 'base' });
+          const getPlatformLabel = (s: typeof a) => {
+            if (s.agent_type === 'ipmi_host' || s.agent_type === 'ipmi_network')
+              return s.profile_id?.split('/')[0]?.toUpperCase() || 'IPMI';
+            return isWindowsSystem(s) ? 'WINDOWS' : 'LINUX';
+          };
+          return getPlatformLabel(a).localeCompare(getPlatformLabel(b), undefined, { sensitivity: 'base' });
         }
         case 'agentType':
           return (a.agent_type || '').localeCompare((b.agent_type || ''), undefined, { sensitivity: 'base' });
         case 'version':
           return compareSemver(a.agent_version, b.agent_version);
         case 'status': {
-          const rank: Record<string, number> = { OFFLINE: 0, ONLINE: 1, UPDATING: 2 };
+          const rank: Record<string, number> = { OFFLINE: 0, ERROR: 1, ONLINE: 2, UPDATING: 3 };
           return (rank[getStatusLabel(a)] ?? 0) - (rank[getStatusLabel(b)] ?? 0);
         }
         case 'maintenance':
@@ -487,20 +490,44 @@ const MaintenanceSection: React.FC<{
                     const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
                     const isOutdated = isMismatch && !isDowngrade;
                     const isUpdating = updatingAgents.has(system.id);
-                    const isOnline = system.status === 'online';
+                    const isOnline = system.status === 'online' || system.status === 'error';
 
                     // Determine status display
                     const statusLabel = getStatusLabel(system);
-                    const statusClass = isUpdating ? 'updating' : (isOnline ? 'online' : 'offline');
-                    const platformIcon = isWindows ? (
-                      <div className="platform-icon windows" title="Windows Agent">
-                        <img src="/icons/windows_01.svg" alt="Windows" width="14" height="14" />
-                      </div>
-                    ) : (
-                      <div className="platform-icon linux" title="Linux Agent">
-                        <img src="/icons/linux_01.svg" alt="Linux" width="14" height="14" />
-                      </div>
-                    );
+                    const statusClass = isUpdating ? 'updating' : (isOnline ? (system.status === 'error' ? 'error' : 'online') : 'offline');
+                    const getFleetIcon = () => {
+                      if (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') {
+                        const vendor = system.profile_id?.split('/')[0]?.toLowerCase();
+                        const vendorIcons: Record<string, string> = {
+                          dell: '/icons/brands/dell_logo.svg',
+                          supermicro: '/icons/brands/supermicro-computer_logo.svg',
+                          asrock: '/icons/brands/asrock_logo.svg',
+                          tyan: '/icons/brands/tyan_logo.svg',
+                          lenovo: '/icons/brands/lenovo_logo.svg',
+                          hp: '/icons/brands/hp_logo.svg',
+                        };
+                        const src = vendor && vendorIcons[vendor] ? vendorIcons[vendor] : '/icons/bmc-01.png';
+                        const title = vendor ? `${vendor} IPMI Agent` : 'IPMI Agent';
+                        return (
+                          <div className="platform-icon" title={title}>
+                            <img src={src} alt={title} style={{ maxWidth: '36px', height: '14px', objectFit: 'contain' }} />
+                          </div>
+                        );
+                      }
+                      if (isWindows) {
+                        return (
+                          <div className="platform-icon windows" title="Windows Agent">
+                            <img src="/icons/windows_01.svg" alt="Windows" width="14" height="14" />
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="platform-icon linux" title="Linux Agent">
+                          <img src="/icons/linux_01.svg" alt="Linux" width="14" height="14" />
+                        </div>
+                      );
+                    };
+                    const platformIcon = getFleetIcon();
 
                     return (
                       <tr key={system.id}>
@@ -514,7 +541,11 @@ const MaintenanceSection: React.FC<{
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
                             {platformIcon}
-                            <span>{isWindows ? 'WINDOWS' : 'LINUX'}</span>
+                            <span>{
+                              (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network')
+                                ? (system.profile_id?.split('/')[0]?.toUpperCase() || 'IPMI')
+                                : isWindows ? 'WINDOWS' : 'LINUX'
+                            }</span>
                           </div>
                         </td>
                         <td>
@@ -544,7 +575,12 @@ const MaintenanceSection: React.FC<{
                           </div>
                         </td>
                         <td>
-                          <span className={`status-tag-v2 ${statusClass}`}>
+                          <span
+                            className={`status-tag-v2 ${statusClass}`}
+                            title={system.status === 'error' && system.last_error
+                              ? `Agent status is currently "ERROR"\n\nReason: ${system.last_error}`
+                              : `Agent status is currently "${statusLabel}"`}
+                          >
                             <span className="status-dot" />
                             {statusLabel}
                           </span>

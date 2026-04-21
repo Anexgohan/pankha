@@ -18,6 +18,7 @@ import { log } from '../utils/logger';
 import Database from '../database/database';
 import { ProfileService } from '../services/ProfileService';
 import { CommandDispatcher } from '../services/CommandDispatcher';
+import { AgentManager } from '../services/AgentManager';
 
 const router = Router();
 const db = Database.getInstance();
@@ -142,6 +143,11 @@ router.put('/assign/:agentId', async (req, res) => {
     }
 
     log.info(`Assigned profile "${profile_id}" to agent ${agentId}`, 'deploy-profiles');
+
+    AgentManager.getInstance().emit('agentConfigUpdated', {
+      agentId,
+      config: { profile_id },
+    });
 
     commandDispatcher.reloadProfile(agentId).catch((err) => {
       log.debug(

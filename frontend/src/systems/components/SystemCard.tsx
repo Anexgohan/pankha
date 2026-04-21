@@ -45,6 +45,7 @@ import {
   Activity,
   Wind,
   Thermometer,
+  ThermometerSun,
   Lock as LockIcon,
   Search
 } from 'lucide-react';
@@ -121,8 +122,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [stagedBmcProfileId, setStagedBmcProfileId] = useState<string | null>(
     system.profile_id ?? null
   );
+  const [appliedProfileId, setAppliedProfileId] = useState<string | null>(
+    system.profile_id ?? null
+  );
   useEffect(() => {
     setStagedBmcProfileId(system.profile_id ?? null);
+    setAppliedProfileId(system.profile_id ?? null);
   }, [system.profile_id]);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const fanRpmStateRef = React.useRef<Record<string, { rpm: number; decreasing: boolean }>>({});
@@ -429,6 +434,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
     }
   };
 
+// icons are generally 96x96 resolution from icons8
   const getSensorIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case "cpu":
@@ -438,13 +444,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
       case "motherboard":
         return <img src="/icons/motherboard-01.png" width={24} height={24} title="Motherboard" alt="Motherboard" />;
       case "pch":
-        return <img src="/icons/pch-01.png" width={24} height={24} title="PCH" alt="PCH" />;
+        return <img src="/icons/icons8-electronics-96.png" width={24} height={24} title="PCH" alt="PCH" />;
       case "peripheral":
       case "pcie":
-        return <img src="/icons/pci-e-02.png" width={24} height={24} title="Peripheral / PCIe" alt="Peripheral / PCIe" />;
+        return <img src="/icons/pci-e-01.png" width={24} height={24} title="Peripheral / PCIe" alt="Peripheral / PCIe" />;
       case "system":
       case "ambient":
-        return <img src="/icons/ambient-04.png" width={24} height={24} title="System / Ambient" alt="System / Ambient" />;
+        return <ThermometerSun size={20} />;
       case "memory":
       case "ram":
       case "dimm":
@@ -526,6 +532,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
     try {
       setLoading("bmc-apply");
       await assignProfileToAgent(system.agent_id, stagedBmcProfileId);
+      setAppliedProfileId(stagedBmcProfileId);
       toast.success(`BMC profile assigned: ${stagedBmcProfileId}`);
       onUpdate();
     } catch (error) {
@@ -950,12 +957,30 @@ const SystemCard: React.FC<SystemCardProps> = ({
       unknown: 'Unknown Agent',
     };
     const agentTypeLabel = system.agent_type ? (agentTypeMap[system.agent_type] || system.agent_type) : null;
-    const tooltip = [platformLabel, agentTypeLabel, archLabel].filter(Boolean).join(' · ');
+    const vendorLabel = (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network')
+      ? appliedProfileId?.split('/')[0] || null
+      : null;
+    const tooltip = [vendorLabel, platformLabel, agentTypeLabel, archLabel].filter(Boolean).join(' · ');
 
-    // Option B: Minimalist larger icon without background container
+    const getIconSrc = (): string => {
+      if (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') {
+        const vendor = appliedProfileId?.split('/')[0]?.toLowerCase();
+        const vendorIcons: Record<string, string> = {
+          dell: '/icons/brands/dell_logo.svg',
+          supermicro: '/icons/brands/supermicro-computer_logo.svg',
+          asrock: '/icons/brands/asrock_logo.svg',
+          tyan: '/icons/brands/tyan_logo.svg',
+          lenovo: '/icons/brands/lenovo_logo.svg',
+          hp: '/icons/brands/hp_logo.svg',
+        };
+        return vendor && vendorIcons[vendor] ? vendorIcons[vendor] : '/icons/bmc-01.png';
+      }
+      return isWindows ? '/icons/windows_01.svg' : '/icons/linux_01.svg';
+    };
+
     return (
       <div className="platform-icon-minimal" title={tooltip}>
-        <img src={`/icons/${isWindows ? 'windows_01.svg' : 'linux_01.svg'}`} alt={platformLabel} width="22" height="22" />
+        <img src={getIconSrc()} alt={platformLabel} style={{ maxWidth: '48px', height: '26px', objectFit: 'contain' }} />
         {(agentTypeLabel || archLabel) && (
           <span className="arch-badge">
             {[agentTypeLabel, archLabel].filter(Boolean).join(' · ')}
