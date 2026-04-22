@@ -27,7 +27,7 @@ import {
   setFanSensor,
   getFanConfigurations,
 } from "../../services/fanConfigurationsApi";
-import { getChipDisplayName } from "../../config/sensorLabels";
+import { getChipDisplayName, getSensorLabel } from "../../config/sensorLabels";
 import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
@@ -45,6 +45,7 @@ import {
   Activity,
   Wind,
   Thermometer,
+  ThermometerSun,
   Lock as LockIcon,
   Search
 } from 'lucide-react';
@@ -53,7 +54,9 @@ import { InlineEdit } from "../../components/InlineEdit";
 import AnimatedFanIcon from "../../components/icons/AnimatedFanIcon";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorItem from "./SensorItem";
+import BmcProfilePicker from "./BmcProfilePicker";
 import { useSensorHistory } from "../hooks/useSensorHistory";
+import { assignProfileToAgent } from "../../services/api";
 import { getOption, getValues, getLabel, getCleanLabel, getDefault, interpolateTooltip } from "../../utils/uiOptions";
 
 interface SystemCardProps {
@@ -63,8 +66,10 @@ interface SystemCardProps {
   onRemove: () => void;
   expandedSensors: boolean;
   expandedFans: boolean;
+  expandedBmc: boolean;
   onToggleSensors: (expanded: boolean) => void;
   onToggleFans: (expanded: boolean) => void;
+  onToggleBmc: (expanded: boolean) => void;
 }
 
 const SystemCard: React.FC<SystemCardProps> = ({
@@ -74,8 +79,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onRemove,
   expandedSensors,
   expandedFans,
+  expandedBmc,
   onToggleSensors,
   onToggleFans,
+  onToggleBmc,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const { timezone, tempThresholds } = useDashboardSettings();
@@ -112,6 +119,16 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const [isCardInView, setIsCardInView] = useState(true);
+  const [stagedBmcProfileId, setStagedBmcProfileId] = useState<string | null>(
+    system.profile_id ?? null
+  );
+  const [appliedProfileId, setAppliedProfileId] = useState<string | null>(
+    system.profile_id ?? null
+  );
+  useEffect(() => {
+    setStagedBmcProfileId(system.profile_id ?? null);
+    setAppliedProfileId(system.profile_id ?? null);
+  }, [system.profile_id]);
   const cardRef = React.useRef<HTMLDivElement>(null);
   const fanRpmStateRef = React.useRef<Record<string, { rpm: number; decreasing: boolean }>>({});
 
@@ -417,15 +434,34 @@ const SystemCard: React.FC<SystemCardProps> = ({
     }
   };
 
+// icons are generally 96x96 resolution from icons8
   const getSensorIcon = (type: string) => {
     switch (type.toLowerCase()) {
       case "cpu":
         return <img src="/icons/processor-01.png" width={24} height={24} title="Processor" alt="Processor" />;
       case "gpu":
-        // return <img src="/icons/vga-card-01.png" width={28} height={28} title="GPU" alt="GPU" />;
         return <img src="/icons/video-card-01.png" width={24} height={24} title="GPU" alt="GPU" />;
       case "motherboard":
         return <img src="/icons/motherboard-01.png" width={24} height={24} title="Motherboard" alt="Motherboard" />;
+      case "pch":
+        return <img src="/icons/icons8-electronics-96.png" width={24} height={24} title="PCH" alt="PCH" />;
+      case "peripheral":
+      case "pcie":
+        return <img src="/icons/pci-e-01.png" width={24} height={24} title="Peripheral / PCIe" alt="Peripheral / PCIe" />;
+      case "system":
+      case "ambient":
+        return <ThermometerSun size={20} />;
+      case "memory":
+      case "ram":
+      case "dimm":
+        return <img src="/icons/ram-01.png" width={24} height={24} title="Memory" alt="Memory" />;
+      case "vrm":
+        return <img src="/icons/vrm-01.png" width={24} height={24} title="VRM" alt="VRM" />;
+      case "bmc":
+        return <img src="/icons/bmc-01.png" width={24} height={24} title="BMC" alt="BMC" />;
+      case "nic":
+      case "network":
+        return <img src="/icons/nic-01.png" width={24} height={24} title="NIC" alt="NIC" />;
       case "nvme":
       case "storage":
         return <img src="/icons/hdd-01.png" width={24} height={24} title="Storage" alt="Storage" />;
@@ -490,6 +526,24 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   // handleFilterDuplicatesChange removed (deprecated feature)
   // handleSensorToleranceChange removed (deprecated feature)
+
+  const handleBmcApply = async () => {
+    if (!stagedBmcProfileId || stagedBmcProfileId === (system.profile_id ?? null)) return;
+    try {
+      setLoading("bmc-apply");
+      await assignProfileToAgent(system.agent_id, stagedBmcProfileId);
+      setAppliedProfileId(stagedBmcProfileId);
+      toast.success(`BMC profile assigned: ${stagedBmcProfileId}`);
+      onUpdate();
+    } catch (error) {
+      toast.error(
+        "Failed to assign BMC profile: " +
+          (error instanceof Error ? error.message : "Unknown error")
+      );
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleFanStepChange = async (newStep: number) => {
     try {
@@ -903,12 +957,30 @@ const SystemCard: React.FC<SystemCardProps> = ({
       unknown: 'Unknown Agent',
     };
     const agentTypeLabel = system.agent_type ? (agentTypeMap[system.agent_type] || system.agent_type) : null;
-    const tooltip = [platformLabel, agentTypeLabel, archLabel].filter(Boolean).join(' · ');
+    const vendorLabel = (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network')
+      ? appliedProfileId?.split('/')[0] || null
+      : null;
+    const tooltip = [vendorLabel, platformLabel, agentTypeLabel, archLabel].filter(Boolean).join(' · ');
 
-    // Option B: Minimalist larger icon without background container
+    const getIconSrc = (): string => {
+      if (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') {
+        const vendor = appliedProfileId?.split('/')[0]?.toLowerCase();
+        const vendorIcons: Record<string, string> = {
+          dell: '/icons/brands/dell_logo.svg',
+          supermicro: '/icons/brands/supermicro-computer_logo.svg',
+          asrock: '/icons/brands/asrock_logo.svg',
+          tyan: '/icons/brands/tyan_logo.svg',
+          lenovo: '/icons/brands/lenovo_logo.svg',
+          hp: '/icons/brands/hp_logo.svg',
+        };
+        return vendor && vendorIcons[vendor] ? vendorIcons[vendor] : '/icons/bmc-01.png';
+      }
+      return isWindows ? '/icons/windows_01.svg' : '/icons/linux_01.svg';
+    };
+
     return (
       <div className="platform-icon-minimal" title={tooltip}>
-        <img src={`/icons/${isWindows ? 'windows_01.svg' : 'linux_01.svg'}`} alt={platformLabel} width="22" height="22" />
+        <img src={getIconSrc()} alt={platformLabel} style={{ maxWidth: '48px', height: '26px', objectFit: 'contain' }} />
         {(agentTypeLabel || archLabel) && (
           <span className="arch-badge">
             {[agentTypeLabel, archLabel].filter(Boolean).join(' · ')}
@@ -928,7 +1000,9 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 className={`status-badge ${isIpmiNoProfile ? 'read-only' : system.status}`}
                 title={isIpmiNoProfile
                   ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
-                  : `Agent status is currently "${system.status.toUpperCase()}"`}
+                  : system.status === 'error' && system.last_error
+                    ? `Agent status is currently "ERROR"\n\nReason: ${system.last_error}`
+                    : `Agent status is currently "${system.status.toUpperCase()}"`}
               >
                 <span className="status-dot" />
                 {isIpmiNoProfile ? 'read only' : system.status}
@@ -1288,7 +1362,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       ([chipId]) => showHidden || !isGroupHidden(chipId)
                     );
 
-                    return visibleGroups.map(([chipId, chipSensors]) => {
+                    const isIpmiAgent =
+                      system.agent_type === 'ipmi_host' ||
+                      system.agent_type === 'ipmi_network';
+                    const ipmiHardwareName = isIpmiAgent
+                      ? filteredSensors.find((s) => s.hardwareName)?.hardwareName ?? null
+                      : null;
+
+                    const renderedGroups = visibleGroups.map(([chipId, chipSensors]) => {
                       const isGroupHiddenState = isGroupHidden(chipId);
                       return (
                         <div
@@ -1298,7 +1379,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           }`}
                         >
                           <div className="sensor-group-header">
-                            <h5>{getChipDisplayName(chipId, chipSensors)}</h5>
+                            <h5>{isIpmiAgent ? getSensorLabel(chipId) : getChipDisplayName(chipId, chipSensors)}</h5>
                             <div className="group-header-right">
                               <button
                                 className="visibility-toggle"
@@ -1349,6 +1430,20 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         </div>
                       );
                     });
+
+                    if (isIpmiAgent) {
+                      return (
+                        <div className="ipmi-sensor-banner">
+                          <div className="ipmi-banner-header">
+                            IPMI: {ipmiHardwareName ?? 'BMC'}
+                          </div>
+                          <div className="ipmi-banner-body">
+                            {renderedGroups}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return renderedGroups;
                   })()}
                 </div>
               </>
@@ -2009,6 +2104,55 @@ const SystemCard: React.FC<SystemCardProps> = ({
         </div>
       )}
 
+      {/* BMC Section — IPMI agents only. Profile assignment lives here
+          so the UI sits next to the hardware it affects, not in Fleet Maintenance. */}
+      {(system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') && (
+        <div className="system-section">
+          <div
+            className="section-header clickable"
+            onClick={() => onToggleBmc(!expandedBmc)}
+          >
+            <h4>BMC</h4>
+            <span className="expand-icon">
+              {expandedBmc ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+            </span>
+          </div>
+
+          {expandedBmc && (
+            <div className="bmc-section-body">
+              <div className="bmc-header-bar">
+                <span className="bmc-current-label">
+                  Current: <span className="bmc-current-value">{system.profile_id ?? 'Not assigned'}</span>
+                </span>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleBmcApply}
+                  disabled={
+                    !stagedBmcProfileId ||
+                    stagedBmcProfileId === (system.profile_id ?? null) ||
+                    loading === 'bmc-apply' ||
+                    isReadOnly
+                  }
+                >
+                  {loading === 'bmc-apply' ? (
+                    <>
+                      <Loader2 className="animate-spin" size={14} /> Applying…
+                    </>
+                  ) : (
+                    'Apply'
+                  )}
+                </button>
+              </div>
+              <BmcProfilePicker
+                selectedProfileId={stagedBmcProfileId}
+                onProfileSelect={setStagedBmcProfileId}
+                disabled={loading === 'bmc-apply' || isReadOnly}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       {/* No data message */}
       {(!system.current_temperatures ||
         system.current_temperatures.length === 0) &&
@@ -2050,6 +2194,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.name === nextProps.system.name &&
     prevProps.system.status === nextProps.system.status &&
     prevProps.system.real_time_status === nextProps.system.real_time_status &&
+    prevProps.system.last_error === nextProps.system.last_error &&
     prevProps.system.last_seen === nextProps.system.last_seen &&
     prevProps.system.current_update_interval ===
       nextProps.system.current_update_interval &&
@@ -2071,6 +2216,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
       nextProps.system.current_fan_speeds &&
     prevProps.expandedSensors === nextProps.expandedSensors &&
     prevProps.expandedFans === nextProps.expandedFans &&
+    prevProps.expandedBmc === nextProps.expandedBmc &&
     prevProps.isDemoMode === nextProps.isDemoMode
   );
 });

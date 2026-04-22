@@ -111,6 +111,7 @@ interface SystemInfo {
   real_time_status?: string;
   agent_version?: string;
   platform?: string;
+  last_error?: string | null;
 }
 
 const DiagnosticsTab: React.FC = () => {
@@ -219,7 +220,7 @@ const DiagnosticsTab: React.FC = () => {
   };
 
   const handleReportIssue = async (system: SystemInfo) => {
-    const isOnline = system.real_time_status === 'online';
+    const isOnline = system.real_time_status === 'online' || system.real_time_status === 'error';
     const platform = system.platform === 'windows' || system.agent_id.toLowerCase().startsWith('windows-') ? 'Windows' : 'Linux';
 
     const issueTitle = encodeURIComponent(`[Hardware Support] ${system.name} - ${platform}`);
@@ -229,7 +230,7 @@ const DiagnosticsTab: React.FC = () => {
 - **Agent ID:** \`${system.agent_id}\`
 - **Platform:** ${platform}
 - **Agent Version:** ${system.agent_version || 'Unknown'}
-- **Status:** ${isOnline ? 'Online' : 'Offline'}
+- **Status:** ${system.real_time_status === 'error' ? 'Error' : (isOnline ? 'Online' : 'Offline')}
 
 ## Issue Description
 <!-- Describe what's not working -->
@@ -284,11 +285,11 @@ const DiagnosticsTab: React.FC = () => {
     window.open(issueUrl, '_blank', 'noopener,noreferrer');
   };
 
-  const onlineCount = systems.filter(s => s.real_time_status === 'online').length;
+  const onlineCount = systems.filter(s => s.real_time_status === 'online' || s.real_time_status === 'error').length;
   const [isExportingAll, setIsExportingAll] = useState(false);
 
   const handleExportAll = async () => {
-    const onlineSystems = systems.filter(s => s.real_time_status === 'online');
+    const onlineSystems = systems.filter(s => s.real_time_status === 'online' || s.real_time_status === 'error');
     if (onlineSystems.length === 0) return;
 
     setIsExportingAll(true);
@@ -322,7 +323,7 @@ const DiagnosticsTab: React.FC = () => {
   const [isReportingWithDiagnostics, setIsReportingWithDiagnostics] = useState(false);
 
   const handleReportWithDiagnostics = async () => {
-    const onlineSystems = systems.filter(s => s.real_time_status === 'online');
+    const onlineSystems = systems.filter(s => s.real_time_status === 'online' || s.real_time_status === 'error');
     
     if (onlineSystems.length === 0) {
       toast.warning('No online agents to export diagnostics from.');
@@ -434,10 +435,10 @@ const DiagnosticsTab: React.FC = () => {
         <tbody>
           {tableSystems.length > 0 ? (
             tableSystems.map(system => {
-              const isOnline = system.real_time_status === 'online';
+              const isOnline = system.real_time_status === 'online' || system.real_time_status === 'error';
               const status = actionStatus[system.id];
-              const statusLabel = isOnline ? 'ONLINE' : 'OFFLINE';
-              const statusClass = isOnline ? 'online' : 'offline';
+              const statusLabel = system.real_time_status === 'error' ? 'ERROR' : (isOnline ? 'ONLINE' : 'OFFLINE');
+              const statusClass = system.real_time_status === 'error' ? 'error' : (isOnline ? 'online' : 'offline');
 
               return (
                 <tr key={system.id}>
@@ -451,7 +452,12 @@ const DiagnosticsTab: React.FC = () => {
                     </div>
                   </td>
                   <td>
-                    <span className={`status-tag-v2 ${statusClass}`}>
+                    <span
+                      className={`status-tag-v2 ${statusClass}`}
+                      title={system.real_time_status === 'error' && system.last_error
+                        ? `Agent status is currently "ERROR"\n\nReason: ${system.last_error}`
+                        : `Agent status is currently "${statusLabel}"`}
+                    >
                       <span className="status-dot" />
                       {statusLabel}
                     </span>

@@ -34,6 +34,7 @@ const SystemsPage: React.FC = () => {
   // Persistent dropdown states across re-renders
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
+  const [expandedBmc, setExpandedBmc] = useState<{[systemId: number]: boolean}>({});
 
   // Pure WebSocket - no HTTP polling!
   const {
@@ -298,8 +299,10 @@ const SystemsPage: React.FC = () => {
                   onRemove={() => removeSystem(system.id)}
                   expandedSensors={expandedSensors[system.id] || false}
                   expandedFans={expandedFans[system.id] || false}
+                  expandedBmc={expandedBmc[system.id] || false}
                   onToggleSensors={(expanded) => setExpandedSensors(prev => ({...prev, [system.id]: expanded}))}
                   onToggleFans={(expanded) => setExpandedFans(prev => ({...prev, [system.id]: expanded}))}
+                  onToggleBmc={(expanded) => setExpandedBmc(prev => ({...prev, [system.id]: expanded}))}
                 />
               ))
             )}

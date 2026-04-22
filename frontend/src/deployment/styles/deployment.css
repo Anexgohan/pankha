@@ -1333,6 +1333,12 @@
   color: var(--color-error);
 }
 
+.status-tag-v2.error {
+  background: color-mix(in srgb, var(--color-warning), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-warning), transparent 85%);
+  color: var(--color-warning);
+}
+
 .status-tag-v2.updating {
   background: color-mix(in srgb, var(--color-accent-dynamic), transparent 92%);
   border-color: color-mix(in srgb, var(--color-accent-dynamic), transparent 85%);

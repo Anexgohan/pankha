@@ -8,17 +8,48 @@ use crate::hardware::types::{Sensor, Fan};
 use crate::profiles::types::Parsing;
 
 /// Normalize an SDR sensor name into a stable, underscore-separated ID.
-/// "CPU Temp" → "ipmi_cpu_temp", "Peripheral Temp" → "ipmi_peripheral_temp"
-/// The "ipmi_" prefix ensures deriveChipName() groups all BMC sensors together,
-/// matching the original agent's chip-based grouping (e.g., "coretemp_0_temp1").
+/// "CPU Temp" → "cpu_temp", "Peripheral Temp" → "peripheral_temp", "PCH Temp" → "pch_temp".
+/// The first segment (before the first underscore) becomes the chip group in the
+/// frontend's deriveChipName() — each subsystem renders as its own chip group,
+/// mirroring how OS sensors group by driver (k10temp, coretemp, nvme).
 fn normalize_sensor_id(sdr_name: &str) -> String {
-    let normalized: String = sdr_name
+    sdr_name
         .trim()
         .to_lowercase()
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect();
-    format!("ipmi_{}", normalized)
+        .collect()
+}
+
+/// Derive the chip group (first id segment) from a normalized sensor id.
+/// "cpu_temp" → "cpu", "peripheral_temp" → "peripheral".
+fn derive_chip(normalized_id: &str) -> String {
+    normalized_id
+        .split_once('_')
+        .map(|(head, _)| head.to_string())
+        .unwrap_or_else(|| normalized_id.to_string())
+}
+
+/// Classify the chip group into a sensor_type category the frontend's
+/// getSensorIcon() switch recognizes. We preserve fine-grained categories
+/// (pch, peripheral, system, memory, vrm, bmc, nic) so each subsystem can
+/// render its own icon — the frontend has dedicated icons per category.
+fn classify_sensor_type(chip: &str) -> String {
+    match chip {
+        "cpu" => "cpu".to_string(),
+        "gpu" => "gpu".to_string(),
+        "pch" => "pch".to_string(),
+        "peripheral" | "pcie" => "peripheral".to_string(),
+        "system" | "ambient" => "system".to_string(),
+        "dimm" | "memory" | "ram" => "memory".to_string(),
+        "vrm" => "vrm".to_string(),
+        "bmc" => "bmc".to_string(),
+        "nic" | "network" | "lan" => "nic".to_string(),
+        "motherboard" | "mainboard" | "lpc" | "superio" => "motherboard".to_string(),
+        "nvme" | "hdd" | "ssd" | "storage" => "nvme".to_string(),
+        "acpi" | "acpitz" | "thermal" => "acpi".to_string(),
+        _ => "other".to_string(),
+    }
 }
 
 /// Parse CSV SDR output into Sensor structs.
@@ -31,14 +62,17 @@ pub fn parse_sensors(csv: &str, parsing: &Parsing, hardware_name: &str) -> Vec<S
             if cols.len() >= 4 && cols[2].contains(&parsing.temp_match_token) {
                 let name = cols[0].trim().to_string();
                 let value: f64 = cols[1].trim().parse().ok()?;
+                let id = normalize_sensor_id(&name);
+                let chip = derive_chip(&id);
+                let sensor_type = classify_sensor_type(&chip);
                 Some(Sensor {
-                    id: normalize_sensor_id(&name),
+                    id,
                     name,
                     temperature: value,
-                    sensor_type: "temperature".to_string(),
+                    sensor_type,
                     max_temp: None,
                     crit_temp: None,
-                    chip: Some("ipmi".to_string()),
+                    chip: Some(chip),
                     hardware_name: Some(hardware_name.to_string()),
                     source: Some("ipmi_sdr".to_string()),
                 })

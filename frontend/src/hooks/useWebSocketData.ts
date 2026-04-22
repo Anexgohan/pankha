@@ -326,10 +326,45 @@ export function useWebSocketData(): UseWebSocketDataReturn {
 
       if (!mountedRef.current) return;
 
+      const errorMessage =
+        typeof data.error === "string"
+          ? data.error
+          : data.error?.message ?? null;
+
       setSystems((prevSystems) =>
         prevSystems.map((s) =>
           s.agent_id === data.agentId
-            ? { ...s, status: "error", real_time_status: "error" }
+            ? {
+                ...s,
+                status: "error",
+                real_time_status: "error",
+                last_error: errorMessage,
+              }
+            : s
+        )
+      );
+    },
+    []
+  );
+
+  /**
+   * Handle agent recovery — error → online. Clears the cached error reason.
+   */
+  const handleAgentRecovered = useCallback(
+    (data: { agentId: string }) => {
+      console.log("✅ Agent recovered:", data.agentId);
+
+      if (!mountedRef.current) return;
+
+      setSystems((prevSystems) =>
+        prevSystems.map((s) =>
+          s.agent_id === data.agentId
+            ? {
+                ...s,
+                status: "online",
+                real_time_status: "online",
+                last_error: null,
+              }
             : s
         )
       );
@@ -428,6 +463,9 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     wsRef.current.on("agentError", (data: unknown) =>
       handleAgentError(data as { agentId: string; error?: any })
     );
+    wsRef.current.on("agentRecovered", (data: unknown) =>
+      handleAgentRecovered(data as { agentId: string })
+    );
     wsRef.current.on("agentConfigUpdated", (data: unknown) =>
       handleAgentConfigUpdated(data as { agentId: string; config: any })
     );
@@ -461,6 +499,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     handleAgentRegistered,
     handleAgentUnregistered,
     handleAgentError,
+    handleAgentRecovered,
     handleAgentConfigUpdated,
   ]);
 

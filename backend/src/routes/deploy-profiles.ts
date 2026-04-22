@@ -17,9 +17,12 @@ import fs from 'fs';
 import { log } from '../utils/logger';
 import Database from '../database/database';
 import { ProfileService } from '../services/ProfileService';
+import { CommandDispatcher } from '../services/CommandDispatcher';
+import { AgentManager } from '../services/AgentManager';
 
 const router = Router();
 const db = Database.getInstance();
+const commandDispatcher = CommandDispatcher.getInstance();
 
 /**
  * GET /api/deploy/profiles
@@ -108,9 +111,10 @@ router.get('/assigned/:agentId', async (req, res) => {
 /**
  * PUT /api/deploy/profiles/assign/:agentId
  * Admin assigns or changes a profile for an agent.
- * If the agent is online, a reloadProfile WebSocket command should be sent
- * (handled by the caller — CommandDispatcher is not imported here to keep
- * this router lightweight; the frontend can trigger reload separately).
+ * After the DB update, fires a reloadProfile WebSocket command so an online
+ * agent hot-reloads immediately. If the agent is offline the command fails
+ * silently — the registration-time mismatch detector in WebSocketHub will
+ * push reloadProfile on the agent's next reconnect.
  */
 router.put('/assign/:agentId', async (req, res) => {
   try {
@@ -139,6 +143,19 @@ router.put('/assign/:agentId', async (req, res) => {
     }
 
     log.info(`Assigned profile "${profile_id}" to agent ${agentId}`, 'deploy-profiles');
+
+    AgentManager.getInstance().emit('agentConfigUpdated', {
+      agentId,
+      config: { profile_id },
+    });
+
+    commandDispatcher.reloadProfile(agentId).catch((err) => {
+      log.debug(
+        `reloadProfile push failed for ${agentId} (likely offline); mismatch detector will fire on reconnect: ${err?.message ?? err}`,
+        'deploy-profiles'
+      );
+    });
+
     res.json({ success: true, profile_id, agent_id: agentId });
   } catch (error) {
     log.error('Failed to assign profile:', 'deploy-profiles', error);

@@ -270,6 +270,32 @@
   padding-left: var(--spacing-xs);
 }
 
+/* IPMI banner — card-level "IPMI: <hardware name>" header pill sitting
+   above BMC-sourced chip groups. Pill is shifted left via margin-left so
+   it visually anchors outside the groups' left edge; groups themselves
+   receive no IPMI-specific width/height changes. */
+.ipmi-sensor-banner {
+  margin-bottom: var(--spacing-lg);
+}
+
+.ipmi-banner-header {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--bg-tertiary);
+  border-left: 6px solid var(--color-info);
+  border-right: 6px solid var(--color-info);
+  border-radius: var(--radius-sm);
+  margin-left: -10px;
+  margin-bottom: var(--spacing-sm);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: 0.02em;
+}
+
+.ipmi-banner-body .sensor-group:last-child {
+  margin-bottom: 0;
+}
+
 /* Fans */
 .fans-list {
   display: flex;
@@ -603,13 +629,56 @@
   overflow: hidden;
 }
 
-.zone-header-bar {
+.zone-header-bar,
+.bmc-header-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: var(--spacing-xs) var(--spacing-sm);
   background-color: color-mix(in srgb, var(--color-info) 8%, var(--bg-panels_01));
   border-bottom: 1px solid var(--border-color);
+}
+
+/* BMC section — profile management for IPMI agents.
+   Shell mirrors .zone-group (rounded container, info border-left); header
+   bar reuses .zone-header-bar visual treatment. Controls inside reuse
+   .fan-control-row so Vendor/Model rows align with other dropdowns. */
+.bmc-section-body {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-panels_01);
+  border-radius: var(--radius-lg);
+  border-left: 4px solid var(--color-info);
+  overflow: hidden;
+}
+
+.bmc-header-bar .btn {
+  padding: 2px var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.bmc-current-label {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.bmc-current-value {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.bmc-section-body .fan-controls {
+  padding: var(--spacing-sm);
+  gap: var(--spacing-sm);
+}
+
+.bmc-section-body .profile-match-card {
+  margin: 0 var(--spacing-sm) var(--spacing-sm);
 }
 
 .zone-name {

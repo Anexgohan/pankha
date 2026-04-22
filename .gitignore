@@ -1,0 +1,101 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+# .env
+# .env.local
+# .env.development.local
+# .env.test.local
+# .env.production.local
+backend/.env
+frontend/.env
+
+# Build outputs
+dist/
+build/
+
+# Data directory (root level only)
+# /data/
+
+# Tasks directory
+documentation/private/
+# documentation/private/
+# documentation/private/tasks-todo
+# Samples directory
+# samples/
+samples/git-clones/
+samples/shared-images/
+
+# PostgreSQL database files (sensitive data)
+backend/database/
+backend/database/postgres_data/
+backend/docker-data/
+backend/docker-data/postgres_data/
+
+# Sensitive files
+# agents/clients/linux/python-script/pankha-agent/config/
+
+# Logs
+logs/
+*.log
+
+# Runtime files
+pids/*.pid
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Python virtual environments
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Rust build artifacts and files - allow only the final binary (should remove later - as not needed anymore since we use release-assets/)
+# target/ contains all build artifacts (555MB+) - never commit
+# target/
+agents/clients/linux/rust/output/
+agents/clients/linux/rust/target/*.*
+agents/clients/linux/rust/target/release/*
+# !agents/clients/linux/rust/target/release/pankha-agent-linux
+agents/clients/linux/rust/target/debug/*
+agents/clients/linux/rust/target/aarch64-unknown-linux-gnu/*.*
+agents/clients/linux/rust/target/aarch64-unknown-linux-gnu/release/*
+# !agents/clients/linux/rust/target/aarch64-unknown-linux-gnu/release/pankha-agent-linux
+
+agents/clients/linux/virtual-agents/host-ipmi-rust/output/
+agents/clients/linux/virtual-agents/host-ipmi-rust/target/*.*
+agents/clients/linux/virtual-agents/host-ipmi-rust/target/release/*
+# !agents/clients/linux/virtual-agents/host-ipmi-rust/target/release/pankha-agent-linux
+agents/clients/linux/virtual-agents/host-ipmi-rust/target/debug/*
+agents/clients/linux/virtual-agents/host-ipmi-rust/target/aarch64-unknown-linux-gnu/*.*
+agents/clients/linux/virtual-agents/host-ipmi-rust/target/aarch64-unknown-linux-gnu/release/*
+# !agents/clients/linux/virtual-agents/host-ipmi-rust/target/aarch64-unknown-linux-gnu/release/pankha-agent-linux
+
+# Windows agent publish directory
+agents/clients/windows/varient-c/publish/
+
+# Rust backup files created by rustfmt
+*.rs.bk
+# Windows debug symbols
+*.pdb
+# Rust agent configuration (contains sensitive data)
+agents/clients/linux/rust/config.json
+# Note: Cargo.lock is committed for binaries (ensures reproducible builds)

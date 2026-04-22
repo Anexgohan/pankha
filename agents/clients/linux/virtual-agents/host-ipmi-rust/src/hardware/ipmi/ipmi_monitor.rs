@@ -1,4 +1,4 @@
-//! IPMI Hardware Monitor — implements HardwareMonitor trait using ipmitool commands.
+//! IPMI Hardware Monitor - implements HardwareMonitor trait using ipmitool commands.
 //! All hardware logic is driven by JSON profiles; this binary contains zero hardcoded hex values.
 
 use std::collections::HashMap;
@@ -35,10 +35,10 @@ pub struct IpmiHardwareMonitor {
     last_sdr_cache: Mutex<Option<String>>,
     cache_from_sdr: AtomicBool,
     /// Track last commanded speed per zone (zone_id → speed%).
-    /// IPMI SDR only reports RPM, not duty cycle — this lets telemetry report the actual speed we set.
+    /// IPMI SDR only reports RPM, not duty cycle - this lets telemetry report the actual speed we set.
     commanded_speeds: Mutex<HashMap<String, u8>>,
     /// Cached sensor thresholds (SDR name → (max_temp, crit_temp)).
-    /// Queried once at init — thresholds don't change at runtime.
+    /// Queried once at init - thresholds don't change at runtime.
     sensor_thresholds: Mutex<HashMap<String, (Option<f64>, Option<f64>)>>,
 }
 
@@ -85,7 +85,7 @@ impl IpmiHardwareMonitor {
     }
 
     /// Get the IPMI protocol section from the loaded profile, or None.
-    /// Returns a cloned copy — cheap for the small IpmiProtocol struct,
+    /// Returns a cloned copy - cheap for the small IpmiProtocol struct,
     /// and avoids holding a RwLock guard across async boundaries.
     fn ipmi_protocol(&self) -> Option<crate::profiles::types::IpmiProtocol> {
         let profile = self.profile.read().unwrap();
@@ -96,7 +96,7 @@ impl IpmiHardwareMonitor {
     }
 
     /// Default parsing config for profile-less monitor-only mode.
-    /// Uses standard IPMI SDR unit strings — universal across all BMC vendors.
+    /// Uses standard IPMI SDR unit strings - universal across all BMC vendors.
     fn default_parsing() -> Parsing {
         Parsing {
             sdr_format: "csv".to_string(),
@@ -109,9 +109,9 @@ impl IpmiHardwareMonitor {
     /// Called once on first sensor discovery.
     async fn run_initialization(&self) -> Result<()> {
         let ipmi = match self.ipmi_protocol() {
-            Some(p) => p,  // owned IpmiProtocol — no lock held
+            Some(p) => p,  // owned IpmiProtocol - no lock held
             None => {
-                info!("No profile loaded — skipping initialization (monitor-only mode)");
+                info!("No profile loaded - skipping initialization (monitor-only mode)");
                 self.initialized.store(true, Ordering::SeqCst);
                 return Ok(());
             }
@@ -128,9 +128,9 @@ impl IpmiHardwareMonitor {
                         Ok(_) => info!("  Init command succeeded: {}", cmd.name),
                         Err(e) => {
                             if cmd.critical {
-                                return Err(anyhow!("Critical init command failed: {} — {}", cmd.name, e));
+                                return Err(anyhow!("Critical init command failed: {} - {}", cmd.name, e));
                             }
-                            warn!("Non-critical init command failed: {} — {}", cmd.name, e);
+                            warn!("Non-critical init command failed: {} - {}", cmd.name, e);
                         }
                     }
                 }
@@ -139,7 +139,7 @@ impl IpmiHardwareMonitor {
 
         self.initialized.store(true, Ordering::SeqCst);
 
-        // Query sensor thresholds once at init — they don't change at runtime.
+        // Query sensor thresholds once at init - they don't change at runtime.
         // Uses `ipmitool sensor get "<name>"` per temperature sensor found in SDR.
         match executor::run_ipmitool_sdr_csv().await {
             Ok(csv) => {
@@ -206,22 +206,22 @@ impl IpmiHardwareMonitor {
                     match executor::run_ipmitool_raw(bytes).await {
                         Ok(_) => info!("  Reset command succeeded: {}", cmd.name),
                         Err(e) => {
-                            error!("Reset command failed: {} — {}", cmd.name, e);
+                            error!("Reset command failed: {} - {}", cmd.name, e);
                         }
                     }
                 }
             }
         }
 
-        // Clear commanded speeds — BMC is back in control, our duty-cycle values are stale
+        // Clear commanded speeds - BMC is back in control, our duty-cycle values are stale
         self.commanded_speeds.lock().await.clear();
 
-        info!("Reset to factory complete — fans returned to BMC auto-control");
+        info!("Reset to factory complete - fans returned to BMC auto-control");
         Ok(())
     }
 
     /// Fetch SDR CSV data, using cache if available in this cycle.
-    /// Only updates cache_from_sdr on cache miss (fresh fetch) — matching the
+    /// Only updates cache_from_sdr on cache miss (fresh fetch) - matching the
     /// original agent where discover_fans() doesn't touch the flag.
     async fn get_sdr_csv(&self) -> Result<String> {
         let mut cache = self.last_sdr_cache.lock().await;
@@ -384,7 +384,7 @@ impl HardwareMonitor for IpmiHardwareMonitor {
                     } else {
                         match executor::run_ipmitool_raw(bytes).await {
                             Ok(response) => {
-                                // Parse response — typically a single hex byte like " 32" (= 0x32)
+                                // Parse response - typically a single hex byte like " 32" (= 0x32)
                                 let trimmed = response.trim();
                                 if let Ok(raw_byte) = u8::from_str_radix(trimmed.trim_start_matches("0x"), 16) {
                                     let speed = reverse_translate_speed(raw_byte, &zone.speed_translation);
@@ -421,7 +421,7 @@ impl HardwareMonitor for IpmiHardwareMonitor {
             }
         }
 
-        // Clear SDR cache after fans are parsed — both consumers (sensors + fans)
+        // Clear SDR cache after fans are parsed - both consumers (sensors + fans)
         // have used this cycle's CSV. Next cycle will fetch fresh readings.
         // (Mirrors the original sysfs agent: cache stores *paths*, not *values*;
         // here the SDR CSV contains live readings, so it must refresh each cycle.)
@@ -450,7 +450,7 @@ impl HardwareMonitor for IpmiHardwareMonitor {
 
     async fn set_fan_speed(&self, fan_id: &str, speed: u8) -> Result<()> {
         let ipmi = self.ipmi_protocol()
-            .ok_or_else(|| anyhow!("No profile loaded — fan control unavailable in monitor-only mode"))?;
+            .ok_or_else(|| anyhow!("No profile loaded - fan control unavailable in monitor-only mode"))?;
 
         if !self.settings.enable_fan_control {
             return Err(anyhow!("Fan control is disabled in agent settings"));
@@ -570,7 +570,7 @@ impl HardwareMonitor for IpmiHardwareMonitor {
             let mut profile = self.profile.write().unwrap();
             *profile = Some(new_profile);
         }
-        // Reset init flag — init commands will re-run on next telemetry cycle
+        // Reset init flag - init commands will re-run on next telemetry cycle
         self.initialized.store(false, Ordering::SeqCst);
         // Clear stale state from previous profile
         self.commanded_speeds.lock().await.clear();

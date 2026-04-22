@@ -199,6 +199,14 @@ export class WebSocketHub extends EventEmitter {
       ]);
     });
 
+    this.agentManager.on("agentRecovered", (event) => {
+      this.broadcast("agentRecovered", event, [
+        `system:${event.agentId}`,
+        "agents:all",
+        "systems:all",
+      ]);
+    });
+
     this.agentManager.on("agentConfigUpdated", (event) => {
       // Broadcast config updates so frontend reflects changes immediately
       this.broadcast("agentConfigUpdated", event, [
@@ -314,53 +322,58 @@ export class WebSocketHub extends EventEmitter {
           "WebSocketHub"
         );
 
-        // Mark agent as offline in AgentManager (in-memory)
-        this.agentManager.markAgentOffline(agentId);
+        const currentStatus = this.agentManager.getAgentStatus(agentId);
+        const isError = currentStatus?.status === "error";
 
-        // Persist offline presence with the same heartbeat-gated DB policy.
-        // This is a write-throttle for SQL only, not a websocket disconnect detector.
-        const Database = (await import("../database/database")).default;
-        const db = Database.getInstance();
-        const presenceHeartbeatSeconds = Math.max(
-          5,
-          parseInt(
-            process.env.DB_SYSTEM_PRESENCE_HEARTBEAT_SECONDS ||
-              process.env.DB_TELEMETRY_HEARTBEAT_SECONDS ||
-              "15",
-            10
-          ) || 15
-        );
-        await db
-          .run(
-            `UPDATE systems
-             SET status = $1, last_seen = CURRENT_TIMESTAMP
-             WHERE agent_id = $2
-               AND (
-                 status IS DISTINCT FROM $1
-                 OR last_seen IS NULL
-                 OR last_seen < CURRENT_TIMESTAMP - ($3 * INTERVAL '1 second')
-               )`,
-            ["offline", agentId, presenceHeartbeatSeconds]
-          )
-          .catch((err) => {
-            log.error(
-              `Failed to update agent status in database`,
-              "WebSocketHub",
-              { agentId, error: err }
-            );
-          });
+        if (isError) {
+          log.info(
+            `Agent ${agentId} disconnected while in error state - preserving error status`,
+            "WebSocketHub"
+          );
+        } else {
+          this.agentManager.markAgentOffline(agentId);
 
-        // Clear delta state to ensure full state is sent on reconnection
+          const Database = (await import("../database/database")).default;
+          const db = Database.getInstance();
+          const presenceHeartbeatSeconds = Math.max(
+            5,
+            parseInt(
+              process.env.DB_SYSTEM_PRESENCE_HEARTBEAT_SECONDS ||
+                process.env.DB_TELEMETRY_HEARTBEAT_SECONDS ||
+                "15",
+              10
+            ) || 15
+          );
+          await db
+            .run(
+              `UPDATE systems
+               SET status = $1, last_seen = CURRENT_TIMESTAMP
+               WHERE agent_id = $2
+                 AND (
+                   status IS DISTINCT FROM $1
+                   OR last_seen IS NULL
+                   OR last_seen < CURRENT_TIMESTAMP - ($3 * INTERVAL '1 second')
+                 )`,
+              ["offline", agentId, presenceHeartbeatSeconds]
+            )
+            .catch((err) => {
+              log.error(
+                `Failed to update agent status in database`,
+                "WebSocketHub",
+                { agentId, error: err }
+              );
+            });
+
+          this.broadcast("systemOffline", { agentId }, [
+            `system:${agentId}`,
+            "systems:all",
+          ]);
+        }
+
         this.deltaComputer.clearAgentState(agentId);
 
-        // Broadcast offline event to frontend clients immediately
-        this.broadcast("systemOffline", { agentId }, [
-          `system:${agentId}`,
-          "systems:all",
-        ]);
-
         log.info(
-          `🔄 Agent ${agentId} marked offline, delta state cleared`,
+          `Agent ${agentId} disconnected, delta state cleared (status: ${isError ? "error" : "offline"})`,
           "WebSocketHub"
         );
       } else {
@@ -481,6 +494,20 @@ export class WebSocketHub extends EventEmitter {
                 agentMessage
               );
             }
+          }
+          break;
+
+        case "error":
+          // Agent is reporting an init/runtime error (e.g. IPMI profile
+          // mismatch, OS agent sysfs permission failure). Forward to
+          // AgentCommunication so markAgentError fires and the frontend
+          // shows the red Error badge with the reported reason.
+          const errorClient = this.clients.get(clientId);
+          if (errorClient?.metadata.isAgent && errorClient.metadata.agentId) {
+            await this.agentCommunication.handleAgentMessage(
+              errorClient.metadata.agentId,
+              { type: "error", data: message.data }
+            );
           }
           break;
 
@@ -971,6 +998,7 @@ export class WebSocketHub extends EventEmitter {
       enable_fan_control: this.agentManager.getAgentEnableFanControl(agentId),
       read_only: isReadOnly,
       access_status: isReadOnly ? "over_limit" : "active",
+      last_error: agentStatus?.connectionInfo?.lastError ?? null,
     };
   }
 
