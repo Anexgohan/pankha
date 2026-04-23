@@ -28,7 +28,7 @@ interface BulkEditPanelProps {
   onClose: () => void;
 }
 
-// Format zone ID for display (e.g., "cpu_zone" → "Cpu Zone") — matches SystemCard.formatZoneName
+// Format zone ID for display (e.g., "cpu_zone" → "Cpu Zone") - matches SystemCard.formatZoneName
 const formatZoneName = (zoneId: string): string => {
   return zoneId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 };
@@ -63,10 +63,10 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   const [panelStyles, setPanelStyles] = useState<React.CSSProperties>({});
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Zone detection — same pattern as SystemCard L1346
+  // Zone detection - same pattern as SystemCard L1346
   const hasZones = fans.some(f => f.zone);
 
-  // Build zone groups when zones are present — same pattern as SystemCard L1350-1354
+  // Build zone groups when zones are present - same pattern as SystemCard L1350-1354
   const zoneGroups = React.useMemo(() => {
     if (!hasZones) return new Map<string, FanReading[]>();
     const groups = new Map<string, FanReading[]>();

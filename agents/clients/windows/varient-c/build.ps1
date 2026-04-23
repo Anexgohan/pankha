@@ -501,7 +501,7 @@ if ($Publish) {
         Copy-Item $PawnIOSetup -Destination $OutputDir
         Write-Host "Copied PawnIO_setup.exe to publish directory" -ForegroundColor Green
     } else {
-        Write-Error "FATAL: PawnIO_setup.exe not found at $PawnIOSetup — cannot build MSI without PawnIO installer"
+        Write-Error "FATAL: PawnIO_setup.exe not found at $PawnIOSetup - cannot build MSI without PawnIO installer"
         exit 1
     }
 

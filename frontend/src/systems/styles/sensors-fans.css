@@ -270,7 +270,7 @@
   padding-left: var(--spacing-xs);
 }
 
-/* IPMI banner — card-level "IPMI: <hardware name>" header pill sitting
+/* IPMI banner - card-level "IPMI: <hardware name>" header pill sitting
    above BMC-sourced chip groups. Pill is shifted left via margin-left so
    it visually anchors outside the groups' left edge; groups themselves
    receive no IPMI-specific width/height changes. */
@@ -353,7 +353,7 @@
   opacity: 1;
 }
 
-/* Fan visibility toggle — positioned below edit icon, left of speed-display */
+/* Fan visibility toggle - positioned below edit icon, left of speed-display */
 .fan-visibility-toggle {
   position: absolute;
   right: 68px;
@@ -378,7 +378,7 @@
   opacity: 1;
 }
 
-/* Fan hidden state — mirrors sensor-hidden pattern */
+/* Fan hidden state - mirrors sensor-hidden pattern */
 .fan-item.fan-hidden {
   opacity: 0.5;
 }
@@ -639,7 +639,7 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-/* BMC section — profile management for IPMI agents.
+/* BMC section - profile management for IPMI agents.
    Shell mirrors .zone-group (rounded container, info border-left); header
    bar reuses .zone-header-bar visual treatment. Controls inside reuse
    .fan-control-row so Vendor/Model rows align with other dropdowns. */

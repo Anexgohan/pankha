@@ -180,7 +180,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
             };
 
             // NOTE: LibreHardwareMonitor doesn't expose hardware max temp thresholds
-            // (unlike Linux sysfs temp{N}_max). This 70°C value is NOT used by the frontend —
+            // (unlike Linux sysfs temp{N}_max). This 70°C value is NOT used by the frontend -
             // the frontend has its own hardcoded 70°C threshold in getTemperatureClass().
             // A future improvement could make this user-configurable via
             // Settings > General > Appearance (see frontend discussion).

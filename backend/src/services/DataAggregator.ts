@@ -306,7 +306,7 @@ export class DataAggregator extends EventEmitter {
     if (!sensors || sensors.length === 0) return;
 
     for (const sensor of sensors) {
-      // ON CONFLICT DO UPDATE refreshes classification from the agent — agents
+      // ON CONFLICT DO UPDATE refreshes classification from the agent - agents
       // may reclassify sensors between releases (e.g. IPMI agent switching from
       // hardcoded "temperature" to chip-derived "cpu"/"motherboard"). Thresholds
       // are preserved when agent sends null so we don't clobber DB-sourced values.

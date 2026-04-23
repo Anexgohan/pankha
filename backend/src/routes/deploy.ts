@@ -237,7 +237,7 @@ router.get('/binaries/:agentType/:arch', (req, res) => {
 
 /**
  * GET /api/deploy/binaries/:arch
- * Legacy route — defaults to os_linux for backward compatibility with older agents
+ * Legacy route - defaults to os_linux for backward compatibility with older agents
  */
 router.get('/binaries/:arch', (req, res) => {
   serveBinary(req, res, 'os_linux', req.params.arch);

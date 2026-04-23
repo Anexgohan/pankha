@@ -4,7 +4,7 @@ import { Server } from 'lucide-react';
 const PANKHA_SITE = 'https://pankha.app';
 
 /**
- * IPMI installer cards — shown when agent mode toggle is set to "IPMI".
+ * IPMI installer cards - shown when agent mode toggle is set to "IPMI".
  * Reuses .installer-card, .coming-soon-badge, .btn-outline-tactical from deployment.css.
  */
 const IpmiInstallerCards: React.FC = React.memo(() => (
@@ -40,7 +40,7 @@ const IpmiInstallerCards: React.FC = React.memo(() => (
       </a>
     </div>
 
-    {/* Network IPMI Agent — Coming Soon */}
+    {/* Network IPMI Agent - Coming Soon */}
     <div className="installer-card">
       <h4>
         <Server size={16} /> Network IPMI Agent

@@ -204,7 +204,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
     setHistoryExpanded(expandedSensors);
   }, [expandedSensors, setHistoryExpanded]);
 
-  // Stable identity keys — reload configs only when the set of fans/sensors changes,
+  // Stable identity keys - reload configs only when the set of fans/sensors changes,
   // not on every temperature/RPM value update (which fires every agent update interval).
   // This prevents the useEffect from overwriting user's in-flight dropdown changes.
   const fanIdsKey = useMemo(
@@ -218,7 +218,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   // Load fan profiles, assignments, and configurations on mount and when hardware structure changes
   useEffect(() => {
-    // Skip if no fans/sensors discovered yet — will re-fire when they appear
+    // Skip if no fans/sensors discovered yet - will re-fire when they appear
     if (!fanIdsKey) return;
 
     const loadProfilesAndAssignments = async () => {
@@ -2104,7 +2104,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
         </div>
       )}
 
-      {/* BMC Section — IPMI agents only. Profile assignment lives here
+      {/* BMC Section - IPMI agents only. Profile assignment lives here
           so the UI sits next to the hardware it affects, not in Fleet Maintenance. */}
       {(system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') && (
         <div className="system-section">

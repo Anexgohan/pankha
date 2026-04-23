@@ -3,7 +3,7 @@
   "metadata": {
     "model_family": ["PowerEdge R640", "PowerEdge R740", "PowerEdge R740xd"],
     "author": "Pankha Official",
-    "description": "Dell 14th Gen rack servers (iDRAC 9). Requires firmware < 3.30.30.30 for raw IPMI fan control — newer firmware may lock out raw commands and require Redfish. Adds 3rd-party PCIe card fan panic disable."
+    "description": "Dell 14th Gen rack servers (iDRAC 9). Requires firmware < 3.30.30.30 for raw IPMI fan control - newer firmware may lock out raw commands and require Redfish. Adds 3rd-party PCIe card fan panic disable."
   },
   "protocols": {
     "ipmi": {

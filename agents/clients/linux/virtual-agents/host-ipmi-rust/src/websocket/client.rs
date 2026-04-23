@@ -275,7 +275,7 @@ impl WebSocketClient {
                             );
                             // Close write half so the read loop exits and the
                             // outer reconnect+failsafe path takes over. If close
-                            // itself fails, break anyway — the 30s connection
+                            // itself fails, break anyway - the 30s connection
                             // health timeout is a backstop.
                             let _ = w.close().await;
                             break;

@@ -372,7 +372,7 @@ export class FanProfileController {
       }
 
       // Zone deduplication: when multiple fans share a zone_id, only process once per zone.
-      // The zone is the atomic control unit for IPMI agents — sending setFanSpeed to the zone
+      // The zone is the atomic control unit for IPMI agents - sending setFanSpeed to the zone
       // sets all member fans at once.
       const processedZones = new Set<string>();
 
@@ -656,7 +656,7 @@ export class FanProfileController {
   /**
    * Clear ALL fan state for a specific agent (used on reconnection).
    * Unlike clearFanState() which preserves lastAppliedSpeeds for smooth stepping,
-   * this clears everything — after reconnection the fan is likely at failsafe speed
+   * this clears everything - after reconnection the fan is likely at failsafe speed
    * and the controller must reinitialize from scratch.
    */
   private clearFanStateForAgent(agentId: string): void {

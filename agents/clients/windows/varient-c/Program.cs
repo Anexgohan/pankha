@@ -108,7 +108,7 @@ class Program
             Directory.CreateDirectory(Path.GetDirectoryName(LOG_PATH)!);
 
             // Set working directory to install path (needed for config/log path resolution)
-            // Windows Service starts in System32 by default — override to install location
+            // Windows Service starts in System32 by default - override to install location
             Directory.SetCurrentDirectory(PathResolver.InstallPath);
 
             // Initialize logging
@@ -119,7 +119,7 @@ class Program
             // Check PawnIO driver presence (required for motherboard sensors and fan control)
             if (!DriverInstaller.IsPawnIOInstalled())
             {
-                Log.Warning("PawnIO driver not installed — motherboard sensors and fan control unavailable");
+                Log.Warning("PawnIO driver not installed - motherboard sensors and fan control unavailable");
                 Log.Warning("Install PawnIO from https://pawnio.eu or run the Pankha installer");
             }
             else

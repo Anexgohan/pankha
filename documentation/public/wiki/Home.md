@@ -23,7 +23,7 @@ Pankha is an open-source, distributed fan control system designed for self-hoste
 ## Architecture
 
 ```
-[ Browser / Dashboard ] <—— WebSocket ——> [ Backend Server ] <—— WebSocket ——> [ Agents ] <——> [ Hardware ]
+[ Browser / Dashboard ] <-- WebSocket --> [ Backend Server ] <-- WebSocket --> [ Agents ] <--> [ Hardware ]
       (React)                              (Node.js + PG)                    (Rust/C#)
 ```
 

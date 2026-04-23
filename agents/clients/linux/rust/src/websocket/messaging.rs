@@ -86,7 +86,7 @@ impl super::client::WebSocketClient {
         // report to the backend, then return Err so P1's retry/escalate logic
         // still kicks in. OS agent discover rarely fails in practice (malformed
         // sensors are skipped per-entry), but sysfs permission errors and total
-        // hwmon failures can still surface here — surfacing the cause before
+        // hwmon failures can still surface here - surfacing the cause before
         // the WS close lets the UI show a red Error badge instead of silent
         // offline.
         let sensors = match hardware_monitor.discover_sensors().await {
@@ -135,7 +135,7 @@ impl super::client::WebSocketClient {
         trace!("Sending WebSocket message (timestamp: {})", timestamp);
         write.send(Message::Text(data.to_string())).await?;
 
-        // Success — clear dedup so the next failure (if any) is reported fresh.
+        // Success - clear dedup so the next failure (if any) is reported fresh.
         clear_reported_error(last_reported_error).await;
 
         // Log with cache status indicator

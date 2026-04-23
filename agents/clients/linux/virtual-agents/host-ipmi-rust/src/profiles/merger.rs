@@ -14,7 +14,7 @@ use anyhow::{anyhow, Context, Result};
 use tracing::info;
 
 /// Resolve `extends` by loading the base profile and merging raw JSON Values.
-/// Both base and child are raw Values — no typed deserialization until after merge.
+/// Both base and child are raw Values - no typed deserialization until after merge.
 /// This allows partial child profiles (e.g., only fan_zones) to work correctly.
 pub fn resolve_extends_value(child: serde_json::Value, base_dir: &Path) -> Result<serde_json::Value> {
     let extends = child.get("extends")

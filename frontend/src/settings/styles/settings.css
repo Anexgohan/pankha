@@ -58,7 +58,7 @@
   width: 100%;
 }
 
-/* Content area — transparent layout wrapper, individual groups/sections are the cards */
+/* Content area - transparent layout wrapper, individual groups/sections are the cards */
 .settings-content {
   padding: var(--spacing-xl);
 }
@@ -2103,7 +2103,7 @@
    Temperature Thresholds Settings
    ═══════════════════════════════════════════ */
 
-/* Wrapper — visual container for the whole appearance section */
+/* Wrapper - visual container for the whole appearance section */
 .appearance-wrapper {
   display: flex;
   flex-direction: column;
@@ -2150,7 +2150,7 @@
   letter-spacing: -0.01em;
 }
 
-/* Wrapper — sub-container for the threshold section */
+/* Wrapper - sub-container for the threshold section */
 .threshold-wrapper {
   display: flex;
   flex-direction: column;
@@ -2168,7 +2168,7 @@
   }
 }
 
-/* Card grid — 2 columns on desktop, 1 on mobile */
+/* Card grid - 2 columns on desktop, 1 on mobile */
 @media (min-width: 601px) {
   .threshold-card-grid {
     display: grid;
@@ -2315,7 +2315,7 @@
   background: rgba(255, 255, 255, 0.04);
 }
 
-/* Per-type cards — same design as global cards */
+/* Per-type cards - same design as global cards */
 .threshold-per-type-container {
   display: flex;
   flex-direction: column;

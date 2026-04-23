@@ -217,7 +217,7 @@ namespace Pankha.WixSharpInstaller
             };
 
             // Bind PawnIO property
-            // Check if PawnIO is already installed — show checked+disabled if so
+            // Check if PawnIO is already installed - show checked+disabled if so
             bool pawnioInstalled = PawnIOHelper.IsPawnIOInstalled();
             string pawnioVal = Runtime.Session["INSTALL_PAWNIO"];
             if (pawnioInstalled)
@@ -225,7 +225,7 @@ namespace Pankha.WixSharpInstaller
                 pawnioCheckBox.Checked = true;
                 pawnioCheckBox.Enabled = false;
                 pawnioCheckBox.Text = "Install PawnIO Driver (already installed)";
-                Runtime.Session["INSTALL_PAWNIO"] = "0"; // Skip install — already present
+                Runtime.Session["INSTALL_PAWNIO"] = "0"; // Skip install - already present
             }
             else
             {
@@ -236,7 +236,7 @@ namespace Pankha.WixSharpInstaller
             {
                 if (!pawnioCheckBox.Checked)
                 {
-                    // PawnIO is mandatory — warn and either re-check or abort
+                    // PawnIO is mandatory - warn and either re-check or abort
                     var result = MessageBox.Show(
                         "PawnIO is required for Pankha to read hardware sensors and control fans.\n\n" +
                         "The installation cannot continue without PawnIO.\n\n" +
@@ -254,7 +254,7 @@ namespace Pankha.WixSharpInstaller
                     }
                     else
                     {
-                        // User chose to abort — cancel the entire installer
+                        // User chose to abort - cancel the entire installer
                         Shell.Cancel();
                         return;
                     }

@@ -156,7 +156,7 @@ export class AgentManager extends EventEmitter {
       ]);
 
       // Sync profile_id: if agent reports a profile and DB has none, accept it.
-      // DB takes priority — if DB already has a profile_id and it differs from agent's,
+      // DB takes priority - if DB already has a profile_id and it differs from agent's,
       // the agent should update its local copy (handled via reloadProfile command).
       const agentProfileId = agentConfig.profileId;
       if (agentProfileId) {

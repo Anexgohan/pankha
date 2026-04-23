@@ -1,4 +1,4 @@
-//! Speed interpolator — translates UI percentage (0-100) into BMC command values.
+//! Speed interpolator - translates UI percentage (0-100) into BMC command values.
 //! Handles all three speed_translation types from the JSON profile schema.
 
 use super::types::SpeedTranslation;
@@ -58,7 +58,7 @@ pub fn reverse_translate_speed(raw_byte: u8, translation: &SpeedTranslation) -> 
             raw_byte.min(100)
         }
         "integer" => {
-            // Same as decimal_hex — raw value is the percentage
+            // Same as decimal_hex - raw value is the percentage
             raw_byte.min(100)
         }
         _ => raw_byte.min(100),

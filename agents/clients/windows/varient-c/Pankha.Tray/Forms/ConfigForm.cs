@@ -292,7 +292,7 @@ public class ConfigForm : Form
                 _agentNameTextBox.Text = _currentConfig.Agent.Name;
                 _agentIdTextBox.Text = _currentConfig.Agent.Id;
 
-                // Display as ip:port — strip ws:// or wss:// prefix and /websocket suffix
+                // Display as ip:port - strip ws:// or wss:// prefix and /websocket suffix
                 string displayUrl = _currentConfig.Backend.ServerUrl;
                 if (displayUrl.StartsWith("wss://", StringComparison.OrdinalIgnoreCase))
                     displayUrl = displayUrl.Substring(6);
@@ -355,7 +355,7 @@ public class ConfigForm : Form
                     if (status != null && !string.IsNullOrEmpty(status.Version))
                         Text = $"Pankha Agent Configuration - v{status.Version}";
                 }
-                catch { /* Non-critical — keep default title */ }
+                catch { /* Non-critical - keep default title */ }
 
                 _statusLabel.Text = "Ready";
                 _saveButton.Enabled = true;

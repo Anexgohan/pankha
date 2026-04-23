@@ -1,5 +1,5 @@
 /**
- * ProfileService — BMC Profile Management
+ * ProfileService - BMC Profile Management
  *
  * Scans backend/profiles/ directory, resolves extends inheritance,
  * and provides a vendor/model catalog for the frontend deployment UI.
@@ -100,7 +100,7 @@ function deepMergeProfile(base: any, child: any): any {
     }
   }
 
-  // protocols.redfish (same pattern — future)
+  // protocols.redfish (same pattern - future)
   if (child.protocols?.redfish) {
     if (!merged.protocols) merged.protocols = {};
     merged.protocols.redfish = {

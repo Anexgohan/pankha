@@ -145,7 +145,7 @@ public static class DriverInstaller
                     return true;
 
                 case 3010: // ERROR_SUCCESS_REBOOT_REQUIRED
-                    Logger.Information("PawnIO installed — reboot required for full functionality");
+                    Logger.Information("PawnIO installed - reboot required for full functionality");
                     Console.WriteLine("PawnIO installed. A reboot is recommended.");
                     return true;
 

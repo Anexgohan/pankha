@@ -141,7 +141,7 @@ export class UpdateDownloadService {
           fileResults[target.arch as keyof typeof fileResults] = true;
         } catch (err) {
           if (!target.required) {
-            log.warn(`Optional binary ${target.filename} not found in release ${tag} — skipping`, 'UpdateService');
+            log.warn(`Optional binary ${target.filename} not found in release ${tag} - skipping`, 'UpdateService');
             continue;
           }
           throw err;

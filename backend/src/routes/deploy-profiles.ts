@@ -1,14 +1,14 @@
 /**
- * Deploy Profiles Router — BMC Profile API
+ * Deploy Profiles Router - BMC Profile API
  *
  * Mounted at /api/deploy/profiles/* inside deploy.ts
  *
  * Endpoints:
- *   GET  /api/deploy/profiles                    — Vendor/model catalog (frontend dropdowns)
- *   GET  /api/deploy/profiles/refresh            — Refresh catalog from disk
- *   GET  /api/deploy/profiles/:vendor/:model     — Resolved profile details (frontend preview)
- *   GET  /api/deploy/profiles/assigned/:agentId  — Agent fetches its assigned profile (Option B)
- *   PUT  /api/deploy/profiles/assign/:agentId    — Admin assigns/changes profile for an agent
+ *   GET  /api/deploy/profiles                    - Vendor/model catalog (frontend dropdowns)
+ *   GET  /api/deploy/profiles/refresh            - Refresh catalog from disk
+ *   GET  /api/deploy/profiles/:vendor/:model     - Resolved profile details (frontend preview)
+ *   GET  /api/deploy/profiles/assigned/:agentId  - Agent fetches its assigned profile (Option B)
+ *   PUT  /api/deploy/profiles/assign/:agentId    - Admin assigns/changes profile for an agent
  */
 
 import { Router } from 'express';
@@ -113,7 +113,7 @@ router.get('/assigned/:agentId', async (req, res) => {
  * Admin assigns or changes a profile for an agent.
  * After the DB update, fires a reloadProfile WebSocket command so an online
  * agent hot-reloads immediately. If the agent is offline the command fails
- * silently — the registration-time mismatch detector in WebSocketHub will
+ * silently - the registration-time mismatch detector in WebSocketHub will
  * push reloadProfile on the agent's next reconnect.
  */
 router.put('/assign/:agentId', async (req, res) => {
@@ -195,7 +195,7 @@ router.post('/custom', async (req, res) => {
     const safeFilename = filename.toLowerCase().replace(/[^a-z0-9_-]/g, '_');
 
     // Write to backend/profiles/{vendor}/user-profile/{filename}.json
-    // Separated from official profiles — scanner picks up user-profile/ subdirs
+    // Separated from official profiles - scanner picks up user-profile/ subdirs
     const userProfileDir = path.join(__dirname, '..', '..', 'profiles', safeVendor, 'user-profile');
     fs.mkdirSync(userProfileDir, { recursive: true });
 

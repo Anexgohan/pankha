@@ -59,7 +59,7 @@ graph LR
 *   **Purpose**: Failsafe protection for hardware safety.
 *   **How it works**: If any sensor reaches this threshold (default **80°C**), the agent **ignores all profiles, hysteresis, and smoothing**.
 *   **Action**: All fans are immediately forced to **100% speed** to protect hardware.
-*   **Offline Failsafe**: When the agent loses connection to the backend, it continues monitoring temperatures locally. If any sensor hits the emergency threshold while disconnected, the agent autonomously triggers 100% fan speed—**no backend required**.
+*   **Offline Failsafe**: When the agent loses connection to the backend, it continues monitoring temperatures locally. If any sensor hits the emergency threshold while disconnected, the agent autonomously triggers 100% fan speed-**no backend required**.
 
 ### Failsafe Speed
 *   **Purpose**: Hardware protection when agent loses connection to backend.

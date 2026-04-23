@@ -10,7 +10,7 @@ use crate::profiles::types::Parsing;
 /// Normalize an SDR sensor name into a stable, underscore-separated ID.
 /// "CPU Temp" → "cpu_temp", "Peripheral Temp" → "peripheral_temp", "PCH Temp" → "pch_temp".
 /// The first segment (before the first underscore) becomes the chip group in the
-/// frontend's deriveChipName() — each subsystem renders as its own chip group,
+/// frontend's deriveChipName() - each subsystem renders as its own chip group,
 /// mirroring how OS sensors group by driver (k10temp, coretemp, nvme).
 fn normalize_sensor_id(sdr_name: &str) -> String {
     sdr_name
@@ -33,7 +33,7 @@ fn derive_chip(normalized_id: &str) -> String {
 /// Classify the chip group into a sensor_type category the frontend's
 /// getSensorIcon() switch recognizes. We preserve fine-grained categories
 /// (pch, peripheral, system, memory, vrm, bmc, nic) so each subsystem can
-/// render its own icon — the frontend has dedicated icons per category.
+/// render its own icon - the frontend has dedicated icons per category.
 fn classify_sensor_type(chip: &str) -> String {
     match chip {
         "cpu" => "cpu".to_string(),

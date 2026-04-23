@@ -54,7 +54,7 @@ pub fn load_profile(path: &Path) -> Result<BmcProfile> {
     }
 
     info!(
-        "Loaded profile: {} ({}) — {} fan zones, {} init commands, {} reset commands{}",
+        "Loaded profile: {} ({}) - {} fan zones, {} init commands, {} reset commands{}",
         profile.metadata.vendor,
         profile.metadata.description.as_deref().unwrap_or("no description"),
         ipmi.fan_zones.len(),

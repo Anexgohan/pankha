@@ -348,7 +348,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   );
 
   /**
-   * Handle agent recovery — error → online. Clears the cached error reason.
+   * Handle agent recovery - error → online. Clears the cached error reason.
    */
   const handleAgentRecovered = useCallback(
     (data: { agentId: string }) => {

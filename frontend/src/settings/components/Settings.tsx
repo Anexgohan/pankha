@@ -1263,7 +1263,7 @@ const Settings: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Temperature Thresholds — sub-section heading */}
+                {/* Temperature Thresholds - sub-section heading */}
                 <div className="threshold-section-header">
                   <h4 className="threshold-wrapper-title">Temperature Thresholds</h4>
                   <p className="settings-info">
@@ -1273,9 +1273,9 @@ const Settings: React.FC = () => {
 
                 <div className="threshold-wrapper">
                   <div className="settings-list">
-                {/* Global Thresholds — Card Grid */}
+                {/* Global Thresholds - Card Grid */}
                 <div className="threshold-card-grid">
-                  {/* Normal — color only */}
+                  {/* Normal - color only */}
                   <div className="threshold-card" style={{ borderLeftColor: tempColors.normal }}>
                     <span className="threshold-color-dot" style={{ backgroundColor: tempColors.normal }} />
                     <span className="threshold-level-label">Normal</span>

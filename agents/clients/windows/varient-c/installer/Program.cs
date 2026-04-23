@@ -160,7 +160,7 @@ namespace Pankha.WixSharpInstaller
                 if (!IO.File.Exists(uiPath)) IO.File.AppendAllText("debug.log", "ERROR: AgentUI not found!\n");
 
                 IO.File.AppendAllText("debug.log", $"DEBUG: Checking PawnIO_setup at '{IO.Path.GetFullPath(pawnioSetupPath)}'\n");
-                if (!IO.File.Exists(pawnioSetupPath)) IO.File.AppendAllText("debug.log", "WARNING: PawnIO_setup.exe not found — MSI will not include PawnIO installer\n");
+                if (!IO.File.Exists(pawnioSetupPath)) IO.File.AppendAllText("debug.log", "WARNING: PawnIO_setup.exe not found - MSI will not include PawnIO installer\n");
 
                 var agentExe = new WixSharp.File(exePath);
 
@@ -537,7 +537,7 @@ namespace Pankha.WixSharpInstaller
                     }
                 }
 
-                // 4. Kill tray process (not a service — direct kill is correct)
+                // 4. Kill tray process (not a service - direct kill is correct)
                 foreach (var proc in Process.GetProcessesByName("pankha-tray"))
                 {
                     try
@@ -795,7 +795,7 @@ namespace Pankha.WixSharpInstaller
 
                         if (!pawnioOk)
                         {
-                            LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO installation failed — aborting install (rollback)");
+                            LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO installation failed - aborting install (rollback)");
                             try
                             {
                                 MessageBox.Show(
@@ -808,18 +808,18 @@ namespace Pankha.WixSharpInstaller
                                     MessageBoxButtons.OK,
                                     MessageBoxIcon.Error);
                             }
-                            catch { /* Deferred action — MessageBox may not be available */ }
+                            catch { /* Deferred action - MessageBox may not be available */ }
                             e.Result = ActionResult.Failure;
                             return;
                         }
                     }
                     else if (installPawnio != "1")
                     {
-                        // User opted out or already installed — verify driver is actually present
+                        // User opted out or already installed - verify driver is actually present
                         pawnioOk = PawnIOHelper.IsPawnIOInstalled();
                         if (!pawnioOk)
                         {
-                            LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO not present and install was skipped — aborting (rollback)");
+                            LogToDebugFile(logBaseDir, logType, "FATAL: PawnIO not present and install was skipped - aborting (rollback)");
                             try
                             {
                                 MessageBox.Show(
@@ -889,7 +889,7 @@ namespace Pankha.WixSharpInstaller
                      }
 
                      // Note: Service is started by WiX ServiceControl (StartOn = SvcEvent.Install).
-                     // No manual 'net start' needed — WiX handles it during the install sequence.
+                     // No manual 'net start' needed - WiX handles it during the install sequence.
 
                      // Configure Service Failure Recovery (SCM)
                      // Restart on failure: 5s → 10s → 15s, reset after 1 day
@@ -944,7 +944,7 @@ namespace Pankha.WixSharpInstaller
 
                         // Unload and clean up legacy WinRing0 runtime-extracted driver
                         // LibreHardwareMonitor 0.9.4 extracted WinRing0 at runtime as {processname}.sys
-                        // LHM 0.9.6+ uses PawnIO instead — clean up old WinRing0 artifacts
+                        // LHM 0.9.6+ uses PawnIO instead - clean up old WinRing0 artifacts
                         string agentExeName = GetProperty("AgentExe");
 
                         LogToDebugFile(logBaseDir, logType, "Phase: Cleaning up legacy WinRing0 driver...");
@@ -986,7 +986,7 @@ namespace Pankha.WixSharpInstaller
                                     }
                                     catch (IO.IOException)
                                     {
-                                        // Driver file locked — schedule deletion on next reboot
+                                        // Driver file locked - schedule deletion on next reboot
                                         LogToDebugFile(logBaseDir, logType, $"WinRing0 driver locked, scheduling delete on reboot: {driverFile}");
                                         NativeMethods.MoveFileEx(driverFile, null, NativeMethods.MOVEFILE_DELAY_UNTIL_REBOOT);
                                     }

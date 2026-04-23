@@ -310,7 +310,7 @@ const MaintenanceSection: React.FC<{
       const nb = pb[i] || 0;
       if (na !== nb) return na - nb;
     }
-    // Base versions equal — compare pre-release: rc2 < rc3 < stable
+    // Base versions equal - compare pre-release: rc2 < rc3 < stable
     return parsePreRelease(cleanA) - parsePreRelease(cleanB);
   };
 

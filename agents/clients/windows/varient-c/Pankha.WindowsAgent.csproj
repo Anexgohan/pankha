@@ -31,7 +31,7 @@
   </PropertyGroup>
 
   <!-- Compile-time architecture constants derived from RuntimeIdentifier -->
-  <!-- Mirrors Rust's std::env::consts::ARCH — value baked into binary at build time -->
+  <!-- Mirrors Rust's std::env::consts::ARCH - value baked into binary at build time -->
   <PropertyGroup Condition="$(RuntimeIdentifier.Contains('x64'))">
     <DefineConstants>$(DefineConstants);ARCH_X86_64</DefineConstants>
   </PropertyGroup>

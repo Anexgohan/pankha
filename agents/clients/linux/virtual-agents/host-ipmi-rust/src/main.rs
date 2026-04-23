@@ -277,7 +277,7 @@ async fn main() -> Result<()> {
     }
 
     // Fetch BMC profile from backend API before starting hardware monitor.
-    // URL derived from backend.server_url + agent.id — no extra config needed.
+    // URL derived from backend.server_url + agent.id - no extra config needed.
     {
         let profile_url = config.profile_url();
         let install_dir = std::env::current_exe()?

@@ -3,7 +3,7 @@
 use clap::Parser;
 
 pub const HELP_TEXT: &str = "
-Pankha IPMI Host Agent — BMC fan control via ipmitool
+Pankha IPMI Host Agent - BMC fan control via ipmitool
 Usage: pankha-agent [OPTIONS]
 
 Options:
@@ -33,7 +33,7 @@ IPMI:
 #[derive(Parser, Debug)]
 #[command(name = "pankha-agent")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(about = "Pankha IPMI Host Agent — BMC fan control via ipmitool", long_about = None)]
+#[command(about = "Pankha IPMI Host Agent - BMC fan control via ipmitool", long_about = None)]
 #[command(after_help = "")]
 #[command(disable_help_flag = false)]
 pub struct Args {

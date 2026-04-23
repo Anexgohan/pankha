@@ -128,7 +128,7 @@ impl super::client::WebSocketClient {
 
         // On discover/get_system_info failure: emit an edge-triggered error
         // report to the backend, then return Err so P1's retry/escalate logic
-        // still kicks in. The WS close path remains identical — we just tell
+        // still kicks in. The WS close path remains identical - we just tell
         // the backend *why* before going quiet.
         let sensors = match hardware_monitor.discover_sensors().await {
             Ok(s) => s,
@@ -176,7 +176,7 @@ impl super::client::WebSocketClient {
         trace!("Sending WebSocket message (timestamp: {})", timestamp);
         write.send(Message::Text(data.to_string())).await?;
 
-        // Success — clear dedup so the next failure (if any) is reported fresh.
+        // Success - clear dedup so the next failure (if any) is reported fresh.
         clear_reported_error(last_reported_error).await;
 
         // Log with cache status indicator
