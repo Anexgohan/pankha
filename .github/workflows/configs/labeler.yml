@@ -1,5 +1,6 @@
 # PR Labeler Configuration
 # Maps files to labels
+# PRs can receive multiple labels (e.g. backend + database)
 
 frontend:
   - changed-files:
@@ -19,14 +20,38 @@ agent-linux:
 
 docker:
   - changed-files:
-    - any-glob-to-any-file: ['docker/**/*', 'compose.yml', 'compose-public.yml']
+    - any-glob-to-any-file: ['docker/**/*', 'compose.yml', '.dockerignore', '.env']
 
 documentation:
   - changed-files:
-    - any-glob-to-any-file: ['documentation/**/*', '*.md']
+    - any-glob-to-any-file: ['documentation/**/*', '*.md', 'LICENSE']
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file: '.github/workflows/ci.yml'
 
 devops:
   - changed-files:
     - any-glob-to-any-file:
       - '.github/**/*'
       - '!.github/workflows/release-public.yml'
+      - '!.github/workflows/ci.yml'
+      - '.gitignore'
+      - '.mailmap'
+      - 'release.json'
+
+database:
+  - changed-files:
+    - any-glob-to-any-file: 'backend/src/database/**'
+
+license:
+  - changed-files:
+    - any-glob-to-any-file: ['backend/src/license/**', 'frontend/src/license/**']
+
+vendor-profiles:
+  - changed-files:
+    - any-glob-to-any-file: 'backend/profiles/**'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: ['**/package.json', '**/package-lock.json']
