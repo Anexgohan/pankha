@@ -71,6 +71,7 @@ __pycache__/
 # Rust build artifacts and files - allow only the final binary (should remove later - as not needed anymore since we use release-assets/)
 # target/ contains all build artifacts (555MB+) - never commit
 # target/
+agents/clients/mock-agents/
 agents/clients/linux/rust/output/
 agents/clients/linux/rust/target/*.*
 agents/clients/linux/rust/target/release/*
