@@ -39,10 +39,12 @@ Out of scope:
 
 Only the latest stable release is supported with security updates. This applies to both the AGPL-3.0 and Commercial license distributions.
 
-| Version | Supported |
-|---------|-----------|
-| Latest  | Yes       |
-| Older   | No        |
+| Version                                    | Supported |
+| ------------------------------------------ | --------- |
+| Latest Stable                              | Yes       |
+| Older                                      | No        |
+| Pre-release, alpha, beta, testing versions | No        |
+
 
 ## Disclosure Policy
 
