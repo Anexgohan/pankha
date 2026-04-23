@@ -70,13 +70,13 @@ Your license term begins on the **date of purchase**, not the date you activate 
 
 ## Restrictions
 
-1. **No Redistribution** — You may not distribute, resell, or make Pankha binaries, source code, or derivative works available to third parties. Internal use within your own organization is permitted.
+1. **No Redistribution** - You may not distribute, resell, or make Pankha binaries, source code, or derivative works available to third parties. Internal use within your own organization is permitted.
 
-2. **Single Production Instance** — Each license covers one production deployment (the primary instance used for real fan control by end users in one organization). Development, staging, and one disaster-recovery replica are included at no extra charge. Separate licenses are required for multiple independent production instances (e.g. two data centers, subsidiary companies, multi-tenant hosting).
+2. **Single Production Instance** - Each license covers one production deployment (the primary instance used for real fan control by end users in one organization). Development, staging, and one disaster-recovery replica are included at no extra charge. Separate licenses are required for multiple independent production instances (e.g. two data centers, subsidiary companies, multi-tenant hosting).
 
-3. **No Sublicensing** — You may not grant, assign, or sublicense rights under this agreement to third parties.
+3. **No Sublicensing** - You may not grant, assign, or sublicense rights under this agreement to third parties.
 
-4. **No Circumvention** — You may not modify, disable, or bypass license validation mechanisms. Doing so terminates your license immediately without refund and may constitute copyright infringement.
+4. **No Circumvention** - You may not modify, disable, or bypass license validation mechanisms. Doing so terminates your license immediately without refund and may constitute copyright infringement.
 
 ## Updates
 
