@@ -1,6 +1,21 @@
 # PR Labeler Configuration
 # Maps files to labels
 # PRs can receive multiple labels (e.g. backend + database)
+# Last updated: 2026-04-23
+#
+# Label colors (managed via GitHub API, catalogued here for reference):
+#   frontend        #f0ad4e  light orange
+#   backend         #0e8a16  green
+#   agent-windows   #00A4EF  Windows blue
+#   agent-linux     #D70A53  Debian red
+#   docker          #384d54  Docker slate
+#   documentation   #006b75  teal
+#   ci              #d4c5f9  light purple
+#   devops          #7057ff  medium purple
+#   database        #b60205  red
+#   license         #d876e3  pink
+#   vendor-profiles #ededed  muted
+#   dependencies    #fffacd  light yellow
 
 frontend:
   - changed-files:
