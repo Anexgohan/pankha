@@ -117,7 +117,7 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  # Job 2: Build IPMI agent (x64 only — enterprise BMC servers)
+  # Job 2: Build IPMI agent (x64 only - enterprise BMC servers)
   build-ipmi-agent:
     runs-on: ubuntu-22.04
 
