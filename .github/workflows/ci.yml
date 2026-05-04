@@ -56,7 +56,7 @@ jobs:
 
       - name: Cargo check
         working-directory: ${{ matrix.path }}
-        run: cargo check --release
+        run: cargo check --release --locked
 
   docker-build:
     name: Docker Build

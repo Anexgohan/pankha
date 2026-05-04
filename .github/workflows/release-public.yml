@@ -92,11 +92,11 @@ jobs:
           if [ "${{ matrix.cross }}" = "true" ]; then
             # Cross-compile for ARM64 using older glibc from Ubuntu 22.04
             export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
-            cargo build --release --target ${{ matrix.target }}
+            cargo build --release --locked --target ${{ matrix.target }}
             BINARY_PATH="target/${{ matrix.target }}/release/pankha-agent-linux"
           else
             # Native build (x86_64)
-            cargo build --release
+            cargo build --release --locked
             BINARY_PATH="target/release/pankha-agent-linux"
           fi
 
@@ -159,7 +159,7 @@ jobs:
         working-directory: agents/clients/linux/virtual-agents/host-ipmi-rust
         run: |
           echo "🦀 Building IPMI agent for x64..."
-          cargo build --release
+          cargo build --release --locked
           mv target/release/pankha-agent-ipmi-linux target/release/pankha-agent-ipmi-linux_x64
           echo "✅ IPMI x64 agent built"
           ls -lh target/release/pankha-agent-ipmi-linux_x64
