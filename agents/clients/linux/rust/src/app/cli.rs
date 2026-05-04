@@ -29,7 +29,7 @@ Config & Debug:
 
 #[derive(Parser, Debug)]
 #[command(name = "pankha-agent")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(version = crate::version::VERSION)]
 #[command(about = "Pankha Cross-Platform Hardware Monitoring Agent", long_about = None)]
 #[command(after_help = "")]
 #[command(disable_help_flag = false)]

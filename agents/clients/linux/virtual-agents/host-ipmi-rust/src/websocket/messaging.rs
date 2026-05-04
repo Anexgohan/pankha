@@ -83,7 +83,7 @@ impl super::client::WebSocketClient {
                 "name": config.agent.name,
                 "agent_type": "ipmi_host",
                 "profile_id": self.hardware_monitor.profile_id(),
-                "agent_version": env!("CARGO_PKG_VERSION"),
+                "agent_version": crate::version::VERSION,
                 "platform": std::env::consts::OS, // "linux", "macos", "windows", etc.
                 "architecture": crate::app::platform::project_arch(),
                 "update_interval": config.agent.update_interval as u64, // Send in seconds to match frontend/backend format

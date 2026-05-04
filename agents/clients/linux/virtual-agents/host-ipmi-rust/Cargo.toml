@@ -1,6 +1,8 @@
 [package]
 name = "pankha-agent-ipmi"
-version = "1.0.0"
+# Version is set at build time via PANKHA_VERSION env var. See build.rs.
+# This static placeholder never changes; release pipeline embeds the real version.
+version = "0.0.0-dev"
 edition = "2021"
 authors = ["Pankha Development Team"]
 description = "IPMI host agent for Pankha - BMC fan control via ipmitool"

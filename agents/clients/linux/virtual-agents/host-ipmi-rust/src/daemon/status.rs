@@ -9,7 +9,7 @@ use crate::daemon::{LOG_DIR, SYSTEMD_SERVICE_PATH};
 use crate::config::persistence::load_config;
 
 pub async fn show_status() -> Result<()> {
-    println!("\x1b[32mpankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+    println!("\x1b[32mpankha-agent v{} ({})\x1b[0m", crate::version::VERSION, std::env::consts::ARCH);
     println!("================================");
 
     if is_running() {
@@ -47,7 +47,7 @@ pub async fn show_status() -> Result<()> {
 
 /// Run health check to verify agent installation
 pub fn run_health_check() -> Result<()> {
-    println!("\x1b[32mpankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+    println!("\x1b[32mpankha-agent v{} ({})\x1b[0m", crate::version::VERSION, std::env::consts::ARCH);
     println!("Health Check");
     println!("============\n");
 

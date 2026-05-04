@@ -29,7 +29,7 @@ pub fn start_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
         process::exit(1);
     }
 
-    println!("\x1b[32mStarting pankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+    println!("\x1b[32mStarting pankha-agent v{} ({})\x1b[0m", crate::version::VERSION, std::env::consts::ARCH);
 
     // Prepare log file
     ensure_directories()?;
@@ -123,7 +123,7 @@ pub fn stop_daemon() -> Result<()> {
 }
 
 pub fn restart_daemon_with_log_level(log_level: Option<String>) -> Result<()> {
-    println!("\x1b[32mRestarting pankha-agent v{} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+    println!("\x1b[32mRestarting pankha-agent v{} ({})\x1b[0m", crate::version::VERSION, std::env::consts::ARCH);
 
     // Check if systemd service is actively managing the process
     // If so, delegate to systemctl to prevent auto-restart conflicts

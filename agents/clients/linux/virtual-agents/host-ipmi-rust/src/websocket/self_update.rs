@@ -29,7 +29,7 @@ impl super::client::WebSocketClient {
     /// 5. Write .update_pending marker
     /// 6. Re-exec or systemctl restart
     pub(crate) async fn self_update(&self, target_version: Option<String>) -> Result<()> {
-        let current_version = env!("CARGO_PKG_VERSION");
+        let current_version = crate::version::VERSION;
 
         // Version check: skip if already on target version
         if let Some(ref target) = target_version {

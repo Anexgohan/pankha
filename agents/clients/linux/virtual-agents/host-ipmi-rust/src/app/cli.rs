@@ -32,7 +32,7 @@ IPMI:
 
 #[derive(Parser, Debug)]
 #[command(name = "pankha-agent")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(version = crate::version::VERSION)]
 #[command(about = "Pankha IPMI Host Agent - BMC fan control via ipmitool", long_about = None)]
 #[command(after_help = "")]
 #[command(disable_help_flag = false)]

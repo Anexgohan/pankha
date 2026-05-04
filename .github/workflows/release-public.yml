@@ -65,24 +65,30 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
-      - name: Inject version into Cargo.toml
-        working-directory: agents/clients/linux/rust
+      - name: Compute PANKHA_VERSION
         run: |
           VERSION="${{ github.event.inputs.version || github.ref_name }}"
           VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix
-          
+
           # Convert 4-part version to SemVer prerelease format: 0.1.7.1 → 0.1.7-1
           DOTS=$(echo "$VERSION_NUM" | grep -o '\.' | wc -l)
           if [ "$DOTS" -ge 3 ]; then
-            CARGO_VER=$(echo "$VERSION_NUM" | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\.\([0-9]*\)/\1-\2/')
-            echo "⚠️  Converting: $VERSION_NUM → $CARGO_VER (SemVer prerelease format)"
+            PANKHA_VERSION=$(echo "$VERSION_NUM" | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\.\([0-9]*\)/\1-\2/')
+            echo "⚠️  Converting: $VERSION_NUM → $PANKHA_VERSION (SemVer prerelease format)"
           else
-            CARGO_VER="$VERSION_NUM"
-            echo "📝 Using version: $CARGO_VER"
+            PANKHA_VERSION="$VERSION_NUM"
+            echo "📝 Using version: $PANKHA_VERSION"
           fi
-          
-          sed -i "s/^version = \".*\"/version = \"$CARGO_VER\"/" Cargo.toml
-          cat Cargo.toml | head -5
+
+          # Guard: refuse to build a release with empty or placeholder version
+          if [ -z "$PANKHA_VERSION" ] || [ "$PANKHA_VERSION" = "0.0.0-dev" ] || [ "$PANKHA_VERSION" = "dev" ]; then
+            echo "❌ ERROR: PANKHA_VERSION resolved to empty/placeholder: '$PANKHA_VERSION'"
+            echo "   Release builds require a real tag version."
+            exit 1
+          fi
+
+          echo "PANKHA_VERSION=$PANKHA_VERSION" >> $GITHUB_ENV
+          echo "✅ PANKHA_VERSION=$PANKHA_VERSION exported to subsequent steps"
 
       - name: Build Rust agent (${{ matrix.arch }})
         working-directory: agents/clients/linux/rust
@@ -136,8 +142,7 @@ jobs:
           workspaces: agents/clients/linux/virtual-agents/host-ipmi-rust
           shared-key: rust-cache-ipmi-x64
 
-      - name: Inject version into Cargo.toml
-        working-directory: agents/clients/linux/virtual-agents/host-ipmi-rust
+      - name: Compute PANKHA_VERSION
         run: |
           VERSION="${{ github.event.inputs.version || github.ref_name }}"
           VERSION_NUM="${VERSION#v}"  # Remove 'v' prefix
@@ -145,15 +150,22 @@ jobs:
           # Convert 4-part version to SemVer prerelease format: 0.1.7.1 → 0.1.7-1
           DOTS=$(echo "$VERSION_NUM" | grep -o '\.' | wc -l)
           if [ "$DOTS" -ge 3 ]; then
-            CARGO_VER=$(echo "$VERSION_NUM" | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\.\([0-9]*\)/\1-\2/')
-            echo "⚠️  Converting: $VERSION_NUM → $CARGO_VER (SemVer prerelease format)"
+            PANKHA_VERSION=$(echo "$VERSION_NUM" | sed 's/^\([0-9]*\.[0-9]*\.[0-9]*\)\.\([0-9]*\)/\1-\2/')
+            echo "⚠️  Converting: $VERSION_NUM → $PANKHA_VERSION (SemVer prerelease format)"
           else
-            CARGO_VER="$VERSION_NUM"
-            echo "📝 Using version: $CARGO_VER"
+            PANKHA_VERSION="$VERSION_NUM"
+            echo "📝 Using version: $PANKHA_VERSION"
           fi
 
-          sed -i "s/^version = \".*\"/version = \"$CARGO_VER\"/" Cargo.toml
-          cat Cargo.toml | head -5
+          # Guard: refuse to build a release with empty or placeholder version
+          if [ -z "$PANKHA_VERSION" ] || [ "$PANKHA_VERSION" = "0.0.0-dev" ] || [ "$PANKHA_VERSION" = "dev" ]; then
+            echo "❌ ERROR: PANKHA_VERSION resolved to empty/placeholder: '$PANKHA_VERSION'"
+            echo "   Release builds require a real tag version."
+            exit 1
+          fi
+
+          echo "PANKHA_VERSION=$PANKHA_VERSION" >> $GITHUB_ENV
+          echo "✅ PANKHA_VERSION=$PANKHA_VERSION exported to subsequent steps"
 
       - name: Build IPMI agent (x64)
         working-directory: agents/clients/linux/virtual-agents/host-ipmi-rust
