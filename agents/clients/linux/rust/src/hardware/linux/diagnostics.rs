@@ -56,7 +56,7 @@ impl super::monitor::LinuxHardwareMonitor {
     }
 
     async fn build_dump_metadata(&self) -> HardwareDumpMetadata {
-        let agent_version = env!("CARGO_PKG_VERSION").to_string();
+        let agent_version = crate::version::VERSION.to_string();
 
         // Get OS version from /etc/os-release or fallback
         let os_version = self.read_file(Path::new("/etc/os-release")).await

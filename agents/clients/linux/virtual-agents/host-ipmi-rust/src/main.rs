@@ -6,6 +6,7 @@ mod daemon;
 mod hardware;
 mod profiles;
 mod system;
+mod version;
 mod websocket;
 
 use anyhow::Result;
@@ -44,7 +45,7 @@ async fn main() -> Result<()> {
             }
             // Custom version output with architecture (green)
             if err.kind() == clap::error::ErrorKind::DisplayVersion {
-                println!("\x1b[32mpankha-agent {} ({})\x1b[0m", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+                println!("\x1b[32mpankha-agent {} ({})\x1b[0m", crate::version::VERSION, std::env::consts::ARCH);
                 std::process::exit(0);
             }
 
@@ -103,13 +104,13 @@ async fn main() -> Result<()> {
             Some(n) => {
                 // Show last N lines: tail -n <lines>
                 println!("Showing last {} log entries...", n);
-                println!("\x1b[32mpankha-agent v{} ({})\x1b[0m\n", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+                println!("\x1b[32mpankha-agent v{} ({})\x1b[0m\n", crate::version::VERSION, std::env::consts::ARCH);
                 cmd.arg("-n").arg(n.to_string());
             }
             None => {
                 // Follow logs: tail -f
                 println!("Showing live agent logs (Ctrl+C to exit)...");
-                println!("\x1b[32mpankha-agent v{} ({})\x1b[0m\n", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+                println!("\x1b[32mpankha-agent v{} ({})\x1b[0m\n", crate::version::VERSION, std::env::consts::ARCH);
                 cmd.arg("-f");
             }
         }
@@ -242,7 +243,7 @@ async fn main() -> Result<()> {
     }
 
     // Log startup message (only for normal operation, not setup/config commands)
-    info!("Pankha IPMI Agent v{} starting ({})", env!("CARGO_PKG_VERSION"), std::env::consts::OS);
+    info!("Pankha IPMI Agent v{} starting ({})", crate::version::VERSION, std::env::consts::OS);
 
     // Check if config file exists (required for normal operation)
     let config_file_path = std::env::current_exe()?

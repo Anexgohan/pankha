@@ -32,7 +32,7 @@ pub async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
     println!("\n╔══════════════════════════════════════════╗");
     println!("║    Pankha IPMI Host Agent Setup Wizard   ║");
     println!("╚══════════════════════════════════════════╝");
-    println!("Build: \x1b[32mpankha-agent v{} ({})\x1b[0m\n", env!("CARGO_PKG_VERSION"), std::env::consts::ARCH);
+    println!("Build: \x1b[32mpankha-agent v{} ({})\x1b[0m\n", crate::version::VERSION, std::env::consts::ARCH);
 
     // Load existing config if present
     let existing_config = if config_file.exists() {

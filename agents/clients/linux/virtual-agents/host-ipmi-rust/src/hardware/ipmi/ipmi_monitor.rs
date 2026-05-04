@@ -537,7 +537,7 @@ impl HardwareMonitor for IpmiHardwareMonitor {
         }
 
         let metadata = HardwareDumpMetadata {
-            agent_version: env!("CARGO_PKG_VERSION").to_string(),
+            agent_version: crate::version::VERSION.to_string(),
             os_version: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
             is_elevated: unsafe { libc::geteuid() == 0 },
             timestamp: chrono::Utc::now().to_rfc3339(),

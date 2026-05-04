@@ -7,6 +7,32 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    inject_version();
+    generate_sst_validation();
+}
+
+/// Resolves PANKHA_VERSION from env, falls back to "0.0.0-dev" placeholder.
+/// Warns on local release builds (not CI) to remind devs to set the var explicitly.
+fn inject_version() {
+    let version = match env::var("PANKHA_VERSION") {
+        Ok(v) => v,
+        Err(_) => {
+            if env::var("PROFILE").as_deref() == Ok("release")
+                && env::var("CI").is_err()
+            {
+                println!("cargo:warning=PANKHA_VERSION not set, using placeholder \"0.0.0-dev\"");
+                println!("cargo:warning=To set, use one of:");
+                println!("cargo:warning=  PANKHA_VERSION=0.4.24-alpha2 cargo build --release");
+                println!("cargo:warning=  make VERSION=0.4.24-alpha2 all");
+            }
+            "0.0.0-dev".to_string()
+        }
+    };
+    println!("cargo:rustc-env=PANKHA_VERSION={}", version);
+    println!("cargo:rerun-if-env-changed=PANKHA_VERSION");
+}
+
+fn generate_sst_validation() {
     println!("cargo:rerun-if-changed=../../../../../frontend/src/config/ui-options.json");
     println!("cargo:rerun-if-changed=build.rs");
 
