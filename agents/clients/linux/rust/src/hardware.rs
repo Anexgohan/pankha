@@ -7,17 +7,9 @@ pub mod types;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
-#[cfg(target_os = "windows")]
-pub mod windows;
-#[cfg(target_os = "macos")]
-pub mod macos;
 
 #[cfg(target_os = "linux")]
 pub use linux::monitor::LinuxHardwareMonitor;
-#[cfg(target_os = "windows")]
-pub use windows::WindowsHardwareMonitor;
-#[cfg(target_os = "macos")]
-pub use macos::MacOSHardwareMonitor;
 
 use types::{Sensor, Fan, SystemHealth, HardwareDumpRoot};
 

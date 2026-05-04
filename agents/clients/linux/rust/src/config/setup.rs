@@ -11,10 +11,6 @@ use crate::hardware::HardwareMonitor;
 
 #[cfg(target_os = "linux")]
 use crate::hardware::LinuxHardwareMonitor;
-#[cfg(target_os = "windows")]
-use crate::hardware::WindowsHardwareMonitor;
-#[cfg(target_os = "macos")]
-use crate::hardware::MacOSHardwareMonitor;
 
 #[cfg(target_os = "linux")]
 use crate::daemon::systemd::{has_systemd, install_systemd_service};
@@ -213,12 +209,6 @@ pub async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
 
         #[cfg(target_os = "linux")]
         let hardware_monitor = LinuxHardwareMonitor::new(config.hardware.clone());
-
-        #[cfg(target_os = "windows")]
-        let hardware_monitor = WindowsHardwareMonitor::new(config.hardware.clone());
-
-        #[cfg(target_os = "macos")]
-        let hardware_monitor = MacOSHardwareMonitor::new(config.hardware.clone());
 
         let sensors = hardware_monitor.discover_sensors().await?;
         let fans = hardware_monitor.discover_fans().await?;
