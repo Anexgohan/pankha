@@ -25,10 +25,6 @@ use websocket::client::WebSocketClient;
 
 #[cfg(target_os = "linux")]
 use hardware::LinuxHardwareMonitor;
-#[cfg(target_os = "windows")]
-use hardware::WindowsHardwareMonitor;
-#[cfg(target_os = "macos")]
-use hardware::MacOSHardwareMonitor;
 
 #[cfg(target_os = "linux")]
 use daemon::systemd::{install_systemd_service, uninstall_systemd_service};
@@ -283,12 +279,6 @@ async fn main() -> Result<()> {
     // Create platform-specific hardware monitor
     #[cfg(target_os = "linux")]
     let hardware_monitor: Arc<dyn HardwareMonitor> = Arc::new(LinuxHardwareMonitor::new(config.hardware.clone()));
-
-    #[cfg(target_os = "windows")]
-    let hardware_monitor: Arc<dyn HardwareMonitor> = Arc::new(WindowsHardwareMonitor::new(config.hardware.clone()));
-
-    #[cfg(target_os = "macos")]
-    let hardware_monitor: Arc<dyn HardwareMonitor> = Arc::new(MacOSHardwareMonitor::new(config.hardware.clone()));
 
     // Generate hardware-info.json diagnostic dump on startup (matches Windows agent behavior)
     #[cfg(target_os = "linux")]
