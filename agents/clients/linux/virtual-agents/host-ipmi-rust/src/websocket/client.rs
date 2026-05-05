@@ -386,7 +386,7 @@ impl WebSocketClient {
                         "type": "pong",
                         "timestamp": chrono::Utc::now().timestamp_millis()
                     });
-                    write.send(Message::Text(pong.to_string())).await?;
+                    write.send(Message::text(pong.to_string())).await?;
                 }
                 "registered" => {
                     info!("Agent successfully registered with backend");

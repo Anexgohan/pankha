@@ -270,7 +270,7 @@ impl super::client::WebSocketClient {
                 }
             }
 
-            write.send(Message::Text(response.to_string())).await?;
+            write.send(Message::text(response.to_string())).await?;
             debug!("Sent command response: {}, success: {}", command_id, success);
         }
 

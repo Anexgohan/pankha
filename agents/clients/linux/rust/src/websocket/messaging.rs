@@ -28,7 +28,7 @@ async fn report_error_if_new(
         "type": "error",
         "data": { "message": error_msg }
     });
-    write.send(Message::Text(payload.to_string())).await?;
+    write.send(Message::text(payload.to_string())).await?;
     *last = Some(error_msg.to_string());
     Ok(())
 }
@@ -67,7 +67,7 @@ impl super::client::WebSocketClient {
             }
         });
 
-        write.send(Message::Text(registration.to_string())).await?;
+        write.send(Message::text(registration.to_string())).await?;
         info!("✅ Agent registered: {}", config.agent.id);
         Ok(())
     }
@@ -133,7 +133,7 @@ impl super::client::WebSocketClient {
         });
 
         trace!("Sending WebSocket message (timestamp: {})", timestamp);
-        write.send(Message::Text(data.to_string())).await?;
+        write.send(Message::text(data.to_string())).await?;
 
         // Success - clear dedup so the next failure (if any) is reported fresh.
         clear_reported_error(last_reported_error).await;
