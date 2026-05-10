@@ -197,12 +197,19 @@ export class LicenseValidator {
       const isGracePeriod = !isLifetime && !!payload.exp && payload.exp < now && (payload.exp + GRACE_PERIOD_SECONDS) >= now;
 
       if (isHardExpired) {
+        // Signature already verified above, so payload fields are trustworthy.
+        // Return identifying fields so LicenseManager can still call /status
+        // for renewal recovery even after the local token is past grace.
         return {
           valid: false,
           tier: 'free',
+          billing: payload.billing,
+          licenseId: payload.lid || payload.sub,
           expiresAt: new Date(payload.exp * 1000),
           isGracePeriod: false,
           activatedAt: payload.iat ? new Date(payload.iat * 1000) : null,
+          customerName: payload.name,
+          customerEmail: payload.email,
           error: 'License expired',
         };
       }

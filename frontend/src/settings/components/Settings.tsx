@@ -25,7 +25,9 @@ import {
   ClipboardPaste,
   RotateCcw,
   Square,
-  CheckSquare
+  CheckSquare,
+  Copy,
+  Check
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -48,12 +50,34 @@ interface TierPricing {
   apiAccess: string;
   showBranding: boolean;
   pricing: { monthly: number; yearly: number; lifetime: number };
+  benefits: string[];
 }
 
 interface PricingData {
   free: TierPricing;
   pro: TierPricing;
   enterprise: TierPricing;
+}
+
+// Advertised discount data — populated from /api/license/promo (Worker → Dodo)
+interface PromoOffer {
+  code: string;
+  name: string;
+  amountPct: number;
+  expiresAt: string | null;
+  remaining: number | null;
+  totalLimit: number | null;
+  cycles: number | null;
+  appliesTo: Array<{
+    tier: 'pro' | 'enterprise';
+    billing: 'monthly' | 'yearly' | 'lifetime';
+    productId: string;
+  }>;
+}
+
+interface PromoResponse {
+  offers: PromoOffer[];
+  fetchedAt: string | null;
 }
 
 // Dodo Payments configuration - Toggle IS_LIVE to switch modes
@@ -101,6 +125,17 @@ const CHECKOUT_URLS = {
     lifetime: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.lifetime}`,
   },
 } as const;
+
+// productId → static checkout URL lookup. Used by handleCheckout to resolve
+// the fallback URL when a Sessions API call fails or no discount is present.
+const PRODUCT_TO_STATIC_URL: Record<string, string> = {
+  [PRODUCT_IDS.pro.monthly]: CHECKOUT_URLS.pro.monthly,
+  [PRODUCT_IDS.pro.yearly]: CHECKOUT_URLS.pro.yearly,
+  [PRODUCT_IDS.pro.lifetime]: CHECKOUT_URLS.pro.lifetime,
+  [PRODUCT_IDS.enterprise.monthly]: CHECKOUT_URLS.enterprise.monthly,
+  [PRODUCT_IDS.enterprise.yearly]: CHECKOUT_URLS.enterprise.yearly,
+  [PRODUCT_IDS.enterprise.lifetime]: CHECKOUT_URLS.enterprise.lifetime,
+};
 
 // Diagnostics Tab Component
 interface SystemInfo {
@@ -720,6 +755,8 @@ const Settings: React.FC = () => {
   
   // Dynamic pricing from API
   const [pricing, setPricing] = useState<PricingData | null>(null);
+  const [promo, setPromo] = useState<PromoResponse | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   // General Settings from Context
   const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel } = useDashboardSettings();
@@ -808,8 +845,100 @@ const Settings: React.FC = () => {
         console.error('Failed to fetch pricing:', error);
       }
     };
+    const fetchPromo = async () => {
+      try {
+        const r = await fetch('/api/license/promo');
+        if (r.ok) {
+          setPromo(await r.json());
+        }
+      } catch {
+        // graceful no-op: empty banner on failure
+      }
+    };
     fetchPricing();
+    fetchPromo();
   }, []);
+
+  // Find the highest-amount discount applicable to a (tier, billing) card.
+  // Returns null if no discount applies. Used for per-card strikethrough +
+  // discount-aware checkout button.
+  const discountForCard = (
+    promoData: PromoResponse | null,
+    tier: 'pro' | 'enterprise',
+    billing: 'monthly' | 'yearly' | 'lifetime'
+  ): PromoOffer | null => {
+    if (!promoData || !promoData.offers.length) return null;
+    const matches = promoData.offers.filter((o) =>
+      o.appliesTo.some((a) => a.tier === tier && a.billing === billing)
+    );
+    if (!matches.length) return null;
+    return matches.reduce((best, cur) => (cur.amountPct > best.amountPct ? cur : best));
+  };
+
+  const productIdForCard = (
+    tier: 'pro' | 'enterprise',
+    billing: 'monthly' | 'yearly' | 'lifetime'
+  ): string | undefined => {
+    const offer = discountForCard(promo, tier, billing);
+    if (!offer) return undefined;
+    const match = offer.appliesTo.find((a) => a.tier === tier && a.billing === billing);
+    return match?.productId;
+  };
+
+  // Copy a discount code to the clipboard, briefly flip the icon to a check.
+  const copyDiscountCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 2000);
+    } catch {
+      // clipboard API unavailable — silently no-op; the code is still visible
+    }
+  };
+
+  // Click handler for "Get Pro/Enterprise" buttons. With a discount code,
+  // calls backend /checkout to get a Dodo Sessions URL with discount
+  // pre-applied. Without a discount, opens the static Dodo URL directly.
+  // Any backend/network failure on the discounted path falls back to the
+  // static URL so the customer can always complete a purchase.
+  const handleCheckout = async (productId: string, discountCode?: string) => {
+    const fallbackUrl = PRODUCT_TO_STATIC_URL[productId];
+    if (!discountCode) {
+      if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    try {
+      const r = await fetch('/api/license/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, discountCode }),
+      });
+      const data = await r.json();
+      if (data.ok && data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      console.warn('[checkout] backend returned error, falling back to static URL', data);
+    } catch (e) {
+      console.warn('[checkout] request failed, falling back to static URL', e);
+    }
+    if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  // Build per-card "Save X% for Y months" caption. Uses the active billing
+  // toggle so phrasing is natural ("for 7 months" on monthly, "for 7 years"
+  // on yearly), falling back to "for X cycles" when ambiguous.
+  const buildSavingsLine = (offer: PromoOffer, billing: 'monthly' | 'yearly' | 'lifetime'): string => {
+    const head = `Save ${offer.amountPct}%`;
+    if (offer.cycles == null) return head;
+    if (billing === 'monthly') {
+      return `${head} for ${offer.cycles} ${offer.cycles === 1 ? 'month' : 'months'}`;
+    }
+    if (billing === 'yearly') {
+      return `${head} for ${offer.cycles} ${offer.cycles === 1 ? 'year' : 'years'}`;
+    }
+    return `${head} for ${offer.cycles} ${offer.cycles === 1 ? 'cycle' : 'cycles'}`;
+  };
 
   const handleCustomScaleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -875,6 +1004,7 @@ const Settings: React.FC = () => {
    */
   const handleSyncLicense = async () => {
     setIsSyncing(true);
+    const wasExpired = license?.tier === 'Free' && !!license?.licenseId;
     try {
       const response = await fetch('/api/license/sync', {
         method: 'POST',
@@ -883,13 +1013,34 @@ const Settings: React.FC = () => {
       const result = await response.json();
 
       if (result.success) {
-        setLicenseStatus({ success: true, message: result.changed ? 'License updated!' : 'License is up to date' });
+        let message: string;
+        if (result.upgraded) {
+          message = 'License renewed! Your subscription is active again.';
+        } else if (result.changed) {
+          message = 'License updated — new expiry applied.';
+        } else if (wasExpired) {
+          message = 'No renewal available yet. If you paid recently, give it a minute and try again, or check your email for the renewal token.';
+        } else {
+          message = 'License is up to date.';
+        }
+        setLicenseStatus({ success: true, message });
         await refreshLicense();
       } else {
-        setLicenseStatus({ success: false, message: result.error || 'Sync failed' });
+        const err = result.error || '';
+        let message: string;
+        if (err === 'Timeout') {
+          message = 'License server did not respond in time. Check your internet connection and try again.';
+        } else if (err === 'License not found') {
+          message = 'This license isn\'t recognized by our server. Please contact support@pankha.app and include your license ID.';
+        } else if (err === 'License server error') {
+          message = 'License server returned an error. Please try again in a few minutes.';
+        } else {
+          message = err || 'Sync failed.';
+        }
+        setLicenseStatus({ success: false, message });
       }
     } catch {
-      setLicenseStatus({ success: false, message: 'Could not reach license server' });
+      setLicenseStatus({ success: false, message: 'Could not reach license server. Check your internet connection.' });
     } finally {
       setIsSyncing(false);
     }
@@ -1507,8 +1658,63 @@ const Settings: React.FC = () => {
             ) : license ? (
               <>
                 {/* Available Plans - First */}
+                {/* Tier benefits, agent limits, retention, and prices below all flow from
+                    backend/src/license/tiers.ts via /api/license/pricing. The `|| N` price
+                    fallbacks only render during the brief loading window before the API
+                    responds — keep them in sync with tiers.ts pricing if you change it. */}
                 <div className="pricing-section">
                   <h3>Available Plans</h3>
+
+                  {promo && promo.offers.length > 0 && (
+                    <div className="promo-offers" role="region" aria-label="Available discount offers">
+                      {promo.offers.map((offer) => {
+                        const hasLimit = offer.expiresAt != null || offer.totalLimit != null;
+                        const productSummary = offer.appliesTo
+                          .map((a) => `${a.tier === 'pro' ? 'Pro' : 'Enterprise'} ${a.billing.charAt(0).toUpperCase() + a.billing.slice(1)}`)
+                          .join(' & ');
+                        const meta: string[] = [];
+                        if (offer.remaining != null) {
+                          meta.push(`${offer.remaining} ${offer.remaining === 1 ? 'spot' : 'spots'} left`);
+                        }
+                        if (offer.cycles != null) {
+                          meta.push(`for ${offer.cycles} ${offer.cycles === 1 ? 'cycle' : 'cycles'}`);
+                        }
+                        if (offer.expiresAt) {
+                          const dt = new Date(offer.expiresAt);
+                          meta.push(`ends ${dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`);
+                        }
+                        return (
+                          <div key={offer.code} className="promo-offer">
+                            <Tag size={16} className="promo-offer-icon" aria-hidden="true" />
+                            <div className="promo-offer-body">
+                              <div className="promo-offer-headline">
+                                <span className="promo-offer-label">{hasLimit ? 'LIMITED OFFER' : 'OFFER'}</span>
+                                <span className="promo-offer-headline-text">{offer.amountPct}% off {productSummary || 'select plans'}</span>
+                              </div>
+                              {meta.length > 0 && (
+                                <div className="promo-offer-meta">{meta.join(' · ')}</div>
+                              )}
+                              <div className="promo-offer-cta">
+                                <span className="promo-offer-code-line">
+                                  Use code <code className="promo-offer-code">{offer.code}</code> at checkout
+                                </span>
+                                <button
+                                  type="button"
+                                  className="promo-copy-btn"
+                                  onClick={() => copyDiscountCode(offer.code)}
+                                  aria-label={`Copy code ${offer.code}`}
+                                >
+                                  {copiedCode === offer.code ? <Check size={14} /> : <Copy size={14} />}
+                                  <span>{copiedCode === offer.code ? 'Copied' : 'Copy'}</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   <div className="pricing-cards">
                     {/* Free Plan */}
                     <div className={`pricing-card ${license.tier === 'Free' ? 'current' : ''}`}>
@@ -1518,194 +1724,253 @@ const Settings: React.FC = () => {
                         <div className="pricing-period">forever</div>
                       </div>
                       <ul className="pricing-features">
-                        <li>{pricing?.free.agents || 3} Agents</li>
-                        <li>{pricing?.free.retentionDays || 7} Days History</li>
-                        <li>Critical Temp & Fan Fail Alerts</li>
-                        <li>Dashboard & Email Notifications</li>
+                        {pricing?.free.benefits?.map((b, i) => <li key={i}>{b}</li>)}
                       </ul>
                       {license.tier === 'Free' && <div className="current-plan-badge">Current Plan</div>}
                     </div>
 
                     {/* Pro Plan */}
-                    <div className="pricing-card featured">
-                      <div className="pricing-header">
-                        <h4>Pro</h4>
-                        <div className="pricing-toggle">
-                          <button 
-                            className={`toggle-btn ${proBilling === 'monthly' ? 'active' : ''}`}
-                            onClick={() => setProBilling('monthly')}
-                          >
-                            Monthly
-                          </button>
-                          <button 
-                            className={`toggle-btn ${proBilling === 'yearly' ? 'active' : ''}`}
-                            onClick={() => setProBilling('yearly')}
-                          >
-                            Yearly
-                          </button>
+                    {(() => {
+                      const proDiscount = discountForCard(promo, 'pro', proBilling);
+                      const proPriceRaw = proBilling === 'monthly'
+                        ? (pricing?.pro.pricing.monthly || 5)
+                        : (pricing?.pro.pricing.yearly || 49);
+                      const proPriceShown = proDiscount
+                        ? Math.round(proPriceRaw * (1 - proDiscount.amountPct / 100) * 100) / 100
+                        : proPriceRaw;
+                      const proProductId = productIdForCard('pro', proBilling);
+                      const proStaticUrl = CHECKOUT_URLS.pro[proBilling];
+                      const proPeriodSuffix = proBilling === 'monthly' ? 'mo' : 'yr';
+                      return (
+                        <div className="pricing-card featured">
+                          <div className="pricing-header">
+                            <h4>Pro</h4>
+                            <div className="pricing-toggle">
+                              <button
+                                className={`toggle-btn ${proBilling === 'monthly' ? 'active' : ''}`}
+                                onClick={() => setProBilling('monthly')}
+                              >
+                                Monthly
+                              </button>
+                              <button
+                                className={`toggle-btn ${proBilling === 'yearly' ? 'active' : ''}`}
+                                onClick={() => setProBilling('yearly')}
+                              >
+                                Yearly
+                              </button>
+                            </div>
+                            <div className="pricing-price">
+                              {proDiscount ? (
+                                <>
+                                  <span className="pricing-price-strike">${proPriceRaw}</span>
+                                  <span className="pricing-price-discounted">${proPriceShown}</span>
+                                </>
+                              ) : (
+                                <>${proPriceRaw}</>
+                              )}
+                            </div>
+                            <div className="pricing-period">
+                              {proBilling === 'monthly' ? 'per month' : 'per year'}
+                              {proBilling === 'yearly' && !proDiscount && <span className="savings"> (save 18%)</span>}
+                            </div>
+                            {proDiscount && (
+                              <div className="pricing-savings-line">{buildSavingsLine(proDiscount, proBilling)}</div>
+                            )}
+                          </div>
+                          <ul className="pricing-features">
+                            {pricing?.pro.benefits?.map((b, i) => <li key={i}>{b}</li>)}
+                          </ul>
+                          {license.tier === 'Pro' && license.billing === proBilling ? (
+                            <div className="current-plan-badge">Current Plan</div>
+                          ) : proDiscount && proProductId ? (
+                            <button
+                              type="button"
+                              className={`pricing-buy-btn ${license.tier === 'Pro' ? 'current-tier-btn' : ''}`}
+                              onClick={() => handleCheckout(proProductId, proDiscount.code)}
+                            >
+                              {license.tier === 'Pro' ? 'Switch to' : 'Get'} Pro {proBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${proPriceShown}/{proPeriodSuffix})
+                            </button>
+                          ) : license.tier === 'Pro' ? (
+                            <a
+                              href={proStaticUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="pricing-buy-btn current-tier-btn"
+                            >
+                              Switch to {proBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${proPriceRaw}/{proPeriodSuffix})
+                            </a>
+                          ) : (
+                            <a
+                              href={proStaticUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="pricing-buy-btn"
+                            >
+                              Get Pro (${proPriceRaw}/{proPeriodSuffix})
+                            </a>
+                          )}
                         </div>
-                        <div className="pricing-price">
-                          ${proBilling === 'monthly' 
-                            ? pricing?.pro.pricing.monthly || 5 
-                            : pricing?.pro.pricing.yearly || 49}
-                        </div>
-                        <div className="pricing-period">
-                          {proBilling === 'monthly' ? 'per month' : 'per year'}
-                          {proBilling === 'yearly' && <span className="savings"> (save 18%)</span>}
-                        </div>
-                      </div>
-                      <ul className="pricing-features">
-                        <li>{pricing?.pro.agents || 10} Agents</li>
-                        <li>{pricing?.pro.retentionDays || 30} Days History</li>
-                        <li>Unlimited Alerts</li>
-                        <li>All Notification Channels</li>
-                        <li>Full API Access</li>
-                      </ul>
-                      {license.tier === 'Pro' && license.billing === proBilling ? (
-                        <div className="current-plan-badge">Current Plan</div>
-                      ) : license.tier === 'Pro' ? (
-                        <a 
-                          href={CHECKOUT_URLS.pro[proBilling]} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="pricing-buy-btn current-tier-btn"
-                        >
-                          Switch to {proBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${proBilling === 'monthly' 
-                            ? `${pricing?.pro.pricing.monthly || 5}/mo` 
-                            : `${pricing?.pro.pricing.yearly || 49}/yr`})
-                        </a>
-                      ) : (
-                        <a 
-                          href={CHECKOUT_URLS.pro[proBilling]} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="pricing-buy-btn"
-                        >
-                          Get Pro (${proBilling === 'monthly' 
-                            ? `${pricing?.pro.pricing.monthly || 5}/mo` 
-                            : `${pricing?.pro.pricing.yearly || 49}/yr`})
-                        </a>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                     {/* Enterprise Plan */}
-                    <div className="pricing-card">
-                      <div className="pricing-header">
-                        <h4>Enterprise</h4>
-                        <div className="pricing-toggle">
-                          <button 
-                            className={`toggle-btn ${enterpriseBilling === 'monthly' ? 'active' : ''}`}
-                            onClick={() => setEnterpriseBilling('monthly')}
-                          >
-                            Monthly
-                          </button>
-                          <button 
-                            className={`toggle-btn ${enterpriseBilling === 'yearly' ? 'active' : ''}`}
-                            onClick={() => setEnterpriseBilling('yearly')}
-                          >
-                            Yearly
-                          </button>
+                    {(() => {
+                      const entDiscount = discountForCard(promo, 'enterprise', enterpriseBilling);
+                      const entPriceRaw = enterpriseBilling === 'monthly'
+                        ? (pricing?.enterprise.pricing.monthly || 25)
+                        : (pricing?.enterprise.pricing.yearly || 249);
+                      const entPriceShown = entDiscount
+                        ? Math.round(entPriceRaw * (1 - entDiscount.amountPct / 100) * 100) / 100
+                        : entPriceRaw;
+                      const entProductId = productIdForCard('enterprise', enterpriseBilling);
+                      const entStaticUrl = CHECKOUT_URLS.enterprise[enterpriseBilling];
+                      const entPeriodSuffix = enterpriseBilling === 'monthly' ? 'mo' : 'yr';
+                      return (
+                        <div className="pricing-card">
+                          <div className="pricing-header">
+                            <h4>Enterprise</h4>
+                            <div className="pricing-toggle">
+                              <button
+                                className={`toggle-btn ${enterpriseBilling === 'monthly' ? 'active' : ''}`}
+                                onClick={() => setEnterpriseBilling('monthly')}
+                              >
+                                Monthly
+                              </button>
+                              <button
+                                className={`toggle-btn ${enterpriseBilling === 'yearly' ? 'active' : ''}`}
+                                onClick={() => setEnterpriseBilling('yearly')}
+                              >
+                                Yearly
+                              </button>
+                            </div>
+                            <div className="pricing-price">
+                              {entDiscount ? (
+                                <>
+                                  <span className="pricing-price-strike">${entPriceRaw}</span>
+                                  <span className="pricing-price-discounted">${entPriceShown}</span>
+                                </>
+                              ) : (
+                                <>${entPriceRaw}</>
+                              )}
+                            </div>
+                            <div className="pricing-period">
+                              {enterpriseBilling === 'monthly' ? 'per month' : 'per year'}
+                              {enterpriseBilling === 'yearly' && !entDiscount && <span className="savings"> (save 17%)</span>}
+                            </div>
+                            {entDiscount && (
+                              <div className="pricing-savings-line">{buildSavingsLine(entDiscount, enterpriseBilling)}</div>
+                            )}
+                          </div>
+                          <ul className="pricing-features">
+                            {pricing?.enterprise.benefits?.map((b, i) => <li key={i}>{b}</li>)}
+                          </ul>
+                          {license.tier === 'Enterprise' && license.billing === enterpriseBilling ? (
+                            <div className="current-plan-badge">Current Plan</div>
+                          ) : entDiscount && entProductId ? (
+                            <button
+                              type="button"
+                              className={`pricing-buy-btn ${license.tier === 'Enterprise' ? 'current-tier-btn' : ''}`}
+                              onClick={() => handleCheckout(entProductId, entDiscount.code)}
+                            >
+                              {license.tier === 'Enterprise' ? 'Switch to' : 'Get'} Enterprise {enterpriseBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${entPriceShown}/{entPeriodSuffix})
+                            </button>
+                          ) : license.tier === 'Enterprise' ? (
+                            <a
+                              href={entStaticUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="pricing-buy-btn current-tier-btn"
+                            >
+                              Switch to {enterpriseBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${entPriceRaw}/{entPeriodSuffix})
+                            </a>
+                          ) : (
+                            <a
+                              href={entStaticUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="pricing-buy-btn"
+                            >
+                              Get Enterprise (${entPriceRaw}/{entPeriodSuffix})
+                            </a>
+                          )}
                         </div>
-                        <div className="pricing-price">
-                          ${enterpriseBilling === 'monthly' 
-                            ? pricing?.enterprise.pricing.monthly || 35 
-                            : pricing?.enterprise.pricing.yearly || 249}
-                        </div>
-                        <div className="pricing-period">
-                          {enterpriseBilling === 'monthly' ? 'per month' : 'per year'}
-                          {enterpriseBilling === 'yearly' && <span className="savings"> (save 17%)</span>}
-                        </div>
-                      </div>
-                      <ul className="pricing-features">
-                        <li>Unlimited Agents</li>
-                        <li>{pricing?.enterprise.retentionDays || 365} Days History</li>
-                        <li>Unlimited Alerts</li>
-                        <li>All Notification Channels</li>
-                        <li>Full API Access</li>
-                        <li>No Branding</li>
-                      </ul>
-                      {license.tier === 'Enterprise' && license.billing === enterpriseBilling ? (
-                        <div className="current-plan-badge">Current Plan</div>
-                      ) : license.tier === 'Enterprise' ? (
-                        <a 
-                          href={CHECKOUT_URLS.enterprise[enterpriseBilling]} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="pricing-buy-btn current-tier-btn"
-                        >
-                          Switch to {enterpriseBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${enterpriseBilling === 'monthly' 
-                            ? `${pricing?.enterprise.pricing.monthly || 35}/mo` 
-                            : `${pricing?.enterprise.pricing.yearly || 249}/yr`})
-                        </a>
-                      ) : (
-                        <a 
-                          href={CHECKOUT_URLS.enterprise[enterpriseBilling]} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="pricing-buy-btn"
-                        >
-                          Get Enterprise (${enterpriseBilling === 'monthly' 
-                            ? `${pricing?.enterprise.pricing.monthly || 35}/mo` 
-                            : `${pricing?.enterprise.pricing.yearly || 249}/yr`})
-                        </a>
-                      )}
-                    </div>
+                      );
+                    })()}
 
                     {/* Lifetime Plan */}
-                    <div className="pricing-card lifetime">
-                      <div className="pricing-badge best-value">BEST VALUE</div>
-                      <div className="pricing-header">
-                        <h4>Lifetime</h4>
-                        <div className="pricing-toggle">
-                          <button 
-                            className={`toggle-btn ${lifetimeTier === 'pro' ? 'active' : ''}`}
-                            onClick={() => setLifetimeTier('pro')}
-                          >
-                            Pro
-                          </button>
-                          <button 
-                            className={`toggle-btn ${lifetimeTier === 'enterprise' ? 'active' : ''}`}
-                            onClick={() => setLifetimeTier('enterprise')}
-                          >
-                            Enterprise
-                          </button>
+                    {(() => {
+                      const lifeDiscount = discountForCard(promo, lifetimeTier, 'lifetime');
+                      const lifePriceRaw = lifetimeTier === 'pro'
+                        ? (pricing?.pro.pricing.lifetime || 199)
+                        : (pricing?.enterprise.pricing.lifetime || 649);
+                      const lifePriceShown = lifeDiscount
+                        ? Math.round(lifePriceRaw * (1 - lifeDiscount.amountPct / 100) * 100) / 100
+                        : lifePriceRaw;
+                      const lifeProductId = productIdForCard(lifetimeTier, 'lifetime');
+                      const lifeStaticUrl = CHECKOUT_URLS[lifetimeTier].lifetime;
+                      const lifeTierLabel = lifetimeTier === 'pro' ? 'Pro' : 'Enterprise';
+                      return (
+                        <div className="pricing-card lifetime">
+                          <div className="pricing-badge best-value">BEST VALUE</div>
+                          <div className="pricing-header">
+                            <h4>Lifetime</h4>
+                            <div className="pricing-toggle">
+                              <button
+                                className={`toggle-btn ${lifetimeTier === 'pro' ? 'active' : ''}`}
+                                onClick={() => setLifetimeTier('pro')}
+                              >
+                                Pro
+                              </button>
+                              <button
+                                className={`toggle-btn ${lifetimeTier === 'enterprise' ? 'active' : ''}`}
+                                onClick={() => setLifetimeTier('enterprise')}
+                              >
+                                Enterprise
+                              </button>
+                            </div>
+                            <div className="pricing-price">
+                              {lifeDiscount ? (
+                                <>
+                                  <span className="pricing-price-strike">${lifePriceRaw}</span>
+                                  <span className="pricing-price-discounted">${lifePriceShown}</span>
+                                </>
+                              ) : (
+                                <>${lifePriceRaw}</>
+                              )}
+                            </div>
+                            <div className="pricing-period">one-time payment</div>
+                            {lifeDiscount && (
+                              <div className="pricing-savings-line">{buildSavingsLine(lifeDiscount, 'lifetime')}</div>
+                            )}
+                          </div>
+                          <ul className="pricing-features">
+                            <li>Pay once, own forever</li>
+                            {(lifetimeTier === 'pro' ? pricing?.pro.benefits : pricing?.enterprise.benefits)
+                              ?.map((b, i) => <li key={i}>{b}</li>)}
+                          </ul>
+                          {license.tier === lifeTierLabel && license.billing === 'lifetime' ? (
+                            <div className="current-plan-badge">Current Plan</div>
+                          ) : lifeDiscount && lifeProductId ? (
+                            <button
+                              type="button"
+                              className="pricing-buy-btn lifetime-btn"
+                              onClick={() => handleCheckout(lifeProductId, lifeDiscount.code)}
+                            >
+                              Get {lifeTierLabel} Lifetime (${lifePriceShown})
+                            </button>
+                          ) : (
+                            <a
+                              href={lifeStaticUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="pricing-buy-btn lifetime-btn"
+                            >
+                              Get {lifeTierLabel} Lifetime (${lifePriceRaw})
+                            </a>
+                          )}
                         </div>
-                        <div className="pricing-price">
-                          ${lifetimeTier === 'pro' 
-                            ? pricing?.pro.pricing.lifetime || 149 
-                            : pricing?.enterprise.pricing.lifetime || 499}
-                        </div>
-                        <div className="pricing-period">one-time payment</div>
-                      </div>
-                      <ul className="pricing-features">
-                        <li>Pay once, own forever</li>
-                        <li>{lifetimeTier === 'pro' 
-                          ? (pricing?.pro.agents || 10)
-                          : (pricing?.enterprise.agents === -1 ? 'Unlimited' : pricing?.enterprise.agents || 'Unlimited')} Agents</li>
-                        <li>{lifetimeTier === 'pro' 
-                          ? (pricing?.pro.retentionDays || 30)
-                          : (pricing?.enterprise.retentionDays || 365)} Days History</li>
-                        <li>Unlimited Alerts</li>
-                        <li>All Notification Channels</li>
-                        <li>Full API Access</li>
-                        {lifetimeTier === 'enterprise' && <li>No Branding</li>}
-                      </ul>
-                      {license.tier === (lifetimeTier === 'pro' ? 'Pro' : 'Enterprise') && license.billing === 'lifetime' ? (
-                        <div className="current-plan-badge">Current Plan</div>
-                      ) : (
-                        <a 
-                          href={CHECKOUT_URLS[lifetimeTier].lifetime} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="pricing-buy-btn lifetime-btn"
-                        >
-                          Get {lifetimeTier === 'pro' ? 'Pro' : 'Enterprise'} Lifetime ($
-                          {lifetimeTier === 'pro' 
-                            ? pricing?.pro.pricing.lifetime || 149 
-                            : pricing?.enterprise.pricing.lifetime || 499})
-                        </a>
-                      )}
-                    </div>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -1806,38 +2071,45 @@ const Settings: React.FC = () => {
                     >
                       {isSubmitting ? 'Validating...' : 'Activate'}
                     </button>
-                    {license.tier !== 'Free' && (
+                    {(license.tier !== 'Free' || license.licenseId) && (
                       <div className="license-action-row">
-                        <button
-                          type="button"
-                          className="remove-license-btn"
-                          onClick={handleRemoveLicense}
-                          disabled={isSubmitting}
-                        >
-                          Remove
-                        </button>
-                        <button
-                          type="button"
-                          className="refresh-button"
-                          onClick={handleSyncLicense}
-                          disabled={isSyncing}
-                          title="Check for license updates"
-                        >
-                          <svg
-                            viewBox="0 0 24 24"
-                            width="18"
-                            height="18"
-                            style={{
-                              animation: isSyncing ? 'spin 1s linear infinite' : 'none',
-                              display: 'block'
-                            }}
+                        {license.tier !== 'Free' && (
+                          <button
+                            type="button"
+                            className="remove-license-btn"
+                            onClick={handleRemoveLicense}
+                            disabled={isSubmitting}
                           >
-                            <path
-                              fill="currentColor"
-                              d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
-                            />
-                          </svg>
-                        </button>
+                            Remove
+                          </button>
+                        )}
+                        {license.licenseId && (
+                          <button
+                            type="button"
+                            className="refresh-button"
+                            onClick={handleSyncLicense}
+                            disabled={isSyncing}
+                            title={license.tier === 'Free'
+                              ? 'Check the license server for a renewed token'
+                              : 'Check for license updates'}
+                          >
+                            <svg
+                              viewBox="0 0 24 24"
+                              width="18"
+                              height="18"
+                              style={{
+                                animation: isSyncing ? 'spin 1s linear infinite' : 'none',
+                                display: 'block'
+                              }}
+                            >
+                              <path
+                                fill="currentColor"
+                                d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                              />
+                            </svg>
+                            <span>{license.tier === 'Free' ? 'Renew' : 'Sync'}</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

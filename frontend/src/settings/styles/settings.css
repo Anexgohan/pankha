@@ -151,6 +151,145 @@
   font-size: var(--font-size-lg);
 }
 
+/* Available offers banner — public discount advertising on the Subscription tab.
+   Visually distinct from .discount-banner (green/applied to your sub) by using
+   the caution palette (amber). One container; one .promo-offer per advertised
+   discount. Both light and dark themes are covered by --temp-caution-* tokens. */
+.promo-offers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--temp-caution-bg);
+  border: 1px solid var(--temp-caution-border);
+  border-radius: var(--radius-lg);
+}
+
+.promo-offer {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.promo-offer + .promo-offer {
+  padding-top: var(--spacing-md);
+  border-top: 1px dashed var(--border-color);
+}
+
+.promo-offer-icon {
+  color: var(--temp-caution-text);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.promo-offer-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.promo-offer-headline {
+  display: flex;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.promo-offer-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--temp-caution-text);
+  background: var(--bg-secondary);
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.promo-offer-headline-text {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.promo-offer-meta {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.promo-offer-cta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-xs);
+}
+
+.promo-offer-code-line {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.promo-offer-code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  padding: 1px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.promo-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.promo-copy-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--temp-caution-border);
+}
+
+.promo-copy-btn:focus-visible {
+  outline: 2px solid var(--temp-caution-border);
+  outline-offset: 2px;
+}
+
+/* Per-card price strikethrough + discounted price emphasis (driven by the
+   same advertised-discounts data — only shown when restricted_to matches). */
+.pricing-price-strike {
+  text-decoration: line-through;
+  opacity: 0.45;
+  margin-right: var(--spacing-sm);
+  font-size: 0.7em;
+  vertical-align: baseline;
+}
+
+.pricing-price-discounted {
+  color: var(--temp-caution-text);
+}
+
+.pricing-savings-line {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  color: var(--temp-caution-text);
+}
+
 /* Discount banner - shows when promo code is active */
 .discount-banner {
   display: flex;
@@ -756,15 +895,43 @@
 .license-action-row {
   display: flex;
   gap: var(--spacing-md);
+  align-items: stretch;
 }
 
-.license-action-row .remove-license-btn {
+.license-action-row .remove-license-btn,
+.license-action-row .refresh-button {
   flex: 1;
 }
 
+/* Sync / Renew button — outlined secondary, pairs with Remove */
 .license-action-row .refresh-button {
-  padding: var(--spacing-md);
-  min-width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-xl);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.license-action-row .refresh-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-color: var(--color-info);
+  color: var(--text-primary);
+}
+
+.license-action-row .refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.license-action-row .refresh-button svg {
   flex-shrink: 0;
 }
 

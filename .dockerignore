@@ -58,3 +58,13 @@ samples/
 backups/
 .github/
 
+# Runtime container mounts (DB files, staging) — never used by build
+backend/docker-data/
+
+# Root-level metadata not needed inside the container
+# (LICENSE / LICENSE-COMMERCIAL.md intentionally kept)
+/AGENTS.md
+/CLAUDE.md
+/CLA.md
+/README.md
+/release.json
