@@ -27,7 +27,8 @@ import {
   Square,
   CheckSquare,
   Copy,
-  Check
+  Check,
+  KeyRound
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -78,6 +79,73 @@ interface PromoOffer {
 interface PromoResponse {
   offers: PromoOffer[];
   fetchedAt: string | null;
+}
+
+// Period-claim badge label.
+// Sourced from JWT pi/pc claims (Dodo payment_frequency_interval/count).
+// Falls back to capitalised billing enum for legacy tokens that pre-date the claims.
+// count=1 collapses to natural English ("Daily", "Monthly"); count>1 expands ("7 Days").
+function formatPeriodBadge(
+  interval: string | null,
+  count: number | null,
+  billingFallback: string | null
+): string {
+  if (interval && count && count > 0) {
+    if (count === 1) {
+      const map: Record<string, string> = {
+        Day: 'Daily',
+        Week: 'Weekly',
+        Month: 'Monthly',
+        Year: 'Yearly',
+      };
+      return map[interval] || `1 ${interval}`;
+    }
+    return `${count} ${interval}s`;
+  }
+  if (billingFallback) {
+    return billingFallback.charAt(0).toUpperCase() + billingFallback.slice(1);
+  }
+  return '';
+}
+
+// 3-line tooltip showing local, UTC, and relative time for a date.
+// Mirrors the format used by Dodo's dashboard:
+//   Asia/Kolkata: May 12, 2026, 1:58:32 AM
+//   UTC: May 11, 2026, 8:28:32 PM
+//   in 8 hours
+// Returns `fallback` when date is null/invalid (use for lifetime products etc.).
+function formatDateTooltip(dateInput: string | null, fallback = ''): string {
+  if (!dateInput) return fallback;
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return fallback;
+
+  const userTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const fmt: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  };
+
+  const local = new Intl.DateTimeFormat('en-US', { ...fmt, timeZone: userTz }).format(d);
+  const utc = new Intl.DateTimeFormat('en-US', { ...fmt, timeZone: 'UTC' }).format(d);
+
+  // Relative — pick the best unit so values like "in 8 hours" or "2 days ago" feel natural
+  const diffSec = (d.getTime() - Date.now()) / 1000;
+  const absSec = Math.abs(diffSec);
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  let rel: string;
+  if (absSec < 45) rel = rtf.format(Math.round(diffSec), 'second');
+  else if (absSec < 45 * 60) rel = rtf.format(Math.round(diffSec / 60), 'minute');
+  else if (absSec < 22 * 3600) rel = rtf.format(Math.round(diffSec / 3600), 'hour');
+  else if (absSec < 26 * 86400) rel = rtf.format(Math.round(diffSec / 86400), 'day');
+  else if (absSec < 320 * 86400) rel = rtf.format(Math.round(diffSec / (30.44 * 86400)), 'month');
+  else rel = rtf.format(Math.round(diffSec / (365.25 * 86400)), 'year');
+
+  return `${userTz}: ${local}\nUTC: ${utc}\n${rel}`;
 }
 
 // Dodo Payments configuration - Toggle IS_LIVE to switch modes
@@ -747,6 +815,7 @@ const Settings: React.FC = () => {
   const [licenseStatus, setLicenseStatus] = useState<{ success: boolean; message: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isRenewing, setIsRenewing] = useState(false);
 
   // Billing period toggles for pricing cards
   const [proBilling, setProBilling] = useState<'monthly' | 'yearly'>('monthly');
@@ -915,7 +984,7 @@ const Settings: React.FC = () => {
       });
       const data = await r.json();
       if (data.ok && data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
+        window.open(data.checkoutUrl, '_blank', 'noopener,noreferrer');
         return;
       }
       console.warn('[checkout] backend returned error, falling back to static URL', data);
@@ -1045,6 +1114,55 @@ const Settings: React.FC = () => {
       setIsSyncing(false);
     }
   };
+
+  /**
+   * Force-renew license via worker /renew (vendor-independent recovery).
+   * Used when Sync alone can't recover the license — e.g., Dodo's webhook
+   * never fired but the customer paid. Subject to 15min cooldown + 3/day cap.
+   */
+  const handleRenewLicense = async () => {
+    setIsRenewing(true);
+    try {
+      const response = await fetch('/api/license/renew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const message = result.changed
+          ? 'License refreshed from server.'
+          : 'License is up to date.';
+        setLicenseStatus({ success: true, message });
+        await refreshLicense();
+      } else {
+        let message: string;
+        if (result.isRateLimited) {
+          message = result.error || 'You can only Renew 3 times per day. Try again later.';
+        } else if (result.error === 'Timeout') {
+          message = 'License server did not respond in time. Check your internet connection and try again.';
+        } else if (result.error === 'No license token to renew' || result.error === 'No stored license token') {
+          message = 'No license token on file to renew. Please activate a token first.';
+        } else {
+          message = result.error || 'Renew failed.';
+        }
+        setLicenseStatus({ success: false, message });
+      }
+    } catch {
+      setLicenseStatus({ success: false, message: 'Could not reach license server. Check your internet connection.' });
+    } finally {
+      setIsRenewing(false);
+    }
+  };
+
+  // Renew is enabled when the local license is in a state Sync alone may not recover:
+  //  1. Demoted to Free with a licenseId on file (hard-expired past 3-day grace)
+  //  2. Token's exp has passed (covers the 3-day grace window before validator demotes)
+  // Disabled otherwise — Sync handles the normal path.
+  const canRenew = !!license?.licenseId && (
+    license.tier === 'Free' ||
+    (!!license.expiresAt && new Date(license.expiresAt).getTime() < Date.now())
+  );
 
   const formatLimit = (value: number) => {
     return value === -1 ? '∞' : value.toString();
@@ -1981,9 +2099,9 @@ const Settings: React.FC = () => {
                     <div className={`tier-badge tier-${license.tier.toLowerCase()}`}>
                       {license.tier}
                     </div>
-                    {license.billing && (
+                    {(license.billing || license.periodInterval) && (
                       <div className="billing-badge">
-                        {license.billing.charAt(0).toUpperCase() + license.billing.slice(1)}
+                        {formatPeriodBadge(license.periodInterval, license.periodCount, license.billing)}
                       </div>
                     )}
                   </div>
@@ -2014,7 +2132,7 @@ const Settings: React.FC = () => {
                       <span className="limit-value">{license.apiAccess === 'none' ? 'No' : license.apiAccess}</span>
                     </div>
                     {license.activatedAt && (
-                      <div className="limit-item">
+                      <div className="limit-item" title={formatDateTooltip(license.activatedAt)}>
                         <span className="limit-label">Activated</span>
                         <div className="limit-value-group">
                           <span className="limit-value">{formatDate(license.activatedAt, timezone)}</span>
@@ -2022,7 +2140,7 @@ const Settings: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    <div className="limit-item">
+                    <div className="limit-item" title={formatDateTooltip(license.expiresAt, 'Lifetime — never expires')}>
                       <span className="limit-label">Expires</span>
                       <div className="limit-value-group">
                         <span className="limit-value">
@@ -2035,8 +2153,11 @@ const Settings: React.FC = () => {
                     </div>
                     {(() => {
                       const remaining = formatRemaining(license.expiresAt);
+                      const remainingTooltip = license.billing === 'lifetime'
+                        ? 'Lifetime — unlimited access'
+                        : formatDateTooltip(license.nextBillingDate, 'No upcoming renewal scheduled');
                       return (
-                        <div className={`limit-item remaining-${remaining.urgency}`}>
+                        <div className={`limit-item remaining-${remaining.urgency}`} title={remainingTooltip}>
                           <span className="limit-label">Remaining</span>
                           <div className="limit-value-group">
                             <span className="limit-value">{remaining.text}</span>
@@ -2084,31 +2205,49 @@ const Settings: React.FC = () => {
                           </button>
                         )}
                         {license.licenseId && (
-                          <button
-                            type="button"
-                            className="refresh-button"
-                            onClick={handleSyncLicense}
-                            disabled={isSyncing}
-                            title={license.tier === 'Free'
-                              ? 'Check the license server for a renewed token'
-                              : 'Check for license updates'}
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              width="18"
-                              height="18"
-                              style={{
-                                animation: isSyncing ? 'spin 1s linear infinite' : 'none',
-                                display: 'block'
-                              }}
+                          <>
+                            <button
+                              type="button"
+                              className="refresh-button"
+                              onClick={handleSyncLicense}
+                              disabled={isSyncing}
+                              title="Check the license server for renewals or updates"
                             >
-                              <path
-                                fill="currentColor"
-                                d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                              <svg
+                                viewBox="0 0 24 24"
+                                width="18"
+                                height="18"
+                                style={{
+                                  animation: isSyncing ? 'spin 1s linear infinite' : 'none',
+                                  display: 'block'
+                                }}
+                              >
+                                <path
+                                  fill="currentColor"
+                                  d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+                                />
+                              </svg>
+                              <span>Sync</span>
+                            </button>
+                            <button
+                              type="button"
+                              className="refresh-button"
+                              onClick={handleRenewLicense}
+                              disabled={!canRenew || isRenewing}
+                              title={canRenew
+                                ? 'Force-refresh your license token from the server. 15 min cooldown, 3/day.'
+                                : 'Available when Sync cannot recover your license (e.g., token expired or webhook lost). Try Sync first.'}
+                            >
+                              <KeyRound
+                                size={18}
+                                style={{
+                                  animation: isRenewing ? 'spin 1s linear infinite' : 'none',
+                                  display: 'block'
+                                }}
                               />
-                            </svg>
-                            <span>{license.tier === 'Free' ? 'Renew' : 'Sync'}</span>
-                          </button>
+                              <span>Renew</span>
+                            </button>
+                          </>
                         )}
                       </div>
                     )}

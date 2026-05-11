@@ -22,6 +22,8 @@ export interface LicenseInfo {
   nextBillingDate: string | null;
   discountCode: string | null;
   discountCyclesRemaining: number | null;
+  periodInterval: string | null;  // From JWT period_interval claim — "Day"|"Week"|"Month"|"Year"; null falls back to billing enum for badge display
+  periodCount: number | null;     // From JWT period_count claim — e.g. 1, 7
   lastSyncAt: string | null;
 }
 
@@ -70,6 +72,8 @@ export const LicenseProvider: React.FC<LicenseProviderProps> = ({ children }) =>
         nextBillingDate: null,
         discountCode: null,
         discountCyclesRemaining: null,
+        periodInterval: null,
+        periodCount: null,
         lastSyncAt: null,
       });
     } finally {

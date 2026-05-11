@@ -27,6 +27,8 @@ export class LicenseManager {
   private nextBillingDate: Date | null = null;  // Next payment date (subscriptions)
   private discountCode: string | null = null;  // Applied promo code
   private discountCyclesRemaining: number | null = null;  // Remaining discounted renewals
+  private periodInterval: string | null = null;  // From JWT period_interval claim — billing cadence display ("Day"|"Week"|"Month"|"Year")
+  private periodCount: number | null = null;     // From JWT period_count claim — e.g. 1, 7
   private lastSyncAt: Date | null = null;  // Last successful sync with license server
   private readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -136,6 +138,8 @@ export class LicenseManager {
       this.nextBillingDate = null;
       this.discountCode = null;
       this.discountCyclesRemaining = null;
+      this.periodInterval = null;
+      this.periodCount = null;
       this.lastSyncAt = null;
       this.cacheExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
@@ -236,6 +240,8 @@ export class LicenseManager {
     nextBillingDate: string | null;
     discountCode: string | null;
     discountCyclesRemaining: number | null;
+    periodInterval: string | null;
+    periodCount: number | null;
     lastSyncAt: string | null;
   }> {
     // Check if auto-sync is needed before returning info
@@ -259,6 +265,8 @@ export class LicenseManager {
       nextBillingDate: this.nextBillingDate ? this.nextBillingDate.toISOString() : null,
       discountCode: this.discountCode,
       discountCyclesRemaining: this.discountCyclesRemaining,
+      periodInterval: this.periodInterval,
+      periodCount: this.periodCount,
       lastSyncAt: this.lastSyncAt ? this.lastSyncAt.toISOString() : null,
     };
   }
@@ -398,6 +406,115 @@ export class LicenseManager {
   }
 
   /**
+   * Force-renew license token via Worker /renew (vendor-independent recovery path).
+   *
+   * Unlike syncWithLicenseServer (which reads /status to pick up existing fresher tokens),
+   * this actively mints a new token via /renew. Use case: customer's token can't be
+   * recovered via Sync (e.g., Dodo webhook failed to fire), customer wants to force
+   * a refresh subject to the worker's cooldown (15min) + daily cap (3/day).
+   *
+   * D-redesign rules apply on the worker side: exp = MAX(Dodo's next_billing_date,
+   * current_exp) when Dodo reachable, 24h bridge when Dodo unreachable. No
+   * unilateral free extension.
+   */
+  async renewLicenseToken(): Promise<{
+    success: boolean;
+    changed: boolean;
+    newExpiresAt?: Date;
+    isRateLimited?: boolean;
+    error?: string;
+  }> {
+    if (!this.licenseId) {
+      return { success: false, changed: false, error: 'No license token to renew' };
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const storedToken = await this.getStoredLicenseKey();
+      if (!storedToken) {
+        return { success: false, changed: false, error: 'No stored license token' };
+      }
+
+      const response = await fetch(`${LICENSE_API_URL}/renew`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: storedToken }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        log.error(`Renew failed (${response.status}): ${errorBody}`, 'LicenseManager');
+        let parsed: { error?: string } | null = null;
+        try { parsed = JSON.parse(errorBody); } catch { /* non-JSON body */ }
+
+        if (response.status === 429) {
+          return {
+            success: false,
+            changed: false,
+            isRateLimited: true,
+            error: parsed?.error || 'Rate limit reached. Try again later.',
+          };
+        }
+        return {
+          success: false,
+          changed: false,
+          error: parsed?.error || 'License server error',
+        };
+      }
+
+      const result = await response.json() as {
+        success: boolean;
+        newToken?: string;
+        expiresAt?: string;
+        error?: string;
+      };
+
+      if (!result.success || !result.newToken) {
+        return {
+          success: false,
+          changed: false,
+          error: result.error || 'Renewal returned no token',
+        };
+      }
+
+      log.info('Renewal succeeded — applying new token', 'LicenseManager');
+      const applyResult = await this.setLicenseKey(result.newToken);
+      if (!applyResult.success) {
+        return {
+          success: false,
+          changed: false,
+          error: `Token apply failed: ${applyResult.error}`,
+        };
+      }
+
+      log.info(`Token renewed: now on ${applyResult.tier} tier`, 'LicenseManager');
+      return {
+        success: true,
+        changed: true,
+        newExpiresAt: result.expiresAt && result.expiresAt !== 'NA'
+          ? new Date(result.expiresAt)
+          : undefined,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        log.error('Renew timeout', 'LicenseManager');
+        return { success: false, changed: false, error: 'Timeout' };
+      }
+      log.error('Renew error', 'LicenseManager', error);
+      return {
+        success: false,
+        changed: false,
+        error: error instanceof Error ? error.message : 'Network error',
+      };
+    }
+  }
+
+  /**
    * Check if auto-sync is needed based on time-to-expiry
    * Progressive frequency: closer to expiry = more frequent syncs
    *
@@ -512,6 +629,8 @@ export class LicenseManager {
     this.customerName = result.customerName || null;  // Store customer name
     this.customerEmail = result.customerEmail || null;  // Store customer email
     this.licenseId = result.licenseId || null;  // Store license ID for /status lookups
+    this.periodInterval = result.periodInterval || null;  // From JWT period_interval claim
+    this.periodCount = (typeof result.periodCount === 'number' && result.periodCount > 0) ? result.periodCount : null;  // From JWT period_count claim
 
     // Persist to database for offline resilience
     try {

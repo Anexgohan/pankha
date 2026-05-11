@@ -150,6 +150,36 @@ router.post('/sync', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/license/renew
+ * Force-refresh license token via worker /renew (vendor-independent recovery path).
+ * Different from /sync which only reads /status. /renew actively mints a fresh JWT.
+ * Subject to worker-side rate limits (15min cooldown, 3/day cap).
+ */
+router.post('/renew', async (req: Request, res: Response) => {
+  try {
+    const result = await licenseManager.renewLicenseToken();
+
+    if (result.success && result.changed) {
+      const info = await licenseManager.getLicenseInfo();
+      res.json({
+        ...result,
+        license: info,
+      });
+    } else {
+      // 429 for rate limit, 400 for client-side problems, 502 for upstream
+      const status = result.isRateLimited ? 429 : (result.success ? 200 : 502);
+      res.status(status).json(result);
+    }
+  } catch (error) {
+    console.error('[License API] Renew error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Renew failed',
+    });
+  }
+});
+
+/**
  * GET /api/license/promo
  * List currently-advertised Dodo discounts. Proxies to Worker GET /promo.
  * Worker holds DODO_API_KEY; this backend never sees it.
