@@ -151,122 +151,280 @@
   font-size: var(--font-size-lg);
 }
 
-/* Available offers banner — public discount advertising on the Subscription tab.
-   Visually distinct from .discount-banner (green/applied to your sub) by using
-   the caution palette (amber). One container; one .promo-offer per advertised
-   discount. Both light and dark themes are covered by --temp-caution-* tokens. */
+/* Available offers — public discount advertising on the Subscription tab.
+   Split-card layout: stamp column (left) + content column (right).
+   --promo-accent drives the card color; defaults to --color-accent-dynamic
+   (user's theme color from Settings > General > Appearance) but is overridden
+   by data-urgency on .promo-offer (absolute remaining count) to reflect tier
+   colors via Pankha's existing --temp-* tokens. The progress bar fill uses
+   its OWN data-urgency on .promo-offer-spots-bar (percentage of slots left)
+   so the bar can show a different tier than the rest of the card. */
 .promo-offers {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+  gap: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
-  padding: var(--spacing-md) var(--spacing-lg);
-  background: var(--temp-caution-bg);
-  border: 1px solid var(--temp-caution-border);
-  border-radius: var(--radius-lg);
 }
 
 .promo-offer {
-  display: flex;
-  gap: var(--spacing-md);
-  align-items: flex-start;
+  --promo-accent: var(--color-accent-dynamic);
+  display: grid;
+  grid-template-columns: minmax(120px, 30%) 1fr;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.promo-offer + .promo-offer {
-  padding-top: var(--spacing-md);
-  border-top: 1px dashed var(--border-color);
+.promo-offer[data-urgency="normal"] {
+  --promo-accent: var(--temp-normal-text);
 }
 
-.promo-offer-icon {
-  color: var(--temp-caution-text);
-  flex-shrink: 0;
-  margin-top: 2px;
+.promo-offer[data-urgency="caution"] {
+  --promo-accent: var(--temp-caution-text);
 }
 
-.promo-offer-body {
-  flex: 1;
+.promo-offer[data-urgency="critical"] {
+  --promo-accent: var(--temp-critical-text);
+}
+
+.promo-offer:hover {
+  border-color: color-mix(in srgb, var(--promo-accent), transparent 60%);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2),
+              0 0 12px color-mix(in srgb, var(--promo-accent), transparent 90%);
+}
+
+.promo-offer-stamp {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* gap: var(--spacing-xs); */
+  padding: var(--spacing-lg) var(--spacing-md);
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--promo-accent), transparent 82%) 0%, transparent 70%),
+    var(--bg-tertiary);
+  border-right: 1px dashed var(--border-color);
+  text-align: center;
+}
+
+.promo-offer-stamp-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--promo-accent), transparent 25%);
+}
+
+.promo-offer-stamp-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  color: var(--promo-accent);
+  line-height: 1;
+}
+
+.promo-offer-stamp-number {
+  font-family: var(--font-primary);
+  font-size: 64px; /* 88px — matches mockup; outside the token scale */
+  font-weight: var(--font-weight-bold-xl);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.promo-offer-stamp-symbol {
+  font-size: var(--font-size-2xl); /* 32px — matches mockup's ~33px */
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.promo-offer-stamp-cycles {
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.promo-offer-stamp-expires {
+  display: inline-flex;
+  align-items: center;
   gap: var(--spacing-xs);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-tertiary);
+  margin-top: var(--spacing-sm);
+}
+
+.promo-offer-content {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
   min-width: 0;
 }
 
-.promo-offer-headline {
+.promo-offer-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
 }
 
 .promo-offer-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--temp-caution-text);
-  background: var(--bg-secondary);
-  padding: 2px var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
+  color: var(--promo-accent);
 }
 
-.promo-offer-headline-text {
-  font-size: var(--font-size-md);
+.promo-offer-label-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-circle);
+  background: var(--promo-accent);
+  box-shadow: 0 0 8px var(--promo-accent);
+}
+
+.promo-offer-days {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.promo-offer-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
+  line-height: 1.3;
 }
 
-.promo-offer-meta {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-}
-
-.promo-offer-cta {
+.promo-offer-spots {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
-  flex-wrap: wrap;
   margin-top: var(--spacing-xs);
 }
 
-.promo-offer-code-line {
+.promo-offer-spots-text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.promo-offer-spots-icon {
+  color: var(--promo-accent);
+  flex-shrink: 0;
+}
+
+.promo-offer-spots-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* Bar color is decoupled from the card's --promo-accent: the bar wrapper
+   has its OWN data-urgency (% slots left), independent from the card's
+   data-urgency (absolute count). Default is caution/amber. */
+.promo-offer-spots-fill {
+  height: 100%;
+  background: var(--temp-caution-text);
+  border-radius: inherit;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--temp-caution-text), transparent 50%);
+}
+
+.promo-offer-spots-bar[data-urgency="normal"] .promo-offer-spots-fill {
+  background: var(--temp-normal-text);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--temp-normal-text), transparent 50%);
+}
+
+.promo-offer-spots-bar[data-urgency="critical"] .promo-offer-spots-fill {
+  background: var(--temp-critical-text);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--temp-critical-text), transparent 50%);
+}
+
+.promo-offer-code-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
 }
 
 .promo-offer-code {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  color: var(--text-primary);
-  background: var(--bg-secondary);
-  padding: 1px var(--spacing-xs);
-  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-primary);
   border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .promo-copy-btn {
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  background: var(--bg-secondary);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-primary);
   color: var(--text-primary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .promo-copy-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--temp-caution-border);
+  background: color-mix(in srgb, var(--promo-accent) 4%, var(--bg-primary));
+  border-color: var(--promo-accent);
+  color: var(--promo-accent);
 }
 
 .promo-copy-btn:focus-visible {
-  outline: 2px solid var(--temp-caution-border);
+  outline: 2px solid var(--promo-accent);
   outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .promo-offers {
+    grid-template-columns: 1fr;
+  }
+  .promo-offer {
+    grid-template-columns: 1fr;
+  }
+  .promo-offer-stamp {
+    border-right: none;
+    border-bottom: 1px dashed var(--border-color);
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    gap: var(--spacing-sm) var(--spacing-md);
+  }
+  .promo-offer-stamp-expires {
+    margin-top: 0;
+  }
 }
 
 /* Per-card price strikethrough + discounted price emphasis (driven by the

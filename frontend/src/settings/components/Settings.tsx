@@ -28,7 +28,9 @@ import {
   CheckSquare,
   Copy,
   Check,
-  KeyRound
+  KeyRound,
+  Clock,
+  Flame
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -955,13 +957,38 @@ const Settings: React.FC = () => {
   };
 
   // Copy a discount code to the clipboard, briefly flip the icon to a check.
+  // navigator.clipboard only works in secure contexts (HTTPS / localhost), so
+  // fall back to a legacy textarea + execCommand path for http://<lan-ip>:port
+  // dev/self-hosted deployments. Surface failure via toast so the user knows.
   const copyDiscountCode = async (code: string) => {
+    let ok = false;
     try {
-      await navigator.clipboard.writeText(code);
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+        ok = true;
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = code;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '0';
+        ta.style.left = '0';
+        ta.style.opacity = '0';
+        ta.style.pointerEvents = 'none';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch {
+      ok = false;
+    }
+    if (ok) {
       setCopiedCode(code);
       setTimeout(() => setCopiedCode((c) => (c === code ? null : c)), 2000);
-    } catch {
-      // clipboard API unavailable — silently no-op; the code is still visible
+    } else {
+      toast.error('Could not copy code. Select and copy manually.');
     }
   };
 
@@ -1781,41 +1808,118 @@ const Settings: React.FC = () => {
                     fallbacks only render during the brief loading window before the API
                     responds — keep them in sync with tiers.ts pricing if you change it. */}
                 <div className="pricing-section">
-                  <h3>Available Plans</h3>
-
                   {promo && promo.offers.length > 0 && (
-                    <div className="promo-offers" role="region" aria-label="Available discount offers">
+                    <>
+                      <h3>Offers</h3>
+                      <div className="promo-offers" role="region" aria-label="Available discount offers">
                       {promo.offers.map((offer) => {
                         const hasLimit = offer.expiresAt != null || offer.totalLimit != null;
                         const productSummary = offer.appliesTo
                           .map((a) => `${a.tier === 'pro' ? 'Pro' : 'Enterprise'} ${a.billing.charAt(0).toUpperCase() + a.billing.slice(1)}`)
                           .join(' & ');
-                        const meta: string[] = [];
-                        if (offer.remaining != null) {
-                          meta.push(`${offer.remaining} ${offer.remaining === 1 ? 'spot' : 'spots'} left`);
-                        }
-                        if (offer.cycles != null) {
-                          meta.push(`for ${offer.cycles} ${offer.cycles === 1 ? 'cycle' : 'cycles'}`);
-                        }
+
+                        let daysRemaining: number | null = null;
+                        let endDateLabel: string | null = null;
                         if (offer.expiresAt) {
                           const dt = new Date(offer.expiresAt);
-                          meta.push(`ends ${dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`);
+                          const msLeft = dt.getTime() - Date.now();
+                          daysRemaining = Math.max(0, Math.ceil(msLeft / (1000 * 60 * 60 * 24)));
+                          endDateLabel = dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
                         }
+
+                        const spotsRatio = offer.remaining != null && offer.totalLimit != null && offer.totalLimit > 0
+                          ? Math.max(0, Math.min(1, offer.remaining / offer.totalLimit))
+                          : null;
+
+                        // Card urgency drives all non-bar elements (label dot,
+                        // stamp number, hover glow, etc.). Based on absolute
+                        // remaining count: <=3 critical, <=10 caution, else
+                        // normal. Days-to-expiry can escalate the tier.
+                        let urgency: 'normal' | 'caution' | 'critical' | null = null;
+                        if (offer.remaining != null) {
+                          if (offer.remaining <= 3) urgency = 'critical';
+                          else if (offer.remaining <= 10) urgency = 'caution';
+                          else urgency = 'normal';
+                        }
+                        if (daysRemaining != null) {
+                          if (daysRemaining <= 7) {
+                            urgency = 'critical';
+                          } else if (daysRemaining <= 30 && urgency !== 'critical') {
+                            urgency = urgency === null || urgency === 'normal' ? 'caution' : urgency;
+                          }
+                        }
+
+                        // Bar urgency drives the progress bar fill only.
+                        // Based on % of slots remaining (independent of card):
+                        //   > 60% left -> normal (green)
+                        //   30-60% left -> caution (amber)
+                        //   < 30% left -> critical (red)
+                        let barUrgency: 'normal' | 'caution' | 'critical' | null = null;
+                        if (spotsRatio != null) {
+                          if (spotsRatio < 0.30) barUrgency = 'critical';
+                          else if (spotsRatio <= 0.60) barUrgency = 'caution';
+                          else barUrgency = 'normal';
+                        }
+
                         return (
-                          <div key={offer.code} className="promo-offer">
-                            <Tag size={16} className="promo-offer-icon" aria-hidden="true" />
-                            <div className="promo-offer-body">
-                              <div className="promo-offer-headline">
-                                <span className="promo-offer-label">{hasLimit ? 'LIMITED OFFER' : 'OFFER'}</span>
-                                <span className="promo-offer-headline-text">{offer.amountPct}% off {productSummary || 'select plans'}</span>
+                          <article
+                            key={offer.code}
+                            className="promo-offer"
+                            data-urgency={urgency ?? undefined}
+                          >
+                            <div className="promo-offer-stamp">
+                              <span className="promo-offer-stamp-label">SAVE</span>
+                              <div className="promo-offer-stamp-amount">
+                                <span className="promo-offer-stamp-number">{offer.amountPct}</span>
+                                <span className="promo-offer-stamp-symbol">%</span>
                               </div>
-                              {meta.length > 0 && (
-                                <div className="promo-offer-meta">{meta.join(' · ')}</div>
-                              )}
-                              <div className="promo-offer-cta">
-                                <span className="promo-offer-code-line">
-                                  Use code <code className="promo-offer-code">{offer.code}</code> at checkout
+                              {offer.cycles != null && (
+                                <span className="promo-offer-stamp-cycles">
+                                  for {offer.cycles} {offer.cycles === 1 ? 'cycle' : 'cycles'}
                                 </span>
+                              )}
+                              {endDateLabel && (
+                                <span className="promo-offer-stamp-expires">
+                                  <Clock size={11} aria-hidden="true" />
+                                  Ends {endDateLabel}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="promo-offer-content">
+                              <div className="promo-offer-header">
+                                <span className="promo-offer-label">
+                                  <span className="promo-offer-label-dot" aria-hidden="true" />
+                                  {hasLimit ? 'LIMITED OFFER' : 'OFFER'}
+                                </span>
+                                {daysRemaining != null && (
+                                  <span className="promo-offer-days">{daysRemaining} days remaining</span>
+                                )}
+                              </div>
+                              <h4 className="promo-offer-title">{productSummary || 'Select plans'}</h4>
+
+                              {offer.remaining != null && (
+                                <div className="promo-offer-spots">
+                                  <span className="promo-offer-spots-text">
+                                    {urgency === 'critical' && (
+                                      <Flame size={12} className="promo-offer-spots-icon" aria-hidden="true" />
+                                    )}
+                                    {offer.remaining} {offer.remaining === 1 ? 'spot' : 'spots'} left
+                                  </span>
+                                  {spotsRatio != null && (
+                                    <div
+                                      className="promo-offer-spots-bar"
+                                      data-urgency={barUrgency ?? undefined}
+                                      aria-hidden="true"
+                                    >
+                                      <div className="promo-offer-spots-fill" style={{ width: `${spotsRatio * 100}%` }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="promo-offer-code-row">
+                                <code className="promo-offer-code">{offer.code}</code>
                                 <button
                                   type="button"
                                   className="promo-copy-btn"
@@ -1827,12 +1931,14 @@ const Settings: React.FC = () => {
                                 </button>
                               </div>
                             </div>
-                          </div>
+                          </article>
                         );
                       })}
-                    </div>
+                      </div>
+                    </>
                   )}
 
+                  <h3>Available Plans</h3>
                   <div className="pricing-cards">
                     {/* Free Plan */}
                     <div className={`pricing-card ${license.tier === 'Free' ? 'current' : ''}`}>
