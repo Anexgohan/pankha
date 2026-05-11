@@ -168,6 +168,10 @@
 
 .promo-offer {
   --promo-accent: var(--color-accent-dynamic);
+  /* Tier color for stamp bg + stamp amount. Defaults to --promo-accent;
+     overridden by [data-stamp-tier="..."] rules below to match the
+     pricing-card header colors. */
+  --stamp-tier-color: var(--promo-accent);
   display: grid;
   grid-template-columns: minmax(120px, 30%) 1fr;
   background: var(--bg-secondary);
@@ -203,7 +207,7 @@
   /* gap: var(--spacing-xs); */
   padding: var(--spacing-lg) var(--spacing-md);
   background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--promo-accent), transparent 82%) 0%, transparent 70%),
+    radial-gradient(circle at top, color-mix(in srgb, var(--stamp-tier-color), transparent 82%) 0%, transparent 70%),
     var(--bg-tertiary);
   border-right: 1px dashed var(--border-color);
   text-align: center;
@@ -214,7 +218,7 @@
   font-weight: var(--font-weight-bold);
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--promo-accent), transparent 25%);
+  color: color-mix(in srgb, var(--stamp-tier-color), transparent 25%);
 }
 
 .promo-offer-stamp-amount {
@@ -222,8 +226,22 @@
   align-items: baseline;
   justify-content: center;
   gap: 2px;
-  color: var(--promo-accent);
+  color: var(--stamp-tier-color);
   line-height: 1;
+}
+
+/* Stamp tier color tracks the rarity of the tier(s) this discount applies to
+   (highest wins: lifetime > enterprise > pro). Matches the pricing-card
+   header colors. Drives both the stamp background gradient AND the amount
+   number via the single --stamp-tier-color custom property. */
+.promo-offer[data-stamp-tier="pro"] {
+  --stamp-tier-color: var(--temp-normal-text);
+}
+.promo-offer[data-stamp-tier="enterprise"] {
+  --stamp-tier-color: var(--color-primary);
+}
+.promo-offer[data-stamp-tier="lifetime"] {
+  --stamp-tier-color: var(--temp-caution-text);
 }
 
 .promo-offer-stamp-number {
@@ -294,8 +312,8 @@
 }
 
 .promo-offer-days {
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
 }
 
 .promo-offer-title {
@@ -308,18 +326,33 @@
 
 .promo-offer-spots {
   display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
+  flex-direction: column;
+  gap: var(--spacing-xs);
   margin-top: var(--spacing-xs);
+}
+
+/* Row inside .promo-offer-spots: spots-text on the left, days on the right. */
+.promo-offer-spots-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--spacing-sm);
 }
 
 .promo-offer-spots-text {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--spacing-xs);
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   white-space: nowrap;
+}
+
+/* Current count ("7" in "7 of 10 spots left") is emphasized vs the rest. */
+.promo-offer-spots-current {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
 }
 
 .promo-offer-spots-icon {
@@ -328,7 +361,6 @@
 }
 
 .promo-offer-spots-bar {
-  flex: 1;
   height: 3px;
   background: var(--bg-tertiary);
   border-radius: var(--radius-sm);
@@ -1282,7 +1314,7 @@
 .pricing-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-md);
-  border-color: var(--color-info);
+  border-color: var(--text-tertiary);
 }
 
 .pricing-card.featured {
@@ -1355,6 +1387,31 @@
   margin: 0 0 var(--spacing-sm) 0;
   color: var(--text-primary);
   font-size: var(--font-size-lg);
+}
+
+/* Tier rarity colors for pricing-header + matching hover border (Free stays
+   neutral and keeps the default --color-info hover from .pricing-card:hover).
+   Ladder: Pro (uncommon/green) -> Enterprise (rare/blue) -> Lifetime (legendary/gold).
+   All values come from existing Pankha tokens; no new tokens added. */
+.pricing-card[data-tier="pro"] .pricing-header h4 {
+  color: var(--temp-normal-text);
+}
+.pricing-card[data-tier="pro"]:hover {
+  border-color: var(--temp-normal-text);
+}
+
+.pricing-card[data-tier="enterprise"] .pricing-header h4 {
+  color: var(--color-primary);
+}
+.pricing-card[data-tier="enterprise"]:hover {
+  border-color: var(--color-primary);
+}
+
+.pricing-card[data-tier="lifetime"] .pricing-header h4 {
+  color: var(--temp-caution-text);
+}
+.pricing-card[data-tier="lifetime"]:hover {
+  border-color: var(--temp-caution-text);
 }
 
 .pricing-price {

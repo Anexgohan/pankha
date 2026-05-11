@@ -1861,11 +1861,25 @@ const Settings: React.FC = () => {
                           else barUrgency = 'normal';
                         }
 
+                        // Stamp tier — drives the big "%" amount color so it
+                        // matches the rarity color of the highest tier this
+                        // discount applies to. Highest rarity wins:
+                        // lifetime > enterprise > pro.
+                        let stampTier: 'pro' | 'enterprise' | 'lifetime' | null = null;
+                        if (offer.appliesTo.some((a) => a.billing === 'lifetime')) {
+                          stampTier = 'lifetime';
+                        } else if (offer.appliesTo.some((a) => a.tier === 'enterprise')) {
+                          stampTier = 'enterprise';
+                        } else if (offer.appliesTo.some((a) => a.tier === 'pro')) {
+                          stampTier = 'pro';
+                        }
+
                         return (
                           <article
                             key={offer.code}
                             className="promo-offer"
                             data-urgency={urgency ?? undefined}
+                            data-stamp-tier={stampTier ?? undefined}
                           >
                             <div className="promo-offer-stamp">
                               <span className="promo-offer-stamp-label">SAVE</span>
@@ -1892,20 +1906,26 @@ const Settings: React.FC = () => {
                                   <span className="promo-offer-label-dot" aria-hidden="true" />
                                   {hasLimit ? 'LIMITED OFFER' : 'OFFER'}
                                 </span>
-                                {daysRemaining != null && (
-                                  <span className="promo-offer-days">{daysRemaining} days remaining</span>
-                                )}
                               </div>
                               <h4 className="promo-offer-title">{productSummary || 'Select plans'}</h4>
 
-                              {offer.remaining != null && (
+                              {(offer.remaining != null || daysRemaining != null) && (
                                 <div className="promo-offer-spots">
-                                  <span className="promo-offer-spots-text">
-                                    {urgency === 'critical' && (
-                                      <Flame size={12} className="promo-offer-spots-icon" aria-hidden="true" />
+                                  <div className="promo-offer-spots-row">
+                                    {offer.remaining != null && (
+                                      <span className="promo-offer-spots-text">
+                                        {urgency === 'critical' && (
+                                          <Flame size={12} className="promo-offer-spots-icon" aria-hidden="true" />
+                                        )}
+                                        <span className="promo-offer-spots-current">{offer.remaining}</span>
+                                        {offer.totalLimit != null && <> of {offer.totalLimit}</>}
+                                        {' '}{offer.remaining === 1 ? 'spot' : 'spots'} left
+                                      </span>
                                     )}
-                                    {offer.remaining} {offer.remaining === 1 ? 'spot' : 'spots'} left
-                                  </span>
+                                    {daysRemaining != null && (
+                                      <span className="promo-offer-days">{daysRemaining} days remaining</span>
+                                    )}
+                                  </div>
                                   {spotsRatio != null && (
                                     <div
                                       className="promo-offer-spots-bar"
@@ -1966,7 +1986,7 @@ const Settings: React.FC = () => {
                       const proStaticUrl = CHECKOUT_URLS.pro[proBilling];
                       const proPeriodSuffix = proBilling === 'monthly' ? 'mo' : 'yr';
                       return (
-                        <div className="pricing-card featured">
+                        <div className="pricing-card featured" data-tier="pro">
                           <div className="pricing-header">
                             <h4>Pro</h4>
                             <div className="pricing-toggle">
@@ -2050,7 +2070,7 @@ const Settings: React.FC = () => {
                       const entStaticUrl = CHECKOUT_URLS.enterprise[enterpriseBilling];
                       const entPeriodSuffix = enterpriseBilling === 'monthly' ? 'mo' : 'yr';
                       return (
-                        <div className="pricing-card">
+                        <div className="pricing-card" data-tier="enterprise">
                           <div className="pricing-header">
                             <h4>Enterprise</h4>
                             <div className="pricing-toggle">
@@ -2134,7 +2154,7 @@ const Settings: React.FC = () => {
                       const lifeStaticUrl = CHECKOUT_URLS[lifetimeTier].lifetime;
                       const lifeTierLabel = lifetimeTier === 'pro' ? 'Pro' : 'Enterprise';
                       return (
-                        <div className="pricing-card lifetime">
+                        <div className="pricing-card lifetime" data-tier="lifetime">
                           <div className="pricing-badge best-value">BEST VALUE</div>
                           <div className="pricing-header">
                             <h4>Lifetime</h4>
