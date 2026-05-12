@@ -24,6 +24,9 @@ export class LicenseManager {
   private customerName: string | null = null;
   private customerEmail: string | null = null;
   private licenseId: string | null = null;  // License ID for /status lookups
+  private subscriptionId: string | null = null;  // From JWT `sid` claim — Dodo subscription identifier (subscriptions only)
+  private customerId: string | null = null;  // Dodo persistent customer identifier (from /status sync)
+  private licenseKey: string | null = null;  // Raw JWT token — exposed read-only via getLicenseInfo for user copy/backup
   private nextBillingDate: Date | null = null;  // Next payment date (subscriptions)
   private discountCode: string | null = null;  // Applied promo code
   private discountCyclesRemaining: number | null = null;  // Remaining discounted renewals
@@ -135,6 +138,9 @@ export class LicenseManager {
       this.customerName = null;
       this.customerEmail = null;
       this.licenseId = null;
+      this.subscriptionId = null;
+      this.customerId = null;
+      this.licenseKey = null;
       this.nextBillingDate = null;
       this.discountCode = null;
       this.discountCyclesRemaining = null;
@@ -229,6 +235,9 @@ export class LicenseManager {
     customerName: string | null;
     customerEmail: string | null;
     licenseId: string | null;
+    subscriptionId: string | null;
+    customerId: string | null;
+    token: string | null;
     agentLimit: number;
     retentionDays: number;
     alertLimit: number;
@@ -254,6 +263,9 @@ export class LicenseManager {
       customerName: this.customerName,
       customerEmail: this.customerEmail,
       licenseId: this.licenseId,
+      subscriptionId: this.subscriptionId,
+      customerId: this.customerId,
+      token: this.licenseKey,
       agentLimit: tier.agentLimit === Infinity ? -1 : tier.agentLimit,
       retentionDays: tier.retentionDays,
       alertLimit: tier.alertLimit === Infinity ? -1 : tier.alertLimit,
@@ -330,6 +342,7 @@ export class LicenseManager {
         nextBillingDate?: string;
         discountCode?: string;
         discountCyclesRemaining?: number;
+        customerId?: string;
         replacementToken?: string;
       };
 
@@ -379,6 +392,7 @@ export class LicenseManager {
         : null;
       this.discountCode = status.discountCode || null;
       this.discountCyclesRemaining = status.discountCyclesRemaining ?? null;
+      this.customerId = status.customerId || null;
       this.lastSyncAt = new Date();
       await this.persistLastSyncAt(this.lastSyncAt);
 
@@ -629,6 +643,8 @@ export class LicenseManager {
     this.customerName = result.customerName || null;  // Store customer name
     this.customerEmail = result.customerEmail || null;  // Store customer email
     this.licenseId = result.licenseId || null;  // Store license ID for /status lookups
+    this.subscriptionId = result.subscriptionId || null;  // From JWT `sid` claim
+    this.licenseKey = key;  // Store raw JWT for read-only exposure to user (copy/backup)
     this.periodInterval = result.periodInterval || null;  // From JWT period_interval claim
     this.periodCount = (typeof result.periodCount === 'number' && result.periodCount > 0) ? result.periodCount : null;  // From JWT period_count claim
 

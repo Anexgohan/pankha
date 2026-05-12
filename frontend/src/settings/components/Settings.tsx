@@ -3,10 +3,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useLicense } from '../../license';
+import { useLicense, type LicenseInfo } from '../../license';
 import { PRIMARY_FONT_OPTIONS, SECONDARY_FONT_OPTIONS, type UIPrimaryFontChoice, type UISecondaryFontChoice, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
 import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
-import { formatDate, formatFriendlyDate } from '../../utils/formatters';
+import { formatDate, formatFriendlyDate, USER_TIMEZONE } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
 import { useDemoMode } from '../../hooks/useDemoMode';
 import ColorPicker from './ColorPicker';
@@ -30,7 +30,9 @@ import {
   Check,
   KeyRound,
   Clock,
-  Flame
+  Flame,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -828,9 +830,13 @@ const Settings: React.FC = () => {
   const [pricing, setPricing] = useState<PricingData | null>(null);
   const [promo, setPromo] = useState<PromoResponse | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [tokenRevealed, setTokenRevealed] = useState(false);
+  // Tracks which one-shot copy succeeded so the icon can flip to a check briefly.
+  // Values: 'token' (license token field), 'account' (Copy All in Account Details).
+  const [copiedTarget, setCopiedTarget] = useState<'token' | 'account' | null>(null);
 
   // General Settings from Context
-  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, timezone, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel } = useDashboardSettings();
+  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel } = useDashboardSettings();
   const [isCustomScale, setIsCustomScale] = useState(false);
   const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
   const [isCustomRetention, setIsCustomRetention] = useState(false);
@@ -992,6 +998,67 @@ const Settings: React.FC = () => {
     }
   };
 
+  // Copy arbitrary text using the same secure-context fallback strategy as
+  // copyDiscountCode. `target` keys the brief icon-flip on the calling button.
+  const copyToClipboard = async (text: string, target: 'token' | 'account'): Promise<void> => {
+    let ok = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        ok = true;
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '0';
+        ta.style.left = '0';
+        ta.style.opacity = '0';
+        ta.style.pointerEvents = 'none';
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);
+        ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+    } catch {
+      ok = false;
+    }
+    if (ok) {
+      setCopiedTarget(target);
+      setTimeout(() => setCopiedTarget((t) => (t === target ? null : t)), 1500);
+    } else {
+      toast.error('Could not copy. Select and copy manually.');
+    }
+  };
+
+  // Mask a token to first 24 + dots + last 12 chars for the default hidden view.
+  const maskToken = (t: string): string => {
+    if (t.length <= 40) return t;
+    return `${t.slice(0, 24)}${'.'.repeat(12)}${t.slice(-12)}`;
+  };
+
+  // Compose Account Details as plain text for the "Copy All" button. The token
+  // is intentionally excluded — users with paranoid clipboards / screen-share
+  // contexts can copy it separately via the dedicated token copy button.
+  const composeAccountDetails = (info: LicenseInfo): string => {
+    const lines: string[] = ['Account Details'];
+    if (info.customerName) lines.push(`Name: ${info.customerName}`);
+    if (info.customerEmail) lines.push(`Email: ${info.customerEmail}`);
+    if (info.licenseId) lines.push(`License ID: ${info.licenseId}`);
+    if (info.subscriptionId) lines.push(`Subscription ID: ${info.subscriptionId}`);
+    if (info.customerId) lines.push(`Customer ID: ${info.customerId}`);
+    if (info.discountCode) {
+      const cycles = info.discountCyclesRemaining;
+      const cyclesPart = cycles != null && cycles > 0 ? `, ${cycles} cycles remaining` : '';
+      lines.push(`Discount: ${info.discountCode}${cyclesPart}`);
+    }
+    if (info.lastSyncAt) {
+      lines.push(`Last Synced: ${formatFriendlyDate(info.lastSyncAt, USER_TIMEZONE)}`);
+    }
+    return lines.join('\n');
+  };
+
   // Click handler for "Get Pro/Enterprise" buttons. With a discount code,
   // calls backend /checkout to get a Dodo Sessions URL with discount
   // pre-applied. Without a discount, opens the static Dodo URL directly.
@@ -1007,7 +1074,11 @@ const Settings: React.FC = () => {
       const r = await fetch('/api/license/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId, discountCode }),
+        body: JSON.stringify({
+          productId,
+          discountCode,
+          returnUrl: `${window.location.origin}/settings?tab=license`,
+        }),
       });
       const data = await r.json();
       if (data.ok && data.checkoutUrl) {
@@ -2261,8 +2332,8 @@ const Settings: React.FC = () => {
                       <div className="limit-item" title={formatDateTooltip(license.activatedAt)}>
                         <span className="limit-label">Activated</span>
                         <div className="limit-value-group">
-                          <span className="limit-value">{formatDate(license.activatedAt, timezone)}</span>
-                          <span className="limit-subtext-date">{formatFriendlyDate(license.activatedAt, timezone)}</span>
+                          <span className="limit-value">{formatDate(license.activatedAt, USER_TIMEZONE)}</span>
+                          <span className="limit-subtext-date">{formatFriendlyDate(license.activatedAt, USER_TIMEZONE)}</span>
                         </div>
                       </div>
                     )}
@@ -2270,10 +2341,10 @@ const Settings: React.FC = () => {
                       <span className="limit-label">Expires</span>
                       <div className="limit-value-group">
                         <span className="limit-value">
-                          {license.expiresAt ? formatDate(license.expiresAt, timezone) : 'Lifetime'}
+                          {license.expiresAt ? formatDate(license.expiresAt, USER_TIMEZONE) : 'Lifetime'}
                         </span>
                         {license.expiresAt && (
-                          <span className="limit-subtext-date">{formatFriendlyDate(license.expiresAt, timezone)}</span>
+                          <span className="limit-subtext-date">{formatFriendlyDate(license.expiresAt, USER_TIMEZONE)}</span>
                         )}
                       </div>
                     </div>
@@ -2290,7 +2361,7 @@ const Settings: React.FC = () => {
                             {/* Show "Renews {date}" for subscriptions, or nothing for lifetime */}
                             {license.billing !== 'lifetime' && license.nextBillingDate && (
                               <span className="limit-subtext-date">
-                                Renews {formatFriendlyDate(license.nextBillingDate, timezone)}
+                                Renews {formatFriendlyDate(license.nextBillingDate, USER_TIMEZONE)}
                               </span>
                             )}
                           </div>
@@ -2387,7 +2458,18 @@ const Settings: React.FC = () => {
 
                 {license.tier !== 'Free' && (license.customerName || license.customerEmail) && (
                   <div className="license-details">
-                    <h4 className="license-details-title">Account Details</h4>
+                    <div className="license-details-header">
+                      <h4 className="license-details-title">Account Details</h4>
+                      <button
+                        type="button"
+                        className="license-details-copy-all"
+                        onClick={() => copyToClipboard(composeAccountDetails(license), 'account')}
+                        title="Copy account details (excludes token)"
+                        aria-label="Copy account details (excludes token)"
+                      >
+                        {copiedTarget === 'account' ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    </div>
                     {license.customerName && (
                       <div className="license-details-row">
                         <span className="license-details-label">Name</span>
@@ -2404,6 +2486,63 @@ const Settings: React.FC = () => {
                       <div className="license-details-row">
                         <span className="license-details-label">License ID</span>
                         <span className="license-details-value license-id-value">{license.licenseId}</span>
+                      </div>
+                    )}
+                    {license.subscriptionId && (
+                      <div className="license-details-row">
+                        <span className="license-details-label">Subscription ID</span>
+                        <span className="license-details-value license-id-value">{license.subscriptionId}</span>
+                      </div>
+                    )}
+                    {license.customerId && (
+                      <div className="license-details-row">
+                        <span className="license-details-label">Customer ID</span>
+                        <span className="license-details-value license-id-value">{license.customerId}</span>
+                      </div>
+                    )}
+                    {license.discountCode && (
+                      <div className="license-details-row">
+                        <span className="license-details-label">Discount</span>
+                        <span className="license-details-value">
+                          {license.discountCode}
+                          {license.discountCyclesRemaining != null && license.discountCyclesRemaining > 0 && (
+                            <>, {license.discountCyclesRemaining} cycles remaining</>
+                          )}
+                        </span>
+                      </div>
+                    )}
+                    {license.lastSyncAt && (
+                      <div className="license-details-row">
+                        <span className="license-details-label">Last Synced</span>
+                        <span className="license-details-value">{formatFriendlyDate(license.lastSyncAt, USER_TIMEZONE)}</span>
+                      </div>
+                    )}
+                    {license.token && (
+                      <div className="license-details-row license-token-row">
+                        <span className="license-details-label">License Token</span>
+                        <div className="license-token-controls">
+                          <button
+                            type="button"
+                            className="license-details-icon-button"
+                            onClick={() => setTokenRevealed((r) => !r)}
+                            title={tokenRevealed ? 'Hide token' : 'Show token'}
+                            aria-label={tokenRevealed ? 'Hide token' : 'Show token'}
+                          >
+                            {tokenRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                          <button
+                            type="button"
+                            className="license-details-icon-button"
+                            onClick={() => copyToClipboard(license.token!, 'token')}
+                            title="Copy token"
+                            aria-label="Copy token"
+                          >
+                            {copiedTarget === 'token' ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                        <span className="license-details-value license-token-value">
+                          {tokenRevealed ? license.token : maskToken(license.token)}
+                        </span>
                       </div>
                     )}
                   </div>

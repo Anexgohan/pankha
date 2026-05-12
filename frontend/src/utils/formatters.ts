@@ -3,6 +3,10 @@
  * Centralizes number and date formatting logic.
  */
 
+// User-facing date displays should render in the browser's local timezone.
+// Resolved once at module load; pass to formatters expecting an IANA timezone.
+export const USER_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 /**
  * Format temperature for UI display.
  * @param temp - Temperature value (may be null/undefined)

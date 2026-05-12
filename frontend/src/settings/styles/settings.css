@@ -1176,10 +1176,46 @@
 }
 
 .license-details-title {
-  margin: 0 0 var(--spacing-sm) 0;
+  margin: 0;
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
+}
+
+.license-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-sm);
+}
+
+.license-details-copy-all,
+.license-details-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.license-details-copy-all:hover,
+.license-details-icon-button:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+
+.license-details-copy-all:focus-visible,
+.license-details-icon-button:focus-visible {
+  outline: 2px solid var(--color-accent, var(--text-primary));
+  outline-offset: 2px;
 }
 
 .license-details-row {
@@ -1206,6 +1242,27 @@
 .license-id-value {
   font-family: var(--font-mono);
   font-size: 0.75rem;
+}
+
+/* Token row: label + controls on one line, masked/full value wraps below. */
+.license-token-row {
+  flex-wrap: wrap;
+  row-gap: var(--spacing-xs);
+}
+
+.license-token-controls {
+  display: inline-flex;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+}
+
+.license-token-value {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  word-break: break-all;
+  line-height: 1.4;
 }
 
 .license-status {

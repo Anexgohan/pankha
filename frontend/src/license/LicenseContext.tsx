@@ -11,6 +11,9 @@ export interface LicenseInfo {
   customerName: string | null;
   customerEmail: string | null;
   licenseId: string | null;
+  subscriptionId: string | null;  // JWT `sid` claim — Dodo subscription identifier; null for lifetime/free
+  customerId: string | null;      // Dodo persistent customer identifier (from /status sync); null if not yet synced
+  token: string | null;           // Raw JWT for user-visible reveal/copy field; null on free tier
   agentLimit: number;
   retentionDays: number;
   alertLimit: number;
@@ -61,6 +64,9 @@ export const LicenseProvider: React.FC<LicenseProviderProps> = ({ children }) =>
         customerName: null,
         customerEmail: null,
         licenseId: null,
+        subscriptionId: null,
+        customerId: null,
+        token: null,
         agentLimit: 3,
         retentionDays: 7,
         alertLimit: 2,
