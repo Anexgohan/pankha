@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useRef, useId } from 'react';
-import { useDashboardSettings } from '../../contexts/DashboardSettingsContext';
+import { USER_TIMEZONE } from '../../utils/formatters';
 import type { HistoryDataPoint, GapInfo } from '../../types/api';
 
 interface SensorSparklineProps {
@@ -56,7 +56,6 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [hoverGap, setHoverGap] = useState<GapPolygon | null>(null);
   const containerRef = useRef<SVGSVGElement>(null);
-  const { timezone } = useDashboardSettings();
 
   // Generate unique IDs for gradient (SSR-safe via React 18+ useId)
   const gradientId = useId();
@@ -381,12 +380,12 @@ const SensorSparkline: React.FC<SensorSparklineProps> = ({
             {new Date(activePoint.timestamp).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
-              timeZone: timezone
+              timeZone: USER_TIMEZONE
             })}
           </span>
           <span className="tooltip-date">
             {new Date(activePoint.timestamp).toLocaleDateString('en-CA', {
-              timeZone: timezone
+              timeZone: USER_TIMEZONE
             })}
           </span>
         </div>

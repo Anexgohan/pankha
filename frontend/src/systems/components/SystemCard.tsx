@@ -31,7 +31,7 @@ import { getChipDisplayName, getSensorLabel } from "../../config/sensorLabels";
 import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
-import { formatTemperature, formatLastSeen } from "../../utils/formatters";
+import { formatTemperature, formatLastSeen, USER_TIMEZONE } from "../../utils/formatters";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
 import {
   Loader2,
@@ -85,7 +85,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onToggleBmc,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
-  const { timezone, tempThresholds } = useDashboardSettings();
+  const { tempThresholds } = useDashboardSettings();
   const [agentInterval, setAgentInterval] = useState<number>(
     system.current_update_interval ?? getDefault<number>('updateInterval')
   );
@@ -1054,7 +1054,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
           </div>
           <div className="meta-item" title="Last seen">
             <Clock size={14} />
-            <span>{formatLastSeen(system.last_seen, timezone)}</span>
+            <span>{formatLastSeen(system.last_seen, USER_TIMEZONE)}</span>
           </div>
           <div className="meta-item" title="Agent Version">
             <ShieldCheck size={14} />

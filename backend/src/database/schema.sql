@@ -401,3 +401,14 @@ END $$;
 UPDATE systems SET agent_type = 'os_linux' WHERE agent_type = 'os' AND (platform = 'linux' OR platform = 'unknown');
 UPDATE systems SET agent_type = 'os_windows' WHERE agent_type = 'os' AND platform = 'windows';
 UPDATE systems SET agent_type = 'ipmi_host' WHERE agent_type = 'ipmi';
+
+-- Migration: Add last_sync_at column to license_config (persist license-server sync timestamp across restarts)
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'license_config' AND column_name = 'last_sync_at'
+  ) THEN
+    ALTER TABLE license_config ADD COLUMN last_sync_at TIMESTAMPTZ;
+    RAISE NOTICE 'Migration: Added last_sync_at column to license_config';
+  END IF;
+END $$;

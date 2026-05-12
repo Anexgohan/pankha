@@ -22,11 +22,14 @@ export interface ValidationResult {
   tier: string;
   billing?: 'monthly' | 'yearly' | 'lifetime';
   licenseId?: string;
+  subscriptionId?: string;    // From JWT `sid` claim — Dodo subscription identifier; absent for lifetime/one-time
   expiresAt: Date | null;
   isGracePeriod: boolean;      // New field: true if currently in 3-day buffer
   activatedAt: Date | null;  // When license was issued
   customerName?: string;
   customerEmail?: string;
+  periodInterval?: string;   // From JWT period_interval claim — "Day" | "Week" | "Month" | "Year"; absent for lifetime/legacy tokens
+  periodCount?: number;      // From JWT period_count claim — e.g. 1, 7
   error?: string;
 }
 
@@ -37,7 +40,10 @@ interface LicensePayload {
   billing?: 'monthly' | 'yearly' | 'lifetime';
   name?: string;   // Customer name
   oid?: string;    // Order ID
-  
+  sid?: string;    // Dodo subscription ID (subscription products only)
+  period_interval?: string;  // "Day"|"Week"|"Month"|"Year" — Dodo payment_frequency_interval; absent for lifetime/pre-2026-05-11 tokens
+  period_count?: number;     // Dodo payment_frequency_count
+
   // Core fields (both v1 and v2)
   tier: 'pro' | 'enterprise';
   email: string;
@@ -197,12 +203,22 @@ export class LicenseValidator {
       const isGracePeriod = !isLifetime && !!payload.exp && payload.exp < now && (payload.exp + GRACE_PERIOD_SECONDS) >= now;
 
       if (isHardExpired) {
+        // Signature already verified above, so payload fields are trustworthy.
+        // Return identifying fields so LicenseManager can still call /status
+        // for renewal recovery even after the local token is past grace.
         return {
           valid: false,
           tier: 'free',
+          billing: payload.billing,
+          licenseId: payload.lid || payload.sub,
+          subscriptionId: payload.sid,
           expiresAt: new Date(payload.exp * 1000),
           isGracePeriod: false,
           activatedAt: payload.iat ? new Date(payload.iat * 1000) : null,
+          customerName: payload.name,
+          customerEmail: payload.email,
+          periodInterval: payload.period_interval,
+          periodCount: payload.period_count,
           error: 'License expired',
         };
       }
@@ -231,11 +247,14 @@ export class LicenseValidator {
         tier: payload.tier,
         billing,
         licenseId,
+        subscriptionId: payload.sid,
         expiresAt,
         isGracePeriod,
         activatedAt: payload.iat ? new Date(payload.iat * 1000) : null,
         customerName: payload.name,
         customerEmail: payload.email,
+        periodInterval: payload.period_interval,
+        periodCount: payload.period_count,
       };
     } catch (error) {
       console.error('[LicenseValidator] Validation error:', error);

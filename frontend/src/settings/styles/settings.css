@@ -151,6 +151,335 @@
   font-size: var(--font-size-lg);
 }
 
+/* Available offers — public discount advertising on the Subscription tab.
+   Split-card layout: stamp column (left) + content column (right).
+   --promo-accent drives the card color; defaults to --color-accent-dynamic
+   (user's theme color from Settings > General > Appearance) but is overridden
+   by data-urgency on .promo-offer (absolute remaining count) to reflect tier
+   colors via Pankha's existing --temp-* tokens. The progress bar fill uses
+   its OWN data-urgency on .promo-offer-spots-bar (percentage of slots left)
+   so the bar can show a different tier than the rest of the card. */
+.promo-offers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(440px, 1fr));
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.promo-offer {
+  --promo-accent: var(--color-accent-dynamic);
+  /* Tier color for stamp bg + stamp amount. Defaults to --promo-accent;
+     overridden by [data-stamp-tier="..."] rules below to match the
+     pricing-card header colors. */
+  --stamp-tier-color: var(--promo-accent);
+  display: grid;
+  grid-template-columns: minmax(120px, 30%) 1fr;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.promo-offer[data-urgency="normal"] {
+  --promo-accent: var(--temp-normal-text);
+}
+
+.promo-offer[data-urgency="caution"] {
+  --promo-accent: var(--temp-caution-text);
+}
+
+.promo-offer[data-urgency="critical"] {
+  --promo-accent: var(--temp-critical-text);
+}
+
+.promo-offer:hover {
+  border-color: color-mix(in srgb, var(--promo-accent), transparent 60%);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2),
+              0 0 12px color-mix(in srgb, var(--promo-accent), transparent 90%);
+}
+
+.promo-offer-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* gap: var(--spacing-xs); */
+  padding: var(--spacing-lg) var(--spacing-md);
+  background:
+    radial-gradient(circle at top, color-mix(in srgb, var(--stamp-tier-color), transparent 82%) 0%, transparent 70%),
+    var(--bg-tertiary);
+  border-right: 1px dashed var(--border-color);
+  text-align: center;
+}
+
+.promo-offer-stamp-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--stamp-tier-color), transparent 25%);
+}
+
+.promo-offer-stamp-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  color: var(--stamp-tier-color);
+  line-height: 1;
+}
+
+/* Stamp tier color tracks the rarity of the tier(s) this discount applies to
+   (highest wins: lifetime > enterprise > pro). Matches the pricing-card
+   header colors. Drives both the stamp background gradient AND the amount
+   number via the single --stamp-tier-color custom property. */
+.promo-offer[data-stamp-tier="pro"] {
+  --stamp-tier-color: var(--temp-normal-text);
+}
+.promo-offer[data-stamp-tier="enterprise"] {
+  --stamp-tier-color: var(--color-primary);
+}
+.promo-offer[data-stamp-tier="lifetime"] {
+  --stamp-tier-color: var(--temp-caution-text);
+}
+
+.promo-offer-stamp-number {
+  font-family: var(--font-primary);
+  font-size: 64px; /* 88px — matches mockup; outside the token scale */
+  font-weight: var(--font-weight-bold-xl);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.promo-offer-stamp-symbol {
+  font-size: var(--font-size-2xl); /* 32px — matches mockup's ~33px */
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.promo-offer-stamp-cycles {
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.promo-offer-stamp-expires {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-tertiary);
+  margin-top: var(--spacing-sm);
+}
+
+.promo-offer-content {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.promo-offer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.promo-offer-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--promo-accent);
+}
+
+.promo-offer-label-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-circle);
+  background: var(--promo-accent);
+  box-shadow: 0 0 8px var(--promo-accent);
+}
+
+.promo-offer-days {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.promo-offer-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.promo-offer-spots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+}
+
+/* Row inside .promo-offer-spots: spots-text on the left, days on the right. */
+.promo-offer-spots-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--spacing-sm);
+}
+
+.promo-offer-spots-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+/* Current count ("7" in "7 of 10 spots left") is emphasized vs the rest. */
+.promo-offer-spots-current {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+}
+
+.promo-offer-spots-icon {
+  color: var(--promo-accent);
+  flex-shrink: 0;
+}
+
+.promo-offer-spots-bar {
+  height: 3px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+/* Bar color is decoupled from the card's --promo-accent: the bar wrapper
+   has its OWN data-urgency (% slots left), independent from the card's
+   data-urgency (absolute count). Default is caution/amber. */
+.promo-offer-spots-fill {
+  height: 100%;
+  background: var(--temp-caution-text);
+  border-radius: inherit;
+  box-shadow: 0 0 6px color-mix(in srgb, var(--temp-caution-text), transparent 50%);
+}
+
+.promo-offer-spots-bar[data-urgency="normal"] .promo-offer-spots-fill {
+  background: var(--temp-normal-text);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--temp-normal-text), transparent 50%);
+}
+
+.promo-offer-spots-bar[data-urgency="critical"] .promo-offer-spots-fill {
+  background: var(--temp-critical-text);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--temp-critical-text), transparent 50%);
+}
+
+.promo-offer-code-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.promo-offer-code {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  letter-spacing: 0.04em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promo-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.promo-copy-btn:hover {
+  background: color-mix(in srgb, var(--promo-accent) 4%, var(--bg-primary));
+  border-color: var(--promo-accent);
+  color: var(--promo-accent);
+}
+
+.promo-copy-btn:focus-visible {
+  outline: 2px solid var(--promo-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .promo-offers {
+    grid-template-columns: 1fr;
+  }
+  .promo-offer {
+    grid-template-columns: 1fr;
+  }
+  .promo-offer-stamp {
+    border-right: none;
+    border-bottom: 1px dashed var(--border-color);
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-around;
+    gap: var(--spacing-sm) var(--spacing-md);
+  }
+  .promo-offer-stamp-expires {
+    margin-top: 0;
+  }
+}
+
+/* Per-card price strikethrough + discounted price emphasis (driven by the
+   same advertised-discounts data — only shown when restricted_to matches). */
+.pricing-price-strike {
+  text-decoration: line-through;
+  opacity: 0.45;
+  margin-right: var(--spacing-sm);
+  font-size: 0.7em;
+  vertical-align: baseline;
+}
+
+.pricing-price-discounted {
+  color: var(--temp-caution-text);
+}
+
+.pricing-savings-line {
+  margin-top: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  color: var(--temp-caution-text);
+}
+
 /* Discount banner - shows when promo code is active */
 .discount-banner {
   display: flex;
@@ -272,6 +601,79 @@
 /* License form - reuses form patterns */
 .license-form {
   margin-top: var(--spacing-xl);
+}
+
+/* Label above the inline input row — replaces the prior h3 heading. */
+.license-form-label {
+  display: block;
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-sm);
+  letter-spacing: 0.01em;
+}
+
+/* Single inline row: input grows to fill, Activate (filled) + Remove/Sync/Renew
+   (outlined) sit to the right. Wraps to multi-row on narrow viewports so the
+   long input keeps usable width on mobile rather than getting squeezed. */
+.license-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--spacing-sm);
+}
+
+.license-form-row .license-input {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+/* Outlined secondary action button — Remove, Sync, Renew sit next to Activate.
+   Same hit-target height as the input + Activate button. */
+.license-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-family: var(--font-primary);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.license-action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
+}
+
+.license-action-btn:focus-visible {
+  outline: 2px solid var(--color-info);
+  outline-offset: 2px;
+}
+
+.license-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.license-action-btn svg {
+  flex-shrink: 0;
+  display: block;
+}
+
+/* Remove flips to error color on hover — visually warns the destructive action. */
+.license-action-btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-error) 14%, var(--bg-tertiary));
+  border-color: var(--color-error);
+  color: var(--color-error);
 }
 
 /* General Settings UI */
@@ -756,15 +1158,43 @@
 .license-action-row {
   display: flex;
   gap: var(--spacing-md);
+  align-items: stretch;
 }
 
-.license-action-row .remove-license-btn {
+.license-action-row .remove-license-btn,
+.license-action-row .refresh-button {
   flex: 1;
 }
 
+/* Sync / Renew button — outlined secondary, pairs with Remove */
 .license-action-row .refresh-button {
-  padding: var(--spacing-md);
-  min-width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-xl);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.license-action-row .refresh-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-color: var(--color-info);
+  color: var(--text-primary);
+}
+
+.license-action-row .refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.license-action-row .refresh-button svg {
   flex-shrink: 0;
 }
 
@@ -811,18 +1241,243 @@
 
 /* License account details - shown for paid tiers */
 .license-details {
-  margin-top: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: var(--bg-tertiary);
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: var(--bg-secondary);
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
+}
+
+.license-details-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+.license-details-heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
 }
 
 .license-details-title {
-  margin: 0 0 var(--spacing-sm) 0;
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.005em;
+}
+
+.license-details-subtitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-normal);
+  cursor: default;
+}
+
+.license-details-subtitle-sep {
+  color: var(--border-light);
+}
+
+.license-details-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+/* Status pill — soft tinted surface, dot + uppercase tracking. The pill
+   communicates lifecycle state at-a-glance without dominating the header.
+   Tier ladder mirrors .pricing-card[data-tier="..."] .pricing-header h4
+   (Pro → green, Enterprise → blue, Lifetime → gold, Free → info blue).
+   Lifetime wins over tier when license.billing === 'lifetime'. */
+.license-status-pill {
+  --pill-color: var(--color-info);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  background: color-mix(in srgb, var(--pill-color) 14%, transparent);
+  color: var(--pill-color);
+  border: 1px solid color-mix(in srgb, var(--pill-color) 35%, transparent);
+  border-radius: 999px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.license-status-pill[data-tier="free"] {
+  --pill-color: var(--color-info);
+}
+
+.license-status-pill[data-tier="pro"] {
+  --pill-color: var(--temp-normal-text);
+}
+
+.license-status-pill[data-tier="enterprise"] {
+  --pill-color: var(--color-primary);
+}
+
+.license-status-pill[data-tier="lifetime"] {
+  --pill-color: var(--temp-caution-text);
+}
+
+.license-status-pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent);
+  flex-shrink: 0;
+}
+
+/* Stacked field grid — labels above input-shaped read-only boxes.
+   2 columns at desktop, 1 column on narrow viewports. Discount + Token
+   span the full row via .license-field--full. */
+.license-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 720px) {
+  .license-field-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.license-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.license-field--full {
+  grid-column: 1 / -1;
+}
+
+.license-field-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  padding: 0 var(--spacing-xs);
+}
+
+.license-field-label {
+  font-size: var(--font-size-sm2);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-normal);
+  letter-spacing: 0.01em;
+}
+
+.license-field-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-normal);
+}
+
+/* Input-shaped read-only box: matches the visual weight of the license
+   key input above so the panel reads as one cohesive form. The inline
+   action area on the right hosts copy / eye buttons. */
+.license-field-input {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-height: 40px;
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.license-field-input:hover {
+  border-color: var(--border-light);
+}
+
+.license-field-input--token {
+  align-items: flex-start;
+}
+
+/* Icon buttons nested inside a field input use a subtler hover than the
+   standalone Copy-All — they sit on top of an already-bordered surface
+   so the lift is the highlight, not a heavier border. */
+.license-field-actions .license-details-icon-button {
+  background: transparent;
+  border-color: transparent;
+}
+
+.license-field-actions .license-details-icon-button:hover {
+  background: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  border-color: transparent;
+  color: var(--text-primary);
+}
+
+.license-field-value {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-base);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.license-field-value--mono {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm2);
+  letter-spacing: 0;
+}
+
+.license-field-value--token {
   font-size: var(--font-size-sm);
   color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
+  word-break: break-all;
+  line-height: 1.55;
+  padding: var(--spacing-xs) 0;
+}
+
+.license-field-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.license-details-copy-all,
+.license-details-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.license-details-copy-all:hover,
+.license-details-icon-button:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+
+.license-details-copy-all:focus-visible,
+.license-details-icon-button:focus-visible {
+  outline: 2px solid var(--color-accent, var(--text-primary));
+  outline-offset: 2px;
 }
 
 .license-details-row {
@@ -849,6 +1504,27 @@
 .license-id-value {
   font-family: var(--font-mono);
   font-size: 0.75rem;
+}
+
+/* Token row: label + controls on one line, masked/full value wraps below. */
+.license-token-row {
+  flex-wrap: wrap;
+  row-gap: var(--spacing-xs);
+}
+
+.license-token-controls {
+  display: inline-flex;
+  gap: var(--spacing-xs);
+  margin-left: auto;
+}
+
+.license-token-value {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  word-break: break-all;
+  line-height: 1.4;
 }
 
 .license-status {
@@ -957,7 +1633,7 @@
 .pricing-card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-md);
-  border-color: var(--color-info);
+  border-color: var(--text-tertiary);
 }
 
 .pricing-card.featured {
@@ -1030,6 +1706,31 @@
   margin: 0 0 var(--spacing-sm) 0;
   color: var(--text-primary);
   font-size: var(--font-size-lg);
+}
+
+/* Tier rarity colors for pricing-header + matching hover border (Free stays
+   neutral and keeps the default --color-info hover from .pricing-card:hover).
+   Ladder: Pro (uncommon/green) -> Enterprise (rare/blue) -> Lifetime (legendary/gold).
+   All values come from existing Pankha tokens; no new tokens added. */
+.pricing-card[data-tier="pro"] .pricing-header h4 {
+  color: var(--temp-normal-text);
+}
+.pricing-card[data-tier="pro"]:hover {
+  border-color: var(--temp-normal-text);
+}
+
+.pricing-card[data-tier="enterprise"] .pricing-header h4 {
+  color: var(--color-primary);
+}
+.pricing-card[data-tier="enterprise"]:hover {
+  border-color: var(--color-primary);
+}
+
+.pricing-card[data-tier="lifetime"] .pricing-header h4 {
+  color: var(--temp-caution-text);
+}
+.pricing-card[data-tier="lifetime"]:hover {
+  border-color: var(--temp-caution-text);
 }
 
 .pricing-price {

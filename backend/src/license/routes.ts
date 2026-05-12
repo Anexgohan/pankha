@@ -6,12 +6,15 @@
  * - GET /api/license/pricing - Get all tier pricing info
  * - POST /api/license - Set/update license key
  * - POST /api/license/sync - Force sync with license server (for renewals)
+ * - GET /api/license/promo - List advertised discounts (proxies to Worker)
+ * - POST /api/license/checkout - Create Dodo checkout session (proxies to Worker)
  * - DELETE /api/license - Remove license (revert to free tier)
  */
 
 import { Router, Request, Response } from 'express';
 import { licenseManager } from './LicenseManager';
 import { TIERS } from './tiers';
+import { LICENSE_API_URL } from './license-config';
 
 const router = Router();
 
@@ -46,6 +49,7 @@ router.get('/pricing', async (req: Request, res: Response) => {
         apiAccess: TIERS.free.apiAccess,
         showBranding: TIERS.free.showBranding,
         pricing: TIERS.free.pricing,
+        benefits: TIERS.free.benefits,
       },
       pro: {
         name: TIERS.pro.name,
@@ -56,6 +60,7 @@ router.get('/pricing', async (req: Request, res: Response) => {
         apiAccess: TIERS.pro.apiAccess,
         showBranding: TIERS.pro.showBranding,
         pricing: TIERS.pro.pricing,
+        benefits: TIERS.pro.benefits,
       },
       enterprise: {
         name: TIERS.enterprise.name,
@@ -66,6 +71,7 @@ router.get('/pricing', async (req: Request, res: Response) => {
         apiAccess: TIERS.enterprise.apiAccess,
         showBranding: TIERS.enterprise.showBranding,
         pricing: TIERS.enterprise.pricing,
+        benefits: TIERS.enterprise.benefits,
       },
     };
     res.json(pricing);
@@ -139,6 +145,99 @@ router.post('/sync', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Sync failed'
+    });
+  }
+});
+
+/**
+ * POST /api/license/renew
+ * Force-refresh license token via worker /renew (vendor-independent recovery path).
+ * Different from /sync which only reads /status. /renew actively mints a fresh JWT.
+ * Subject to worker-side rate limits (15min cooldown, 3/day cap).
+ */
+router.post('/renew', async (req: Request, res: Response) => {
+  try {
+    const result = await licenseManager.renewLicenseToken();
+
+    if (result.success && result.changed) {
+      const info = await licenseManager.getLicenseInfo();
+      res.json({
+        ...result,
+        license: info,
+      });
+    } else {
+      // 429 for rate limit, 400 for client-side problems, 502 for upstream
+      const status = result.isRateLimited ? 429 : (result.success ? 200 : 502);
+      res.status(status).json(result);
+    }
+  } catch (error) {
+    console.error('[License API] Renew error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Renew failed',
+    });
+  }
+});
+
+/**
+ * GET /api/license/promo
+ * List currently-advertised Dodo discounts. Proxies to Worker GET /promo.
+ * Worker holds DODO_API_KEY; this backend never sees it.
+ * On any failure, returns an empty offers array so the UI gracefully shows
+ * no banner instead of erroring.
+ */
+router.get('/promo', async (req: Request, res: Response) => {
+  try {
+    const r = await fetch(`${LICENSE_API_URL}/promo`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!r.ok) {
+      return res.json({ offers: [], fetchedAt: null });
+    }
+    const data = await r.json();
+    res.json(data);
+  } catch (error) {
+    console.error('[License API] Promo proxy error:', error);
+    res.json({ offers: [], fetchedAt: null });
+  }
+});
+
+/**
+ * POST /api/license/checkout
+ * Create a Dodo checkout session with optional pre-applied discount.
+ * Proxies to Worker POST /checkout. Returns { ok, checkoutUrl } on success
+ * or { ok: false, error, message } on failure so the frontend can decide
+ * whether to retry, fall back to a static URL, or surface an error.
+ */
+router.post('/checkout', async (req: Request, res: Response) => {
+  const { productId, discountCode, returnUrl } = req.body || {};
+
+  if (!productId || typeof productId !== 'string') {
+    return res.status(400).json({
+      ok: false,
+      error: 'invalid_request',
+      message: 'productId required',
+    });
+  }
+
+  try {
+    const r = await fetch(`${LICENSE_API_URL}/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        productId,
+        discountCode: typeof discountCode === 'string' ? discountCode : undefined,
+        returnUrl: typeof returnUrl === 'string' ? returnUrl : undefined,
+      }),
+    });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (error) {
+    console.error('[License API] Checkout proxy error:', error);
+    res.status(502).json({
+      ok: false,
+      error: 'dodo_error',
+      message: 'License server unreachable',
     });
   }
 });

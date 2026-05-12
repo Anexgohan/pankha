@@ -10,7 +10,9 @@
 
 import { LicenseValidator, ValidationResult } from './LicenseValidator';
 import { TIERS, TierConfig, getTier } from './tiers';
+import { LICENSE_API_URL } from './license-config';
 import Database from '../database/database';
+import { log } from '../utils/logger';
 
 export class LicenseManager {
   private validator: LicenseValidator;
@@ -22,12 +24,16 @@ export class LicenseManager {
   private customerName: string | null = null;
   private customerEmail: string | null = null;
   private licenseId: string | null = null;  // License ID for /status lookups
+  private subscriptionId: string | null = null;  // From JWT `sid` claim — Dodo subscription identifier (subscriptions only)
+  private customerId: string | null = null;  // Dodo persistent customer identifier (from /status sync)
+  private licenseKey: string | null = null;  // Raw JWT token — exposed read-only via getLicenseInfo for user copy/backup
   private nextBillingDate: Date | null = null;  // Next payment date (subscriptions)
   private discountCode: string | null = null;  // Applied promo code
   private discountCyclesRemaining: number | null = null;  // Remaining discounted renewals
+  private periodInterval: string | null = null;  // From JWT period_interval claim — billing cadence display ("Day"|"Week"|"Month"|"Year")
+  private periodCount: number | null = null;     // From JWT period_count claim — e.g. 1, 7
   private lastSyncAt: Date | null = null;  // Last successful sync with license server
   private readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
-  private readonly LICENSE_API_URL = 'https://license.pankha.app';
 
   constructor() {
     this.validator = new LicenseValidator();
@@ -43,28 +49,45 @@ export class LicenseManager {
   }
 
   /**
+   * Whether we have a stored token from a paid (non-lifetime) purchase.
+   * Drives sync eligibility independently of the current cached tier — so
+   * a token that expired past grace can still recover via /status.
+   */
+  private hasPaidTokenOnFile(): boolean {
+    return this.licenseId !== null
+      && this.licenseBilling !== null
+      && this.licenseBilling !== 'lifetime';
+  }
+
+  /**
    * Initialize license manager - load and validate stored license key
    */
   async initialize(): Promise<void> {
     try {
       const result = await this.getPool().query(
-        'SELECT license_key FROM license_config WHERE id = 1'
+        'SELECT license_key, last_sync_at FROM license_config WHERE id = 1'
       );
 
       if (result.rows.length > 0 && result.rows[0].license_key) {
-        await this.validateAndCache(result.rows[0].license_key);
-        console.log(`[LicenseManager] Initialized with tier: ${this.cachedTier.name}`);
+        // Load persisted lastSyncAt before sync so checkAutoSync can honor cooldown
+        if (result.rows[0].last_sync_at) {
+          this.lastSyncAt = new Date(result.rows[0].last_sync_at);
+        }
 
-        // Auto-sync on startup for paid subscriptions to get nextBillingDate, discountCode, etc.
-        if (this.cachedTier.name !== 'Free' && this.licenseBilling !== 'lifetime' && this.licenseId) {
-          console.log('[LicenseManager] Syncing subscription data...');
+        await this.validateAndCache(result.rows[0].license_key);
+        log.info(`Initialized with tier: ${this.cachedTier.name}`, 'LicenseManager');
+
+        // Auto-sync on startup if we have a paid token on file (active OR
+        // recently expired) to detect Dodo-side renewals during downtime.
+        if (this.hasPaidTokenOnFile()) {
+          log.info('Syncing subscription data...', 'LicenseManager');
           await this.syncWithLicenseServer();
         }
       } else {
-        console.log('[LicenseManager] No license key found, using free tier');
+        log.info('No license key found, using free tier', 'LicenseManager');
       }
     } catch (error) {
-      console.error('[LicenseManager] Initialization error:', error);
+      log.error('Initialization error', 'LicenseManager', error);
       // Continue with free tier
     }
   }
@@ -80,19 +103,21 @@ export class LicenseManager {
     }
 
     try {
-      // Save to database
+      // Save to database — reset last_sync_at so the fresh license starts
+      // with a clean sync history (prevents stale cooldown from prior token).
       await this.getPool().query(`
-        INSERT INTO license_config (id, license_key, updated_at)
-        VALUES (1, $1, NOW())
-        ON CONFLICT (id) DO UPDATE SET license_key = $1, updated_at = NOW()
+        INSERT INTO license_config (id, license_key, updated_at, last_sync_at)
+        VALUES (1, $1, NOW(), NULL)
+        ON CONFLICT (id) DO UPDATE SET license_key = $1, updated_at = NOW(), last_sync_at = NULL
       `, [key]);
 
       // Cache locally
       await this.cacheResult(key, result);
+      this.lastSyncAt = null;
 
       return { success: true, tier: result.tier };
     } catch (error) {
-      console.error('[LicenseManager] Failed to save license:', error);
+      log.error('Failed to save license', 'LicenseManager', error);
       return { success: false, tier: 'free', error: 'Failed to save license' };
     }
   }
@@ -113,12 +138,21 @@ export class LicenseManager {
       this.customerName = null;
       this.customerEmail = null;
       this.licenseId = null;
+      this.subscriptionId = null;
+      this.customerId = null;
+      this.licenseKey = null;
+      this.nextBillingDate = null;
+      this.discountCode = null;
+      this.discountCyclesRemaining = null;
+      this.periodInterval = null;
+      this.periodCount = null;
+      this.lastSyncAt = null;
       this.cacheExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-      console.log('[LicenseManager] License removed, reverted to free tier');
+      log.info('License removed, reverted to free tier', 'LicenseManager');
       return { success: true };
     } catch (error) {
-      console.error('[LicenseManager] Failed to remove license:', error);
+      log.error('Failed to remove license', 'LicenseManager', error);
       return { success: false, error: 'Failed to remove license' };
     }
   }
@@ -141,7 +175,7 @@ export class LicenseManager {
         await this.validateAndCache(result.rows[0].license_key);
       }
     } catch (error) {
-      console.error('[LicenseManager] Re-validation failed:', error);
+      log.error('Re-validation failed', 'LicenseManager', error);
       // Keep using cached tier
     }
 
@@ -201,6 +235,9 @@ export class LicenseManager {
     customerName: string | null;
     customerEmail: string | null;
     licenseId: string | null;
+    subscriptionId: string | null;
+    customerId: string | null;
+    token: string | null;
     agentLimit: number;
     retentionDays: number;
     alertLimit: number;
@@ -212,6 +249,8 @@ export class LicenseManager {
     nextBillingDate: string | null;
     discountCode: string | null;
     discountCyclesRemaining: number | null;
+    periodInterval: string | null;
+    periodCount: number | null;
     lastSyncAt: string | null;
   }> {
     // Check if auto-sync is needed before returning info
@@ -224,6 +263,9 @@ export class LicenseManager {
       customerName: this.customerName,
       customerEmail: this.customerEmail,
       licenseId: this.licenseId,
+      subscriptionId: this.subscriptionId,
+      customerId: this.customerId,
+      token: this.licenseKey,
       agentLimit: tier.agentLimit === Infinity ? -1 : tier.agentLimit,
       retentionDays: tier.retentionDays,
       alertLimit: tier.alertLimit === Infinity ? -1 : tier.alertLimit,
@@ -235,6 +277,8 @@ export class LicenseManager {
       nextBillingDate: this.nextBillingDate ? this.nextBillingDate.toISOString() : null,
       discountCode: this.discountCode,
       discountCyclesRemaining: this.discountCyclesRemaining,
+      periodInterval: this.periodInterval,
+      periodCount: this.periodCount,
       lastSyncAt: this.lastSyncAt ? this.lastSyncAt.toISOString() : null,
     };
   }
@@ -253,13 +297,10 @@ export class LicenseManager {
     discountCyclesRemaining?: number;
     error?: string;
   }> {
-    // Skip sync for free tier or lifetime licenses
-    if (this.cachedTier.name === 'Free' || this.licenseBilling === 'lifetime') {
-      return { success: true, changed: false };
-    }
-
-    // Need licenseId to sync
-    if (!this.licenseId) {
+    // Skip sync for lifetime licenses or when no paid token is on file.
+    // Note: do NOT gate on cachedTier — a hard-expired paid token still
+    // qualifies for sync so we can recover the renewed license from /status.
+    if (!this.hasPaidTokenOnFile()) {
       return { success: true, changed: false };
     }
 
@@ -273,7 +314,7 @@ export class LicenseManager {
         return { success: true, changed: false };
       }
 
-      const response = await fetch(`${this.LICENSE_API_URL}/status`, {
+      const response = await fetch(`${LICENSE_API_URL}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: storedToken, licenseId: this.licenseId }),
@@ -283,8 +324,15 @@ export class LicenseManager {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('[LicenseManager] Sync failed:', error);
+        const errorBody = await response.text();
+        log.error(`Sync failed: ${errorBody}`, 'LicenseManager');
+        // Distinguish "license unknown to server" (permanent) from transient errors.
+        // Worker returns 404 with {found: false, ...} when the lid is not in D1.
+        let parsed: { found?: boolean } | null = null;
+        try { parsed = JSON.parse(errorBody); } catch { /* non-JSON body */ }
+        if (response.status === 404 && parsed?.found === false) {
+          return { success: false, changed: false, error: 'License not found' };
+        }
         return { success: false, changed: false, error: 'License server error' };
       }
 
@@ -294,27 +342,31 @@ export class LicenseManager {
         nextBillingDate?: string;
         discountCode?: string;
         discountCyclesRemaining?: number;
-        upgradeToken?: string;
+        customerId?: string;
+        replacementToken?: string;
       };
 
       if (!status.found) {
         return { success: true, changed: false };
       }
 
-      // Auto-upgrade: if server returns an upgradeToken, activate the new license
-      if (status.upgradeToken) {
-        console.log('[LicenseManager] Auto-upgrade detected! Activating new license...');
-        const upgradeResult = await this.setLicenseKey(status.upgradeToken);
-        if (upgradeResult.success) {
-          console.log(`[LicenseManager] Auto-upgrade successful: now on ${upgradeResult.tier} tier`);
-          // Sync again to fetch D1 metadata (discount, billing date, etc.) for the new license.
-          // No recursion risk: the new license won't have an upgradeToken.
+      // Same-lid token refresh: D1 holds a fresher JWT for our existing license
+      // (e.g. after a Dodo subscription.renewed UPDATEd the row in place, or
+      // after /renew). Identity-preserving — same lid, possibly new tier/billing
+      // from a plan change. Worker enforces the lineage rules; trust the field.
+      if (status.replacementToken) {
+        log.info('Token replacement detected (same-lid refresh)', 'LicenseManager');
+        const refreshResult = await this.setLicenseKey(status.replacementToken);
+        if (refreshResult.success) {
+          log.info(`Token refreshed: now on ${refreshResult.tier} tier`, 'LicenseManager');
+          // Re-sync to capture updated metadata (discount, billing date, etc.).
+          // Idempotent: post-refresh, status.replacementToken will be absent (hash match).
           const followUp = await this.syncWithLicenseServer();
-          console.log(`[LicenseManager] Post-upgrade sync: discountCode=${followUp.discountCode || 'none'}`);
-          return { success: true, changed: true, upgraded: true };
+          log.info(`Post-refresh sync: discountCode=${followUp.discountCode || 'none'}`, 'LicenseManager');
+          return { success: true, changed: true, upgraded: false };
         } else {
-          console.error(`[LicenseManager] Auto-upgrade failed: ${upgradeResult.error}`);
-          // Fall through to normal sync logic
+          log.error(`Token replacement failed: ${refreshResult.error}`, 'LicenseManager');
+          // Fall through to expiry-only update path below.
         }
       }
 
@@ -331,7 +383,7 @@ export class LicenseManager {
         // Update cached expiry - renewal detected!
         this.licenseExpiresAt = serverExpiry;
         this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION_MS);
-        console.log(`[LicenseManager] Expiry updated via sync: ${serverExpiry.toISOString()}`);
+        log.info(`Expiry updated via sync: ${serverExpiry.toISOString()}`, 'LicenseManager');
       }
 
       // Update other fields
@@ -340,7 +392,9 @@ export class LicenseManager {
         : null;
       this.discountCode = status.discountCode || null;
       this.discountCyclesRemaining = status.discountCyclesRemaining ?? null;
+      this.customerId = status.customerId || null;
       this.lastSyncAt = new Date();
+      await this.persistLastSyncAt(this.lastSyncAt);
 
       return {
         success: true,
@@ -353,14 +407,123 @@ export class LicenseManager {
 
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        console.error('[LicenseManager] Sync timeout');
+        log.error('Sync timeout', 'LicenseManager');
         return { success: false, changed: false, error: 'Timeout' };
       }
-      console.error('[LicenseManager] Sync error:', error);
+      log.error('Sync error', 'LicenseManager', error);
       return {
         success: false,
         changed: false,
         error: error instanceof Error ? error.message : 'Network error'
+      };
+    }
+  }
+
+  /**
+   * Force-renew license token via Worker /renew (vendor-independent recovery path).
+   *
+   * Unlike syncWithLicenseServer (which reads /status to pick up existing fresher tokens),
+   * this actively mints a new token via /renew. Use case: customer's token can't be
+   * recovered via Sync (e.g., Dodo webhook failed to fire), customer wants to force
+   * a refresh subject to the worker's cooldown (15min) + daily cap (3/day).
+   *
+   * D-redesign rules apply on the worker side: exp = MAX(Dodo's next_billing_date,
+   * current_exp) when Dodo reachable, 24h bridge when Dodo unreachable. No
+   * unilateral free extension.
+   */
+  async renewLicenseToken(): Promise<{
+    success: boolean;
+    changed: boolean;
+    newExpiresAt?: Date;
+    isRateLimited?: boolean;
+    error?: string;
+  }> {
+    if (!this.licenseId) {
+      return { success: false, changed: false, error: 'No license token to renew' };
+    }
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const storedToken = await this.getStoredLicenseKey();
+      if (!storedToken) {
+        return { success: false, changed: false, error: 'No stored license token' };
+      }
+
+      const response = await fetch(`${LICENSE_API_URL}/renew`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: storedToken }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+        log.error(`Renew failed (${response.status}): ${errorBody}`, 'LicenseManager');
+        let parsed: { error?: string } | null = null;
+        try { parsed = JSON.parse(errorBody); } catch { /* non-JSON body */ }
+
+        if (response.status === 429) {
+          return {
+            success: false,
+            changed: false,
+            isRateLimited: true,
+            error: parsed?.error || 'Rate limit reached. Try again later.',
+          };
+        }
+        return {
+          success: false,
+          changed: false,
+          error: parsed?.error || 'License server error',
+        };
+      }
+
+      const result = await response.json() as {
+        success: boolean;
+        newToken?: string;
+        expiresAt?: string;
+        error?: string;
+      };
+
+      if (!result.success || !result.newToken) {
+        return {
+          success: false,
+          changed: false,
+          error: result.error || 'Renewal returned no token',
+        };
+      }
+
+      log.info('Renewal succeeded — applying new token', 'LicenseManager');
+      const applyResult = await this.setLicenseKey(result.newToken);
+      if (!applyResult.success) {
+        return {
+          success: false,
+          changed: false,
+          error: `Token apply failed: ${applyResult.error}`,
+        };
+      }
+
+      log.info(`Token renewed: now on ${applyResult.tier} tier`, 'LicenseManager');
+      return {
+        success: true,
+        changed: true,
+        newExpiresAt: result.expiresAt && result.expiresAt !== 'NA'
+          ? new Date(result.expiresAt)
+          : undefined,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        log.error('Renew timeout', 'LicenseManager');
+        return { success: false, changed: false, error: 'Timeout' };
+      }
+      log.error('Renew error', 'LicenseManager', error);
+      return {
+        success: false,
+        changed: false,
+        error: error instanceof Error ? error.message : 'Network error',
       };
     }
   }
@@ -378,13 +541,15 @@ export class LicenseManager {
    * - < 12 hours out: every 15 minutes
    */
   private async checkAutoSync(): Promise<void> {
-    // Skip for free tier or lifetime
-    if (this.cachedTier.name === 'Free' || this.licenseBilling === 'lifetime') {
+    // Same gate as syncWithLicenseServer — paid (non-lifetime) token must
+    // be on file. Demoted-to-Free state with a hard-expired token still
+    // passes, allowing recovery via /status.
+    if (!this.hasPaidTokenOnFile()) {
       return;
     }
 
-    // Need expiry date and licenseId
-    if (!this.licenseExpiresAt || !this.licenseId) {
+    // Need expiry date to compute interval
+    if (!this.licenseExpiresAt) {
       return;
     }
 
@@ -416,7 +581,7 @@ export class LicenseManager {
 
     // Sync if interval exceeded
     if (requiredInterval && timeSinceLastSync >= requiredInterval) {
-      console.log(`[LicenseManager] Auto-sync triggered (${Math.round(timeToExpiry / HOUR)}h to expiry, ${Math.round(timeSinceLastSync / 60000)}min since last sync)`);
+      log.info(`Auto-sync triggered (${Math.round(timeToExpiry / HOUR)}h to expiry, ${Math.round(timeSinceLastSync / 60000)}min since last sync)`, 'LicenseManager');
       await this.syncWithLicenseServer();
     }
   }
@@ -436,6 +601,22 @@ export class LicenseManager {
   }
 
   /**
+   * Persist lastSyncAt to license_config so it survives container restarts.
+   * Failure here is non-fatal; in-memory value still drives behaviour for
+   * the current process lifetime.
+   */
+  private async persistLastSyncAt(when: Date | null): Promise<void> {
+    try {
+      await this.getPool().query(
+        'UPDATE license_config SET last_sync_at = $1 WHERE id = 1',
+        [when]
+      );
+    } catch (error) {
+      log.error('Failed to persist last_sync_at', 'LicenseManager', error);
+    }
+  }
+
+  /**
    * Validate license key and update cache
    */
   private async validateAndCache(key: string): Promise<void> {
@@ -443,7 +624,7 @@ export class LicenseManager {
       const result = await this.validator.validate(key);
       await this.cacheResult(key, result);
     } catch (error) {
-      console.error('[LicenseManager] Validation error, using cached value');
+      log.error('Validation error, using cached value', 'LicenseManager');
       // Try to load from local cache
       await this.loadFromLocalCache(key);
     }
@@ -462,6 +643,10 @@ export class LicenseManager {
     this.customerName = result.customerName || null;  // Store customer name
     this.customerEmail = result.customerEmail || null;  // Store customer email
     this.licenseId = result.licenseId || null;  // Store license ID for /status lookups
+    this.subscriptionId = result.subscriptionId || null;  // From JWT `sid` claim
+    this.licenseKey = key;  // Store raw JWT for read-only exposure to user (copy/backup)
+    this.periodInterval = result.periodInterval || null;  // From JWT period_interval claim
+    this.periodCount = (typeof result.periodCount === 'number' && result.periodCount > 0) ? result.periodCount : null;  // From JWT period_count claim
 
     // Persist to database for offline resilience
     try {
@@ -475,7 +660,7 @@ export class LicenseManager {
           tier = $2, agent_limit = $3, retention_days = $4, validated_at = NOW()
       `, [key, tier, agentLimit, this.cachedTier.retentionDays]);
     } catch (error) {
-      console.error('[LicenseManager] Failed to cache result:', error);
+      log.error('Failed to cache result', 'LicenseManager', error);
     }
   }
 
@@ -494,7 +679,7 @@ export class LicenseManager {
         this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION_MS);
       }
     } catch (error) {
-      console.error('[LicenseManager] Failed to load from cache:', error);
+      log.error('Failed to load from cache', 'LicenseManager', error);
       this.cachedTier = TIERS.free;
     }
   }

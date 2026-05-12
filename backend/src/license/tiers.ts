@@ -27,40 +27,67 @@ export interface TierConfig {
   apiAccess: 'none' | 'read' | 'full';
   showBranding: boolean;
   pricing: TierPricing;
+  benefits: string[];
 }
 
-export const TIERS: Record<string, TierConfig> = {
-  free: {
-    name: 'Free',
-    agentLimit: 3,
-    retentionDays: 7,
-    alertLimit: 2,  // Critical temp and fan fail only
-    alertChannels: ['dashboard', 'email'],
-    apiAccess: 'none',
-    showBranding: true,
-    pricing: { monthly: 0, yearly: 0, lifetime: 0 },
-  },
-  pro: {
-    name: 'Pro',
-    agentLimit: 10,
-    retentionDays: 30,
-    alertLimit: Infinity,
-    alertChannels: ['dashboard', 'email', 'webhook'],
-    apiAccess: 'full',
-    showBranding: true,
-    pricing: { monthly: 5, yearly: 49, lifetime: 199 },
-  },
-  enterprise: {
-    name: 'Enterprise',
-    agentLimit: Infinity,
-    retentionDays: 365,
-    alertLimit: Infinity,
-    alertChannels: ['dashboard', 'email', 'webhook'],
-    apiAccess: 'full',
-    showBranding: false,
-    pricing: { monthly: 25, yearly: 249, lifetime: 649 },
-  },
+const free: TierConfig = {
+  name: 'Free',
+  agentLimit: 3,
+  retentionDays: 7,
+  alertLimit: 2,  // Critical temp and fan fail only
+  alertChannels: ['dashboard', 'email'],
+  apiAccess: 'none',
+  showBranding: true,
+  pricing: { monthly: 0, yearly: 0, lifetime: 0 },
+  benefits: [],
 };
+free.benefits = [
+  `${free.agentLimit} Agents`,
+  `${free.retentionDays} Days History`,
+  'Critical Temp & Fan Fail Alerts',
+  'Dashboard & Email Notifications',
+];
+
+const pro: TierConfig = {
+  name: 'Pro',
+  agentLimit: 10,
+  retentionDays: 30,
+  alertLimit: Infinity,
+  alertChannels: ['dashboard', 'email', 'webhook'],
+  apiAccess: 'full',
+  showBranding: true,
+  pricing: { monthly: 5, yearly: 49, lifetime: 199 },
+  benefits: [],
+};
+pro.benefits = [
+  `${pro.agentLimit} Agents`,
+  `${pro.retentionDays} Days History`,
+  'Unlimited Alerts',
+  'All Notification Channels',
+  'Full API Access',
+];
+
+const enterprise: TierConfig = {
+  name: 'Enterprise',
+  agentLimit: Infinity,
+  retentionDays: 365,
+  alertLimit: Infinity,
+  alertChannels: ['dashboard', 'email', 'webhook'],
+  apiAccess: 'full',
+  showBranding: false,
+  pricing: { monthly: 25, yearly: 249, lifetime: 649 },
+  benefits: [],
+};
+enterprise.benefits = [
+  enterprise.agentLimit === Infinity ? 'Unlimited Agents' : `${enterprise.agentLimit} Agents`,
+  `${enterprise.retentionDays} Days History`,
+  'Unlimited Alerts',
+  'All Notification Channels',
+  'Full API Access',
+  'No Branding',
+];
+
+export const TIERS: Record<string, TierConfig> = { free, pro, enterprise };
 
 /**
  * Get tier configuration by name (case-insensitive)
