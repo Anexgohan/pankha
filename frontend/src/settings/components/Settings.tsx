@@ -32,7 +32,9 @@ import {
   Clock,
   Flame,
   Eye,
-  EyeOff
+  EyeOff,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -150,6 +152,24 @@ function formatDateTooltip(dateInput: string | null, fallback = ''): string {
   else rel = rtf.format(Math.round(diffSec / (365.25 * 86400)), 'year');
 
   return `${userTz}: ${local}\nUTC: ${utc}\n${rel}`;
+}
+
+// Short relative-time phrase ("2 hours ago", "in 3 days") for inline use under
+// the Account Details title. Same picker as formatDateTooltip's relative line
+// so phrasing stays consistent across the panel and its tooltip.
+function formatRelativeTime(dateInput: string | null): string {
+  if (!dateInput) return '';
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return '';
+  const diffSec = (d.getTime() - Date.now()) / 1000;
+  const absSec = Math.abs(diffSec);
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
+  if (absSec < 45) return rtf.format(Math.round(diffSec), 'second');
+  if (absSec < 45 * 60) return rtf.format(Math.round(diffSec / 60), 'minute');
+  if (absSec < 22 * 3600) return rtf.format(Math.round(diffSec / 3600), 'hour');
+  if (absSec < 26 * 86400) return rtf.format(Math.round(diffSec / 86400), 'day');
+  if (absSec < 320 * 86400) return rtf.format(Math.round(diffSec / (30.44 * 86400)), 'month');
+  return rtf.format(Math.round(diffSec / (365.25 * 86400)), 'year');
 }
 
 // Dodo Payments configuration - Toggle IS_LIVE to switch modes
@@ -2372,9 +2392,10 @@ const Settings: React.FC = () => {
                 </div>
 
                 <form onSubmit={handleLicenseSubmit} className="license-form">
-                  <h3>Enter License Key</h3>
-                  <div className="license-input-group">
+                  <label className="license-form-label" htmlFor="license-key-input">Enter License Key</label>
+                  <div className="license-form-row">
                     <input
+                      id="license-key-input"
                       type="text"
                       value={licenseKey}
                       onChange={(e) => setLicenseKey(e.target.value)}
@@ -2382,71 +2403,56 @@ const Settings: React.FC = () => {
                       className="license-input"
                       disabled={isSubmitting}
                     />
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       className="license-submit"
                       disabled={isSubmitting || !licenseKey.trim()}
                     >
                       {isSubmitting ? 'Validating...' : 'Activate'}
                     </button>
-                    {(license.tier !== 'Free' || license.licenseId) && (
-                      <div className="license-action-row">
-                        {license.tier !== 'Free' && (
-                          <button
-                            type="button"
-                            className="remove-license-btn"
-                            onClick={handleRemoveLicense}
-                            disabled={isSubmitting}
-                          >
-                            Remove
-                          </button>
-                        )}
-                        {license.licenseId && (
-                          <>
-                            <button
-                              type="button"
-                              className="refresh-button"
-                              onClick={handleSyncLicense}
-                              disabled={isSyncing}
-                              title="Check the license server for renewals or updates"
-                            >
-                              <svg
-                                viewBox="0 0 24 24"
-                                width="18"
-                                height="18"
-                                style={{
-                                  animation: isSyncing ? 'spin 1s linear infinite' : 'none',
-                                  display: 'block'
-                                }}
-                              >
-                                <path
-                                  fill="currentColor"
-                                  d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
-                                />
-                              </svg>
-                              <span>Sync</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="refresh-button"
-                              onClick={handleRenewLicense}
-                              disabled={!canRenew || isRenewing}
-                              title={canRenew
-                                ? 'Force-refresh your license token from the server. 15 min cooldown, 3/day.'
-                                : 'Available when Sync cannot recover your license (e.g., token expired or webhook lost). Try Sync first.'}
-                            >
-                              <KeyRound
-                                size={18}
-                                style={{
-                                  animation: isRenewing ? 'spin 1s linear infinite' : 'none',
-                                  display: 'block'
-                                }}
-                              />
-                              <span>Renew</span>
-                            </button>
-                          </>
-                        )}
-                      </div>
+                    {license.tier !== 'Free' && (
+                      <button
+                        type="button"
+                        className="license-action-btn license-action-btn--danger"
+                        onClick={handleRemoveLicense}
+                        disabled={isSubmitting}
+                        title="Remove license and revert to free tier"
+                      >
+                        <Trash2 size={16} />
+                        <span>Remove</span>
+                      </button>
+                    )}
+                    {license.licenseId && (
+                      <>
+                        <button
+                          type="button"
+                          className="license-action-btn"
+                          onClick={handleSyncLicense}
+                          disabled={isSyncing}
+                          title="Check the license server for renewals or updates"
+                        >
+                          <RefreshCw
+                            size={16}
+                            style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }}
+                          />
+                          <span>Sync</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="license-action-btn"
+                          onClick={handleRenewLicense}
+                          disabled={!canRenew || isRenewing}
+                          title={canRenew
+                            ? 'Force-refresh your license token from the server. 15 min cooldown, 3/day.'
+                            : 'Available when Sync cannot recover your license (e.g., token expired or webhook lost). Try Sync first.'}
+                        >
+                          <KeyRound
+                            size={16}
+                            style={{ animation: isRenewing ? 'spin 1s linear infinite' : 'none' }}
+                          />
+                          <span>Renew</span>
+                        </button>
+                      </>
                     )}
                   </div>
                   {licenseStatus && (
@@ -2459,92 +2465,207 @@ const Settings: React.FC = () => {
                 {license.tier !== 'Free' && (license.customerName || license.customerEmail) && (
                   <div className="license-details">
                     <div className="license-details-header">
-                      <h4 className="license-details-title">Account Details</h4>
-                      <button
-                        type="button"
-                        className="license-details-copy-all"
-                        onClick={() => copyToClipboard(composeAccountDetails(license), 'account')}
-                        title="Copy account details (excludes token)"
-                        aria-label="Copy account details (excludes token)"
-                      >
-                        {copiedTarget === 'account' ? <Check size={14} /> : <Copy size={14} />}
-                      </button>
+                      <div className="license-details-heading">
+                        <h4 className="license-details-title">Account Details</h4>
+                        {license.lastSyncAt && (
+                          <p
+                            className="license-details-subtitle"
+                            title={formatDateTooltip(license.lastSyncAt)}
+                          >
+                            Last synced {formatFriendlyDate(license.lastSyncAt, USER_TIMEZONE)}
+                            <span className="license-details-subtitle-sep"> · </span>
+                            {formatRelativeTime(license.lastSyncAt)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="license-details-meta">
+                        <span
+                          className="license-status-pill"
+                          data-tier={license.billing === 'lifetime' ? 'lifetime' : license.tier.toLowerCase()}
+                          title={license.billing ? `${license.tier} · ${license.billing}` : license.tier}
+                        >
+                          <span className="license-status-pill-dot" aria-hidden="true" />
+                          <span className="license-status-pill-text">
+                            ACTIVE
+                            {license.billing && <> · {license.tier.toUpperCase()} {license.billing.toUpperCase()}</>}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          className="license-details-copy-all"
+                          onClick={() => copyToClipboard(composeAccountDetails(license), 'account')}
+                          title="Copy account details (excludes token)"
+                          aria-label="Copy account details (excludes token)"
+                        >
+                          {copiedTarget === 'account' ? <Check size={14} /> : <Copy size={14} />}
+                        </button>
+                      </div>
                     </div>
-                    {license.customerName && (
-                      <div className="license-details-row">
-                        <span className="license-details-label">Name</span>
-                        <span className="license-details-value">{license.customerName}</span>
-                      </div>
-                    )}
-                    {license.customerEmail && (
-                      <div className="license-details-row">
-                        <span className="license-details-label">Email</span>
-                        <span className="license-details-value">{license.customerEmail}</span>
-                      </div>
-                    )}
-                    {license.licenseId && (
-                      <div className="license-details-row">
-                        <span className="license-details-label">License ID</span>
-                        <span className="license-details-value license-id-value">{license.licenseId}</span>
-                      </div>
-                    )}
-                    {license.subscriptionId && (
-                      <div className="license-details-row">
-                        <span className="license-details-label">Subscription ID</span>
-                        <span className="license-details-value license-id-value">{license.subscriptionId}</span>
-                      </div>
-                    )}
-                    {license.customerId && (
-                      <div className="license-details-row">
-                        <span className="license-details-label">Customer ID</span>
-                        <span className="license-details-value license-id-value">{license.customerId}</span>
-                      </div>
-                    )}
-                    {license.discountCode && (
-                      <div className="license-details-row">
-                        <span className="license-details-label">Discount</span>
-                        <span className="license-details-value">
-                          {license.discountCode}
-                          {license.discountCyclesRemaining != null && license.discountCyclesRemaining > 0 && (
-                            <>, {license.discountCyclesRemaining} cycles remaining</>
-                          )}
-                        </span>
-                      </div>
-                    )}
-                    {license.lastSyncAt && (
-                      <div className="license-details-row">
-                        <span className="license-details-label">Last Synced</span>
-                        <span className="license-details-value">{formatFriendlyDate(license.lastSyncAt, USER_TIMEZONE)}</span>
-                      </div>
-                    )}
-                    {license.token && (
-                      <div className="license-details-row license-token-row">
-                        <span className="license-details-label">License Token</span>
-                        <div className="license-token-controls">
-                          <button
-                            type="button"
-                            className="license-details-icon-button"
-                            onClick={() => setTokenRevealed((r) => !r)}
-                            title={tokenRevealed ? 'Hide token' : 'Show token'}
-                            aria-label={tokenRevealed ? 'Hide token' : 'Show token'}
-                          >
-                            {tokenRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
-                          </button>
-                          <button
-                            type="button"
-                            className="license-details-icon-button"
-                            onClick={() => copyToClipboard(license.token!, 'token')}
-                            title="Copy token"
-                            aria-label="Copy token"
-                          >
-                            {copiedTarget === 'token' ? <Check size={14} /> : <Copy size={14} />}
-                          </button>
+
+                    <div className="license-field-grid">
+                      {license.customerName && (
+                        <div className="license-field">
+                          <div className="license-field-header">
+                            <span className="license-field-label">Name</span>
+                          </div>
+                          <div className="license-field-input">
+                            <span className="license-field-value">{license.customerName}</span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.customerName!, 'account')}
+                                title="Copy name"
+                                aria-label="Copy name"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <span className="license-details-value license-token-value">
-                          {tokenRevealed ? license.token : maskToken(license.token)}
-                        </span>
-                      </div>
-                    )}
+                      )}
+                      {license.customerEmail && (
+                        <div className="license-field">
+                          <div className="license-field-header">
+                            <span className="license-field-label">Email</span>
+                          </div>
+                          <div className="license-field-input">
+                            <span className="license-field-value">{license.customerEmail}</span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.customerEmail!, 'account')}
+                                title="Copy email"
+                                aria-label="Copy email"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {license.licenseId && (
+                        <div className="license-field">
+                          <div className="license-field-header">
+                            <span className="license-field-label">License ID</span>
+                          </div>
+                          <div className="license-field-input">
+                            <span className="license-field-value license-field-value--mono">{license.licenseId}</span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.licenseId!, 'account')}
+                                title="Copy License ID"
+                                aria-label="Copy License ID"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {license.subscriptionId && (
+                        <div className="license-field">
+                          <div className="license-field-header">
+                            <span className="license-field-label">Subscription ID</span>
+                          </div>
+                          <div className="license-field-input">
+                            <span className="license-field-value license-field-value--mono">{license.subscriptionId}</span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.subscriptionId!, 'account')}
+                                title="Copy Subscription ID"
+                                aria-label="Copy Subscription ID"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {license.customerId && (
+                        <div className="license-field">
+                          <div className="license-field-header">
+                            <span className="license-field-label">Customer ID</span>
+                          </div>
+                          <div className="license-field-input">
+                            <span className="license-field-value license-field-value--mono">{license.customerId}</span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.customerId!, 'account')}
+                                title="Copy Customer ID"
+                                aria-label="Copy Customer ID"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {license.discountCode && (
+                        <div className="license-field license-field--full">
+                          <div className="license-field-header">
+                            <span className="license-field-label">Discount code</span>
+                            {license.discountCyclesRemaining != null && license.discountCyclesRemaining > 0 && (
+                              <span className="license-field-hint">{license.discountCyclesRemaining} cycles remaining</span>
+                            )}
+                          </div>
+                          <div className="license-field-input">
+                            <span className="license-field-value license-field-value--mono">{license.discountCode}</span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.discountCode!, 'account')}
+                                title="Copy discount code"
+                                aria-label="Copy discount code"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {license.token && (
+                        <div className="license-field license-field--full">
+                          <div className="license-field-header">
+                            <span className="license-field-label">License Token</span>
+                            <span className="license-field-hint">Keep this secret — it authenticates your client.</span>
+                          </div>
+                          <div className="license-field-input license-field-input--token">
+                            <span className="license-field-value license-field-value--mono license-field-value--token">
+                              {tokenRevealed ? license.token : maskToken(license.token)}
+                            </span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => setTokenRevealed((r) => !r)}
+                                title={tokenRevealed ? 'Hide token' : 'Show token'}
+                                aria-label={tokenRevealed ? 'Hide token' : 'Show token'}
+                              >
+                                {tokenRevealed ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.token!, 'token')}
+                                title="Copy token"
+                                aria-label="Copy token"
+                              >
+                                {copiedTarget === 'token' ? <Check size={14} /> : <Copy size={14} />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </>
