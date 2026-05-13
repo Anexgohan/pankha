@@ -266,16 +266,16 @@ jobs:
           cache-from: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }}
           cache-to: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }},mode=max
 
-  # Job 5: Compose release notes (reusable workflow)
-  compose-notes:
-    needs: [build-rust-agents, build-ipmi-agent, build-windows-agent, build-docker]
+  # Job 5: Release notes (reusable workflow, runs in parallel with builds)
+  make-release-notes:
+    name: release notes
     uses: ./.github/workflows/release-notes.yml
     with:
       version: ${{ github.event.inputs.version || github.ref_name }}
 
   # Job 6: Create multi-arch manifest and release
   release:
-    needs: [build-rust-agents, build-ipmi-agent, build-windows-agent, build-docker, compose-notes]
+    needs: [build-rust-agents, build-ipmi-agent, build-windows-agent, build-docker, make-release-notes]
     runs-on: ubuntu-22.04
 
     steps:
@@ -463,7 +463,7 @@ jobs:
             release-assets/*.jpeg
             release-assets/*.gif
             release-assets/*.webp
-          body: ${{ needs.compose-notes.outputs.body }}
+          body: ${{ needs.make-release-notes.outputs.body }}
           draft: false
           prerelease: ${{ steps.version.outputs.is_prerelease == 'true' }}
 

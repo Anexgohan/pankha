@@ -35,6 +35,7 @@ permissions:
 
 jobs:
   compose:
+    name: create
     runs-on: ubuntu-latest
     outputs:
       body: ${{ steps.compose.outputs.body }}
