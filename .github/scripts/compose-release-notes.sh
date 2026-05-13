@@ -50,13 +50,17 @@ if [ -f "$INPUT_NOTES" ]; then
   [ -n "$STRIPPED" ] && HIGHLIGHTS="$RAW"
 fi
 if [ -z "$HIGHLIGHTS" ]; then
-  TAG_MSG=$(git tag -l --format='%(contents)' "$VERSION" 2>/dev/null | sed '/^$/d' || true)
-  # Skip boilerplate annotations like "Release v0.4.23" auto-set by release-public.yml.
-  # Only treat as highlights if the annotation is substantive (>1 line OR doesn't
-  # match the boilerplate pattern).
-  LINE_COUNT=$(echo "$TAG_MSG" | wc -l)
-  if [ -n "$TAG_MSG" ] && ! { [ "$LINE_COUNT" -le 1 ] && echo "$TAG_MSG" | grep -qE "^Release v[0-9]+\.[0-9]+\.[0-9]+"; }; then
-    HIGHLIGHTS="$TAG_MSG"
+  # Only read tag contents for ANNOTATED tags. For lightweight tags
+  # (git tag X without -a -m), `--format='%(contents)'` returns the underlying
+  # commit message, which would leak squash-merge commit bodies into highlights.
+  TAG_TYPE=$(git cat-file -t "$VERSION" 2>/dev/null || true)
+  if [ "$TAG_TYPE" = "tag" ]; then
+    TAG_MSG=$(git tag -l --format='%(contents)' "$VERSION" 2>/dev/null | sed '/^$/d' || true)
+    # Skip boilerplate annotations like "Release v0.4.23" auto-set by release-public.yml.
+    LINE_COUNT=$(echo "$TAG_MSG" | wc -l)
+    if [ -n "$TAG_MSG" ] && ! { [ "$LINE_COUNT" -le 1 ] && echo "$TAG_MSG" | grep -qE "^Release v[0-9]+\.[0-9]+\.[0-9]+"; }; then
+      HIGHLIGHTS="$TAG_MSG"
+    fi
   fi
 fi
 

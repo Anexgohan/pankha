@@ -44,7 +44,7 @@ chmod +x pankha-agent
 ./pankha-agent --start
 ```
 
-### [![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square)](https://github.com/Anexgohan/pankha/releases/download/{{VERSION}}/pankha-agent-windows_x64.msi) Windows Agent
+### [![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4OCIgaGVpZ2h0PSI4OCI+PHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0ibTAgMTIuNDAyIDM1LjY4Ny00Ljg2LjAxNiAzNC40MjMtMzUuNjcuMjAzem0zNS42NyAzMy41MjkuMDI4IDM0LjQ1M0wuMDI4IDc1LjQ4LjAyNiA0NS43em00LjMyNi0zOS4wMjVMODcuMzE0IDB2NDEuNTI3bC00Ny4zMTguMzc2em00Ny4zMjkgMzkuMzQ5LS4wMTEgNDEuMzQtNDcuMzE4LTYuNjc4LS4wNjYtMzQuNzM5eiIvPjwvc3ZnPg==&style=flat-square)](https://github.com/Anexgohan/pankha/releases/download/{{VERSION}}/pankha-agent-windows_x64.msi) Windows Agent
 #### ![Intel 64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD 64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x64 systems:
 ```bash
 # Download MSI form release assets below, then run it
