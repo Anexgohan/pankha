@@ -11,4 +11,5 @@
 * [API Reference](API-Reference)
 * **Development**
   * [Building from Source](Development-Build)
+  * [Release Process](Development-Release-Process)
 * [Troubleshooting](Troubleshooting)
