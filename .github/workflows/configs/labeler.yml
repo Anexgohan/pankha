@@ -50,6 +50,7 @@ devops:
     - any-glob-to-any-file:
       - '.github/**/*'
       - '!.github/workflows/release-public.yml'
+      - '!.github/workflows/release-notes.yml'
       - '!.github/workflows/ci.yml'
       - '.gitignore'
       - '.mailmap'
@@ -69,4 +70,9 @@ vendor-profiles:
 
 dependencies:
   - changed-files:
-    - any-glob-to-any-file: ['**/package.json', '**/package-lock.json']
+    - any-glob-to-any-file:
+      - '**/package.json'
+      - '**/package-lock.json'
+      - '**/packages.lock.json'
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'

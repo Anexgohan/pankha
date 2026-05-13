@@ -266,9 +266,16 @@ jobs:
           cache-from: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }}
           cache-to: type=registry,ref=anexgohan/pankha:buildcache-${{ matrix.tag_suffix }},mode=max
 
-  # Job 5: Create multi-arch manifest and release
-  release:
+  # Job 5: Compose release notes (reusable workflow)
+  compose-notes:
     needs: [build-rust-agents, build-ipmi-agent, build-windows-agent, build-docker]
+    uses: ./.github/workflows/release-notes.yml
+    with:
+      version: ${{ github.event.inputs.version || github.ref_name }}
+
+  # Job 6: Create multi-arch manifest and release
+  release:
+    needs: [build-rust-agents, build-ipmi-agent, build-windows-agent, build-docker, compose-notes]
     runs-on: ubuntu-22.04
 
     steps:
@@ -345,6 +352,11 @@ jobs:
           # Copy Docker deployment files
           cp compose.yml release-assets/
           cp .env release-assets/example.env
+
+          # Copy user-supplied screenshots referenced from .github/input/release-notes.md
+          if [ -d .github/input/images ]; then
+            find .github/input/images -type f ! -name '.gitkeep' -exec cp {} release-assets/ \;
+          fi
 
           # Make binaries executable
           chmod +x release-assets/pankha-agent-*linux_* 2>/dev/null || true
@@ -437,7 +449,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.version }}
-          generate_release_notes: true
           files: |
             release-assets/pankha-agent-linux_x64
             release-assets/pankha-agent-linux_arm64
@@ -447,85 +458,40 @@ jobs:
             release-assets/compose.yml
             release-assets/example.env
             release-assets/checksums.txt
-          body: |
-            ## Pankha Fan Control (पंखा) ${{ steps.version.outputs.is_prerelease == 'true' && '- Pre-release' || '- Release' }} ${{ steps.version.outputs.version }}
-
-            ### Instructions:
-              1. Deploy the Pankha Server Docker Container
-              2. Deploy the Pankha Agents to your client devices
-              3. Access the Pankha Web Interface at `http://<server-ip>:<port>`
-
-            ## ![Docker](https://img.shields.io/badge/-Docker-0db7ed?logo=docker&logoColor=white&style=flat-square) Quick Start (Pankha Server)
-            **Docker Compose Method (Recommended):**
-            ```bash
-            # Download Docker Compose files from release
-            wget -O compose.yml https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/compose.yml
-            wget -O .env https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/example.env
-
-            # Edit .env with your settings, then start
-            docker compose up -d
-            ```
-
-            **Docker Run Method:**
-            ```bash
-            # Specific version (recommended for production)
-            docker run -d --name pankha anexgohan/pankha:${{ steps.version.outputs.version }}
-
-            # Latest version
-            docker run -d --name pankha anexgohan/pankha:latest
-            ```
-
-            ## Quick Start (Pankha Agents)
-            
-            ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agents
-            #### ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x64 systems:
-            ```bash
-            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_x64
-            chmod +x pankha-agent
-            ./pankha-agent --setup
-            ./pankha-agent --start
-            ```
-
-            #### ![ARM64](https://img.shields.io/badge/CPU-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For ARM64 systems (Raspberry Pi 5):
-            ```bash
-            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-linux_arm64
-            chmod +x pankha-agent
-            ./pankha-agent --setup
-            ./pankha-agent --start
-            ```
-
-            ### [![Windows](https://img.shields.io/badge/CPU-x64-0078D4?logo=windows&logoColor=white&style=flat-square&labelColor=333&logoSize=auto)](https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-windows_x64.msi) Windows Agent
-            #### ![Intel 64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD 64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x64 systems:
-            ```bash
-            # Download MSI form release assets below, then run it
-            wget -O pankha-agent-windows_x64.msi https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-windows_x64.msi
-            ```
-
-            ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) IPMI Host Agent (Enterprise Servers)
-            #### ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For servers with /dev/ipmi0 (Dell, Supermicro, ASRock, Tyan, Lenovo):
-            ```bash
-            wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/pankha-agent-ipmi-linux_x64
-            chmod +x pankha-agent
-            ./pankha-agent --setup
-            ./pankha-agent --start
-            ```
-
-            ### ![SHA256](https://img.shields.io/badge/-SHA256-28A745?logo=gnuprivacyguard&logoColor=white&style=flat-square) Verify Download Integrity
-            ```bash
-            wget -O checksums.txt https://github.com/Anexgohan/pankha/releases/download/${{ steps.version.outputs.version }}/checksums.txt
-            sha256sum -c checksums.txt
-            ```
-
-            ## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square)
-
-            - [Installation Guide](https://github.com/Anexgohan/pankha/wiki/Installation)
-            - [Agent Setup Guide](https://github.com/Anexgohan/pankha/wiki/Agent-Setup)
-            - [Configuration](https://github.com/Anexgohan/pankha/wiki/Configuration)
-            - [API Documentation](https://github.com/Anexgohan/pankha/wiki/API-Reference)
-            - [Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)
-
+            release-assets/*.png
+            release-assets/*.jpg
+            release-assets/*.jpeg
+            release-assets/*.gif
+            release-assets/*.webp
+          body: ${{ needs.compose-notes.outputs.body }}
           draft: false
           prerelease: ${{ steps.version.outputs.is_prerelease == 'true' }}
+
+      # Reset .github/input/release-notes.md to its template and clear images/
+      # so the next release starts from a clean slate. Commit back to main.
+      # (The published GitHub Release page is the canonical archive; git log of
+      # release-notes.md preserves the authored prose per release.)
+      - name: Reset release notes input
+        if: success()
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          # Switch to latest main for the cleanup commit
+          git fetch origin main
+          git checkout -B main origin/main
+
+          bash .github/scripts/reset-release-notes.sh
+          find .github/input/images -type f ! -name '.gitkeep' -delete 2>/dev/null || true
+
+          git config user.name "Anexgohan"
+          git config user.email "monish05m@gmail.com"
+          git add .github/input/release-notes.md .github/input/images
+          if git diff --cached --quiet; then
+            echo "No release-notes changes to commit"
+          else
+            git commit -m "chore: reset release-notes input after ${VERSION}"
+            git push origin main
+          fi
 
       # Summary
       - name: Release Summary

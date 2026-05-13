@@ -1,0 +1,66 @@
+# REPO: pankha (public) | Composes the GitHub Release body for a tag.
+# Called via workflow_call from release-public.yml during the release pipeline,
+# or via workflow_dispatch to refresh notes on an existing release without
+# rebuilding agents/Docker.
+name: release-notes
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+    outputs:
+      body:
+        description: 'Composed GitHub Release body markdown'
+        value: ${{ jobs.compose.outputs.body }}
+      has_images:
+        description: 'true if .github/input/images/ contains user-supplied files'
+        value: ${{ jobs.compose.outputs.has_images }}
+      release_type:
+        description: 'Release or Pre-release'
+        value: ${{ jobs.compose.outputs.release_type }}
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g. v0.4.24) — must already exist as a tag'
+        required: true
+      update_existing_release:
+        description: 'Apply the composed body to the existing GitHub Release in place'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    outputs:
+      body: ${{ steps.compose.outputs.body }}
+      has_images: ${{ steps.compose.outputs.has_images }}
+      release_type: ${{ steps.compose.outputs.release_type }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history + all tags for diff base resolution
+
+      - name: Compose release notes
+        id: compose
+        run: bash .github/scripts/compose-release-notes.sh "${{ inputs.version }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: Preview body (logs)
+        run: |
+          echo "::group::Composed body.md"
+          cat body.md
+          echo "::endgroup::"
+
+      - name: Update existing release body (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch' && inputs.update_existing_release
+        run: gh release edit "${{ inputs.version }}" --notes-file body.md --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
