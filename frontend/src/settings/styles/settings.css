@@ -929,67 +929,6 @@
   color: var(--color-error);
 }
 
-/* Appearance Controls */
-.aesthetics-compact-list {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-    margin-top: 1rem;
-}
-
-.aesthetics-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.6rem 0.75rem !important;
-    background: var(--bg-tertiary);
-    border-radius: 6px;
-    border: 1px solid var(--border-color);
-    transition: all 0.2s ease;
-    position: relative;
-}
-
-.aesthetics-row:hover {
-    background: color-mix(in srgb, var(--color-hover-tint-dynamic) 4%, var(--bg-tertiary));
-    border-color: rgba(255, 255, 255, 0.1);
-}
-
-.aesthetics-row::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: var(--color-accent-dynamic);
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    border-radius: 2px 0 0 2px;
-}
-
-.aesthetics-row:hover::before {
-    opacity: 1;
-}
-
-.aesthetics-row .setting-label {
-    margin-bottom: 0;
-    font-size: 0.85rem;
-    color: var(--color-text-dim);
-    min-width: unset;
-    margin-right: 1rem;
-}
-
-.tactical-accent-picker {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.font-select-wrapper {
-  width: 100%;
-  max-width: 220px;
-}
-
 .font-select {
   width: 100%;
   padding: 6px 10px;
@@ -1908,11 +1847,14 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
+  background: var(--bg-panels_01);
   box-shadow: var(--shadow-2xl);
   border: 1px solid var(--border-color);
   backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   user-select: none;
 }
+
 
 .picker-header {
   display: flex;
@@ -2801,150 +2743,207 @@
 }
 
 /* ═══════════════════════════════════════════
-   Temperature Thresholds Settings
+   Appearance — Native Rows
+   Reuses .setting-item / .setting-info-wrapper
+   so Appearance rows match GUI Settings rows.
    ═══════════════════════════════════════════ */
 
-/* Wrapper - visual container for the whole appearance section */
-.appearance-wrapper {
+/* ─── Color row control ───────────────────── */
+.appearance-color-control {
   display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-lg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  background: var(--bg-secondary);
-}
-
-.appearance-wrapper .threshold-section-header:not(:first-child) {
-  margin-top: var(--spacing-xl);
-}
-
-.threshold-section-header .settings-info {
-  margin-bottom: 0;
-}
-
-@media (max-width: 600px) {
-  .appearance-wrapper {
-    padding: var(--spacing-md);
-    gap: var(--spacing-sm);
-  }
-}
-
-.threshold-section-header {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  padding: 0 var(--spacing-sm);
-}
-
-@media (max-width: 600px) {
-  .threshold-section-header {
-    padding: 0;
-  }
-}
-
-.threshold-wrapper-title {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  color: var(--text-primary);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: -0.01em;
-}
-
-/* Wrapper - sub-container for the threshold section */
-.threshold-wrapper {
-  display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--spacing-md);
-  padding: var(--spacing-md);
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
-@media (max-width: 600px) {
-  .threshold-wrapper {
-    padding: var(--spacing-sm);
-    gap: var(--spacing-sm);
-  }
+.appearance-color-presets {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-wrap: wrap;
 }
 
-/* Card grid - 2 columns on desktop, 1 on mobile */
-@media (min-width: 601px) {
-  .threshold-card-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    grid-template-rows: repeat(2, auto);
-    grid-auto-flow: column;
-    gap: var(--spacing-md);
-    padding-inline: var(--spacing-xl);
-  }
+.appearance-color-preset {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s ease, outline-color 0.15s ease, border-color 0.15s ease;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
 }
 
-@media (max-width: 600px) {
-  .threshold-card-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    padding-inline: var(--spacing-sm);
-    gap: var(--spacing-sm);
-  }
+.appearance-color-preset:hover {
+  transform: scale(1.1);
 }
 
-.threshold-card {
+.appearance-color-preset.active {
+  border-color: var(--text-primary);
+  outline-color: var(--color-accent-dynamic);
+}
+
+.appearance-color-divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border-color-dimmed);
+}
+
+/* ─── Font row control ────────────────────── */
+.appearance-font-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  min-width: 0;
+  justify-content: flex-end;
+}
+
+.appearance-font-sample {
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+  padding-right: var(--spacing-md);
+  border-right: 1px solid var(--border-color-dimmed);
+}
+
+.appearance-font-control .font-select {
+  min-width: 200px;
+  margin: 0;
+}
+
+/* ─── Threshold row (wide, stacked content) ─ */
+.appearance-threshold-item {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch !important;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg) !important;
+}
+
+.appearance-threshold-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+}
+
+/* Reuse scale-presets for the type tabs; tighten padding so it fits more pills */
+.appearance-threshold-tabs .scale-preset-btn {
+  min-width: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+}
+
+/* Slim vertical rule between the base tabs (Global/Customise) and revealed type tabs */
+.appearance-threshold-tabs-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 4px 2px;
+  background: var(--border-color-dimmed);
+  flex-shrink: 0;
+}
+
+.appearance-threshold-chips {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacing-sm);
+}
+
+.appearance-threshold-chip {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
   padding: var(--spacing-sm) var(--spacing-md);
   background: var(--bg-tertiary);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color-dimmed);
   border-left: 3px solid transparent;
-  transition: all 0.2s ease;
-  min-width: 0; /* Allow shrinking */
+  border-radius: var(--radius-md);
+  min-width: 0;
 }
 
-@media (max-width: 480px) {
-  .threshold-card {
-    padding-inline: var(--spacing-sm);
-    gap: var(--spacing-xs);
-  }
-}
-
-.threshold-card:hover {
-  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 4%, var(--bg-tertiary));
-}
-
-.threshold-spacer {
+.appearance-threshold-chip-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   flex: 1;
+  min-width: 0;
 }
 
+.appearance-threshold-chip-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.appearance-threshold-chip-value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.appearance-threshold-chip-input {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.appearance-threshold-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xs);
+  flex-wrap: wrap;
+}
+
+.appearance-threshold-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.appearance-threshold-hint {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+  flex: 1;
+  min-width: 0;
+}
+
+.appearance-threshold-hint strong {
+  color: var(--color-accent-dynamic);
+  font-weight: var(--font-weight-bold);
+}
+
+/* Paste-Global keeps the threshold-action-btn look but admits a text label */
+.appearance-threshold-paste-btn {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ─── Reused classes (kept from the old block) ─── */
 .threshold-color-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   box-shadow: 0 0 6px currentColor;
-}
-
-.threshold-level-label {
-  font-size: var(--font-size-sm);
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
-  min-width: 52px;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (max-width: 400px) {
-  .threshold-card {
-    padding: var(--spacing-sm);
-    gap: var(--spacing-xs);
-  }
-  
-  .threshold-level-label {
-    min-width: 40px;
-  }
 }
 
 .threshold-input {
@@ -2954,16 +2953,9 @@
   text-align: center;
 }
 
-/* Spinner arrows visible for easy value adjustment */
-
 .threshold-unit {
   font-size: var(--font-size-sm);
   color: var(--text-tertiary);
-}
-
-.threshold-color-picker {
-  display: flex;
-  align-items: center;
 }
 
 .threshold-action-btn {
@@ -2986,119 +2978,6 @@
   background: color-mix(in srgb, var(--color-accent-dynamic) 8%, transparent);
 }
 
-/* Per-type toggle */
-.threshold-per-type-toggle {
-  background: transparent !important;
-  border: none !important;
-  padding: var(--spacing-sm) 0 !important;
-}
-
-.threshold-per-type-toggle::before {
-  display: none !important;
-}
-
-.threshold-checkbox-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--radius-sm);
-  transition: all 0.2s ease;
-}
-
-.threshold-checkbox-btn:hover {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-/* Per-type cards - same design as global cards */
-.threshold-per-type-container {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  animation: fadeIn 0.2s ease-out;
-  width: fit-content;
-  margin: 0 auto;
-  max-width: 100%;
-}
-
-@media (max-width: 600px) {
-  .threshold-per-type-container {
-    width: 100%;
-  }
-}
-
-.threshold-type-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.threshold-type-label {
-  font-size: var(--font-size-xs);
-  color: var(--text-tertiary);
-  font-weight: var(--font-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding-left: var(--spacing-xs);
-}
-
-.threshold-type-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--spacing-md);
-}
-
-@media (max-width: 600px) {
-  .threshold-type-cards {
-    grid-template-columns: 1fr;
-    gap: var(--spacing-sm);
-  }
-}
-
-/* Aesthetics Rows */
-.aesthetics-compact-list {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-md);
-}
-
-.aesthetics-row {
-  display: flex;
-  flex-direction: column !important;
-  align-items: center !important;
-  gap: var(--spacing-sm) !important;
-  padding: var(--spacing-md) !important;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  text-align: center;
-}
-
-.aesthetics-row .setting-label {
-  margin: 0 !important;
-  font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-sm);
-}
-
-@media (max-width: 500px) {
-  .aesthetics-compact-list {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* Reset row */
-.threshold-reset-row {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: var(--spacing-sm);
-}
-
 .threshold-reset-btn {
   display: flex;
   align-items: center;
@@ -3117,5 +2996,165 @@
 .threshold-reset-btn:hover {
   color: var(--color-error);
   border-color: var(--color-error);
-  background: rgba(244, 67, 54, 0.08);
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+
+/* ─── ThresholdStrip ──────────────────────── */
+.threshold-strip {
+  padding: 22px 8px 4px;
+}
+
+.threshold-strip.read-only {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.threshold-strip-track {
+  position: relative;
+  width: 100%;
+  height: 56px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color-dimmed);
+  user-select: none;
+  touch-action: none;
+}
+
+.threshold-strip-tick {
+  position: absolute;
+  top: 4px;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.78);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+
+[data-theme="light"] .threshold-strip-tick {
+  color: rgba(0, 0, 0, 0.7);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+}
+
+.threshold-strip-handle {
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  transform: translateX(-50%);
+  width: 14px;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+}
+
+.threshold-strip-handle:active {
+  cursor: grabbing;
+}
+
+.threshold-strip-grip {
+  display: block;
+  width: 4px;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  border-radius: 2px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="light"] .threshold-strip-grip {
+  background: var(--bg-primary);
+  border-color: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+.threshold-strip-label {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-secondary);
+  border: 1px solid var(--handle-color);
+  color: var(--handle-color);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ─── Tablet ──────────────────────────────── */
+@media (max-width: 900px) {
+  .appearance-threshold-chips {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─── Phone ───────────────────────────────── */
+@media (max-width: 600px) {
+  .settings-group-appearance .setting-item {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  .appearance-color-control,
+  .appearance-font-control {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .appearance-color-divider {
+    display: none;
+  }
+
+  .appearance-font-sample {
+    white-space: normal;
+    max-width: 100%;
+    padding: var(--spacing-xs) var(--spacing-sm);
+    border-right: none;
+    border-left: 2px solid var(--color-accent-dynamic);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: color-mix(in srgb, var(--color-accent-dynamic) 4%, transparent);
+  }
+
+  .appearance-font-control {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .appearance-font-control .font-select {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .appearance-threshold-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .appearance-threshold-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .appearance-threshold-chip {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-xs);
+  }
+
+  .appearance-threshold-chip-head {
+    justify-content: space-between;
+  }
+}
+
+/* ─── Small phone ─────────────────────────── */
+@media (max-width: 480px) {
+  .appearance-threshold-chips {
+    grid-template-columns: 1fr;
+  }
 }

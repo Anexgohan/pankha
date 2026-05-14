@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import '../styles/settings.css';
 
 interface ColorPickerProps {
@@ -21,7 +21,9 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label, prese
   const [hsv, setHsv] = useState({ h: 0, s: 0, v: 0 });
   const [isOpen, setIsOpen] = useState(false);
   const [initialColor, setInitialColor] = useState(color);
+  const [dropdownPos, setDropdownPos] = useState<React.CSSProperties>({});
   const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLDivElement>(null);
   const svAreaRef = useRef<HTMLDivElement>(null);
   const hueSliderRef = useRef<HTMLDivElement>(null);
 
@@ -93,6 +95,80 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label, prese
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Viewport-aware positioning — anchors to the trigger rect, prefers below
+  // and right-aligned, flips above if the bottom would overflow, then clamps
+  // so the dropdown stays fully on-screen. Sets max-height so its inner
+  // content scrolls when it can't fully fit either way. Same pattern as
+  // BulkEditPanel.tsx L92. Held visibility:hidden until first compute lands
+  // so the dropdown never paints at its CSS-default off-screen position.
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setDropdownPos({});
+      return;
+    }
+    const compute = () => {
+      const trigger = triggerRef.current;
+      const dropdown = pickerRef.current?.querySelector<HTMLDivElement>('.picker-dropdown');
+      if (!trigger || !dropdown) return;
+      const r = trigger.getBoundingClientRect();
+      const panelWidth = dropdown.offsetWidth;
+      const panelHeight = dropdown.offsetHeight;
+      const vv = (window as Window & { visualViewport?: VisualViewport }).visualViewport;
+      const viewportWidth = vv?.width ?? window.innerWidth;
+      const viewportHeight = vv?.height ?? window.innerHeight;
+      const gap = 8;
+      const edge = 10;
+
+      // Horizontal: right-align to trigger; flip to left-align if right
+      // would overflow the left edge; clamp inside viewport.
+      let left = r.right - panelWidth;
+      if (left < edge) left = r.left;
+      if (left + panelWidth > viewportWidth - edge) left = viewportWidth - panelWidth - edge;
+      if (left < edge) left = edge;
+
+      // Vertical: prefer below; flip above if bottom would overflow and
+      // above has more room; otherwise pin to the edge with scroll.
+      const spaceBelow = viewportHeight - r.bottom - gap - edge;
+      const spaceAbove = r.top - gap - edge;
+      let top: number;
+      let maxHeight: number;
+      if (panelHeight <= spaceBelow) {
+        top = r.bottom + gap;
+        maxHeight = spaceBelow;
+      } else if (panelHeight <= spaceAbove) {
+        top = r.top - panelHeight - gap;
+        maxHeight = spaceAbove;
+      } else if (spaceBelow >= spaceAbove) {
+        top = r.bottom + gap;
+        maxHeight = spaceBelow;
+      } else {
+        top = edge;
+        maxHeight = spaceAbove;
+      }
+
+      setDropdownPos({
+        position: 'fixed',
+        top,
+        left,
+        right: 'auto',
+        bottom: 'auto',
+        maxHeight,
+        overflowY: 'auto',
+        visibility: 'visible',
+      });
+    };
+    compute();
+    window.addEventListener('resize', compute);
+    window.addEventListener('scroll', compute, true);
+    const vv = (window as Window & { visualViewport?: VisualViewport }).visualViewport;
+    vv?.addEventListener('resize', compute);
+    return () => {
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('scroll', compute, true);
+      vv?.removeEventListener('resize', compute);
+    };
+  }, [isOpen]);
+
   const handleSvChange = useCallback((e: React.MouseEvent | React.TouchEvent | MouseEvent | TouchEvent) => {
     if (!svAreaRef.current) return;
     const rect = svAreaRef.current.getBoundingClientRect();
@@ -139,20 +215,24 @@ const ColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, label, prese
 
   return (
     <div className="custom-color-picker-container" ref={pickerRef}>
-      <div 
-        className="picker-trigger" 
+      <div
+        className="picker-trigger"
+        ref={triggerRef}
         onClick={() => {
           if (!isOpen) setInitialColor(color);
           setIsOpen(!isOpen);
         }}
-        style={{ '--current-color': color } as React.CSSProperties}
+        style={{ '--current-color': color, touchAction: 'manipulation' } as React.CSSProperties}
       >
         <div className="trigger-preview" />
         <span className="trigger-hex">{color}</span>
       </div>
 
       {isOpen && (
-        <div className="picker-dropdown glass-panel animate-in">
+        <div
+          className="picker-dropdown glass-panel animate-in"
+          style={{ visibility: 'hidden', ...dropdownPos }}
+        >
           <div className="picker-header">
             {label && <div className="picker-label">{label}</div>}
             {presets && (
