@@ -10,6 +10,7 @@ import { formatDate, formatFriendlyDate, USER_TIMEZONE } from '../../utils/forma
 import { toast } from '../../utils/toast';
 import { useDemoMode } from '../../hooks/useDemoMode';
 import ColorPicker from './ColorPicker';
+import ThresholdStrip from './ThresholdStrip';
 import {
   Github,
   ExternalLink,
@@ -24,8 +25,6 @@ import {
   Tag,
   ClipboardPaste,
   RotateCcw,
-  Square,
-  CheckSquare,
   Copy,
   Check,
   KeyRound,
@@ -862,6 +861,9 @@ const Settings: React.FC = () => {
   const [isCustomRetention, setIsCustomRetention] = useState(false);
   const [customRetentionInput, setCustomRetentionInput] = useState(dataRetentionDays.toString());
 
+  type ThresholdTab = 'global' | 'customise' | 'cpu' | 'gpu' | 'nvme' | 'mobo';
+  const [activeThresholdType, setActiveThresholdType] = useState<ThresholdTab>('global');
+
   const {
     accentColor, updateAccentColor,
     hoverTintColor, updateHoverTintColor,
@@ -884,6 +886,35 @@ const Settings: React.FC = () => {
     { name: 'Toxic Green', color: '#4CAF50' },
     { name: 'Mistic Water', color: '#0FEEEE' },
   ];
+
+  // Temperature-themed presets per status level. Kept short on purpose —
+  // these guide the user toward sane hues, not give every shade.
+  const tempColorPresets: Record<'normal' | 'caution' | 'warning' | 'critical', { name: string; color: string }[]> = {
+    normal: [
+      { name: 'Toxic Green', color: '#4CAF50' },
+      { name: 'Emerald', color: '#00C853' },
+      { name: 'Mint', color: '#2ECC71' },
+      { name: 'Sage', color: '#66BB6A' },
+    ],
+    caution: [
+      { name: 'Amber', color: '#FFCA28' },
+      { name: 'Goldenrod', color: '#FFC107' },
+      { name: 'Lemon', color: '#FDD835' },
+      { name: 'Bold Saffron', color: '#F0741E' },
+    ],
+    warning: [
+      { name: 'Hazard Orange', color: '#FF9800' },
+      { name: 'Tangerine', color: '#FF6F00' },
+      { name: 'Deep Orange', color: '#FF5722' },
+      { name: 'Marigold', color: '#FFAB00' },
+    ],
+    critical: [
+      { name: 'Crimson', color: '#F44336' },
+      { name: 'Inferno', color: '#c80f0f' },
+      { name: 'Maroon', color: '#B71C1C' },
+      { name: 'Vermilion', color: '#FF3C00' },
+    ],
+  };
   
   // Update custom inputs when global values change (e.g. from preset)
   useEffect(() => {
@@ -1569,22 +1600,35 @@ const Settings: React.FC = () => {
                 <div className="settings-group-header">
                   <h3 className="settings-group-title">Appearance</h3>
                   <p className="settings-group-info">
-                    Theme colors and temperature status styling.
+                    Theme colors, typography, and temperature status styling.
                   </p>
                 </div>
 
-              <div className="appearance-wrapper">
-                <div className="threshold-section-header">
-                  <h4 className="threshold-wrapper-title">Theme Colors</h4>
-                  <p className="settings-info">
-                    Customize the primary accent and interaction colors for the interface.
-                  </p>
-                </div>
+                <div className="settings-list">
 
-                <div className="settings-list aesthetics-compact-list">
-                  <div className="setting-item aesthetics-row" style={{ '--row-accent': accentColor, borderLeft: `3px solid ${accentColor}` } as React.CSSProperties}>
-                    <span className="setting-label">Accent Color</span>
-                    <div className="tactical-accent-picker">
+                  {/* Accent Color */}
+                  <div className="setting-item">
+                    <div className="setting-info-wrapper">
+                      <span className="setting-label">Accent Color</span>
+                      <span className="setting-description">
+                        Primary brand color — buttons, focus rings, tab underlines, active states.
+                      </span>
+                    </div>
+                    <div className="appearance-color-control">
+                      <div className="appearance-color-presets">
+                        {tacticalPresets.map((p) => (
+                          <button
+                            key={p.color}
+                            type="button"
+                            className={`appearance-color-preset ${accentColor.toLowerCase() === p.color.toLowerCase() ? 'active' : ''}`}
+                            style={{ backgroundColor: p.color }}
+                            title={p.name}
+                            onClick={() => updateAccentColor(p.color)}
+                            aria-label={`Accent: ${p.name}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="appearance-color-divider" aria-hidden />
                       <ColorPicker
                         color={accentColor}
                         onChange={updateAccentColor}
@@ -1594,9 +1638,29 @@ const Settings: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="setting-item aesthetics-row" style={{ '--row-accent': hoverTintColor, borderLeft: `3px solid ${hoverTintColor}` } as React.CSSProperties}>
-                    <span className="setting-label">Hover Tint</span>
-                    <div className="tactical-accent-picker">
+                  {/* Hover Tint */}
+                  <div className="setting-item">
+                    <div className="setting-info-wrapper">
+                      <span className="setting-label">Hover Tint</span>
+                      <span className="setting-description">
+                        Bloom color that washes over rows and controls on mouse-over.
+                      </span>
+                    </div>
+                    <div className="appearance-color-control">
+                      <div className="appearance-color-presets">
+                        {tacticalPresets.map((p) => (
+                          <button
+                            key={p.color}
+                            type="button"
+                            className={`appearance-color-preset ${hoverTintColor.toLowerCase() === p.color.toLowerCase() ? 'active' : ''}`}
+                            style={{ backgroundColor: p.color }}
+                            title={p.name}
+                            onClick={() => updateHoverTintColor(p.color)}
+                            aria-label={`Hover: ${p.name}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="appearance-color-divider" aria-hidden />
                       <ColorPicker
                         color={hoverTintColor}
                         onChange={updateHoverTintColor}
@@ -1605,19 +1669,22 @@ const Settings: React.FC = () => {
                       />
                     </div>
                   </div>
-                </div>
 
-                <div className="threshold-section-header">
-                  <h4 className="threshold-wrapper-title">Typography</h4>
-                  <p className="settings-info">
-                    Choose the primary and secondary fonts used across the interface.
-                  </p>
-                </div>
-
-                <div className="settings-list aesthetics-compact-list">
-                  <div className="setting-item aesthetics-row">
-                    <span className="setting-label">Primary Font</span>
-                    <div className="font-select-wrapper">
+                  {/* Primary Font */}
+                  <div className="setting-item">
+                    <div className="setting-info-wrapper">
+                      <span className="setting-label">Primary Font</span>
+                      <span className="setting-description">
+                        The interface body font. Used for everything except numeric monospace areas.
+                      </span>
+                    </div>
+                    <div className="appearance-font-control">
+                      <span
+                        className="appearance-font-sample"
+                        style={{ fontFamily: PRIMARY_FONT_OPTIONS.find((o) => o.value === primaryFont)?.stack }}
+                      >
+                        The quick brown fox jumps over the lazy dog
+                      </span>
                       <select
                         className="font-select"
                         value={primaryFont}
@@ -1632,9 +1699,21 @@ const Settings: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="setting-item aesthetics-row">
-                    <span className="setting-label">Secondary Font</span>
-                    <div className="font-select-wrapper">
+                  {/* Secondary Font */}
+                  <div className="setting-item">
+                    <div className="setting-info-wrapper">
+                      <span className="setting-label">Secondary Font</span>
+                      <span className="setting-description">
+                        Monospace face — temperatures, fan speeds, hex codes, code blocks.
+                      </span>
+                    </div>
+                    <div className="appearance-font-control">
+                      <span
+                        className="appearance-font-sample"
+                        style={{ fontFamily: SECONDARY_FONT_OPTIONS.find((o) => o.value === secondaryFont)?.stack }}
+                      >
+                        42.7°C · 1800 RPM · 0xDEADBEEF
+                      </span>
                       <select
                         className="font-select"
                         value={secondaryFont}
@@ -1648,238 +1727,221 @@ const Settings: React.FC = () => {
                       </select>
                     </div>
                   </div>
-                </div>
 
-                {/* Temperature Thresholds - sub-section heading */}
-                <div className="threshold-section-header">
-                  <h4 className="threshold-wrapper-title">Temperature Thresholds</h4>
-                  <p className="settings-info">
-                    Configure when sensor status changes color on the dashboard.
-                  </p>
-                </div>
+                  {/* Temperature Thresholds — wide row */}
+                  {(() => {
+                    const isTypeTab =
+                      activeThresholdType === 'cpu' ||
+                      activeThresholdType === 'gpu' ||
+                      activeThresholdType === 'nvme' ||
+                      activeThresholdType === 'mobo';
+                    const isCustomiseTab = activeThresholdType === 'customise';
+                    const typeTabsVisible = isCustomiseTab || isTypeTab;
 
-                <div className="threshold-wrapper">
-                  <div className="settings-list">
-                {/* Global Thresholds - Card Grid */}
-                <div className="threshold-card-grid">
-                  {/* Normal - color only */}
-                  <div className="threshold-card" style={{ borderLeftColor: tempColors.normal }}>
-                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.normal }} />
-                    <span className="threshold-level-label">Normal</span>
-                    <div className="threshold-color-picker">
-                      <ColorPicker
-                        color={tempColors.normal}
-                        onChange={(c) => updateTempColors({ ...tempColors, normal: c })}
-                        label="Normal"
-                      />
-                    </div>
-                  </div>
+                    const activeThresholds = isTypeTab
+                      ? (perTypeThresholds[activeThresholdType] ?? { ...tempThresholds })
+                      : tempThresholds;
 
-                  {/* Caution */}
-                  <div className="threshold-card" style={{ borderLeftColor: tempColors.caution }}>
-                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.caution }} />
-                    <span className="threshold-level-label">Caution</span>
-                    <input
-                      type="number"
-                      className="setting-input threshold-input"
-                      value={tempThresholds.caution}
-                      min={1}
-                      max={tempThresholds.warning - 1}
-                      onChange={(e) => {
-                        const raw = parseInt(e.target.value, 10);
-                        if (isNaN(raw)) return;
-                        const val = Math.max(1, Math.min(tempThresholds.warning - 1, raw));
-                        updateTempThresholds({ ...tempThresholds, caution: val });
-                      }}
-                    />
-                    <span className="threshold-unit">°C</span>
-                    <div className="threshold-color-picker">
-                      <ColorPicker
-                        color={tempColors.caution}
-                        onChange={(c) => updateTempColors({ ...tempColors, caution: c })}
-                        label="Caution"
-                      />
-                    </div>
-                  </div>
+                    const updateActiveThresholds = (next: typeof tempThresholds) => {
+                      if (isTypeTab) {
+                        if (!perTypeEnabled) setPerTypeEnabled(true);
+                        updatePerTypeThresholds({ ...perTypeThresholds, [activeThresholdType]: next });
+                      } else if (activeThresholdType === 'global') {
+                        updateTempThresholds(next);
+                      }
+                      // 'customise' is a meta-tab — drag/edits are disabled until a type is picked.
+                    };
 
-                  {/* Warning */}
-                  <div className="threshold-card" style={{ borderLeftColor: tempColors.warning }}>
-                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.warning }} />
-                    <span className="threshold-level-label">Warning</span>
-                    <input
-                      type="number"
-                      className="setting-input threshold-input"
-                      value={tempThresholds.warning}
-                      min={tempThresholds.caution + 1}
-                      max={tempThresholds.critical - 1}
-                      onChange={(e) => {
-                        const raw = parseInt(e.target.value, 10);
-                        if (isNaN(raw)) return;
-                        const val = Math.max(tempThresholds.caution + 1, Math.min(tempThresholds.critical - 1, raw));
-                        updateTempThresholds({ ...tempThresholds, warning: val });
-                      }}
-                    />
-                    <span className="threshold-unit">°C</span>
-                    <div className="threshold-color-picker">
-                      <ColorPicker
-                        color={tempColors.warning}
-                        onChange={(c) => updateTempColors({ ...tempColors, warning: c })}
-                        label="Warning"
-                      />
-                    </div>
-                  </div>
+                    const handleTabClick = (key: ThresholdTab) => {
+                      if (key === 'global') {
+                        setPerTypeEnabled(false);
+                      } else if (key === 'customise') {
+                        setPerTypeEnabled(true);
+                      } else {
+                        if (!perTypeEnabled) setPerTypeEnabled(true);
+                      }
+                      setActiveThresholdType(key);
+                    };
 
-                  {/* Critical */}
-                  <div className="threshold-card" style={{ borderLeftColor: tempColors.critical }}>
-                    <span className="threshold-color-dot" style={{ backgroundColor: tempColors.critical }} />
-                    <span className="threshold-level-label">Critical</span>
-                    <input
-                      type="number"
-                      className="setting-input threshold-input"
-                      value={tempThresholds.critical}
-                      min={tempThresholds.warning + 1}
-                      max={150}
-                      onChange={(e) => {
-                        const raw = parseInt(e.target.value, 10);
-                        if (isNaN(raw)) return;
-                        const val = Math.max(tempThresholds.warning + 1, Math.min(150, raw));
-                        updateTempThresholds({ ...tempThresholds, critical: val });
-                      }}
-                    />
-                    <span className="threshold-unit">°C</span>
-                    <div className="threshold-color-picker">
-                      <ColorPicker
-                        color={tempColors.critical}
-                        onChange={(c) => updateTempColors({ ...tempColors, critical: c })}
-                        label="Critical"
-                      />
-                    </div>
-                  </div>
-                </div>
+                    const baseTabs: { key: ThresholdTab; label: string }[] = [
+                      { key: 'global', label: 'Global' },
+                      { key: 'customise', label: 'Customise' },
+                    ];
+                    const typeTabs: { key: ThresholdTab; label: string }[] = [
+                      { key: 'cpu', label: 'CPU' },
+                      { key: 'gpu', label: 'GPU' },
+                      { key: 'nvme', label: 'NVMe' },
+                      { key: 'mobo', label: 'Mobo' },
+                    ];
 
-                {/* Per-type toggle */}
-                <div className="setting-item threshold-per-type-toggle">
-                  <button
-                    className="threshold-checkbox-btn"
-                    onClick={() => setPerTypeEnabled(!perTypeEnabled)}
-                  >
-                    {perTypeEnabled ? <CheckSquare size={16} /> : <Square size={16} />}
-                    <span>Customize per type</span>
-                  </button>
-                </div>
-
-                {/* Per-type cards (expanded) */}
-                {perTypeEnabled && (
-                  <div className="threshold-per-type-container">
-                    {(['cpu', 'gpu', 'nvme', 'mobo'] as const).map((type) => {
-                      const t = perTypeThresholds[type] || { ...tempThresholds };
-                      const label = type === 'nvme' ? 'NVMe' : type === 'mobo' ? 'Mobo' : type.toUpperCase();
-                      return (
-                        <div key={type} className="threshold-type-group">
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span className="threshold-type-label">{label}</span>
-                            <button
-                              className="threshold-action-btn"
-                              onClick={() => {
-                                updatePerTypeThresholds({
-                                  ...perTypeThresholds,
-                                  [type]: { ...tempThresholds },
-                                });
-                                toast.success(`${label} reset to global values`);
-                              }}
-                              title="Paste global thresholds"
-                            >
-                              <ClipboardPaste size={14} />
-                            </button>
+                    return (
+                      <div className="setting-item appearance-threshold-item">
+                        <div className="appearance-threshold-head">
+                          <div className="setting-info-wrapper">
+                            <span className="setting-label">Temperature Thresholds</span>
+                            <span className="setting-description">
+                              Where sensors flip from normal → caution → warning → critical on the dashboard.
+                            </span>
                           </div>
-                          <div className="threshold-type-cards">
-                            <div className="threshold-card" style={{ borderLeftColor: tempColors.caution }}>
-                              <span className="threshold-color-dot" style={{ backgroundColor: tempColors.caution }} />
-                              <span className="threshold-level-label">Caution</span>
-                              <input
-                                type="number"
-                                className="setting-input threshold-input"
-                                value={t.caution}
-                                min={1}
-                                max={t.warning - 1}
-                                onChange={(e) => {
-                                  const raw = parseInt(e.target.value, 10);
-                                  if (isNaN(raw)) return;
-                                  const val = Math.max(1, Math.min(t.warning - 1, raw));
-                                  updatePerTypeThresholds({
-                                    ...perTypeThresholds,
-                                    [type]: { ...t, caution: val },
-                                  });
-                                }}
-                              />
-                              <span className="threshold-unit">°C</span>
-                            </div>
-                            <div className="threshold-card" style={{ borderLeftColor: tempColors.warning }}>
-                              <span className="threshold-color-dot" style={{ backgroundColor: tempColors.warning }} />
-                              <span className="threshold-level-label">Warning</span>
-                              <input
-                                type="number"
-                                className="setting-input threshold-input"
-                                value={t.warning}
-                                min={t.caution + 1}
-                                max={t.critical - 1}
-                                onChange={(e) => {
-                                  const raw = parseInt(e.target.value, 10);
-                                  if (isNaN(raw)) return;
-                                  const val = Math.max(t.caution + 1, Math.min(t.critical - 1, raw));
-                                  updatePerTypeThresholds({
-                                    ...perTypeThresholds,
-                                    [type]: { ...t, warning: val },
-                                  });
-                                }}
-                              />
-                              <span className="threshold-unit">°C</span>
-                            </div>
-                            <div className="threshold-card" style={{ borderLeftColor: tempColors.critical }}>
-                              <span className="threshold-color-dot" style={{ backgroundColor: tempColors.critical }} />
-                              <span className="threshold-level-label">Critical</span>
-                              <input
-                                type="number"
-                                className="setting-input threshold-input"
-                                value={t.critical}
-                                min={t.warning + 1}
-                                max={150}
-                                onChange={(e) => {
-                                  const raw = parseInt(e.target.value, 10);
-                                  if (isNaN(raw)) return;
-                                  const val = Math.max(t.warning + 1, Math.min(150, raw));
-                                  updatePerTypeThresholds({
-                                    ...perTypeThresholds,
-                                    [type]: { ...t, critical: val },
-                                  });
-                                }}
-                              />
-                              <span className="threshold-unit">°C</span>
-                            </div>
+                          <div className="scale-presets appearance-threshold-tabs" role="tablist" aria-label="Threshold scope">
+                            {baseTabs.map(({ key, label }) => (
+                              <button
+                                key={key}
+                                type="button"
+                                role="tab"
+                                aria-selected={activeThresholdType === key}
+                                className={`scale-preset-btn ${activeThresholdType === key ? 'active' : ''}`}
+                                onClick={() => handleTabClick(key)}
+                              >
+                                {label}
+                              </button>
+                            ))}
+                            {typeTabsVisible && (
+                              <>
+                                <span className="appearance-threshold-tabs-divider" aria-hidden />
+                                {typeTabs.map(({ key, label }) => (
+                                  <button
+                                    key={key}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeThresholdType === key}
+                                    className={`scale-preset-btn ${activeThresholdType === key ? 'active' : ''}`}
+                                    onClick={() => handleTabClick(key)}
+                                  >
+                                    {label}
+                                  </button>
+                                ))}
+                              </>
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
 
-                {/* Reset Defaults */}
-                <div className="threshold-reset-row">
-                  <button
-                    className="threshold-reset-btn"
-                    onClick={() => {
-                      resetTempDefaults();
-                      toast.success('Temperature thresholds and colors reset to defaults');
-                    }}
-                  >
-                    <RotateCcw size={14} />
-                    Reset Defaults
-                  </button>
+                        <ThresholdStrip
+                          values={activeThresholds}
+                          colors={tempColors}
+                          onChange={updateActiveThresholds}
+                          readOnly={isCustomiseTab}
+                        />
+
+                        <div className="appearance-threshold-chips">
+                          {/* Normal — color only */}
+                          <div className="appearance-threshold-chip" style={{ borderLeftColor: tempColors.normal }}>
+                            <div className="appearance-threshold-chip-head">
+                              <span className="threshold-color-dot" style={{ backgroundColor: tempColors.normal }} />
+                              <span className="appearance-threshold-chip-label">Normal</span>
+                              <ColorPicker
+                                color={tempColors.normal}
+                                onChange={(c) => updateTempColors({ ...tempColors, normal: c })}
+                                label="Normal"
+                                presets={tempColorPresets.normal}
+                              />
+                            </div>
+                            <span className="appearance-threshold-chip-value">&lt; {activeThresholds.caution}°C</span>
+                          </div>
+
+                          {(['caution', 'warning', 'critical'] as const).map((lvl) => {
+                            const min =
+                              lvl === 'caution'
+                                ? 1
+                                : activeThresholds[lvl === 'warning' ? 'caution' : 'warning'] + 1;
+                            const max =
+                              lvl === 'critical'
+                                ? 150
+                                : activeThresholds[lvl === 'caution' ? 'warning' : 'critical'] - 1;
+                            const label = lvl[0].toUpperCase() + lvl.slice(1);
+                            return (
+                              <div
+                                key={lvl}
+                                className="appearance-threshold-chip"
+                                style={{ borderLeftColor: tempColors[lvl] }}
+                              >
+                                <div className="appearance-threshold-chip-head">
+                                  <span className="threshold-color-dot" style={{ backgroundColor: tempColors[lvl] }} />
+                                  <span className="appearance-threshold-chip-label">{label}</span>
+                                  <ColorPicker
+                                    color={tempColors[lvl]}
+                                    onChange={(c) => updateTempColors({ ...tempColors, [lvl]: c })}
+                                    label={label}
+                                    presets={tempColorPresets[lvl]}
+                                  />
+                                </div>
+                                <div className="appearance-threshold-chip-input">
+                                  <input
+                                    type="number"
+                                    className="setting-input threshold-input"
+                                    value={activeThresholds[lvl]}
+                                    min={min}
+                                    max={max}
+                                    disabled={isCustomiseTab}
+                                    onChange={(e) => {
+                                      const raw = parseInt(e.target.value, 10);
+                                      if (isNaN(raw)) return;
+                                      const val = Math.max(min, Math.min(max, raw));
+                                      updateActiveThresholds({ ...activeThresholds, [lvl]: val });
+                                    }}
+                                  />
+                                  <span className="threshold-unit">°C</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="appearance-threshold-foot">
+                          <span className="appearance-threshold-hint">
+                            {activeThresholdType === 'global' && (
+                              <>Editing the <strong>Global</strong> baseline — applies to all sensors.</>
+                            )}
+                            {isCustomiseTab && (
+                              <>Per-type overrides <strong>enabled</strong> — pick a sensor type to edit its thresholds.</>
+                            )}
+                            {isTypeTab && (
+                              <>
+                                Editing override for <strong>{activeThresholdType.toUpperCase()}</strong> — falls back to Global where unset.
+                              </>
+                            )}
+                          </span>
+                          <div className="appearance-threshold-foot-actions">
+                            {isTypeTab && (
+                              <button
+                                className="threshold-action-btn appearance-threshold-paste-btn"
+                                onClick={() => {
+                                  const label =
+                                    activeThresholdType === 'nvme'
+                                      ? 'NVMe'
+                                      : activeThresholdType === 'mobo'
+                                      ? 'Mobo'
+                                      : activeThresholdType.toUpperCase();
+                                  updatePerTypeThresholds({
+                                    ...perTypeThresholds,
+                                    [activeThresholdType]: { ...tempThresholds },
+                                  });
+                                  toast.success(`${label} reset to global values`);
+                                }}
+                                title="Paste Global thresholds into this type"
+                              >
+                                <ClipboardPaste size={14} />
+                                <span>Paste Global</span>
+                              </button>
+                            )}
+                            <button
+                              className="threshold-reset-btn"
+                              onClick={() => {
+                                resetTempDefaults();
+                                toast.success('Temperature thresholds and colors reset to defaults');
+                              }}
+                            >
+                              <RotateCcw size={14} />
+                              Reset Defaults
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                 </div>
               </div>
-            </div>
-              </div>
-            </div>
           </div>
       </div>
     )}
