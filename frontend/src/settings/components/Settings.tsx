@@ -903,14 +903,14 @@ const Settings: React.FC = () => {
       { name: 'Bold Saffron', color: '#F0741E' },
     ],
     warning: [
+      { name: 'Hazard', color: '#FF7700' },
       { name: 'Hazard Orange', color: '#FF9800' },
       { name: 'Tangerine', color: '#FF6F00' },
       { name: 'Deep Orange', color: '#FF5722' },
-      { name: 'Marigold', color: '#FFAB00' },
     ],
     critical: [
-      { name: 'Crimson', color: '#F44336' },
       { name: 'Inferno', color: '#c80f0f' },
+      { name: 'Crimson', color: '#F44336' },
       { name: 'Maroon', color: '#B71C1C' },
       { name: 'Vermilion', color: '#FF3C00' },
     ],

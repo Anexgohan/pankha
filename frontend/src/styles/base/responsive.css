@@ -479,18 +479,6 @@
     padding: var(--spacing-md) !important;
   }
 
-  /* Center and flip the color picker dropdown on mobile to avoid bottom cutoff */
-  .picker-dropdown {
-    left: 50% !important;
-    right: auto !important;
-    bottom: calc(100% + 12px) !important; /* Open upwards */
-    top: auto !important;
-    transform: translateX(-50%) !important;
-    width: 280px;
-    max-width: calc(100vw - 40px);
-    z-index: 1001;
-  }
-
   /* Add extra breathing room at the bottom of settings to prevent clipping */
   .settings-container {
     padding: var(--spacing-sm);
