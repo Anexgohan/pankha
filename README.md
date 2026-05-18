@@ -32,22 +32,40 @@ Its built to support single Windows or Linux PC or multiple Servers, VM's, NAS b
 ---
 ## Features
 
-- **Quieter PCs, cooler temps**  
-  smart fan curves with hysteresis and stepping eliminate the always full throttlenoise and thermal spikes left behind by stock BIOS fan profiles
-- **Unify Everything into 'One dashboard'**  
-  unified web UI for one system or 100, on Windows, Linux, or IPMI / BMC-controlled servers, manage fans and temperatures across all your machines, on Windows, Linux, Virtual Machines with passed through devices like GPU, PCIe card, HBA, etc and x64 or ARM from one dashboard
-- **Visual profile editor**  
-  drag-and-drop curve editor with import / export so you can build, share, and reuse fan profiles across machines
-- **Real hardware control**  
-  direct PWM control with live RPM feedback, per-fan policies, and an always-on emergency-temperature override
-- **Real-time monitoring**  
-  temperature, RPM, and historical data for CPU, GPU, NVMe, motherboard, and chipset, streamed live over WebSocket
-- **Safe by design**  
-  if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override
-- **Light and fast**  
-  the Linux agent is a single Rust binary using under 15MB RAM and under 1% CPU. The Windows agent runs as a .NET 8 service using under 25MB RAM and under 1% CPU with full LibreHardwareMonitor access. IPMI/BMC Agents use even less resources.
-- **Open source, self-hosted**  
-  AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment
+<ul>
+  <li>
+    <strong>Quieter PCs, cooler temps</strong><br>
+    smart fan curves with hysteresis and stepping eliminate the always full throttlenoise and thermal spikes left behind by stock BIOS fan profiles
+  </li>
+  <li>
+    <strong>Unify Everything into 'One dashboard'</strong><br>
+    unified web UI for one system or 100, on Windows, Linux, or IPMI / BMC-controlled servers, manage fans and temperatures across all your machines, on Windows, Linux, Virtual Machines with passed through devices like GPU, PCIe card, HBA, etc and x64 or ARM from one dashboard
+  </li>
+  <li>
+    <strong>Visual profile editor</strong><br>
+    drag-and-drop curve editor with import / export so you can build, share, and reuse fan profiles across machines
+  </li>
+  <li>
+    <strong>Real hardware control</strong><br>
+    direct PWM control with live RPM feedback, per-fan policies, and an always-on emergency-temperature override
+  </li>
+  <li>
+    <strong>Real-time monitoring</strong><br>
+    temperature, RPM, and historical data for CPU, GPU, NVMe, motherboard, and chipset, streamed live over WebSocket
+  </li>
+  <li>
+    <strong>Safe by design</strong><br>
+    if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override
+  </li>
+  <li>
+    <strong>Light and fast</strong><br>
+    the Linux agent is a single Rust binary using under 15MB RAM and under 1% CPU. The Windows agent runs as a .NET 8 service using under 25MB RAM and under 1% CPU with full LibreHardwareMonitor access. IPMI/BMC Agents use even less resources.
+  </li>
+  <li>
+    <strong>Open source, self-hosted</strong><br>
+    AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment
+  </li>
+</ul>
 
 ---
 ## Who is Pankha Fan Control for?
