@@ -1,5 +1,8 @@
 # Pankha (पंखा) <img src="documentation/public/images/animation/pankha_fan_256x256_5-fins.webp" width="32" style="vertical-align: sub;"> Fan Management System
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-demo.pankha.app-22c55e?style=for-the-badge)](https://demo.pankha.app/)
+[![Website](https://img.shields.io/badge/Website-pankha.app-0db7ed?style=for-the-badge)](https://pankha.app/)
+
 ![Docker Pulls](https://img.shields.io/docker/pulls/anexgohan/pankha)
 ![GitHub Discussions](https://img.shields.io/github/discussions/Anexgohan/pankha)
 ![GitHub Repo Size](https://img.shields.io/github/repo-size/Anexgohan/pankha)
