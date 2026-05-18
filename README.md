@@ -32,40 +32,26 @@ Its built to support single Windows or Linux PC or multiple Servers, VM's, NAS b
 ---
 ## Features
 
-- **Quieter PCs, cooler temps :**  
-  *smart fan curves with hysteresis and stepping eliminate the always full throttlenoise and thermal spikes left behind by stock BIOS fan profiles*
-- **Unify Everything into 'One dashboard' :**  
-  *unified web UI for one system or 100, on Windows, Linux, or IPMI / BMC-controlled servers, manage fans and temperatures across all your machines, on Windows, Linux, Virtual Machines with passed through devices like GPU, PCIe card, HBA, etc and x64 or ARM from one dashboard*
-- **Visual profile editor :**  
-  *drag-and-drop curve editor with import / export so you can build, share, and reuse fan profiles across machines*
-- **Real hardware control :**  
-  *direct PWM control with live RPM feedback, per-fan policies, and an always-on emergency-temperature override*
-- **Real-time monitoring :**  
-  *temperature, RPM, and historical data for CPU, GPU, NVMe, motherboard, and chipset, streamed live over WebSocket*
-- **Safe by design :**  
-  *if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override*
-- **Light and fast :**  
-  *the Linux agent is a single Rust binary using under 15MB RAM and under 1% CPU. The Windows agent runs as a .NET 8 service using under 25MB RAM and under 1% CPU with full LibreHardwareMonitor access. IPMI/BMC Agents use even less resources.*
-- **Open source, self-hosted :**  
-  *AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment*
+- **Quieter PCs, cooler temps :**  smart fan curves with hysteresis and stepping eliminate the always full throttlenoise and thermal spikes left behind by stock BIOS fan profiles
+- **Unify Everything into 'One dashboard' :**  unified web UI for one system or 100, on Windows, Linux, or IPMI / BMC-controlled servers, manage fans and temperatures across all your machines, on Windows, Linux, Virtual Machines with passed through devices like GPU, PCIe card, HBA, etc and x64 or ARM from one dashboard
+- **Visual profile editor :**  drag-and-drop curve editor with import / export so you can build, share, and reuse fan profiles across machines
+- **Real hardware control :**  direct PWM control with live RPM feedback, per-fan policies, and an always-on emergency-temperature override
+- **Real-time monitoring :**  temperature, RPM, and historical data for CPU, GPU, NVMe, motherboard, and chipset, streamed live over WebSocket
+- **Safe by design :**  if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override
+- **Light and fast :**  the Linux agent is a single Rust binary using under 15MB RAM and under 1% CPU. The Windows agent runs as a .NET 8 service using under 25MB RAM and under 1% CPU with full LibreHardwareMonitor access. IPMI/BMC Agents use even less resources.
+- **Open source, self-hosted :**  AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment
 
 ---
 ## Who is Pankha Fan Control for?
 
 **Anyone who wants more control over their cooling than stock tools allow.** From a single quiet desktop to a fleet of servers - same dashboard, same workflow.
 
-- **PC builders and gamers :**  
-    *replace stock BIOS fan curves with smart custom ones; quieten your desktop without sacrificing thermals*
-- **Windows users :**  
-    *a no-cloud, no-account fan utility that doesn't require per-machine setup*
-- **Linux desktop and server users :**  
-    *PWM fan control on headless boxes (Debian, Ubuntu, RHEL, Proxmox, TrueNAS) without a GUI*
-- **Homelabbers and self-hosters :**  
-    *manage Proxmox hosts, NAS boxes, and virtualisation hosts from one place*
-- **Server admins :**  
-    *readable fan curves and a web UI for Dell PowerEdge, HP ProLiant, and Supermicro hardware controlled through IPMI / BMC, cure for always screaming fans even when idle.*
-- **Anyone managing more than one machine :**  
-    *configure one or multiple profiles and apply to as many machines as you like.*
+- **PC builders and gamers :**  replace stock BIOS fan curves with smart custom ones; quieten your desktop without sacrificing thermals
+- **Windows users :**  a no-cloud, no-account fan utility that doesn't require per-machine setup
+- **Linux desktop and server users :**  PWM fan control on headless boxes (Debian, Ubuntu, RHEL, Proxmox, TrueNAS) without a GUI
+- **Homelabbers and self-hosters :**  manage Proxmox hosts, NAS boxes, and virtualisation hosts from one place
+- **Server admins :**  readable fan curves and a web UI for Dell PowerEdge, HP ProLiant, and Supermicro hardware controlled through IPMI / BMC, cure for always screaming fans even when idle.
+- **Anyone managing more than one machine :**  configure one or multiple profiles and apply to as many machines as you like.
 
 ---
 ## Screenshots
