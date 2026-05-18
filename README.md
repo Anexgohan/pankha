@@ -42,6 +42,21 @@ Its built to support single Windows or Linux PC or multiple Servers, VM's, NAS b
 - **Open source, self-hosted :**  AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment
 
 ---
+## Supported Systems & Architecture
+
+Pankha is designed to manage cooling profiles across all your hardware from a single interface. Whether you are adjusting a gaming desktop, a personal Linux machine, or multiple computers at once, Pankha keeps your system footprint light and your control absolute.
+
+
+| Feature / System | 🪟 Windows Desktop | 🐧 Linux System | 💻 Central Dashboard |
+| :--- | :--- | :--- | :--- |
+| **Ideal For** | Gaming Rigs, Workstations, virtual or remote desktops | Daily Drivers, Servers, Hosts/Nodes, Virtual device passed through | Any modern web browser (Mobile/PC) |
+| **Tech Stack** | C# / .NET (Native Client) | Rust (Lightweight Binary) | TypeScript / React Backend |
+| **Deployment** | Quick-install `.msi` package | Pre-configured standalone binary | 1-Click Docker Compose setup |
+| **Resource Usage** | Near-zero background RAM & CPU usage | Near-zero background RAM & CPU usage | Low-overhead WebSocket hub |
+| **Hardware Link** | via LibreHardwareMonitor | Direct kernel-level device mappings | Real-time aggregated data stream |
+| **Installation** | Fully automated/guided | Instant pre-configured binary | Self-hosted or local execution |
+
+---
 ## Who is Pankha Fan Control for?
 
 **Anyone who wants more control over their cooling than stock tools allow.** From a single quiet desktop to a fleet of servers - same dashboard, same workflow.
@@ -73,6 +88,10 @@ Its built to support single Windows or Linux PC or multiple Servers, VM's, NAS b
 
 ---
 ## Quick Start
+### Overview :
+1. Deploy the backend server (Docker)
+2. Install appropriate agent on each machine you want to control (Linux, Windows, IPMI/BMC)
+3. Open the dashboard and start tuning your fan curves!
 
 ### ![Server](https://img.shields.io/badge/-Server-0db7ed?logo=docker&logoColor=white&style=flat-square) Server (Docker)
 
@@ -82,7 +101,7 @@ wget -O .env https://github.com/Anexgohan/pankha/releases/latest/download/exampl
 docker compose pull && docker compose up -d
 ```
 
-Open the dashboard at `http://localhost:3000` (or your configured `PANKHA_PORT`).
+Open the dashboard at `http://localhost:3143` (or your configured `PANKHA_PORT`).
 
 [![Wiki Server Setup](https://img.shields.io/badge/Wiki-Server_Setup-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Server-Installation)
 
@@ -94,9 +113,10 @@ Open the dashboard at `http://localhost:3000` (or your configured `PANKHA_PORT`)
 In the dashboard, open **Deployment &rarr; Deployment AIO**, configure your options, and copy the generated command. It will look like:
 
 ```bash
-wget -qO- "http://<your-backend>:<port>/api/deploy/linux?token=<token>" | bash
+# This is an example
+wget -qO- "http://<pankha-ip>:<port>/api/deploy/linux?token=<token>" | bash
 # or
-curl -sSL "http://<your-backend>:<port>/api/deploy/linux?token=<token>" | bash
+curl -sSL "http://<pankha-ip>:<port>/api/deploy/linux?token=<token>" | bash
 ```
 
 The script auto-detects your CPU architecture, downloads the matching binary, applies the config you set in the GUI, and installs the systemd service.
@@ -149,7 +169,8 @@ List all commands: `./pankha-agent --help`
 ---
 ### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent (.NET 8) :
 
-Download **[pankha-agent-windows_x64.msi](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi)** from the latest release. The installer sets up the background service and the tray app. Right-click the tray icon &rarr; **Settings** &rarr; set the backend URL.
+Download **[pankha-agent-windows_x64.msi](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi)** from the latest release. The installer sets up the background service and the tray app. Right-click the tray icon &rarr; **Settings** &rarr; set the backend URL. Done.
+Control your fans and monitor your temperatures from the dashboard!
 
 [![Wiki Windows Agent](https://img.shields.io/badge/Wiki-Windows_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)
 
