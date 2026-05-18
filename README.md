@@ -106,22 +106,29 @@ The script auto-detects your CPU architecture, downloads the matching binary, ap
 <details>
 <summary>Show x64 / ARM64 manual install (wget or curl)</summary>
 
-##### ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) Intel / AMD x64
+##### ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) Intel / AMD x64 :
 
+with wget:
 ```bash
-# wget
 wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
-# or curl
+chmod +x pankha-agent
+```
+or with curl:
+```bash
 curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
 chmod +x pankha-agent
 ```
 
-##### ![ARM64](https://img.shields.io/badge/-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square) ARM64 (Raspberry Pi 5, etc.)
+##### ![ARM64](https://img.shields.io/badge/-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square) ARM64 (Raspberry Pi 5, etc.) :
 
+
+with wget:
 ```bash
-# wget
 wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
-# or curl
+chmod +x pankha-agent
+```
+or with curl:
+```bash
 curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
 chmod +x pankha-agent
 ```
@@ -140,7 +147,7 @@ List all commands: `./pankha-agent --help`
 [![Wiki Linux Agent](https://img.shields.io/badge/Wiki-Linux_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)
 
 ---
-### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent (.NET 8)
+### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent (.NET 8) :
 
 Download **[pankha-agent-windows_x64.msi](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi)** from the latest release. The installer sets up the background service and the tray app. Right-click the tray icon &rarr; **Settings** &rarr; set the backend URL.
 
@@ -156,7 +163,7 @@ A central **backend** (Docker container with Node.js, PostgreSQL, and a WebSocke
 **Components**
 
 - **Backend** - Node.js + Express + WebSocket + PostgreSQL, deployed as a single Docker container
-- **Frontend** - React + TypeScript + Vite, served by nginx
+- **Frontend** - React + TypeScript + Vite, served directly as a Web GUI Dashboard on `http://<IP>:<PORT>`
 - **Linux agent** - single Rust binary using <15MB RAM and <1% CPU, `sysfs` hardware access, zero runtime dependencies
 - **Windows agent** - self installing .NET 8 service using <25MB RAM and <1% CPU, capable of full LibreHardwareMonitor access to all sensors and fans on any Windows machine
 
@@ -164,6 +171,7 @@ A central **backend** (Docker container with Node.js, PostgreSQL, and a WebSocke
 
 - Agents push sensor and fan readings to the backend over WebSocket every few configurable seconds; the backend computes deltas and broadcasts changes only when needed to minimise bandwidth.
 - The backend evaluates your fan curves and sends control commands back to agents in real time
+- Frontend connects to the backend to display real-time sensor readings and fan speeds, and to send profile updates and config and user changes back to the backend
 - If the backend is unreachable, agents enter **failsafe mode** - a configurable safe fan speed with a local emergency-temperature override
 
 ```
