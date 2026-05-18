@@ -1,219 +1,181 @@
-# Pankha (पंखा) <img src="documentation/public/images/animation/pankha_fan_256x256_5-fins.webp" width="32" style="vertical-align: sub;"> Fan Management System
+# Pankha Fan Control <img src="documentation/public/images/animation/pankha_fan_256x256_5-fins.webp" width="32" style="vertical-align: sub;"> (पंखा)
 
 <p align="center">
   <a href="https://demo.pankha.app/"><img src="https://img.shields.io/badge/Click_Here-Live_Demo-0db7ed?style=plastic&labelColor=555555" alt="Click Here - Live Demo" width="280"></a>
+  <br>
+  <sub>No install required</sub>
 </p>
+<br>
 <p align="center">
-  <sub>No install required &middot; Official website: <a href="https://pankha.app/"><b>pankha.app</b></a></sub>
+  <a href="https://pankha.app/"><img src="https://img.shields.io/badge/Official_website-pankha.app-2563eb?style=flat&labelColor=555555" alt="Official website - pankha.app"></a>
 </p>
 
-![Docker Pulls](https://img.shields.io/docker/pulls/anexgohan/pankha)
-![GitHub Discussions](https://img.shields.io/github/discussions/Anexgohan/pankha)
-![GitHub Repo Size](https://img.shields.io/github/repo-size/Anexgohan/pankha)
-![GitHub Commit Activity](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha)
-![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
+**Pankha Fan Control** is an open-source fan and temperature management system for any PC - single desktop, server, or homelab fleet. Build smarter fan curves, lower noise, drop temperatures, and manage every machine from one web dashboard. Works on Windows and Linux. Free, self-hosted, no telemetry.
 
-![GitHub Latest Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/latest/total?label=Latest%20Downloads)
-![GitHub Total Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/total?label=Total%20Downloads)
-![GitHub Last Commit](https://img.shields.io/github/last-commit/Anexgohan/pankha)
-![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
+![Docker Pulls](https://img.shields.io/docker/pulls/anexgohan/pankha) ![GitHub Discussions](https://img.shields.io/github/discussions/Anexgohan/pankha) ![GitHub Repo Size](https://img.shields.io/github/repo-size/Anexgohan/pankha) ![GitHub Commit Activity](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha) ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
+![GitHub Latest Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/latest/total?label=Latest%20Downloads) ![GitHub Total Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/total?label=Total%20Downloads) ![GitHub Last Commit](https://img.shields.io/github/last-commit/Anexgohan/pankha) ![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
 
-![GitHub Stars](https://img.shields.io/github/stars/Anexgohan/pankha?style=social)
-![GitHub Forks](https://img.shields.io/github/forks/Anexgohan/pankha?style=social)
-![GitHub Watchers](https://img.shields.io/github/watchers/Anexgohan/pankha?style=social)
-![GitHub Sponsors](https://img.shields.io/github/sponsors/Anexgohan?style=social)
-![GitHub Issues](https://img.shields.io/github/issues/Anexgohan/pankha)
-![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Anexgohan/pankha)
+![GitHub Stars](https://img.shields.io/github/stars/Anexgohan/pankha?style=social) ![GitHub Forks](https://img.shields.io/github/forks/Anexgohan/pankha?style=social) ![GitHub Watchers](https://img.shields.io/github/watchers/Anexgohan/pankha?style=social) ![GitHub Sponsors](https://img.shields.io/github/sponsors/Anexgohan?style=social) ![GitHub Issues](https://img.shields.io/github/issues/Anexgohan/pankha) ![GitHub Pull Requests](https://img.shields.io/github/issues-pr/Anexgohan/pankha)
+![Reddit Subscribers](https://img.shields.io/reddit/subreddit-subscribers/selfhosted?style=social) ![Discord](https://img.shields.io/badge/Discord-Coming%20Soon-5865F2?logo=discord&logoColor=white&style=flat-square)
 
-![Reddit Subscribers](https://img.shields.io/reddit/subreddit-subscribers/selfhosted?style=social)
-![Discord](https://img.shields.io/badge/Discord-Coming%20Soon-5865F2?logo=discord&logoColor=white&style=flat-square)
+![Centralized Dashboard](documentation/public/images/pankha_title-bar_01.png)
 
 ---
-### Open Source Fan Control System
-Pankha is an open-source Distributed fan control system with a Centralized Management Web Interface for monitoring and controlling hardware cooling across multiple machines. Production-ready with real-time hardware monitoring, WebSocket communication, and PostgreSQL database.
 
-## Features:
+## What is Pankha Fan Control?
 
-- **Real-time Temperature Monitoring** - Manage Sensors across multiple hardware types and and Operating System.
-- **PWM Fan Control** - Direct hardware control with RPM feedback, Profiles, and Safety features, historical data visualization.
-- **Multi-System Support** - Monitor and control multiple machines from one dashboard
-- **Web Dashboard** - Modern Web UI Interface with real-time updates
-- **WebSocket Communication** - Bidirectional real-time data transmission to centralize control
-- **Easy Deployment** - Docker based server deployment, with one command setup for agents
-- **PostgreSQL Database** - Production ready data storage.
-- **Open Source** - Pankha is an open source project, Contribute to the project. 
+**Pankha Fan Control** - is open-source software that gives you complete control over your systems cooling. 
+Build custom fan curves, monitor temperatures in real time, and tune RPM and noise to your exact preference - on a single desktop, a homelab, or a fleet of servers.
 
-## Showcase:  
-Centralized Dashboard:  
-![Centralized Dashboard](documentation/public/images/pankha_title-bar_01.png)  
+It runs the same way whether you're managing one machine or one hundred. The web dashboard works in any browser, on any device. Agents are lightweight, the backend is self-hosted, and nothing about your hardware ever leaves your network.
+Its built to support single Windows or Linux PC or multiple Servers, VM's, NAS boxes, PC's - it can handle any scale.
 
-Agent widget:  
-![Agent widget](documentation/public/images/pankha_system-cards_02.png)  
+---
+## Features
 
-Temperature Sensors:  
-![Temperature Sensors](documentation/public/images/pankha_sensor-cards_02.png)  
+- **Quieter PCs, cooler temps** - smart fan curves with hysteresis and stepping eliminate the always full throttlenoise and thermal spikes left behind by stock BIOS fan profiles
+- **Unify Everything into 'One dashboard'** - unified web UI for one system or 100, on Windows, Linux, or IPMI / BMC-controlled servers, manage fans and temperatures across all your machines, on Windows, Linux, Virtual Machines with passed through devices like GPU, PCIe card, HBA, etc and x64 or ARM from one dashboard
+- **Visual profile editor** - drag-and-drop curve editor with import / export so you can build, share, and reuse fan profiles across machines
+- **Real hardware control** - direct PWM control with live RPM feedback, per-fan policies, and an always-on emergency-temperature override
+- **Real-time monitoring** - temperature, RPM, and historical data for CPU, GPU, NVMe, motherboard, and chipset, streamed live over WebSocket
+- **Safe by design** - if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override
+- **Light and fast** - the Linux agent is a single Rust binary using under 15MB RAM and under 1% CPU. The Windows agent runs as a .NET 8 service using under 25MB RAM and under 1% CPU with full LibreHardwareMonitor access. IPMI/BMC Agents use even less resources.
+- **Open source, self-hosted** - AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment
 
-Fan Control:  
-![Fan Control](documentation/public/images/pankha_fan-cards_02.png)  
+---
+## Who is Pankha Fan Control for?
 
-Profiles:  
-![Profiles](documentation/public/images/pankha_fan-profiles_01.png)  
+**Anyone who wants more control over their cooling than stock tools allow.** From a single quiet desktop to a fleet of servers - same dashboard, same workflow.
 
-Fully Customizable:  
-![Profiles](documentation/public/images/pankha_fan-profile_editor_01.png)
+- **PC builders and gamers** - replace stock BIOS fan curves with smart custom ones; quieten your desktop without sacrificing thermals
+- **Windows users** - a no-cloud, no-account fan utility that doesn't require per-machine setup
+- **Linux desktop and server users** - PWM fan control on headless boxes (Debian, Ubuntu, RHEL, Proxmox, TrueNAS) without a GUI
+- **Homelabbers and self-hosters** - manage Proxmox hosts, NAS boxes, and virtualisation hosts from one place
+- **Server admins** - readable fan curves and a web UI for Dell PowerEdge, HP ProLiant, and Supermicro hardware controlled through IPMI / BMC, cure for always screaming fans even when idle.
+- **Anyone managing more than one machine** - configure one or multiple profiles and apply to as many machines as you like.
 
-![Import Export](documentation/public/images/pankha_fan-profile_import-export_01.png)  
+---
+## Screenshots
 
-## Why Pankha?
+<table>
+  <tr>
+    <td align="center"><img src="documentation/public/images/pankha_system-cards_02.png" alt="Agent widget"><br><sub>Agent widget</sub></td>
+    <td align="center"><img src="documentation/public/images/pankha_sensor-cards_02.png" alt="Temperature sensors"><br><sub>Temperature sensors</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="documentation/public/images/pankha_fan-cards_02.png" alt="Fan control with RPM feedback"><br><sub>Fan control with RPM feedback</sub></td>
+    <td align="center"><img src="documentation/public/images/pankha_fan-profiles_01.png" alt="Fan profiles"><br><sub>Fan profiles</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="documentation/public/images/pankha_fan-profile_editor_01.png" alt="Customisable profile editor"><br><sub>Customisable profile editor</sub></td>
+    <td align="center"><img src="documentation/public/images/pankha_fan-profile_import-export_01.png" alt="Profile import / export"><br><sub>Profile import / export</sub></td>
+  </tr>
+</table>
 
-  - ✅ Reduced Fan Wear - Fewer speed changes extend fan lifespan
-  - ✅ Quieter Operation - Smooth transitions eliminate abrupt noise changes
-  - ✅ Stable UI - No flickering fan speed indicators
-  - ✅ Better UX - Professional, predictable behavior
-  - ✅ Energy Efficiency - Smoother transitions reduce power spikes
-  - ✅ User Control - Tune behavior per system/use case
-  - ✅ Safety - Emergency override ensures critical temps handled immediately
-  - ✅ Multi-System Support - Monitor and control multiple machines from one dashboard
-  - ✅ Open Source - Easy to deploy, manage, and scale
-  - ✅ Real-time Updates - Instant feedback on temperature and fan speed changes
-  - ✅ Real-time Profiles - Customizable fan profiles for different workloads
-  - ✅ Real-time Data - Historical data visualization for better planning
+---
+## Quick Start
 
-## Instructions:
+### ![Server](https://img.shields.io/badge/-Server-0db7ed?logo=docker&logoColor=white&style=flat-square) Server (Docker)
 
-### Prerequisites
+```bash
+wget -O compose.yml https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
+wget -O .env https://github.com/Anexgohan/pankha/releases/latest/download/example.env
+docker compose pull && docker compose up -d
+```
 
-- Docker and Docker Compose for server deployment
-- System with fan control capabilities (for agents)
+Open the dashboard at `http://localhost:3000` (or your configured `PANKHA_PORT`).
 
-# ![Docker](https://img.shields.io/badge/-Docker-0db7ed?logo=docker&logoColor=white&style=flat-square) Server Installation Guide:
-## Docker Compose Deployment:
-1. Download the Docker Compose file:
-   ```bash
-   wget -O compose.yml https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
-   ```
-   or,
-   ```bash
-   curl -fsSLo compose.yml https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
-   ```
-2. Download the .env file
-   ```bash
-   wget -O .env https://github.com/Anexgohan/pankha/releases/latest/download/example.env
-   ```
-   or,
-   ```bash
-   curl -fsSLo .env https://github.com/Anexgohan/pankha/releases/latest/download/example.env
-   ```
-3. Start Docker Compose
-   ```bash
-   docker pull && docker compose up -d
-   ```
+[![Wiki Server Setup](https://img.shields.io/badge/Wiki-Server_Setup-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Server-Installation)
 
-## Clone and Deploy (Alternate Method):
-1. Clone the repository  
-    this creates a pankha directory in your current path
-    ```bash
-    git clone https://github.com/Anexgohan/pankha.git
-    cd pankha
-    ```
-    or, clone to current directory without creating pankha/ folder
-      ```bash
-      git clone https://github.com/Anexgohan/pankha.git .
-      ```
-    NOTE:  
-    Edit `.env` and `compose` with your configuration, if needed.
-
-2. Start the system  
-      ```bash
-      docker compose pull && docker compose up -d
-      ```
-
-That's it! The backend is now running with:
-  - Access the Web Dashboard at http://localhost:3000 or http://[serverIP]:[PANKHA_PORT]
-  - To stop the system, run:  
-    ```bash
-    docker compose down
-    ```
-
-# ![Agent](https://img.shields.io/badge/-Agent-4A90A4?logo=robot&logoColor=white&style=flat-square) Agent Installation Guide:  
-
-### [![Windows](https://img.shields.io/badge/CPU-x64-0078D4?logo=windows&logoColor=white&style=flat-square&labelColor=333&logoSize=auto)](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi) Windows Agent
-**Requirements**: Windows 10/11, .NET 8 Runtime.
-
-1. **Download Installer**:
-   - Download `pankha-agent-windows_x64.msi` from [Latest Releases](https://github.com/Anexgohan/pankha/releases/latest).
-2. **Install**:
-   - Run the installer. It will install the Background Service and Tray Application.
-3. **Configure**:
-   - Launch "Pankha Fan Control" from the Start Menu.
-   - Right-click the Tray Icon -> **Settings** to configure the backend URL.
-
+---
 ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agent (Rust)
-**Performance**: Single binary, <10MB RAM, <1% CPU. Zero dependencies.
 
-## ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) For x64 systems:
-  - With wget
-    ```bash
-    wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
-    chmod +x pankha-agent
-    ```
-  - Or, With curl
-    ```bash
-    curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
-    chmod +x pankha-agent
-    ```
-  ***Configure and manage the agent using the following commands:***
+**A. Recommended - one-line install via Deployment AIO**
 
-  1. Configure agent (Required for first time)
-      ```bash
-      ./pankha-agent --setup
-      ```
-  2. Manage Service (Auto-start on boot)
-      ```bash
-      ./pankha-agent --install-service
-      ./pankha-agent --uninstall-service
-      ```
-  3. Check status & Health
-      ```bash
-      ./pankha-agent --status
-      ./pankha-agent --check
-      ```
-  4. Start/Stop daemon
-      ```bash
-      ./pankha-agent --start
-      ./pankha-agent --stop
-      ```
-  5. Help, or list all commands and options
-      ```bash
-      ./pankha-agent --help
-      ```
+In the dashboard, open **Deployment &rarr; Deployment AIO**, configure your options, and copy the generated command. It will look like:
 
-## ![ARM64](https://img.shields.io/badge/-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square) For ARM64 systems (Raspberry Pi 5, etc):
-  - With wget
-    ```bash
-    wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
-    chmod +x pankha-agent
-    ```
-  - Or, With curl
-    ```bash
-    curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
-    chmod +x pankha-agent
-    ```
+```bash
+wget -qO- "http://<your-backend>:<port>/api/deploy/linux?token=<token>" | bash
+# or
+curl -sSL "http://<your-backend>:<port>/api/deploy/linux?token=<token>" | bash
+```
 
-  ***Configure and manage the agent using the same commands as above:***
+The script auto-detects your CPU architecture, downloads the matching binary, applies the config you set in the GUI, and installs the systemd service.
 
-  1. **Interactive Setup**: `./pankha-agent --setup`
-  2. **Manage Service**: `./pankha-agent --install-service`
-  3. **Check Status**: `./pankha-agent --status`
-  4. **View Logs**: `./pankha-agent --log-show`
+**B. Manual install**
 
-The agent will connect to the backend and start sending hardware data. You can now manage the agent from the dashboard.
+<details>
+<summary>Show x64 / ARM64 manual install (wget or curl)</summary>
 
-## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square) Documentation:
+##### ![Intel x64](https://img.shields.io/badge/CPU-x64-0071C5?logo=intel&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) ![AMD x64](https://img.shields.io/badge/CPU-x64-ED1C24?logo=amd&logoColor=white&style=flat-square&labelColor=333&logoSize=auto) Intel / AMD x64
+
+```bash
+# wget
+wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
+# or curl
+curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_x64
+chmod +x pankha-agent
+```
+
+##### ![ARM64](https://img.shields.io/badge/-ARM64-0091BD?logo=arm&logoColor=white&style=flat-square) ARM64 (Raspberry Pi 5, etc.)
+
+```bash
+# wget
+wget -O pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+# or curl
+curl -fsSLo pankha-agent https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-linux_arm64
+chmod +x pankha-agent
+```
+
+Then configure (works for both):
+
+```bash
+sudo ./pankha-agent --setup
+```
+
+List all commands: `./pankha-agent --help`
+
+</details>
+
+###
+[![Wiki Linux Agent](https://img.shields.io/badge/Wiki-Linux_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)
+
+---
+### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent (.NET 8)
+
+Download **[pankha-agent-windows_x64.msi](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi)** from the latest release. The installer sets up the background service and the tray app. Right-click the tray icon &rarr; **Settings** &rarr; set the backend URL.
+
+[![Wiki Windows Agent](https://img.shields.io/badge/Wiki-Windows_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)
+
+---
+## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square) How Pankha Fan Control works
+
+![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=nodedotjs&logoColor=white&style=flat-square) ![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black&style=flat-square) ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-336791?logo=postgresql&logoColor=white&style=flat-square) ![Rust](https://img.shields.io/badge/-Rust-CE422B?logo=rust&logoColor=white&style=flat-square) ![.NET](https://img.shields.io/badge/-.NET%208-512BD4?logo=dotnet&logoColor=white&style=flat-square) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square)
+
+A central **backend** (Docker container with Node.js, PostgreSQL, and a WebSocket hub) coordinates lightweight **agents** running on each machine you want to control.
+
+**Components**
+
+- **Backend** - Node.js + Express + WebSocket + PostgreSQL, deployed as a single Docker container
+- **Frontend** - React + TypeScript + Vite, served by nginx
+- **Linux agent** - single Rust binary using <15MB RAM and <1% CPU, `sysfs` hardware access, zero runtime dependencies
+- **Windows agent** - self installing .NET 8 service using <25MB RAM and <1% CPU, capable of full LibreHardwareMonitor access to all sensors and fans on any Windows machine
+
+**How it works**
+
+- Agents push sensor and fan readings to the backend over WebSocket every few configurable seconds; the backend computes deltas and broadcasts changes only when needed to minimise bandwidth.
+- The backend evaluates your fan curves and sends control commands back to agents in real time
+- If the backend is unreachable, agents enter **failsafe mode** - a configurable safe fan speed with a local emergency-temperature override
+
+```
+Browser <-HTTP/WebSocket-> Backend (Docker) <-WebSocket-> Agents <-Direct-> Hardware
+```
+
+[![Wiki Architecture](https://img.shields.io/badge/Wiki-Architecture-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Architecture)
+
+## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square) Documentation
 
 [![Wiki](https://img.shields.io/badge/Full_Documentation-GitHub_Wiki-0db7ed?style=for-the-badge&logo=github)](https://github.com/Anexgohan/pankha/wiki)
-
-### Quick Links
 
 <table>
 <tr>
@@ -265,241 +227,13 @@ The agent will connect to the backend and start sending hardware data. You can n
 </tr>
 </table>
 
-## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square) Architecture:
+## ![Contributing](https://img.shields.io/badge/-Contributing-28A745?logo=github&logoColor=white&style=flat-square) Contributing & Community
 
-![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=nodedotjs&logoColor=white&style=flat-square) ![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black&style=flat-square) ![PostgreSQL](https://img.shields.io/badge/-PostgreSQL-336791?logo=postgresql&logoColor=white&style=flat-square) ![Rust](https://img.shields.io/badge/-Rust-CE422B?logo=rust&logoColor=white&style=flat-square) ![.NET](https://img.shields.io/badge/-.NET%208-512BD4?logo=dotnet&logoColor=white&style=flat-square) ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square)
-
-```
-Browser ←HTTP/WS→ Backend (Docker) ←WebSocket→ Agents ←Direct→ Hardware
-```
-
-- **Backend**: Node.js + Express + WebSocket + PostgreSQL (Dockerized)
-- **Frontend**: React + TypeScript + Vite (served by nginx)
-- **Agents**: 
-  - **Linux**: Rust single binary processes (sysfs)
-  - **Windows**: .NET 8 Service (LibreHardwareMonitor)
-
-## Extra:
-- **Verify installation**
-   ```bash
-   # Check services are running
-   docker compose ps
-
-   # Check backend health
-   curl http://localhost:${PANKHA_PORT:-3000}/health
-
-   # Access dashboard
-   open http://localhost:3000
-   ```
-
-- **Cleanup**
-   ```bash
-   # To stop services
-   docker compose down
-
-   # To remove volumes (data loss)
-   docker compose down -v
-   ```
-
-### Option 2: Manual Build
-
-Build from source:  
-
-  Clone repository  
-  ```bash
-  git clone https://github.com/Anexgohan/pankha.git
-  cd pankha
-  ```
-  Build Docker image
-  ```bash
-  docker compose pull
-  docker compose build --no-cache
-  ```
-  Run with compose
-  ```bash
-  docker compose up -d
-  ```
-
-## ![Config](https://img.shields.io/badge/-Configuration-5C5C5C?logo=gnubash&logoColor=white&style=flat-square) Configuration
-
-### Backend Configuration
-
-Environment variables in `.env`:
-
-```bash
-# Database Configuration
-POSTGRES_DB=db_pankha
-POSTGRES_USER=pankha_user
-POSTGRES_PASSWORD=your_secure_password
-DATABASE_URL=postgresql://pankha_user:your_secure_password@pankha-postgres:5432/db_pankha
-
-# Server Configuration
-PANKHA_PORT=3000
-NODE_ENV=production
-```
-
-### Agent Configuration
-Generate Agent config with 
-```bash
-./pankha-agent --setup
-```
-
-Agent configuration file: `config.json` (running directory)
-
-```json
-{
-  "agent": {
-    "id": "OS-mysystem-randomhash",
-    "name": "hostname-or-custom-name",
-    "update_interval": 3.0,
-    "log_level": "INFO"
-  },
-  "backend": {
-    "server_url": "ws://192.168.1.100:3000/websocket",
-    "reconnect_interval": 30.0,
-    "max_reconnect_attempts": -1,
-    "connection_timeout": 10.0
-  },
-  "hardware": {
-    "enable_fan_control": true,
-    "enable_sensor_monitoring": true,
-    "fan_safety_minimum": 30,
-    "filter_duplicate_sensors": false,
-    "duplicate_sensor_tolerance": 2.0,
-    "fan_step_percent": 5,
-    "hysteresis_temp": 3.0,
-    "emergency_temp": 85.0
-  },
-  "logging": {
-    "enable_file_logging": true,
-    "log_file": "/var/log/pankha-agent/agent.log",
-    "max_log_size_mb": 10,
-    "log_retention_days": 7
-  }
-}
-
-
-```
-
-## ![Troubleshoot](https://img.shields.io/badge/-Troubleshooting-DC3545?logo=bug&logoColor=white&style=flat-square) Troubleshooting
-
-### Backend Issues
-
-**Issue: Cannot connect to database**
-```bash
-# Check PostgreSQL is running
-docker compose ps
-
-# Check logs
-docker compose logs postgres
-
-# Verify DATABASE_URL in .env
-cat .env | grep DATABASE_URL
-```
-
-**Issue: Port already in use**
-```bash
-# Change port in compose
-    ports:
-      - "${PANKHA_PORT:-7000}:3000"
-# or in .env file
-    PANKHA_PORT=7000
-
-# Restart
-docker compose down
-docker compose up -d
-```
-
-### Agent Issues
-
-**Issue: Agent cannot connect to backend**
-```bash
-# Test backend connectivity
-curl http://your-backend:3000/health
-
-# Check agent logs
-tail -f /var/log/pankha-agent/agent.log
-
-# Verify config
-./pankha-agent --config
-```
-
-**Issue: No sensors detected**
-```bash
-# Verify lm-sensors
-sensors
-
-# Check permissions
-ls -la /sys/class/hwmon/
-
-# Run as root
-sudo ./pankha-agent --start
-```
-
-**Issue: Fan control not working**
-```bash
-# Check PWM support
-cat /sys/class/hwmon/hwmon*/pwm*
-
-# Test manual control
-echo 128 | sudo tee /sys/class/hwmon/hwmon0/pwm1
-```
-
-## ![Contributing](https://img.shields.io/badge/-Contributing-28A745?logo=github&logoColor=white&style=flat-square) Contributing
-
-We welcome contributions! Please see our contributing guidelines:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## System Requirements
-
-### Backend (Server)
-- CPU: x86_64 or ARM64
-- RAM: 256MB minimum
-- Disk: 1GB (for database)
-- OS: Linux, Windows (Docker supported), Mac support in future
-
-### Agent (Client)
-- CPU: <1% usage
-- RAM: <50MB
-- OS: Linux with hwmon support, Windows
-- Requirements:
-  - PWM-controllable fans
-
-## Supported Hardware
-
-### Fan Control
-- ✅ PWM fans (4-pin, Speed control)
-- ✅ DC fans (voltage control, On/Off)
-- Hardware monitoring chips (IPMI, Supermicro, Dell iDRAC), coming soon
+- **Discussions** - [GitHub Discussions](https://github.com/Anexgohan/pankha/discussions) for questions, ideas, and hardware reports
+- **Issues** - [GitHub Issues](https://github.com/Anexgohan/pankha/issues) for bugs and feature requests
+- **Discord** - coming soon
+- **Pull Requests welcome** - fork the repo, branch as `feature/<name>`, open a PR. CI runs typecheck (frontend + backend), `cargo check` on the Rust agents, and a Docker build before review.
 
 ## License
 
-This project is licensed under the AGPL-3.0 License ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg) , see the [LICENSE](LICENSE) file for details.
-
-## Links
-
-- **GitHub**: https://github.com/Anexgohan/pankha
-- **Docker Hub**: https://hub.docker.com/r/anexgohan/pankha
-- **Issues**: https://github.com/Anexgohan/pankha/issues
-- **Discussions**: https://github.com/Anexgohan/pankha/discussions
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/Anexgohan/pankha/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/Anexgohan/pankha/discussions)
-- **Discord**: [Discore coming Soon](#discord)
-
-## Acknowledgments
-
-- Built with Node.js, React, and PostgreSQL
-- Inspired by the need for centralized hardware monitoring
-- Thanks to the open source community
-
----
-
-**Made with ❤️ for the self-hosting community**
+Pankha Fan Control is licensed under [AGPL-3.0](LICENSE) ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg). Commercial licensing is also available - see [LICENSE-COMMERCIAL.md](LICENSE-COMMERCIAL.md).
