@@ -21,7 +21,6 @@
 ![Centralized Dashboard](documentation/public/images/pankha_title-bar_01.png)
 
 ---
-
 ## What is Pankha Fan Control?
 
 **Pankha Fan Control** - is open-source software that gives you complete control over your systems cooling. 
