@@ -29,7 +29,6 @@ import RuntimeDefaults, { type LogLevel } from './RuntimeDefaults';
 import DeploySummary from './DeploySummary';
 import MaintenanceSection from './MaintenanceSection';
 import ResourcesSection from './ResourcesSection';
-import ProfileBuilder from './ProfileBuilder';
 import '../styles/deployment.css';
 
 type Failsafe = string;
@@ -488,6 +487,7 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
               onProfileModeChange={setProfileMode}
               selectedProfileId={selectedProfileId}
               onProfileSelect={setSelectedProfileId}
+              systems={systems}
             />
           )}
 
@@ -544,11 +544,6 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
           githubRepo={GITHUB_REPO}
         />
       </div>
-
-      {/* Profile Builder appears below workspace when ipmi + custom mode */}
-      {isIpmi && profileMode === 'custom' && (
-        <ProfileBuilder systems={systems} />
-      )}
 
       {/* Existing fleet section */}
       <div className="deploy-existing-fleet-divider">

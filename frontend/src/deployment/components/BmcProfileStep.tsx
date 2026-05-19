@@ -1,5 +1,6 @@
 import React from 'react';
 import IpmiProfileSelector from './IpmiProfileSelector';
+import ProfileBuilder from './ProfileBuilder';
 
 export type ProfileMode = 'catalog' | 'custom';
 
@@ -9,6 +10,7 @@ interface BmcProfileStepProps {
   onProfileModeChange: (mode: ProfileMode) => void;
   selectedProfileId: string | null;
   onProfileSelect: (id: string | null) => void;
+  systems: any[];
 }
 
 const BmcProfileStep: React.FC<BmcProfileStepProps> = React.memo(({
@@ -17,6 +19,7 @@ const BmcProfileStep: React.FC<BmcProfileStepProps> = React.memo(({
   onProfileModeChange,
   selectedProfileId,
   onProfileSelect,
+  systems,
 }) => (
   <section className="deployment-section step-block">
     <div className="step-header">
@@ -58,9 +61,7 @@ const BmcProfileStep: React.FC<BmcProfileStepProps> = React.memo(({
     )}
 
     {profileMode === 'custom' && (
-      <p className="profile-builder-hint">
-        No profile needed for deployment. A bare agent will connect to the hub but won't control fans. Use the Profile Builder below to test commands and create a profile.
-      </p>
+      <ProfileBuilder systems={systems} />
     )}
   </section>
 ));

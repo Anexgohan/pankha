@@ -980,11 +980,11 @@
   background: transparent;
   border: 1px solid var(--border-color);
   color: var(--text-secondary);
-  padding: 4px 10px;
+  padding: var(--spacing-xs) var(--spacing-sm);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   text-transform: uppercase;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -1141,11 +1141,11 @@
 .prep-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacing-xs);
   font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-sm);
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
@@ -1165,7 +1165,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: var(--font-size-sm2);
 }
 
 .prep-status svg {
@@ -2003,30 +2003,30 @@
 
 .platform-card-footer {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 /* Arch chips row inside platform card */
 .arch-chip-row {
   display: flex;
   gap: var(--spacing-xs);
-  flex-wrap: wrap;
 }
 
 .arch-chip {
-  display: inline-flex;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  justify-content: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-sm) var(--spacing-md);
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -2052,7 +2052,7 @@
   height: 6px;
   border-radius: 50%;
   background: var(--color-success);
-  margin-left: 2px;
+  margin-left: auto;
 }
 
 /* ============================================
@@ -2284,9 +2284,9 @@
 
 .binary-format-pill {
   font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 3px;
+  font-size: var(--font-size-xs);
+  padding: 1px var(--spacing-sm);
+  border-radius: var(--radius-sm);
   background: var(--bg-hover);
   color: var(--text-tertiary);
   text-transform: uppercase;

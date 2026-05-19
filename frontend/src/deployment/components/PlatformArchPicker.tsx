@@ -31,7 +31,7 @@ const PLATFORMS: PlatformCardDef[] = [
     iconSrc: '/icons/linux_01.svg',
     iconAlt: 'Linux',
     tagline: 'Systemd service, Rust-based monitoring',
-    footer: 'Debian . Ubuntu . Proxmox . RPi',
+    footer: 'Debian·Ubuntu·Proxmox·RPi',
     archs: ['x64', 'arm64'],
   },
   {
@@ -40,7 +40,7 @@ const PLATFORMS: PlatformCardDef[] = [
     iconSrc: '/icons/windows_01.svg',
     iconAlt: 'Windows',
     tagline: 'Native service with Tray App',
-    footer: 'Windows 10/11 . Self-contained .NET 8.0',
+    footer: 'Windows 10/11·Self-contained .NET 8.0',
     archs: ['x64'],
   },
   {
@@ -49,7 +49,7 @@ const PLATFORMS: PlatformCardDef[] = [
     iconSrc: '/icons/bmc-01.png',
     iconAlt: 'IPMI',
     tagline: 'Out-of-band fan control over BMC',
-    footer: 'iDRAC . iLO . IPMI 2.0',
+    footer: 'iDRAC·iLO·IPMI 2.0',
     archs: ['x64'],
   },
 ];

@@ -254,7 +254,7 @@ const DeploySummary: React.FC<DeploySummaryProps> = React.memo(({
             <span className="summary-value">{agentRate}s</span>
           </div>
           <div className="summary-row">
-            <span className="summary-eyebrow">Fan step / Hyst.</span>
+            <span className="summary-eyebrow">Fan step / Hysteresis</span>
             <span className="summary-value">{fanStep}% / {hysteresis}°C</span>
           </div>
         </div>
