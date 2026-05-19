@@ -29,8 +29,8 @@ const SystemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [unstableVersion, setUnstableVersion] = useState<string | null>(null);
-  const [stableReleases, setStableReleases] = useState<{ tag_name: string }[]>([]);
-  const [unstableReleases, setUnstableReleases] = useState<{ tag_name: string }[]>([]);
+  const [stableReleases, setStableReleases] = useState<{ tag_name: string; body?: string; published_at?: string }[]>([]);
+  const [unstableReleases, setUnstableReleases] = useState<{ tag_name: string; body?: string; published_at?: string }[]>([]);
   // Persistent dropdown states across re-renders
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
@@ -91,12 +91,12 @@ const SystemsPage: React.FC = () => {
               .filter((r: any) => !r.prerelease)
               .sort(semverDesc)
               .slice(0, 10)
-              .map((r: any) => ({ tag_name: r.tag_name }));
+              .map((r: any) => ({ tag_name: r.tag_name, body: r.body, published_at: r.published_at }));
             const unstables = releases
               .filter((r: any) => r.prerelease)
               .sort(semverDesc)
               .slice(0, 10)
-              .map((r: any) => ({ tag_name: r.tag_name }));
+              .map((r: any) => ({ tag_name: r.tag_name, body: r.body, published_at: r.published_at }));
             setStableReleases(stables);
             setUnstableReleases(unstables);
           }

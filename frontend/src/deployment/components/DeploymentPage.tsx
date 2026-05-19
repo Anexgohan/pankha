@@ -1,82 +1,41 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  Download,
-  ExternalLink,
-  Copy,
-  Check,
-  Rocket,
-  Activity,
-  Server,
-  Terminal,
-  Settings2,
-  ShieldAlert,
-  ArrowRight,
   Command,
-  ChevronDown,
-  ChevronRight,
+  Server,
+  Activity,
+  ShieldAlert,
   History,
-  FolderDown,
-  Link2,
-  RotateCcw,
-  Trash2
+  ExternalLink,
 } from 'lucide-react';
 import { toast } from '../../utils/toast';
-import { uiOptions, getDefault, getOption, interpolateTooltip } from '../../utils/uiOptions';
-import { createDeploymentTemplate, selfUpdateAgent, API_BASE_URL, getHubStatus, stageUpdateToHub, clearHubDownloads, getDeploymentHubConfig, type HubStatus, type DeploymentHubConfig } from '../../services/api';
-import IpmiInstallerCards from './IpmiInstallerCards';
-import IpmiProfileSelector from './IpmiProfileSelector';
-import ProfileBuilder from './ProfileBuilder';
+import { getDefault } from '../../utils/uiOptions';
+import {
+  createDeploymentTemplate,
+  selfUpdateAgent,
+  API_BASE_URL,
+  getHubStatus,
+  stageUpdateToHub,
+  clearHubDownloads,
+  getDeploymentHubConfig,
+  type HubStatus,
+  type DeploymentHubConfig,
+} from '../../services/api';
+
+import PlatformArchPicker, { type Platform, type Arch } from './PlatformArchPicker';
+import ReleaseHubCache, { type Channel, type ReleaseInfo } from './ReleaseHubCache';
+import BmcProfileStep, { type ProfileMode } from './BmcProfileStep';
+import InstallConnection, { type PathMode, type UrlMode } from './InstallConnection';
+import RuntimeDefaults, { type LogLevel } from './RuntimeDefaults';
+import DeploySummary from './DeploySummary';
+import MaintenanceSection from './MaintenanceSection';
+import ResourcesSection from './ResourcesSection';
 import '../styles/deployment.css';
 
-type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
-type Failsafe = '30' | '50' | '100';
-type PathMode = 'standard' | 'portable';
-type UrlMode = 'internal' | 'external';
-type AgentMode = 'os' | 'ipmi';
-type ProfileMode = 'catalog' | 'custom';
-type MaintenanceSortKey = 'name' | 'agentId' | 'platform' | 'agentType' | 'version' | 'status' | 'maintenance';
-type SortDirection = 'asc' | 'desc';
+type Failsafe = string;
+type Tool = 'wget' | 'curl' | 'powershell';
 
-interface TerminalBlockProps {
-  title: string;
-  tool: 'curl' | 'wget';
-  copiedType: 'curl' | 'wget' | null;
-  command: string;
-  onCopy: (tool: 'curl' | 'wget') => void;
-  isLoading?: boolean;
-}
-
-const TerminalBlock: React.FC<TerminalBlockProps> = ({ title, tool, copiedType, command, onCopy, isLoading }) => (
-  <div className="terminal-instance">
-    <div className="terminal-instance-header">
-      <span className="terminal-title-text">{title}</span>
-      <button
-        className={`terminal-copy-action ${copiedType === tool ? 'success' : ''}`}
-        onClick={() => onCopy(tool)}
-        disabled={isLoading || !command}
-      >
-        {copiedType === tool ? <Check size={14} /> : <Copy size={14} />}
-        {copiedType === tool ? 'COPIED' : 'COPY'}
-      </button>
-    </div>
-    <div className="terminal-container">
-      <div className="terminal-header">
-        <div className="terminal-dots">
-          <span className="terminal-dot dot-red" />
-          <span className="terminal-dot dot-yellow" />
-          <span className="terminal-dot dot-green" />
-        </div>
-        <div className="terminal-path">~/install-pankha</div>
-      </div>
-      <div className="terminal-body">
-        <span className="command-prompt">#</span>
-        <code className="command-line">
-          {isLoading ? 'Generating secure token...' : (command || 'Configure settings to generate command')}
-        </code>
-      </div>
-    </div>
-  </div>
-);
+const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
+const PANKHA_SITE = 'https://pankha.app';
 
 const MetricCard: React.FC<{
   label: string;
@@ -96,101 +55,7 @@ const MetricCard: React.FC<{
     </div>
   </div>
 ));
-
-const InstallerSection: React.FC<{
-  latestVersion: string | null;
-  unstableVersion: string | null;
-  githubRepo: string;
-  agentMode: AgentMode;
-  onAgentModeChange: (mode: AgentMode) => void;
-}> = React.memo(({ latestVersion, unstableVersion, githubRepo, agentMode, onAgentModeChange }) => (
-  <section className="deployment-section">
-    <div className="installer-header">
-      <h3><Download size={20} /> Official Installers</h3>
-      <div className="toggle-presets agent-mode-toggle">
-        <button
-          className={`toggle-item ${agentMode === 'os' ? 'active' : ''}`}
-          onClick={() => onAgentModeChange('os')}
-        >
-          OS Agents
-        </button>
-        <button
-          className={`toggle-item ${agentMode === 'ipmi' ? 'active' : ''}`}
-          onClick={() => onAgentModeChange('ipmi')}
-        >
-          IPMI Agents
-        </button>
-      </div>
-    </div>
-
-    {agentMode === 'os' ? (
-      <div className="download-options">
-        <div className="installer-card">
-          <h4>
-            <img src="/icons/windows_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Windows Agent
-            <div className="version-tags-row">
-              {latestVersion && <span className="version-tag stable">S {latestVersion}</span>}
-              {unstableVersion && <span className="version-tag unstable">U {unstableVersion}</span>}
-              {!latestVersion && !unstableVersion && <span className="version-tag">Detecting</span>}
-            </div>
-          </h4>
-          <p>Native Windows service with Tray App. Supports Windows 10/11 x64. Self-contained .NET 8.0 execution.</p>
-          <div className="card-actions-row">
-            <a
-              href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`}
-              className="btn-primary-tactical"
-              style={{ flex: 1 }}
-              download
-            >
-              <Download size={16} /> Get Latest Release
-            </a>
-            <a
-              href={`${PANKHA_SITE}/docs/wiki/agents-windows/`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-outline-tactical"
-            >
-              <Server size={16} /> DOCUMENTATION
-            </a>
-          </div>
-        </div>
-
-        <div className="installer-card">
-          <h4>
-            <img src="/icons/linux_01.svg" alt="" width="16" height="16" aria-hidden="true" /> Linux Setup
-            <div className="version-tags-row">
-              <span className="version-tag stable">STABLE</span>
-              {unstableVersion && <span className="version-tag unstable">PRE-RELEASE</span>}
-            </div>
-          </h4>
-          <p>Systemd service with Rust-based hardware monitoring. Supports Debian, Ubuntu, Proxmox, and RPI.</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' }}>
-              <div className="coming-soon-badge">
-                  <span className="badge-dot" />
-                  STANDALONE GUI AGENT COMING SOON
-              </div>
-              <p className="subtitle-note">
-                  Use script-based installation below for current deployments.
-              </p>
-          </div>
-          <a
-            href={`${PANKHA_SITE}/docs/wiki/agents-linux/`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-outline-tactical"
-          >
-            <Server size={16} /> DOCUMENTATION
-          </a>
-        </div>
-      </div>
-    ) : (
-      <IpmiInstallerCards />
-    )}
-  </section>
-));
-
-const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
-const PANKHA_SITE = 'https://pankha.app';
+MetricCard.displayName = 'MetricCard';
 
 const ActionButton: React.FC<{ githubRepo: string }> = React.memo(({ githubRepo }) => (
   <div className="deployment-action-bar">
@@ -200,466 +65,62 @@ const ActionButton: React.FC<{ githubRepo: string }> = React.memo(({ githubRepo 
       rel="noopener noreferrer"
       className="btn-action-full"
     >
-      <History size={16} /> VIEW ALL RELEASES & CHANGELOG <ExternalLink size={14} />
+      <History size={16} /> VIEW ALL RELEASES &amp; CHANGELOG <ExternalLink size={14} />
     </a>
   </div>
 ));
+ActionButton.displayName = 'ActionButton';
 
-const ResourcesSection: React.FC<{ githubRepo: string }> = React.memo(({ githubRepo }) => (
-  <section className="deployment-section">
-    <h3><Terminal size={20} /> Technical Documentation</h3>
-    <div className="resource-grid">
-      <a href={`${PANKHA_SITE}/docs/`} target="_blank" rel="noopener noreferrer" className="resource-link">
-        <div className="link-label">
-          <Server size={18} />
-          <span>Wiki: Setup & Configuration</span>
-        </div>
-        <ArrowRight size={16} className="link-arrow" />
-      </a>
-      <a href={`${PANKHA_SITE}/docs/wiki/agents-linux/`} target="_blank" rel="noopener noreferrer" className="resource-link">
-        <div className="link-label">
-          <Settings2 size={18} />
-          <span>Linux Service Guide</span>
-        </div>
-        <ArrowRight size={16} className="link-arrow" />
-      </a>
-      <a href={`${PANKHA_SITE}/docs/wiki/agents-windows/`} target="_blank" rel="noopener noreferrer" className="resource-link">
-        <div className="link-label">
-          <Settings2 size={18} />
-          <span>Windows Service Guide</span>
-        </div>
-        <ArrowRight size={16} className="link-arrow" />
-      </a>
-      <a href={`${PANKHA_SITE}/docs/wiki/agents-advanced-settings/`} target="_blank" rel="noopener noreferrer" className="resource-link">
-        <div className="link-label">
-          <Settings2 size={18} />
-          <span>Advanced Agent Settings</span>
-        </div>
-        <ArrowRight size={16} className="link-arrow" />
-      </a>
-      <a href={`${githubRepo}/issues`} target="_blank" rel="noopener noreferrer" className="resource-link">
-        <div className="link-label">
-          <ExternalLink size={18} />
-          <span>Bug Reports & Issues</span>
-        </div>
-        <ArrowRight size={16} className="link-arrow" />
-      </a>
-    </div>
-  </section>
-));
-
-const MaintenanceSection: React.FC<{
-  isExpanded: boolean;
-  onToggle: () => void;
-  systems: any[];
-  stableVersion: string | null;
-  unstableVersion: string | null;
-  updatingAgents: Set<number>;
-  onApplyUpdate: (systemId: number) => void;
-  hubStatus: HubStatus | null;
-}> = React.memo(({ isExpanded, onToggle, systems, stableVersion, unstableVersion, updatingAgents, onApplyUpdate, hubStatus }) => {
-  const [sortKey, setSortKey] = useState<MaintenanceSortKey | null>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
-
-  const isWindowsSystem = (system: any) =>
-    system.platform === 'windows' || system.agent_id?.toLowerCase().startsWith('windows-');
-
-  const getStatusLabel = (system: any) =>
-    updatingAgents.has(system.id) ? 'UPDATING' : (system.status === 'error' ? 'ERROR' : (system.status === 'online' ? 'ONLINE' : 'OFFLINE'));
-
-  /**
-   * Parse pre-release tag into a comparable number based on GitHub workflow definition.
-   * Ranks: stable (Infinity) > rc > beta > alpha > dev/nightly/etc.
-   */
-  const parsePreRelease = (version: string): number => {
-    // No pre-release suffix = stable release, ranks highest
-    if (!version.includes('-')) return Infinity;
-
-    const suffix = version.split('-')[1]?.toLowerCase() || '';
-
-    // Extract any trailing numbers (e.g., rc2 -> 2)
-    const numMatch = suffix.match(/\d+$/);
-    const num = numMatch ? parseInt(numMatch[0], 10) : 0;
-
-    // Base weights for different types of pre-releases
-    let weight = 0;
-    if (suffix.startsWith('rc')) weight = 8000;
-    else if (suffix.startsWith('beta')) weight = 7000;
-    else if (suffix.startsWith('alpha')) weight = 6000;
-    else if (suffix.startsWith('pre') || suffix.startsWith('preview')) weight = 5000;
-    else if (suffix.startsWith('insiders')) weight = 4000;
-    else if (suffix.startsWith('experimental')) weight = 3000;
-    else if (suffix.startsWith('canary')) weight = 2000;
-    else if (suffix.startsWith('dev')) weight = 1000;
-    else if (suffix.startsWith('nightly')) weight = 500;
-    else weight = 100; // any other unknown suffix
-
-    return weight + num;
-  };
-
-  const stripPreRelease = (version: string): string =>
-    (version || '0.0.0').replace(/^v/, '').replace(/-.*$/, '');
-
-  const compareSemver = (a: string, b: string): number => {
-    const cleanA = (a || '0.0.0').replace(/^v/, '');
-    const cleanB = (b || '0.0.0').replace(/^v/, '');
-    const pa = stripPreRelease(cleanA).split('.').map(Number);
-    const pb = stripPreRelease(cleanB).split('.').map(Number);
-    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-      const na = pa[i] || 0;
-      const nb = pb[i] || 0;
-      if (na !== nb) return na - nb;
-    }
-    // Base versions equal - compare pre-release: rc2 < rc3 < stable
-    return parsePreRelease(cleanA) - parsePreRelease(cleanB);
-  };
-
-  const getMaintenanceLabel = (system: any) => {
-    const isWindows = isWindowsSystem(system);
-    const hubVer = hubStatus?.version?.replace('v', '') || '';
-    const stableVer = stableVersion?.replace('v', '') || '';
-    const cleanTarget = isWindows ? stableVer : (hubVer || stableVer);
-    const isMismatch = cleanTarget && system.agent_version && compareSemver(cleanTarget, system.agent_version) !== 0;
-    const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
-    const isOutdated = isMismatch && !isDowngrade;
-    const isUpdating = updatingAgents.has(system.id);
-    const isOnline = system.status === 'online' || system.status === 'error';
-
-    if (isWindows) return isOutdated ? 'DOWNLOAD MSI' : 'GET MSI';
-    if (!hubStatus?.version) return 'UNAVAILABLE';
-    if (!isOnline) return 'OFFLINE';
-    if (isUpdating) return 'UPDATING';
-    if (isDowngrade) return 'DOWNGRADE';
-    if (isOutdated) return 'UPDATE NOW';
-    return 'REINSTALL';
-  };
-
-  const handleSort = (key: MaintenanceSortKey) => {
-    if (sortKey !== key) {
-      setSortKey(key);
-      setSortDirection('asc');
-      return;
-    }
-
-    if (sortDirection === 'asc') {
-      setSortDirection('desc');
-      return;
-    }
-
-    // Third click resets to default incoming order.
-    setSortKey(null);
-    setSortDirection('asc');
-  };
-
-  const getSortIndicator = (key: MaintenanceSortKey) => {
-    if (sortKey !== key) return '↕';
-    return sortDirection === 'asc' ? '↑' : '↓';
-  };
-
-  const outdatedCount = useMemo(() => {
-    // Hub staging is for Linux agents only; Windows agents use GitHub MSI directly
-    const hubVer = hubStatus?.version?.replace('v', '') || '';
-    const stableVer = stableVersion?.replace('v', '') || '';
-
-    const linuxTarget = hubVer || stableVer;
-    const windowsTarget = stableVer;
-
-    if (!linuxTarget && !windowsTarget) return 0;
-    return systems.filter(s => {
-      if (!s.agent_version) return false;
-      const isWindows = isWindowsSystem(s);
-      const target = isWindows ? windowsTarget : linuxTarget;
-      return target && compareSemver(target, s.agent_version) !== 0;
-    }).length;
-  }, [systems, stableVersion, hubStatus]);
-
-  const sortedSystems = useMemo(() => {
-    if (!sortKey) return systems;
-
-    const sorted = [...systems].sort((a, b) => {
-      switch (sortKey) {
-        case 'name':
-          return (a.name || '').localeCompare((b.name || ''), undefined, { sensitivity: 'base', numeric: true });
-        case 'agentId':
-          return (a.agent_id || '').localeCompare((b.agent_id || ''), undefined, { sensitivity: 'base', numeric: true });
-        case 'platform': {
-          const getPlatformLabel = (s: typeof a) => {
-            if (s.agent_type === 'ipmi_host' || s.agent_type === 'ipmi_network')
-              return s.profile_id?.split('/')[0]?.toUpperCase() || 'IPMI';
-            return isWindowsSystem(s) ? 'WINDOWS' : 'LINUX';
-          };
-          return getPlatformLabel(a).localeCompare(getPlatformLabel(b), undefined, { sensitivity: 'base' });
-        }
-        case 'agentType':
-          return (a.agent_type || '').localeCompare((b.agent_type || ''), undefined, { sensitivity: 'base' });
-        case 'version':
-          return compareSemver(a.agent_version, b.agent_version);
-        case 'status': {
-          const rank: Record<string, number> = { OFFLINE: 0, ERROR: 1, ONLINE: 2, UPDATING: 3 };
-          return (rank[getStatusLabel(a)] ?? 0) - (rank[getStatusLabel(b)] ?? 0);
-        }
-        case 'maintenance':
-          return getMaintenanceLabel(a).localeCompare(getMaintenanceLabel(b), undefined, { sensitivity: 'base', numeric: true });
-        default:
-          return 0;
-      }
-    });
-
-    return sortDirection === 'asc' ? sorted : sorted.reverse();
-  }, [systems, sortKey, sortDirection, updatingAgents]);
-
-  return (
-    <section className={`deployment-section maintenance-panel ${!isExpanded ? 'collapsed' : ''}`}>
-      <div className="maintenance-header-toggle">
-        <h3 onClick={onToggle} className="clickable-title">
-          <Activity size={20} /> Fleet Maintenance
-          {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-          {outdatedCount > 0 && (
-            <span className="header-badge pulse">
-              {outdatedCount} UPDATE{outdatedCount !== 1 ? 'S' : ''} AVAILABLE
-            </span>
-          )}
-        </h3>
-
-        <span className="maintenance-stats">
-          {systems.length} System{systems.length !== 1 ? 's' : ''} Connected
-        </span>
-      </div>
-
-      {isExpanded && (
-        <div className="maintenance-content">
-          <div className="maintenance-table-wrapper">
-            <table className="maintenance-table">
-              <thead>
-                <tr>
-                  <th>
-                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'name' ? 'active' : ''}`} onClick={() => handleSort('name')}>
-                      Hostname <span className="sort-indicator">{getSortIndicator('name')}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'agentId' ? 'active' : ''}`} onClick={() => handleSort('agentId')}>
-                      Agent ID <span className="sort-indicator">{getSortIndicator('agentId')}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'platform' ? 'active' : ''}`} onClick={() => handleSort('platform')}>
-                      Platform <span className="sort-indicator">{getSortIndicator('platform')}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'agentType' ? 'active' : ''}`} onClick={() => handleSort('agentType')}>
-                      Agent Type <span className="sort-indicator">{getSortIndicator('agentType')}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'version' ? 'active' : ''}`} onClick={() => handleSort('version')}>
-                      Version <span className="sort-indicator">{getSortIndicator('version')}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'status' ? 'active' : ''}`} onClick={() => handleSort('status')}>
-                      Status <span className="sort-indicator">{getSortIndicator('status')}</span>
-                    </button>
-                  </th>
-                  <th>
-                    <button type="button" className={`maintenance-sort-btn ${sortKey === 'maintenance' ? 'active' : ''}`} onClick={() => handleSort('maintenance')}>
-                      Maintenance <span className="sort-indicator">{getSortIndicator('maintenance')}</span>
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {systems.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: 'var(--spacing-2xl) 0', color: 'var(--text-tertiary)' }}>
-                      NO REMOTE NODES DISCOVERED
-                    </td>
-                  </tr>
-                ) : (
-                  sortedSystems.map(system => {
-                    const isWindows = isWindowsSystem(system);
-
-                    // Windows compares against GitHub latest; Linux compares against hub staged version
-                    const hubVer = hubStatus?.version?.replace('v', '') || '';
-                    const stableVer = stableVersion?.replace('v', '') || '';
-                    const cleanTarget = isWindows ? stableVer : (hubVer || stableVer);
-                    const targetVersion = cleanTarget ? `v${cleanTarget}` : null;
-                    const isMismatch = cleanTarget && system.agent_version && compareSemver(cleanTarget, system.agent_version) !== 0;
-                    // Determine if this is an upgrade or downgrade (semver-aware comparison)
-                    const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
-                    const isOutdated = isMismatch && !isDowngrade;
-                    const isUpdating = updatingAgents.has(system.id);
-                    const isOnline = system.status === 'online' || system.status === 'error';
-
-                    // Determine status display
-                    const statusLabel = getStatusLabel(system);
-                    const statusClass = isUpdating ? 'updating' : (isOnline ? (system.status === 'error' ? 'error' : 'online') : 'offline');
-                    const getFleetIcon = () => {
-                      if (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') {
-                        const vendor = system.profile_id?.split('/')[0]?.toLowerCase();
-                        const vendorIcons: Record<string, string> = {
-                          dell: '/icons/brands/dell_logo.svg',
-                          supermicro: '/icons/brands/supermicro-computer_logo.svg',
-                          asrock: '/icons/brands/asrock_logo.svg',
-                          tyan: '/icons/brands/tyan_logo.svg',
-                          lenovo: '/icons/brands/lenovo_logo.svg',
-                          hp: '/icons/brands/hp_logo.svg',
-                        };
-                        const src = vendor && vendorIcons[vendor] ? vendorIcons[vendor] : '/icons/bmc-01.png';
-                        const title = vendor ? `${vendor} IPMI Agent` : 'IPMI Agent';
-                        return (
-                          <div className="platform-icon" title={title}>
-                            <img src={src} alt={title} style={{ maxWidth: '36px', height: '14px', objectFit: 'contain' }} />
-                          </div>
-                        );
-                      }
-                      if (isWindows) {
-                        return (
-                          <div className="platform-icon windows" title="Windows Agent">
-                            <img src="/icons/windows_01.svg" alt="Windows" width="14" height="14" />
-                          </div>
-                        );
-                      }
-                      return (
-                        <div className="platform-icon linux" title="Linux Agent">
-                          <img src="/icons/linux_01.svg" alt="Linux" width="14" height="14" />
-                        </div>
-                      );
-                    };
-                    const platformIcon = getFleetIcon();
-
-                    return (
-                      <tr key={system.id}>
-                        <td className="hostname-cell">
-                          <div className="hostname-wrapper">
-                            {platformIcon}
-                            <span className="hostname-text">{system.name}</span>
-                          </div>
-                        </td>
-                        <td className="agent-id-cell"><code>{system.agent_id}</code></td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' }}>
-                            {platformIcon}
-                            <span>{
-                              (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network')
-                                ? (system.profile_id?.split('/')[0]?.toUpperCase() || 'IPMI')
-                                : isWindows ? 'WINDOWS' : 'LINUX'
-                            }</span>
-                          </div>
-                        </td>
-                        <td>
-                          <span>{
-                            ({
-                              os_linux: 'OS Agent Linux',
-                              os_windows: 'OS Agent Windows',
-                              ipmi_host: 'IPMI Agent Host',
-                              ipmi_network: 'IPMI Agent Network',
-                              unknown: 'Unknown Agent',
-                            } as Record<string, string>)[system.agent_type || ''] || system.agent_type || '-'
-                          }</span>
-                        </td>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                            <span>v{system.agent_version || '0.0.0'}</span>
-                            {isOutdated && !isUpdating && (
-                              <span className="update-badge" title={`Update to ${targetVersion} available`}>
-                                NEW {targetVersion}
-                              </span>
-                            )}
-                            {isDowngrade && !isUpdating && (
-                              <span className="update-badge downgrade" title={`Downgrade to ${targetVersion}`}>
-                                {targetVersion}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td>
-                          <span
-                            className={`status-tag-v2 ${statusClass}`}
-                            title={system.status === 'error' && system.last_error
-                              ? `Agent status is currently "ERROR"\n\nReason: ${system.last_error}`
-                              : `Agent status is currently "${statusLabel}"`}
-                          >
-                            <span className="status-dot" />
-                            {statusLabel}
-                          </span>
-                        </td>
-                          <td>
-                            {isWindows ? (
-                              <a 
-                                href={`${GITHUB_REPO}/releases/latest/download/pankha-agent-windows_x64.msi`}
-                                className={`btn-table-action windows-download ${isOutdated ? 'update-needed' : ''}`}
-                                style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
-                                download
-                              >
-                                <Download size={14} />
-                                {isOutdated ? 'Download MSI' : 'Get MSI'}
-                              </a>
-                            ) : (
-                              <span
-                                title={
-                                  !hubStatus?.version
-                                    ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first`
-                                    : (!isOnline
-                                      ? 'Agent is offline'
-                                      : (isUpdating
-                                        ? 'Update in progress...'
-                                        : (isDowngrade
-                                          ? `Downgrade agent to ${targetVersion}`
-                                          : (isOutdated
-                                            ? `Click to update agent to ${targetVersion}`
-                                            : `Reinstall agent version ${targetVersion}`))))
-                                }
-                                style={{ display: 'inline-block' }}
-                              >
-                                <button
-                                  className={`btn-table-action ${isOutdated ? 'update-needed' : ''} ${isDowngrade ? 'downgrade' : ''}`}
-                                  onClick={() => onApplyUpdate(system.id)}
-                                  disabled={!isOnline || isUpdating || !hubStatus?.version}
-                                  style={{ pointerEvents: 'auto' }}
-                                >
-                                  {isUpdating ? 'Updating...' : (isDowngrade ? 'Downgrade' : (isOutdated ? 'Update Now' : 'Reinstall'))}
-                                </button>
-                              </span>
-                            )}
-                          </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </section>
-  );
-});
-
-export const DeploymentPage: React.FC<{
+interface DeploymentPageProps {
   systems: any[];
   latestVersion: string | null;
   unstableVersion?: string | null;
-  stableReleases?: { tag_name: string }[];
-  unstableReleases?: { tag_name: string }[];
-}> = ({ systems, latestVersion, unstableVersion, stableReleases = [], unstableReleases = [] }) => {
+  stableReleases?: ReleaseInfo[];
+  unstableReleases?: ReleaseInfo[];
+}
+
+export const DeploymentPage: React.FC<DeploymentPageProps> = ({
+  systems,
+  latestVersion,
+  unstableVersion,
+  stableReleases = [],
+  unstableReleases = [],
+}) => {
+  // Workspace state (new shape replaces aioAgentMode/arch)
+  const [platform, setPlatform] = useState<Platform>('linux');
+  const [arch, setArch] = useState<Arch>('x64');
+  const [channel, setChannel] = useState<Channel>('stable');
+
+  // Runtime defaults state
   const [logLevel, setLogLevel] = useState<LogLevel>(getDefault('logLevel'));
-  const [failsafe, setFailsafe] = useState<Failsafe>(String(getDefault('failsafeSpeed')) as Failsafe);
-  const [pathMode, setPathMode] = useState<PathMode>('standard');
+  const [failsafe, setFailsafe] = useState<Failsafe>(String(getDefault('failsafeSpeed')));
   const [emergency, setEmergency] = useState(String(getDefault('emergencyTemp')));
   const [agentRate, setAgentRate] = useState(String(getDefault('updateInterval')));
   const [fanStep, setFanStep] = useState(String(getDefault('fanStep')));
   const [hysteresis, setHysteresis] = useState(String(getDefault('hysteresis')));
-  const [copiedType, setCopiedType] = useState<'curl' | 'wget' | null>(null);
-  const [installerMode, setInstallerMode] = useState<AgentMode>('os');
-  const [aioAgentMode, setAioAgentMode] = useState<AgentMode>('os');
+
+  // Install + connection state
+  const [pathMode, setPathMode] = useState<PathMode>('standard');
+  const [urlMode, setUrlMode] = useState<UrlMode>('internal');
+  const [hubConfig, setHubConfig] = useState<DeploymentHubConfig | null>(null);
+  const [hubUrl, setHubUrl] = useState<string>('');
+
+  // IPMI profile state
   const [profileMode, setProfileMode] = useState<ProfileMode>('catalog');
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
 
-  // Hub URL Configuration - fetched from backend
-  const [hubConfig, setHubConfig] = useState<DeploymentHubConfig | null>(null);
-  const [urlMode, setUrlMode] = useState<UrlMode>('internal');
+  // Hub + deployment state
+  const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
+  const [isStaging, setIsStaging] = useState(false);
+  const [deploymentToken, setDeploymentToken] = useState<string | null>(null);
+  const [isLoadingToken, setIsLoadingToken] = useState(false);
+  const [updatingAgents, setUpdatingAgents] = useState<Set<number>>(new Set());
+  const [isMaintenanceExpanded, setIsMaintenanceExpanded] = useState(true);
+  const [copiedType, setCopiedType] = useState<Tool | null>(null);
+
+  // Version picker state (preserved from previous implementation)
+  const [selectedStableVersion, setSelectedStableVersion] = useState<string>('');
+  const [selectedUnstableVersion, setSelectedUnstableVersion] = useState<string>('');
 
   // Compute URLs based on mode and config
   const getExternalUrl = () => {
@@ -676,33 +137,10 @@ export const DeploymentPage: React.FC<{
     if (hubConfig?.hubIp) {
       return `http://${hubConfig.hubIp}:${hubConfig.hubPort}`;
     }
-    return getExternalUrl(); // Fallback if not configured
+    return getExternalUrl();
   };
 
-  const [hubUrl, setHubUrl] = useState<string>('');
-  const [isMaintenanceExpanded, setIsMaintenanceExpanded] = useState(true);
-  const [deploymentToken, setDeploymentToken] = useState<string | null>(null);
-  const [isLoadingToken, setIsLoadingToken] = useState(false);
-  const [updatingAgents, setUpdatingAgents] = useState<Set<number>>(new Set());
-  const [hubStatus, setHubStatus] = useState<HubStatus | null>(null);
-  const [isStaging, setIsStaging] = useState(false);
-  const [selectedStableVersion, setSelectedStableVersion] = useState<string>('');
-  const [selectedUnstableVersion, setSelectedUnstableVersion] = useState<string>('');
-  const [pickerDisplay, setPickerDisplay] = useState<string>(() => {
-    return sessionStorage.getItem('pankha-picker-display') || 'Pick a version';
-  });
-
-  // Tooltip context for interpolation (uses current form values)
-  const tooltipContext = useMemo(() => ({
-    logLevel,
-    emergencyTemp: emergency,
-    failsafeSpeed: failsafe,
-    agentInterval: agentRate,
-    fanStep,
-    hysteresis
-  }), [logLevel, emergency, failsafe, agentRate, fanStep, hysteresis]);
-
-  // Fleet Statistics Calculations
+  // Fleet Statistics
   const fleetStats = useMemo(() => {
     const total = systems.length;
     const online = systems.filter(s => s.status === 'online').length;
@@ -711,11 +149,9 @@ export const DeploymentPage: React.FC<{
       const cleanLatest = latestVersion.replace('v', '');
       return !s.agent_version.includes(cleanLatest);
     }).length;
-
     return { total, online, outdated };
   }, [systems, latestVersion]);
 
-  // Fetch hub status on load and after actions
   const refreshHubStatus = async () => {
     try {
       const status = await getHubStatus();
@@ -727,7 +163,6 @@ export const DeploymentPage: React.FC<{
 
   useEffect(() => {
     refreshHubStatus();
-    // Poll hub status every 10s while on this page
     const interval = setInterval(refreshHubStatus, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -749,12 +184,11 @@ export const DeploymentPage: React.FC<{
     }
   }, [unstableReleases]);
 
-  // Fetch deployment hub config ONCE on mount
+  // Fetch deployment hub config once
   useEffect(() => {
     getDeploymentHubConfig()
       .then(config => {
         setHubConfig(config);
-        // Set initial URL based on whether internal IP is available
         if (config.hubIp) {
           setHubUrl(`http://${config.hubIp}:${config.hubPort}`);
           setUrlMode('internal');
@@ -765,18 +199,26 @@ export const DeploymentPage: React.FC<{
       })
       .catch(err => {
         console.error('Failed to fetch deployment config', err);
-        // Fallback to external URL
         setHubUrl(getExternalUrl());
         setUrlMode('external');
       });
   }, []);
+
+  const handleUrlModeChange = (mode: UrlMode) => {
+    setUrlMode(mode);
+    setHubUrl(mode === 'internal' ? getInternalUrl() : getExternalUrl());
+  };
+
+  const handleHubUrlReset = () => {
+    setHubUrl(urlMode === 'internal' ? getInternalUrl() : getExternalUrl());
+  };
 
   const handleStageUpdate = async (version: string) => {
     setIsStaging(true);
     try {
       const result = await stageUpdateToHub(version);
       const f = result.files;
-      const fileParts = `x64 ${f.x64 ? '✓' : '✗'} arm64 ${f.arm64 ? '✓' : '✗'} ipmi ${f.ipmi_x64 ? '✓' : '✗'}`;
+      const fileParts = `x64 ${f.x64 ? '+' : '-'} arm64 ${f.arm64 ? '+' : '-'} ipmi ${f.ipmi_x64 ? '+' : '-'}`;
       const checksum = result.checksumVerified ? 'checksums passed' : 'checksums unverified';
       toast.success(`Download ready ${result.version} (${fileParts}) ${checksum}`);
       await refreshHubStatus();
@@ -784,7 +226,7 @@ export const DeploymentPage: React.FC<{
       const data = error?.response?.data;
       if (data?.files) {
         const f = data.files;
-        const fileParts = `x64 ${f.x64 ? '✓' : '✗'} arm64 ${f.arm64 ? '✓' : '✗'} ipmi ${f.ipmi_x64 ? '✓' : '✗'}`;
+        const fileParts = `x64 ${f.x64 ? '+' : '-'} arm64 ${f.arm64 ? '+' : '-'} ipmi ${f.ipmi_x64 ? '+' : '-'}`;
         toast.error(`Download failed ${data.version || version} (${fileParts}) ${data.error}`);
       } else {
         toast.error(data?.error || 'Download failed');
@@ -799,7 +241,6 @@ export const DeploymentPage: React.FC<{
       toast.error('No cached agents to clear');
       return;
     }
-
     try {
       await clearHubDownloads();
       toast.success('Agent cache cleared successfully');
@@ -811,8 +252,13 @@ export const DeploymentPage: React.FC<{
 
   // Handle token generation when config changes (debounced)
   useEffect(() => {
-    // Skip token generation for IPMI mode when no profile is selected
-    if (aioAgentMode === 'ipmi' && !selectedProfileId) {
+    // Windows uses MSI download, no token needed
+    if (platform === 'windows') {
+      setDeploymentToken(null);
+      return;
+    }
+    // Skip token generation for IPMI catalog mode when no profile is selected
+    if (platform === 'ipmi' && profileMode === 'catalog' && !selectedProfileId) {
       setDeploymentToken(null);
       return;
     }
@@ -828,12 +274,15 @@ export const DeploymentPage: React.FC<{
           fan_step: parseInt(fanStep),
           hysteresis: parseFloat(hysteresis),
           path_mode: pathMode,
-          base_url: hubUrl  // User-editable Hub URL for agent connections
+          base_url: hubUrl,
+          arch,
         };
 
-        if (aioAgentMode === 'ipmi') {
-          config.agent_type = 'ipmi_host';  // Future: 'ipmi_network' when network toggle is enabled
-          config.profile_id = selectedProfileId;
+        if (platform === 'ipmi') {
+          config.agent_type = 'ipmi_host';
+          if (profileMode === 'catalog' && selectedProfileId) {
+            config.profile_id = selectedProfileId;
+          }
         }
 
         const response = await createDeploymentTemplate(config);
@@ -846,16 +295,15 @@ export const DeploymentPage: React.FC<{
       }
     };
 
-    const timer = setTimeout(refreshToken, 500); // Debounce 500ms
+    const timer = setTimeout(refreshToken, 500);
     return () => clearTimeout(timer);
-  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode, hubUrl, aioAgentMode, selectedProfileId]);
+  }, [logLevel, failsafe, emergency, agentRate, fanStep, hysteresis, pathMode, hubUrl, platform, arch, profileMode, selectedProfileId]);
 
   // Clear updating state when agent reconnects
   useEffect(() => {
     if (updatingAgents.size > 0) {
       systems.forEach(system => {
         if (updatingAgents.has(system.id) && system.status === 'online') {
-          // Agent reconnected, clear updating state after brief delay
           setTimeout(() => {
             setUpdatingAgents(current => {
               const updated = new Set(current);
@@ -868,15 +316,16 @@ export const DeploymentPage: React.FC<{
     }
   }, [systems, updatingAgents]);
 
-  const generateCommand = (tool: 'curl' | 'wget') => {
-    if (!deploymentToken) return '';
-
-    const endpoint = aioAgentMode === 'ipmi' ? 'ipmi' : 'linux';
-    const url = `${hubUrl}/api/deploy/${endpoint}?token=${deploymentToken}`;
-
-    if (tool === 'curl') {
-      return `curl -sSL "${url}" | bash`;
+  const generateCommand = (tool: Tool): string => {
+    if (tool === 'powershell') {
+      // Windows PowerShell installer placeholder - no token yet (Windows endpoint TBD)
+      const versionPath = selectedStableVersion || 'latest';
+      return `iwr -useb "${GITHUB_REPO}/releases/download/${versionPath}/install.ps1" | iex`;
     }
+    if (!deploymentToken) return '';
+    const endpoint = platform === 'ipmi' ? 'ipmi' : 'linux';
+    const url = `${hubUrl}/api/deploy/${endpoint}?token=${deploymentToken}`;
+    if (tool === 'curl') return `curl -sSL "${url}" | bash`;
     return `wget -qO- "${url}" | bash`;
   };
 
@@ -888,7 +337,6 @@ export const DeploymentPage: React.FC<{
     } catch (error: any) {
       console.error('Failed to trigger remote update', error);
       toast.error(error?.response?.data?.error || 'Failed to send update command');
-      // Clear updating state on error
       setUpdatingAgents(prev => {
         const next = new Set(prev);
         next.delete(systemId);
@@ -897,10 +345,9 @@ export const DeploymentPage: React.FC<{
     }
   };
 
-  const copyToClipboard = async (tool: 'curl' | 'wget') => {
+  const copyToClipboard = async (tool: Tool) => {
     const command = generateCommand(tool);
     if (!command) return;
-
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
         await navigator.clipboard.writeText(command);
@@ -911,7 +358,7 @@ export const DeploymentPage: React.FC<{
       toast.success(`${tool.toUpperCase()} command copied to clipboard`);
       setTimeout(() => setCopiedType(null), 2000);
     } catch {
-      // Fallback for non-secure contexts (HTTP over IP)
+      // Fallback for non-secure contexts
       try {
         const textarea = document.createElement('textarea');
         textarea.value = command;
@@ -934,19 +381,30 @@ export const DeploymentPage: React.FC<{
     }
   };
 
+  // Selected version (used across panels)
+  const selectedVersion = channel === 'stable' ? selectedStableVersion : selectedUnstableVersion;
+
+  // Release notes lookup
+  const releaseNotes: ReleaseInfo | null = useMemo(() => {
+    const list = channel === 'stable' ? stableReleases : unstableReleases;
+    return list.find(r => r.tag_name === selectedVersion) || list[0] || null;
+  }, [channel, selectedVersion, stableReleases, unstableReleases]);
+
+  // BMC profile display (vendor / model from profile_id)
+  const bmcVendorModel = selectedProfileId
+    ? selectedProfileId.split('/').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' / ')
+    : null;
+
+  // Step numbering: IPMI gets 5 steps with BMC Profile as step 3
+  const isIpmi = platform === 'ipmi';
+  const stepInstallConnection = isIpmi ? 4 : 3;
+  const stepRuntimeDefaults = isIpmi ? 5 : 4;
 
   return (
     <div className="deployment-page">
       <div className="deployment-section-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' }}>
-          <div style={{
-            color: 'var(--color-accent-dynamic)',
-            background: 'color-mix(in srgb, var(--color-accent-dynamic), transparent 92%)',
-            padding: 'var(--spacing-sm)',
-            borderRadius: 'var(--radius-md)',
-            display: 'flex',
-            border: '1px solid color-mix(in srgb, var(--color-accent-dynamic), transparent 85%)'
-          }}>
+          <div className="deployment-page-icon">
             <Command size={24} />
           </div>
           <div>
@@ -979,424 +437,134 @@ export const DeploymentPage: React.FC<{
           borderLeftColor={fleetStats.outdated > 0 ? 'var(--color-warning)' : 'var(--border-color)'}
           iconStyle={{
             color: fleetStats.outdated > 0 ? 'var(--color-warning)' : 'var(--text-tertiary)',
-            background: fleetStats.outdated > 0 ? 'rgba(255, 152, 0, 0.1)' : 'var(--bg-hover)'
+            background: fleetStats.outdated > 0 ? 'rgba(255, 152, 0, 0.1)' : 'var(--bg-hover)',
           }}
           tooltip="Agents running older versions than the latest release"
         />
       </div>
 
-      <div className="deployment-content-grid">
-        <InstallerSection
-          latestVersion={latestVersion}
-          unstableVersion={unstableVersion || null}
-          githubRepo={GITHUB_REPO}
-          agentMode={installerMode}
-          onAgentModeChange={setInstallerMode}
-        />
-
-        {/* Agent Downloads - Stage binaries from GitHub to local Hub */}
-        <section className="deployment-section agent-downloads-panel">
-          <h3><Download size={20} /> Agent Downloads</h3>
-          <p style={{ margin: '-12px 0 0 28px', fontSize: 'var(--font-size-sm2)', color: 'var(--text-secondary)' }}>Download a release to the Pankha Hub, then push it to Clients from Fleet Maintenance.</p>
-          <div className="local-prep-widget">
-            {/* Row 1: Status + Binary badges + Clear */}
-            <div className="prep-row prep-status-row">
-              <div className="prep-status">
-                <Server size={14} />
-                <span className="prep-label">Pankha Hub:</span>
-                {hubStatus?.version ? (
-                  <span className="prep-version success">{hubStatus.version} Ready</span>
-                ) : (
-                  <span className="prep-version empty">No Cache</span>
-                )}
-                {latestVersion && hubStatus?.version && hubStatus.version !== latestVersion && (
-                  <span className="prep-version available">{latestVersion} Available</span>
-                )}
-              </div>
-
-              <div className="prep-binary-badges">
-                <span className={`prep-badge ${hubStatus?.files?.x64 ? 'ready' : 'missing'}`} title="OS Linux x64 binary">
-                  OS x64 {hubStatus?.files?.x64 ? '✓' : '✗'}
-                </span>
-                <span className={`prep-badge ${hubStatus?.files?.arm64 ? 'ready' : 'missing'}`} title="OS Linux arm64 binary">
-                  OS arm64 {hubStatus?.files?.arm64 ? '✓' : '✗'}
-                </span>
-                <span className={`prep-badge ${hubStatus?.files?.ipmi_x64 ? 'ready' : 'missing'}`} title="IPMI Host x64 binary">
-                  IPMI x64 {hubStatus?.files?.ipmi_x64 ? '✓' : '✗'}
-                </span>
-              </div>
-
-              <div className="prep-manual-actions">
-                <button
-                  className="btn-clear-cache"
-                  onClick={handleClearDownloads}
-                  disabled={!hubStatus?.version || isStaging}
-                  title="Clear all cached agent binaries from Hub server"
-                >
-                  <Trash2 size={14} />
-                  <span>Clear Cache</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Row 2: Version picker + Download buttons */}
-            <div className="prep-row prep-actions-row">
-              <div className="prep-actions-group">
-                <div className="stealth-select-wrapper version-picker-wrapper">
-                  <div className="select-display">{pickerDisplay}</div>
-                  <select
-                    className="select-engine"
-                    value=""
-                    onChange={(e) => {
-                      const ver = e.target.value;
-                      const isStable = stableReleases.some(r => r.tag_name === ver);
-                      if (isStable) {
-                        setSelectedStableVersion(ver);
-                        sessionStorage.setItem('pankha-picker-stable', ver);
-                      } else {
-                        setSelectedUnstableVersion(ver);
-                        sessionStorage.setItem('pankha-picker-unstable', ver);
-                      }
-                      const label = isStable ? `Stable ${ver}` : `Unstable ${ver}`;
-                      setPickerDisplay(label);
-                      sessionStorage.setItem('pankha-picker-display', label);
-                    }}
-                    disabled={isStaging}
-                  >
-                    <option value="" disabled>Pick a version</option>
-                    {stableReleases.length > 0 && (
-                      <optgroup label="Stable">
-                        {stableReleases.map(r => (
-                          <option key={r.tag_name} value={r.tag_name}>
-                            {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {unstableReleases.length > 0 && (
-                      <optgroup label="Unstable">
-                        {unstableReleases.map(r => (
-                          <option key={r.tag_name} value={r.tag_name}>
-                            {r.tag_name}{hubStatus?.version === r.tag_name ? ' (Ready)' : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
-                </div>
-
-                {latestVersion && (
-                  <button
-                    className={`btn-prep-action stable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedStableVersion ? 'current' : ''}`}
-                    onClick={() => handleStageUpdate(selectedStableVersion)}
-                    disabled={isStaging || hubStatus?.version === selectedStableVersion}
-                    title={hubStatus?.version === selectedStableVersion
-                      ? `Stable Version ${selectedStableVersion} is Ready to Deploy.`
-                      : `Download Stable Version ${selectedStableVersion} \nSafe & Reliable.`}
-                  >
-                    <Download size={12} />
-                    <span>Stable {selectedStableVersion}</span>
-                  </button>
-                )}
-
-                {unstableVersion && (
-                  <button
-                    className={`btn-prep-action unstable ${isStaging ? 'loading' : ''} ${hubStatus?.version === selectedUnstableVersion ? 'current' : ''}`}
-                    onClick={() => handleStageUpdate(selectedUnstableVersion)}
-                    disabled={isStaging || hubStatus?.version === selectedUnstableVersion}
-                    title={hubStatus?.version === selectedUnstableVersion
-                      ? `Experimental Version ${selectedUnstableVersion} is Ready to Deploy.`
-                      : `Download Experimental Version ${selectedUnstableVersion} \nNewest Features & Fixes, may have bugs.`}
-                  >
-                    <Activity size={12} />
-                    <span>Unstable {selectedUnstableVersion}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Rapid Deployment Section */}
-        <section className="deployment-section builder-panel">
-          <h3><Rocket size={20} /> Deployment AIO</h3>
-          <p style={{ margin: '-12px 0 0 28px', fontSize: 'var(--font-size-sm2)', color: 'var(--text-secondary)' }}>
-            Prepare your Agent Settings before deployment.
-          </p>
-
-          <div className="builder-ui">
-            {/* Agent Type + Installation Mode - Top Bar */}
-            <div className="builder-top-bar">
-              <div className="builder-group" title="Select OS Agent for sysfs/LHM-based monitoring or IPMI Agent for BMC-based fan control.">
-                <span className="builder-label">Agent Type</span>
-                <div className="toggle-presets agent-mode-toggle">
-                  <button
-                    className={`toggle-item ${aioAgentMode === 'os' ? 'active' : ''}`}
-                    onClick={() => { setAioAgentMode('os'); setSelectedProfileId(null); }}
-                  >
-                    OS Agents
-                  </button>
-                  <button
-                    className={`toggle-item ${aioAgentMode === 'ipmi' ? 'active' : ''}`}
-                    onClick={() => setAioAgentMode('ipmi')}
-                  >
-                    IPMI Agents
-                  </button>
-                </div>
-              </div>
-
-              <div className="builder-group path-group" title="Choose where the agent will be installed. Standard uses system paths, Portable installs to current directory.">
-                <span className="builder-label">Installation Mode</span>
-                <div className="toggle-presets path-toggles">
-                  <button
-                    className={`toggle-item ${pathMode === 'standard' ? 'active' : ''}`}
-                    onClick={() => setPathMode('standard')}
-                    title="Install to /opt/pankha-agent/ with logs in /var/log/pankha-agent/"
-                  >
-                    <Server size={14} />
-                    Standard (/opt/)
-                  </button>
-                  <button
-                    className={`toggle-item ${pathMode === 'portable' ? 'active' : ''}`}
-                    onClick={() => setPathMode('portable')}
-                    title="Install to current working directory with logs in same folder"
-                  >
-                    <FolderDown size={14} />
-                    Portable (CWD)
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Hub URL - Connection Mode Toggle + Editable URL */}
-            <div className="builder-hub-url">
-              <div className="builder-group" title="Select Internal for LAN agents or External for remote agents accessing via public URL.">
-                <span className="builder-label">Connection Mode</span>
-                <div className="toggle-presets">
-                  <button
-                    className={`toggle-item ${urlMode === 'internal' ? 'active' : ''}`}
-                    onClick={() => {
-                      setUrlMode('internal');
-                      setHubUrl(getInternalUrl());
-                    }}
-                    disabled={!hubConfig?.hubIp}
-                    title={hubConfig?.hubIp ? `Internal network address: ${hubConfig.hubIp}:${hubConfig.hubPort}` : 'Internal IP not configured in server settings'}
-                  >
-                    <Server size={14} />{' '}Internal
-                  </button>
-                  <button
-                    className={`toggle-item ${urlMode === 'external' ? 'active' : ''}`}
-                    onClick={() => {
-                      setUrlMode('external');
-                      setHubUrl(getExternalUrl());
-                    }}
-                    title="For remote agents outside your network. Uses the URL you're currently accessing this page from. Ensure your reverse proxy supports WebSocket connections."
-                  >
-                    <ExternalLink size={14} />{' '}External
-                  </button>
-                </div>
-              </div>
-              <div className="hub-url-group" title="The URL agents will use to connect to this Pankha Hub. You can edit this manually.">
-                <span className="builder-label"><Link2 size={14} /> Hub URL</span>
-                <div className="hub-url-input-wrapper">
-                  <input
-                    type="text"
-                    className="hub-url-input"
-                    value={hubUrl}
-                    onChange={(e) => setHubUrl(e.target.value)}
-                    placeholder="http://192.168.1.100:3000"
-                  />
-                  <button
-                    className="hub-url-reset"
-                    onClick={() => {
-                      const url = urlMode === 'internal' ? getInternalUrl() : getExternalUrl();
-                      setHubUrl(url);
-                    }}
-                    title={`Reset to ${urlMode} URL`}
-                  >
-                    <RotateCcw size={14} />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {aioAgentMode === 'ipmi' && (
-              <div className="profile-selector-section">
-                <div className="builder-group">
-                  <span className="builder-label">BMC Profile</span>
-                  <div className="toggle-presets">
-                    <button
-                      className={`toggle-item ${profileMode === 'catalog' ? 'active' : ''}`}
-                      onClick={() => setProfileMode('catalog')}
-                    >
-                      Select from Catalog
-                    </button>
-                    <button
-                      className={`toggle-item ${profileMode === 'custom' ? 'active' : ''}`}
-                      onClick={() => { setProfileMode('custom'); setSelectedProfileId(null); }}
-                    >
-                      Build Custom Profile
-                    </button>
-                  </div>
-                </div>
-
-                {profileMode === 'catalog' && (
-                  <IpmiProfileSelector
-                    selectedProfileId={selectedProfileId}
-                    onProfileSelect={setSelectedProfileId}
-                  />
-                )}
-
-                {profileMode === 'custom' && (
-                  <p className="profile-builder-hint">
-                    No profile needed for deployment. A bare agent will connect to the hub but won't control fans. Use the Profile Builder below to test commands and create a profile.
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="builder-main-grid">
-              {/* Row 1: Log Level | Emergency C | Failsafe Speed */}
-              <div className="builder-group" title={interpolateTooltip(getOption('logLevel').tooltip, tooltipContext)}>
-                <span className="builder-label">{uiOptions.options.logLevel.label}</span>
-                <div className="toggle-presets">
-                  {uiOptions.options.logLevel.values.map(opt => (
-                    <button
-                      key={String(opt.value)}
-                      className={`toggle-item ${logLevel === opt.value ? 'active' : ''}`}
-                      onClick={() => setLogLevel(opt.value as LogLevel)}
-                    >
-                      {opt.cleanLabel || opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="builder-group" title={interpolateTooltip(getOption('emergencyTemp').tooltip, tooltipContext)}>
-                <span className="builder-label">{uiOptions.options.emergencyTemp.label}</span>
-                <div className="toggle-presets">
-                  {uiOptions.options.emergencyTemp.values.map(opt => (
-                    <button
-                      key={String(opt.value)}
-                      className={`toggle-item ${emergency === String(opt.value) ? 'active' : ''}`}
-                      onClick={() => setEmergency(String(opt.value))}
-                    >
-                      {opt.cleanLabel || opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="builder-group" title={interpolateTooltip(getOption('failsafeSpeed').tooltip, tooltipContext)}>
-                <span className="builder-label">{uiOptions.options.failsafeSpeed.label}</span>
-                <div className="toggle-presets">
-                  {uiOptions.options.failsafeSpeed.values.map(opt => (
-                    <button
-                      key={String(opt.value)}
-                      className={`toggle-item ${failsafe === String(opt.value) ? 'active' : ''}`}
-                      onClick={() => setFailsafe(String(opt.value) as Failsafe)}
-                    >
-                      {opt.cleanLabel || opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Row 2: Agent rate | Fan Step | Hysteresis */}
-              <div className="builder-group" title={interpolateTooltip(getOption('updateInterval').tooltip, tooltipContext)}>
-                <span className="builder-label">{uiOptions.options.updateInterval.label}</span>
-                <div className="toggle-presets">
-                  {uiOptions.options.updateInterval.values.map(opt => (
-                    <button
-                      key={String(opt.value)}
-                      className={`toggle-item ${agentRate === String(opt.value) ? 'active' : ''}`}
-                      onClick={() => setAgentRate(String(opt.value))}
-                    >
-                      {opt.cleanLabel || opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="builder-group" title={interpolateTooltip(getOption('fanStep').tooltip, tooltipContext)}>
-                <span className="builder-label">{uiOptions.options.fanStep.label}</span>
-                <div className="toggle-presets">
-                  {uiOptions.options.fanStep.values.map(opt => (
-                    <button
-                      key={String(opt.value)}
-                      className={`toggle-item ${fanStep === String(opt.value) ? 'active' : ''}`}
-                      onClick={() => setFanStep(String(opt.value))}
-                    >
-                      {opt.cleanLabel || opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="builder-group" title={interpolateTooltip(getOption('hysteresis').tooltip, tooltipContext)}>
-                <span className="builder-label">{uiOptions.options.hysteresis.label}</span>
-                <div className="toggle-presets">
-                  {uiOptions.options.hysteresis.values.map(opt => (
-                    <button
-                      key={String(opt.value)}
-                      className={`toggle-item ${hysteresis === String(opt.value) ? 'active' : ''}`}
-                      onClick={() => setHysteresis(String(opt.value))}
-                    >
-                      {opt.cleanLabel || opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="deployment-commands-header">
-              <h3>Deployment Commands</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 'var(--font-size-sm2)', color: 'var(--text-secondary)' }}>
-                Copy and Run any of the following command on Clients to start the Agent
-              </p>
-            </div>
-
-            <div className="terminal-stack">
-              <TerminalBlock
-                title="WGET"
-                tool="wget"
-                copiedType={copiedType}
-                command={generateCommand('wget')}
-                onCopy={copyToClipboard}
-                isLoading={isLoadingToken}
-              />
-              <TerminalBlock
-                title="CURL"
-                tool="curl"
-                copiedType={copiedType}
-                command={generateCommand('curl')}
-                onCopy={copyToClipboard}
-                isLoading={isLoadingToken}
-              />
-            </div>
-          </div>
-        </section>
-
-        {aioAgentMode === 'ipmi' && profileMode === 'custom' && (
-          <ProfileBuilder systems={systems} />
-        )}
-
-        <MaintenanceSection
-          isExpanded={isMaintenanceExpanded}
-          onToggle={() => setIsMaintenanceExpanded(!isMaintenanceExpanded)}
-          systems={systems}
-          stableVersion={latestVersion}
-          unstableVersion={unstableVersion || null}
-          updatingAgents={updatingAgents}
-          onApplyUpdate={handleRemoteUpdate}
-          hubStatus={hubStatus}
-        />
-
-        <ActionButton githubRepo={GITHUB_REPO} />
-
-        {/* Resources Section */}
-        <ResourcesSection githubRepo={GITHUB_REPO} />
+      {/* Deploy workspace eyebrow */}
+      <div className="deploy-workspace-eyebrow">
+        <span className="deploy-workspace-title">Deploy a new agent</span>
+        <span className="deploy-workspace-sub">
+          The summary on the right updates as you configure - copy the command when it looks right.
+        </span>
       </div>
+
+      {/* 2-column workspace */}
+      <div className="deploy-workspace">
+        <div className="deploy-workspace-steps">
+          <PlatformArchPicker
+            stepNumber={1}
+            platform={platform}
+            arch={arch}
+            onPlatformChange={setPlatform}
+            onArchChange={setArch}
+            hubStatus={hubStatus}
+          />
+
+          <ReleaseHubCache
+            stepNumber={2}
+            channel={channel}
+            onChannelChange={setChannel}
+            stableReleases={stableReleases}
+            unstableReleases={unstableReleases}
+            selectedStableVersion={selectedStableVersion}
+            selectedUnstableVersion={selectedUnstableVersion}
+            onSelectStableVersion={setSelectedStableVersion}
+            onSelectUnstableVersion={setSelectedUnstableVersion}
+            hubStatus={hubStatus}
+            isStaging={isStaging}
+            onStageVersion={handleStageUpdate}
+            onClearCache={handleClearDownloads}
+            githubRepo={GITHUB_REPO}
+          />
+
+          {isIpmi && (
+            <BmcProfileStep
+              stepNumber={3}
+              profileMode={profileMode}
+              onProfileModeChange={setProfileMode}
+              selectedProfileId={selectedProfileId}
+              onProfileSelect={setSelectedProfileId}
+              systems={systems}
+            />
+          )}
+
+          <InstallConnection
+            stepNumber={stepInstallConnection}
+            pathMode={pathMode}
+            onPathModeChange={setPathMode}
+            urlMode={urlMode}
+            onUrlModeChange={handleUrlModeChange}
+            hubUrl={hubUrl}
+            onHubUrlChange={setHubUrl}
+            onHubUrlReset={handleHubUrlReset}
+            hubConfig={hubConfig}
+          />
+
+          <RuntimeDefaults
+            stepNumber={stepRuntimeDefaults}
+            logLevel={logLevel}
+            onLogLevelChange={setLogLevel}
+            emergency={emergency}
+            onEmergencyChange={setEmergency}
+            failsafe={failsafe}
+            onFailsafeChange={setFailsafe}
+            agentRate={agentRate}
+            onAgentRateChange={setAgentRate}
+            fanStep={fanStep}
+            onFanStepChange={setFanStep}
+            hysteresis={hysteresis}
+            onHysteresisChange={setHysteresis}
+          />
+        </div>
+
+        <DeploySummary
+          platform={platform}
+          arch={arch}
+          channel={channel}
+          selectedVersion={selectedVersion}
+          pathMode={pathMode}
+          urlMode={urlMode}
+          hubUrl={hubUrl}
+          logLevel={logLevel}
+          emergency={emergency}
+          failsafe={failsafe}
+          agentRate={agentRate}
+          fanStep={fanStep}
+          hysteresis={hysteresis}
+          bmcVendorModel={bmcVendorModel}
+          bmcProfileSource={isIpmi ? profileMode : null}
+          isLoadingToken={isLoadingToken}
+          generateCommand={generateCommand}
+          onCopy={copyToClipboard}
+          copiedType={copiedType}
+          releaseNotes={releaseNotes}
+          githubRepo={GITHUB_REPO}
+        />
+      </div>
+
+      {/* Existing fleet section */}
+      <div className="deploy-existing-fleet-divider">
+        <span className="builder-label">Existing fleet</span>
+      </div>
+
+      <MaintenanceSection
+        isExpanded={isMaintenanceExpanded}
+        onToggle={() => setIsMaintenanceExpanded(!isMaintenanceExpanded)}
+        systems={systems}
+        stableVersion={latestVersion}
+        unstableVersion={unstableVersion || null}
+        updatingAgents={updatingAgents}
+        onApplyUpdate={handleRemoteUpdate}
+        hubStatus={hubStatus}
+        githubRepo={GITHUB_REPO}
+      />
+
+      <ActionButton githubRepo={GITHUB_REPO} />
+
+      <ResourcesSection githubRepo={GITHUB_REPO} pankhaSite={PANKHA_SITE} />
     </div>
   );
 };
