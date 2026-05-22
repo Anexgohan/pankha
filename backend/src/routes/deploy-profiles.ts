@@ -19,6 +19,7 @@ import Database from '../database/database';
 import { ProfileService } from '../services/ProfileService';
 import { CommandDispatcher } from '../services/CommandDispatcher';
 import { AgentManager } from '../services/AgentManager';
+import { createDemoLockResponse, isDemoMode } from '../utils/mode';
 
 const router = Router();
 const db = Database.getInstance();
@@ -118,6 +119,10 @@ router.get('/assigned/:agentId', async (req, res) => {
  */
 router.put('/assign/:agentId', async (req, res) => {
   try {
+    if (isDemoMode()) {
+      return res.json(createDemoLockResponse('Profile Change not allowed, it is locked in demo'));
+    }
+
     const { agentId } = req.params;
     const { profile_id } = req.body;
 

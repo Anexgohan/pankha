@@ -7,8 +7,8 @@ export const getPankhaMode = (): string | null => {
 
 export const isDemoMode = (): boolean => getPankhaMode() === "demo";
 
-export const createDemoLockResponse = (functionName: string) => ({
+export const createDemoLockResponse = (lockMessage: string) => ({
   locked: true,
-  message: `${functionName} locked in demonstration`,
+  message: lockMessage,
   code: DEMO_MODE_LOCK_CODE,
 });

@@ -100,7 +100,7 @@ const FanProfileManager: React.FC = () => {
     if (!profile) return;
 
     if (isDemoMode && profile.created_by === 'system') {
-      toast.warning('deleteFanProfile(default) locked in demonstration');
+      toast.warning('Default Profiles cannot be deleted, it is locked in demo');
       return;
     }
 
@@ -111,7 +111,7 @@ const FanProfileManager: React.FC = () => {
     try {
       const result = await deleteFanProfile(profileId);
       if (result.locked) {
-        toast.warning(result.message || 'deleteFanProfile(default) locked in demonstration');
+        toast.warning(result.message || 'Default Profiles cannot be deleted, it is locked in demo');
         return;
       }
       await loadData(); // Reload data
@@ -314,7 +314,7 @@ const FanProfileManager: React.FC = () => {
                   className="action-button delete-button"
                   title={
                     isDemoMode && profile.created_by === 'system'
-                      ? 'deleteFanProfile(default) locked in demonstration'
+                      ? 'Default Profiles cannot be deleted, it is locked in demo'
                       : 'Delete profile'
                   }
                 >

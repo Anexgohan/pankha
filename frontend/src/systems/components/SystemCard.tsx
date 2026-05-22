@@ -358,7 +358,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
         const result = await setEnableFanControl(system.id, true);
         if (result.locked) {
           toast.warning(
-            result.message || "setEnableFanControl(true) locked in demonstration"
+            result.message || "Fan Control cannot be disabled, it is locked in demo"
           );
           return;
         }
@@ -477,7 +477,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   const handleDeleteSystem = async () => {
     if (isDemoMode) {
-      toast.warning("deleteSystem locked in demonstration");
+      toast.warning("Cannot remove system, locked in demo");
       return;
     }
 
@@ -493,7 +493,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setLoading("delete");
       const result = await deleteSystem(system.id);
       if (result.locked) {
-        toast.warning(result.message || "deleteSystem locked in demonstration");
+        toast.warning(result.message || "Cannot remove system, locked in demo");
         return;
       }
       toast.success(`System "${system.name}" deleted successfully`);
@@ -529,9 +529,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   const handleBmcApply = async () => {
     if (!stagedBmcProfileId || stagedBmcProfileId === (system.profile_id ?? null)) return;
+    if (isDemoMode) {
+      toast.warning("Profile Change not allowed, it is locked in demo");
+      return;
+    }
     try {
       setLoading("bmc-apply");
-      await assignProfileToAgent(system.agent_id, stagedBmcProfileId);
+      const result = await assignProfileToAgent(system.agent_id, stagedBmcProfileId);
+      if (result.locked) {
+        toast.warning(result.message || "Profile Change not allowed, it is locked in demo");
+        return;
+      }
       setAppliedProfileId(stagedBmcProfileId);
       toast.success(`BMC profile assigned: ${stagedBmcProfileId}`);
       onUpdate();
@@ -628,7 +636,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const handleEnableFanControlChange = async (enabled: boolean) => {
     if (isDemoMode && enabled === false) {
       setEnableFanControlLocal(true);
-      toast.warning("setEnableFanControl(false) locked in demonstration");
+      toast.warning("Fan Control cannot be disabled, it is locked in demo");
       return;
     }
 
@@ -638,7 +646,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       if (result.locked) {
         setEnableFanControlLocal(true);
         toast.warning(
-          result.message || "setEnableFanControl(false) locked in demonstration"
+          result.message || "Fan Control cannot be disabled, it is locked in demo"
         );
         return;
       }
@@ -1020,7 +1028,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 className="delete-button"
                 onClick={handleDeleteSystem}
                 disabled={loading === "delete"}
-                title={isDemoMode ? "deleteSystem locked in demonstration" : "Delete system"}
+                title={isDemoMode ? "Cannot remove system, locked in demo" : "Delete system"}
               >
                 {loading === "delete" ? (
                   <Loader2 className="animate-spin" size={14} />
@@ -1138,7 +1146,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   isReadOnly
                     ? readOnlyTooltip
                     : isDemoMode
-                    ? "setEnableFanControl(false) locked in demonstration"
+                    ? "Fan Control cannot be disabled, it is locked in demo"
                     : interpolateTooltip(getOption('fanControl').tooltip, tooltipContext)
                 }
               >
@@ -2120,7 +2128,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
           {expandedBmc && (
             <div className="bmc-section-body">
-              <div className="bmc-header-bar">
+              <div
+                className="bmc-header-bar"
+                title={isDemoMode ? "Profile Change not allowed, it is locked in demo" : undefined}
+              >
                 <span className="bmc-current-label">
                   Current: <span className="bmc-current-value">{system.profile_id ?? 'Not assigned'}</span>
                 </span>

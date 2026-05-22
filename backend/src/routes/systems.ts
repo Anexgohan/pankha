@@ -515,7 +515,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
     if (isDemoMode()) {
-      return res.json(createDemoLockResponse("deleteSystem"));
+      return res.json(createDemoLockResponse("Cannot remove system, locked in demo"));
     }
 
     const systemId = parseInt(req.params.id);
@@ -1272,7 +1272,7 @@ router.put("/:id/enable-fan-control", async (req: Request, res: Response) => {
     }
 
     if (isDemoMode() && enabled === false) {
-      return res.json(createDemoLockResponse("setEnableFanControl(false)"));
+      return res.json(createDemoLockResponse("Fan Control cannot be disabled, it is locked in demo"));
     }
 
     const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [

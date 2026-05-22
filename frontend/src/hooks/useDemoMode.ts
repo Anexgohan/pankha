@@ -1,44 +1,24 @@
-import { useEffect, useState } from "react";
-import { getDeploymentHubConfig } from "../services/api";
+interface PankhaBootConfig {
+  hubIp: string | null;
+  hubPort: string;
+  pankhaMode: string | null;
+  isDemoMode: boolean;
+}
+
+declare global {
+  interface Window {
+    __PANKHA_CONFIG__?: PankhaBootConfig;
+  }
+}
 
 interface DemoModeState {
   isDemoMode: boolean;
-  loading: boolean;
-  error: string | null;
 }
 
+// Synchronous reader of window.__PANKHA_CONFIG__, populated by
+// /api/config/deployment.js before the React bundle executes (see index.html).
+// If the boot script failed to load, defaults to isDemoMode=false (safe -
+// all controls remain available; backend still enforces the demo lock).
 export const useDemoMode = (): DemoModeState => {
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const fetchMode = async () => {
-      try {
-        const config = await getDeploymentHubConfig();
-        if (!mounted) return;
-        setIsDemoMode(config.isDemoMode === true);
-        setError(null);
-      } catch (err) {
-        if (!mounted) return;
-        setIsDemoMode(false);
-        setError(err instanceof Error ? err.message : "Failed to detect mode");
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchMode();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  return { isDemoMode, loading, error };
+  return { isDemoMode: window.__PANKHA_CONFIG__?.isDemoMode === true };
 };
-

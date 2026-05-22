@@ -545,7 +545,10 @@ export const saveCustomProfile = async (profile: Record<string, unknown>, filena
   return response.data;
 };
 
-export const assignProfileToAgent = async (agentId: string, profileId: string): Promise<{ success: boolean }> => {
+export const assignProfileToAgent = async (
+  agentId: string,
+  profileId: string
+): Promise<{ success?: boolean } & ActionResponse> => {
   const response = await api.put(`/api/deploy/profiles/assign/${agentId}`, { profile_id: profileId });
   return response.data;
 };

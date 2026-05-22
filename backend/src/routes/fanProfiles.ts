@@ -340,7 +340,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
     if (isDemoMode() && profile.created_by === 'system') {
       return res.json({
         success: true,
-        ...createDemoLockResponse("deleteFanProfile(default)")
+        ...createDemoLockResponse("Default Profiles cannot be deleted, it is locked in demo")
       });
     }
 

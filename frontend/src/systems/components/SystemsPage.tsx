@@ -120,7 +120,7 @@ const SystemsPage: React.FC = () => {
 
   const handleEmergencyStop = async () => {
     if (isDemoMode) {
-      toast.warning('emergencyStop locked in demonstration');
+      toast.warning('Emergency Stop is locked in demo');
       return;
     }
 
@@ -128,7 +128,7 @@ const SystemsPage: React.FC = () => {
       try {
         const result = await emergencyStop();
         if (result.locked) {
-          toast.warning(result.message || 'emergencyStop locked in demonstration');
+          toast.warning(result.message || 'Emergency Stop is locked in demo');
           return;
         }
         toast.success('Emergency stop triggered successfully');

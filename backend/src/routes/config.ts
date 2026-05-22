@@ -28,4 +28,24 @@ router.get('/deployment', (req, res) => {
   });
 });
 
+/**
+ * GET /api/config/deployment.js
+ * Boot-time config script - loaded by index.html before the React bundle.
+ * Sets window.__PANKHA_CONFIG__ synchronously so isDemoMode and other
+ * boot-derived values are known at first paint (no fetch flicker).
+ */
+router.get('/deployment.js', (req, res) => {
+  const config = {
+    hubIp: process.env.PANKHA_HUB_IP || null,
+    hubPort: process.env.PANKHA_PORT || '3143',
+    pankhaMode: getPankhaMode(),
+    isDemoMode: isDemoMode(),
+  };
+  // Escape `<` so a hostile env value can't break out of </script>
+  const safeJson = JSON.stringify(config).replace(/</g, '\\u003c');
+  res.set('Content-Type', 'application/javascript');
+  res.set('Cache-Control', 'no-store');
+  res.send(`window.__PANKHA_CONFIG__ = ${safeJson};`);
+});
+
 export default router;

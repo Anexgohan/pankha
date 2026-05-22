@@ -275,7 +275,7 @@ app.post('/api/emergency-stop', async (req, res) => {
   }
 
   if (isDemoMode()) {
-    return res.json(createDemoLockResponse("emergencyStop"));
+    return res.json(createDemoLockResponse("Emergency Stop is locked in demo"));
   }
 
   try {
