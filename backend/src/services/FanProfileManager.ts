@@ -604,7 +604,7 @@ export class FanProfileManager extends EventEmitter {
         })) || []
       }));
 
-      log.info(`📥 Loading ${normalizedProfiles.length} default fan profiles`, 'FanProfileManager');
+      log.info(`Loading ${normalizedProfiles.length} default fan profiles`, 'FanProfileManager');
 
       // Use existing import logic. Re-seeded defaults must keep their 'system'
       // ownership so demo-mode delete protection and the system/user stat split
@@ -665,7 +665,7 @@ export class FanProfileManager extends EventEmitter {
         profiles: exportableProfiles
       };
 
-      log.info(`📤 Exported ${exportableProfiles.length} fan profiles`, 'FanProfileManager');
+      log.info(`Exported ${exportableProfiles.length} fan profiles`, 'FanProfileManager');
       this.emit('profilesExported', { count: exportableProfiles.length });
 
       return exportData;
@@ -689,7 +689,7 @@ export class FanProfileManager extends EventEmitter {
         profiles: []
       };
 
-      log.info(`📥 Starting import of ${request.profiles.length} fan profiles`, 'FanProfileManager');
+      log.info(`Starting import of ${request.profiles.length} fan profiles`, 'FanProfileManager');
 
       for (const profileData of request.profiles) {
         try {
@@ -768,7 +768,7 @@ export class FanProfileManager extends EventEmitter {
 
       result.success = result.error_count === 0;
 
-      log.info(`📥 Import completed: ${result.imported_count} imported, ${result.skipped_count} skipped, ${result.error_count} errors`, 'FanProfileManager');
+      log.info(`Import completed: ${result.imported_count} imported, ${result.skipped_count} skipped, ${result.error_count} errors`, 'FanProfileManager');
       this.emit('profilesImported', result);
 
       return result;
@@ -790,6 +790,6 @@ export class FanProfileManager extends EventEmitter {
     this.activeProfileCalculations.clear();
 
     this.removeAllListeners();
-    log.info('🧹 FanProfileManager cleaned up', 'FanProfileManager');
+    log.info('FanProfileManager cleaned up', 'FanProfileManager');
   }
 }
