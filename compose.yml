@@ -53,8 +53,9 @@ services:
       - .env
     volumes:
       - ./docker-data/backend/database/postgres_data:/var/lib/postgresql
-    ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+# disabled ports for security (no external access), set in the .env instead
+#    ports:
+#      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
