@@ -6,7 +6,7 @@ export interface FanProfile {
   system_id?: number;
   profile_name: string;
   description?: string;
-  profile_type: 'silent' | 'balanced' | 'performance' | 'custom';
+  profile_type: string;
   is_global: boolean;
   is_active: boolean;
   created_by?: string;
@@ -40,7 +40,7 @@ export interface FanProfileAssignment {
 export interface CreateFanProfileRequest {
   profile_name: string;
   description?: string;
-  profile_type?: 'silent' | 'balanced' | 'performance' | 'custom';
+  profile_type?: string;
   is_global?: boolean;
   system_id?: number;
   curve_points: Array<{
@@ -67,15 +67,9 @@ export interface FanProfileAssignmentRequest {
 
 export interface FanProfileStats {
   total_profiles: number;
-  global_profiles: number;
   system_profiles: number;
+  user_profiles: number;
   active_assignments: number;
-  profiles_by_type: {
-    silent: number;
-    balanced: number;
-    performance: number;
-    custom: number;
-  };
 }
 
 // Import/Export Types
@@ -90,7 +84,7 @@ export interface FanProfileExport {
 export interface ExportableFanProfile {
   profile_name: string;
   description?: string;
-  profile_type: 'silent' | 'balanced' | 'performance' | 'custom';
+  profile_type: string;
   curve_points: Array<{
     temperature: number;
     fan_speed: number;

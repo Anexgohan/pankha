@@ -35,7 +35,6 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
   const [showDefaultsDialog, setShowDefaultsDialog] = useState(false);
   const [resolveConflicts, setResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('rename');
   const [defaultResolveConflicts, setDefaultResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('skip');
-  const [makeGlobal, setMakeGlobal] = useState(false);
   const [defaultProfiles, setDefaultProfiles] = useState<DefaultProfileInfo[]>([]);
   const [selectedDefaults, setSelectedDefaults] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,7 +179,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       const result = await importFanProfiles({
         profiles: profilesToImport,
         resolve_conflicts: resolveConflicts,
-        make_global: makeGlobal
+        make_global: true
       });
       setImportResult(result);
       if (result.success && result.imported_count > 0) {
@@ -245,7 +244,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                 title="Reset library to system default fan curves"
               >
                 {isLoadingDefaults ? <RefreshCw size={16} className="spin" /> : <RefreshCw size={16} />}
-                <span>{isLoadingDefaults ? 'Loading...' : 'Restore All Defaults'}</span>
+                <span>{isLoadingDefaults ? 'Loading...' : 'Restore All System Defaults'}</span>
               </button>
               <button
                 onClick={() => setShowDefaultsDialog(true)}
@@ -340,10 +339,6 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                     <option value="rename">Automatic Renaming</option>
                     <option value="overwrite">System Overwrite</option>
                   </select>
-                </div>
-                <div className="option-row checkbox">
-                  <input type="checkbox" id="global-import" checked={makeGlobal} onChange={(e) => setMakeGlobal(e.target.checked)} />
-                  <label htmlFor="global-import">Grant Global Access to Imported Profiles</label>
                 </div>
               </div>
             </div>

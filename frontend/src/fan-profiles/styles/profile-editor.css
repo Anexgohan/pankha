@@ -248,6 +248,27 @@
     max-height: 350px;
 }
 
+/* Profile Type row: select + [+] + [-] action buttons.
+   Reuses the existing .sidebar-group input/select styling for the field and
+   .action-button for the icon buttons - no new visual tokens introduced. */
+.profile-type-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-xs);
+}
+
+.profile-type-row select,
+.profile-type-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-type-row .action-button {
+  flex: 0 0 auto;
+  width: 36px;
+  height: auto;
+}
+
 .editor-content {
   display: none; /* Deprecated in favor of editor-body */
 }

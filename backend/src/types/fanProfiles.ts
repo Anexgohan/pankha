@@ -5,7 +5,7 @@ export interface FanProfile {
   system_id?: number;           // null for global profiles
   profile_name: string;
   description?: string;
-  profile_type: 'silent' | 'balanced' | 'performance' | 'custom';
+  profile_type: string;
   is_global: boolean;
   is_active: boolean;
   created_by?: string;
@@ -39,9 +39,12 @@ export interface FanProfileAssignment {
 export interface CreateFanProfileRequest {
   profile_name: string;
   description?: string;
-  profile_type?: 'silent' | 'balanced' | 'performance' | 'custom';
+  profile_type?: string;
   is_global?: boolean;
   system_id?: number;
+  // Optional override for the created_by column. Defaults to 'user' when omitted.
+  // Used by the default-profile loader to mark seeded rows as 'system'.
+  created_by?: string;
   curve_points: Array<{
     temperature: number;
     fan_speed: number;
@@ -89,15 +92,9 @@ export interface SystemFanControlState {
 
 export interface FanProfileStats {
   total_profiles: number;
-  global_profiles: number;
   system_profiles: number;
+  user_profiles: number;
   active_assignments: number;
-  profiles_by_type: {
-    silent: number;
-    balanced: number;
-    performance: number;
-    custom: number;
-  };
 }
 
 // Import/Export Types
@@ -112,7 +109,7 @@ export interface FanProfileExport {
 export interface ExportableFanProfile {
   profile_name: string;
   description?: string;
-  profile_type: 'silent' | 'balanced' | 'performance' | 'custom';
+  profile_type: string;
   curve_points: Array<{
     temperature: number;
     fan_speed: number;
@@ -123,6 +120,9 @@ export interface ImportFanProfilesRequest {
   profiles: ExportableFanProfile[];
   resolve_conflicts: 'skip' | 'rename' | 'overwrite';
   make_global?: boolean;
+  // Optional created_by value applied to every imported profile. Defaults to 'user'.
+  // Used by the default-profile loader to re-seed system rows correctly.
+  created_by_override?: string;
 }
 
 export interface ImportResult {
@@ -142,4 +142,18 @@ export interface ExportOptions {
   profile_ids?: number[];
   include_assignments?: boolean;
   include_system_profiles?: boolean;
+}
+
+// Fan Profile Type lookup (table fan_profile_types). Distinct from FanProfile.
+export interface FanProfileType {
+  name: string;
+  is_system: boolean;
+  color: string | null;       // 7-char hex (#RRGGBB) or null - badge renderer reads via --badge-color
+  in_use_count: number;       // populated from a COUNT(*) against fan_profiles.profile_type
+  created_at: string;
+}
+
+export interface CreateFanProfileTypeRequest {
+  name: string;
+  color?: string;             // 7-char hex; optional, defaults to a neutral grey on create
 }

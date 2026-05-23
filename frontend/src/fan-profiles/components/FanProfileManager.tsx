@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  VolumeX,
-  Scale,
-  Rocket,
   Settings,
   Plus,
   FileUp,
@@ -10,7 +7,6 @@ import {
   Trash2,
   Edit3,
   Library,
-  Box,
   LayoutGrid,
   CheckSquare,
   BookOpen,
@@ -26,6 +22,8 @@ import type {
   FanProfile,
   FanProfileStats
 } from '../../services/fanProfilesApi';
+import { getFanProfileTypes } from '../../services/fanProfileTypesApi';
+import type { FanProfileType } from '../../services/fanProfileTypesApi';
 import FanProfileEditor from './FanProfileEditor';
 import FanCurveChart from './FanCurveChart';
 import ProfileImportExport from './ProfileImportExport';
@@ -43,6 +41,10 @@ const FanProfileManager: React.FC = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [showImportExport, setShowImportExport] = useState(false);
   const [showSelectionCheckboxes, setShowSelectionCheckboxes] = useState(false);
+  // Type catalog drives badge coloring - user-defined types provide their
+  // own color via fan_profile_types.color, which we pass to the badge as an
+  // inline --badge-color custom property.
+  const [typeColorMap, setTypeColorMap] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     loadData();
@@ -51,13 +53,20 @@ const FanProfileManager: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [profilesData, statsData] = await Promise.all([
+      const [profilesData, statsData, typesData] = await Promise.all([
         getFanProfiles(),
-        getFanProfileStats()
+        getFanProfileStats(),
+        getFanProfileTypes()
       ]);
-      
+
       setProfiles(profilesData);
       setStats(statsData);
+      setTypeColorMap(
+        typesData.reduce<Record<string, string | null>>((acc, t: FanProfileType) => {
+          acc[t.name] = t.color;
+          return acc;
+        }, {})
+      );
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load fan profiles');
@@ -80,13 +89,14 @@ const FanProfileManager: React.FC = () => {
   };
 
   const handleDuplicateProfile = (profile: FanProfile) => {
-    // Create a new profile based on the selected one
+    // Carry through the source profile so the editor can pre-select it as the
+    // template. We keep the original `id` (it's read by the editor to set
+    // `selectedTemplateId` and never round-tripped to a server update because
+    // `isCreating` routes through createFanProfile, not updateFanProfile).
     const duplicatedProfile: FanProfile = {
       ...profile,
-      id: 0, // Will be assigned by backend
       profile_name: `${profile.profile_name} (Copy)`,
       created_by: undefined,
-      is_global: false, // Duplicates are not global by default
       assignments: [], // Clear assignments
     };
 
@@ -143,25 +153,9 @@ const FanProfileManager: React.FC = () => {
     loadData(); // Reload data
   };
 
-  const getProfileTypeIcon = (type: string) => {
-    switch (type) {
-      case 'silent': return <VolumeX size={18} />;
-      case 'balanced': return <Scale size={18} />;
-      case 'performance': return <Rocket size={18} />;
-      case 'custom': return <Settings size={18} />;
-      default: return <Box size={18} />;
-    }
-  };
-
-  const getProfileTypeColor = (type: string) => {
-    switch (type) {
-      case 'silent': return '#4CAF50';
-      case 'balanced': return '#FF9800';
-      case 'performance': return '#F44336';
-      case 'custom': return '#2196F3';
-      default: return '#9E9E9E';
-    }
-  };
+  // All profiles use the same Settings icon; profile_type is conveyed via the
+  // badge in the card footer rather than the leading glyph.
+  const getProfileIcon = () => <Settings size={18} />;
 
   if (loading) {
     return (
@@ -248,16 +242,16 @@ const FanProfileManager: React.FC = () => {
             <div className="stat-label">Total Profiles</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{stats.global_profiles}</div>
-            <div className="stat-label">Global Profiles</div>
-          </div>
-          <div className="stat-card">
             <div className="stat-value">{stats.active_assignments}</div>
             <div className="stat-label">Active Assignments</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">{stats.profiles_by_type.custom}</div>
-            <div className="stat-label">Custom Profiles</div>
+            <div className="stat-value">{stats.system_profiles}</div>
+            <div className="stat-label">System Profiles</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{stats.user_profiles}</div>
+            <div className="stat-label">User Profiles</div>
           </div>
         </div>
       )}
@@ -277,11 +271,8 @@ const FanProfileManager: React.FC = () => {
                 </div>
               )}
               <div className="profile-title">
-                <span
-                  className="profile-icon"
-                  style={{ color: getProfileTypeColor(profile.profile_type) }}
-                >
-                  {getProfileTypeIcon(profile.profile_type)}
+                <span className="profile-icon">
+                  {getProfileIcon()}
                 </span>
                 <div className="profile-info">
                   <h3 className="profile-name-text">{profile.profile_name}</h3>
@@ -345,10 +336,19 @@ const FanProfileManager: React.FC = () => {
 
             <div className="profile-badges">
               <span className={`badge type-${profile.created_by === 'system' ? 'default' : 'custom'}`}>
-                {profile.created_by === 'system' ? 'Default' : 'Custom'}
+                {profile.created_by === 'system' ? 'System' : 'User'}
               </span>
-              {profile.is_global && (
-                <span className="badge global">Global</span>
+              {profile.profile_type && (
+                <span
+                  className={`badge profile-type ${profile.profile_type}`}
+                  style={
+                    typeColorMap[profile.profile_type]
+                      ? ({ '--badge-color': typeColorMap[profile.profile_type] } as React.CSSProperties)
+                      : undefined
+                  }
+                >
+                  {profile.profile_type}
+                </span>
               )}
               {profile.is_active && (
                 <span className="badge active">Active</span>
