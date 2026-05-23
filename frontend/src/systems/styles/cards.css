@@ -534,6 +534,31 @@
   /* text-transform: uppercase; */
 }
 
+/* Fan-profile dropdown collapsed state - small gap between the colour
+ * dot and the profile name. Scoped to .fan-profile-select so we don't
+ * accidentally add spacing to other .select-display usages (log level,
+ * update interval, etc.) where there is only a single text child. */
+.fan-profile-select .select-display {
+  gap: var(--spacing-sm);
+}
+
+/* Inline colour swatch used in the fan-profile dropdown's collapsed state
+ * (.select-display). Shape and size mirror `.status-badge .status-dot`,
+ * but the colour comes from an inline `background` style set by the
+ * renderer (the profile_type hex resolved through typeColorMap). Kept as
+ * its own class so we don't have to nest under `.status-badge` just to
+ * pick up styles. */
+.profile-color-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* `background` is set inline per-render. A neutral fallback keeps the
+     element visible if a profile somehow has no resolved colour. */
+  background: var(--text-tertiary);
+}
+
 /* 3.7 Footer Stats */
 .system-stats {
   display: flex;

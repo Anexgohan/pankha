@@ -248,6 +248,27 @@
     max-height: 350px;
 }
 
+/* Profile Type row: select + [+] + [-] action buttons.
+   Reuses the existing .sidebar-group input/select styling for the field and
+   .action-button for the icon buttons - no new visual tokens introduced. */
+.profile-type-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--spacing-xs);
+}
+
+.profile-type-row select,
+.profile-type-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-type-row .action-button {
+  flex: 0 0 auto;
+  width: 36px;
+  height: auto;
+}
+
 .editor-content {
   display: none; /* Deprecated in favor of editor-body */
 }
@@ -717,30 +738,45 @@
   gap: var(--spacing-md);
 }
 
+/* Library Initialization / Data Portability buttons.
+ *
+ * Re-tuned to match Pankha's established button language - same typography,
+ * spacing, hover micro-interaction, and shadow tinting as the manager-header
+ * buttons (`.docs-link-button` / `.selection-toggle-button` /
+ * `.create-profile-button` defined above L31-89). All colors flow through
+ * the design tokens so the component reads correctly in both light and dark
+ * themes; the old `rgba(0,0,0,0.4)` hardcoded hover shadow was the one
+ * theme-blind escape and is replaced with a color-mixed accent shadow here.
+ *
+ * Variants:
+ *   .primary   - accent-tinted text + border (Export All Profiles)
+ *   .highlight - success-green (Restore All System Defaults; same green as
+ *                .create-profile-button so the constructive/restore intent
+ *                reads consistently across the page)
+ */
 .action-pill {
-  padding: var(--spacing-md) var(--spacing-xl);
+  padding: var(--spacing-sm) var(--spacing-lg);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  background: var(--bg-tertiary);
+  background: var(--bg-secondary);
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: var(--font-weight-bold);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
   display: flex;
-  justify-content: center;
   align-items: center;
   gap: var(--spacing-sm);
-  text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .action-pill:hover:not(:disabled) {
-  background: var(--bg-hover);
   border-color: var(--color-accent-dynamic);
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 92%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 80%);
 }
 
 .action-pill:disabled {
@@ -750,23 +786,24 @@
 }
 
 .action-pill.primary {
-  background: var(--bg-secondary);
-  border-color: color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
+  border-color: color-mix(in srgb, var(--color-accent-dynamic), transparent 40%);
+  color: var(--color-accent-dynamic);
+}
+
+.action-pill.primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 92%);
+  border-color: var(--color-accent-dynamic);
 }
 
 .action-pill.highlight {
-  border-color: color-mix(in srgb, var(--color-success), transparent 70%);
+  border-color: color-mix(in srgb, var(--color-success), transparent 40%);
   color: var(--color-success);
 }
 
 .action-pill.highlight:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-success), transparent 92%);
   border-color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success), transparent 94%);
-}
-
-.action-pill.primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent-dynamic), transparent 94%);
-  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 80%);
 }
 
 .hint-text {
@@ -896,6 +933,59 @@
   gap: var(--spacing-md);
 }
 
+/* Dialog footer buttons. Scoped to .standard-dialog so the simple class
+ * names (.btn-cancel, .btn-confirm) used in the dialog JSX don't leak
+ * onto random pages. Visual language mirrors the picker buttons in
+ * fan-profile-color-picker.css (which mirror the global action-pill /
+ * docs-link-button family): semibold + uppercase + light tracking,
+ * accent-tinted primary, neutral bordered secondary. Tokenised so light
+ * and dark themes both render correctly. */
+.standard-dialog .btn-cancel,
+.standard-dialog .btn-confirm {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.standard-dialog .btn-cancel {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.standard-dialog .btn-cancel:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+
+.standard-dialog .btn-confirm {
+  background: var(--color-accent-dynamic);
+  color: #fff;
+  border: 1px solid var(--color-accent-dynamic);
+}
+
+.standard-dialog .btn-confirm:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 70%);
+  transform: translateY(-1px);
+}
+
+.standard-dialog .btn-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+}
+
 /* Results Section refinements */
 .import-results {
   margin-top: var(--spacing-3xl);
@@ -931,6 +1021,12 @@
   font-weight: var(--font-weight-bold);
   padding: 4px 12px;
   border-radius: var(--radius-full);
+  /* inline-flex so the lucide-react icon and the count number sit on the
+     same baseline with a small gap. The pill itself is still inline so it
+     wraps inside `.summary-pills` like the original text-only pills did. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .pill.success { background: rgba(76, 175, 80, 0.1); color: var(--color-success); border: 1px solid rgba(76, 175, 80, 0.2); }

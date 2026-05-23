@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, Check, X } from 'lucide-react';
 import {
   createFanProfile,
   updateFanProfile,
@@ -9,7 +10,15 @@ import type {
   CreateFanProfileRequest,
   UpdateFanProfileRequest
 } from '../../services/fanProfilesApi';
+import {
+  getFanProfileTypes,
+  createFanProfileType,
+  deleteFanProfileType,
+  updateFanProfileTypeColor
+} from '../../services/fanProfileTypesApi';
+import type { FanProfileType } from '../../services/fanProfileTypesApi';
 import FanCurveChart from './FanCurveChart';
+import FanProfileColorPicker from './FanProfileColorPicker';
 import { toast } from '../../utils/toast';
 
 interface FanProfileEditorProps {
@@ -32,13 +41,30 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
 }) => {
   const [profileName, setProfileName] = useState('');
   const [description, setDescription] = useState('');
-  const [profileType, setProfileType] = useState<'silent' | 'balanced' | 'performance' | 'custom'>('custom');
-  const [isGlobal, setIsGlobal] = useState(true);
+  const [profileType, setProfileType] = useState<string>('custom');
   const [curvePoints, setCurvePoints] = useState<CurvePoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [availableProfiles, setAvailableProfiles] = useState<FanProfile[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+
+  // Profile type catalog (system + user types from fan_profile_types table).
+  // Loaded once on mount and refreshed after add/delete.
+  const [profileTypes, setProfileTypes] = useState<FanProfileType[]>([]);
+  // Inline "add new type" state. When true, the dropdown is replaced by a
+  // text input + accept/cancel icon buttons. Kept inline (no modal) to match
+  // the existing sidebar editing patterns.
+  const [addingType, setAddingType] = useState(false);
+  const [newTypeName, setNewTypeName] = useState('');
+  // Default color for the inline add picker - a neutral mid-grey so the user
+  // picks something intentional rather than accidentally accepting a tinted
+  // default that clashes with the system palette.
+  const [newTypeColor, setNewTypeColor] = useState('#9E9E9E');
+  // Local override while the user is dragging in the picker for an *existing*
+  // type. The committed value lives in `profileTypes` (refreshed via PATCH on
+  // Done); this state just lets the trigger swatch follow the drag live.
+  // `null` means "no override - show the committed color from profileTypes".
+  const [pendingTypeColor, setPendingTypeColor] = useState<string | null>(null);
 
   // Load available profiles for template selection
   useEffect(() => {
@@ -56,31 +82,143 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
     }
   }, [isCreating]);
 
+  // Load profile type catalog. Always needed (both create + edit paths show
+  // the type dropdown).
+  useEffect(() => {
+    refreshProfileTypes();
+  }, []);
+
+  const refreshProfileTypes = async () => {
+    try {
+      const types = await getFanProfileTypes();
+      setProfileTypes(types);
+    } catch (err) {
+      console.error('Failed to load profile types:', err);
+    }
+  };
+
+  const handleStartAddType = () => {
+    setNewTypeName('');
+    setNewTypeColor('#9E9E9E');
+    setAddingType(true);
+  };
+
+  const handleCancelAddType = () => {
+    setAddingType(false);
+    setNewTypeName('');
+  };
+
+  const handleConfirmAddType = async () => {
+    const trimmed = newTypeName.trim();
+    if (!trimmed) {
+      handleCancelAddType();
+      return;
+    }
+    try {
+      const created = await createFanProfileType(trimmed, newTypeColor);
+      await refreshProfileTypes();
+      // Auto-select the newly created type so the user sees the effect
+      // immediately.
+      setProfileType(created.name);
+      setAddingType(false);
+      setNewTypeName('');
+      toast.success(`Added profile type "${created.name}"`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add profile type');
+    }
+  };
+
+  // Delete the currently-selected type. Wired to the [-] button. Blocked for
+  // system types (the button is disabled), and for user types still in use
+  // (server returns 409 - we translate to a friendly toast).
+  const handleDeleteType = async () => {
+    const selected = profileTypes.find(t => t.name === profileType);
+    if (!selected || selected.is_system) return;
+
+    if (!confirm(`Delete profile type "${selected.name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    const result = await deleteFanProfileType(selected.name);
+    if (result.ok) {
+      toast.success(`Deleted profile type "${selected.name}"`);
+      // Fall back to 'custom' which is always present (is_system).
+      setProfileType('custom');
+      await refreshProfileTypes();
+    } else if (result.reason === 'in_use') {
+      toast.error(
+        `Cannot delete "${selected.name}" - ${result.in_use_count} profile${result.in_use_count === 1 ? '' : 's'} still use${result.in_use_count === 1 ? 's' : ''} this type.`
+      );
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const selectedTypeIsSystem =
+    profileTypes.find(t => t.name === profileType)?.is_system ?? true;
+
+  // Recolor handlers for the *existing*-type swatch. `pendingTypeColor` is
+  // the live drag state shown in the trigger; onDone PATCHes the backend and
+  // clears the override (the picker then reads the new color from the
+  // refreshed profileTypes catalog), onCancel just drops the override.
+  const selectedTypeColor =
+    profileTypes.find(t => t.name === profileType)?.color || '#9E9E9E';
+
+  const handleRecolorChange = (color: string) => {
+    setPendingTypeColor(color);
+  };
+
+  const handleRecolorDone = async () => {
+    if (!profileType || pendingTypeColor === null) {
+      setPendingTypeColor(null);
+      return;
+    }
+    try {
+      await updateFanProfileTypeColor(profileType, pendingTypeColor);
+      await refreshProfileTypes();
+      toast.success(`Updated color for "${profileType}"`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update color');
+    } finally {
+      setPendingTypeColor(null);
+    }
+  };
+
+  const handleRecolorCancel = () => {
+    setPendingTypeColor(null);
+  };
+
   useEffect(() => {
     if (profile) {
-      // Load profile data whether creating (duplicate) or editing
+      // Load profile data whether creating (duplicate) or editing.
+      // For duplicates (profile && isCreating), reflect the source in the
+      // template dropdown so the user can see what they're cloning from and
+      // freely switch to another template - same control surface, just
+      // pre-selected. The editor never sends `profile.id` back as an update;
+      // isCreating=true always routes through createFanProfile.
       setProfileName(profile.profile_name);
       setDescription(profile.description || '');
       setProfileType(profile.profile_type);
-      setIsGlobal(profile.is_global);
       setCurvePoints(
         profile.curve_points?.map(p => ({
           temperature: p.temperature,
           fan_speed: p.fan_speed
         })) || []
       );
+      if (isCreating && profile.id) {
+        setSelectedTemplateId(profile.id.toString());
+      }
     } else if (isCreating) {
-      // Only use default curve when creating from scratch (no profile provided)
+      // Default starter shape for "Create New Profile" - minimal 4-point curve.
+      // Kept intentionally sparse so the user shapes it themselves rather than
+      // editing a presumptuous default.
       setProfileName('');
       setDescription('');
       setProfileType('custom');
-      setIsGlobal(true);
       setCurvePoints([
-        { temperature: 30, fan_speed: 25 },
-        { temperature: 40, fan_speed: 35 },
-        { temperature: 50, fan_speed: 50 },
-        { temperature: 60, fan_speed: 65 },
-        { temperature: 70, fan_speed: 80 },
+        { temperature: 0, fan_speed: 0 },
+        { temperature: 40, fan_speed: 30 },
+        { temperature: 60, fan_speed: 55 },
         { temperature: 80, fan_speed: 100 }
       ]);
     }
@@ -129,13 +267,11 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
     setSelectedTemplateId(templateId);
 
     if (!templateId) {
-      // Reset to default curve
+      // Reset to the starter shape (matches the initial state above).
       setCurvePoints([
-        { temperature: 30, fan_speed: 25 },
-        { temperature: 40, fan_speed: 35 },
-        { temperature: 50, fan_speed: 50 },
-        { temperature: 60, fan_speed: 65 },
-        { temperature: 70, fan_speed: 80 },
+        { temperature: 0, fan_speed: 0 },
+        { temperature: 40, fan_speed: 30 },
+        { temperature: 60, fan_speed: 55 },
         { temperature: 80, fan_speed: 100 }
       ]);
       setProfileType('custom');
@@ -201,7 +337,7 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
           profile_name: profileName.trim(),
           description: description.trim() || undefined,
           profile_type: profileType,
-          is_global: isGlobal,
+          is_global: true,
           curve_points: curvePoints.sort((a, b) => a.temperature - b.temperature)
         };
         
@@ -295,7 +431,7 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
                   value={selectedTemplateId}
                   onChange={(e) => handleTemplateSelection(e.target.value)}
                 >
-                  <option value="">Default Balanced</option>
+                  <option value="">Starter Curve</option>
                   {availableProfiles.map((template) => (
                     <option key={template.id} value={template.id}>
                       {template.profile_name}
@@ -320,16 +456,102 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
                 />
               </div>
 
-              <div className="form-group checkbox-group">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={isGlobal}
-                    onChange={(e) => setIsGlobal(e.target.checked)}
-                    disabled={loading}
-                  />
-                  Make Global
-                </label>
+              <div className="form-group">
+                <label htmlFor="profileType">Profile Type</label>
+                <div className="profile-type-row">
+                  {addingType ? (
+                    <>
+                      <input
+                        id="newTypeName"
+                        type="text"
+                        value={newTypeName}
+                        onChange={(e) => setNewTypeName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleConfirmAddType();
+                          if (e.key === 'Escape') handleCancelAddType();
+                        }}
+                        placeholder="new-type-name"
+                        autoFocus
+                        disabled={loading}
+                      />
+                      <FanProfileColorPicker
+                        color={newTypeColor}
+                        onChange={setNewTypeColor}
+                        label="Badge color"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleConfirmAddType}
+                        className="action-button edit-button"
+                        title="Save new type"
+                        disabled={loading}
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelAddType}
+                        className="action-button delete-button"
+                        title="Cancel"
+                        disabled={loading}
+                      >
+                        <X size={16} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <select
+                        id="profileType"
+                        value={profileType}
+                        onChange={(e) => setProfileType(e.target.value)}
+                        disabled={loading}
+                      >
+                        {profileTypes.map(t => (
+                          <option key={t.name} value={t.name}>
+                            {t.name}
+                          </option>
+                        ))}
+                        {/* If the loaded profile uses a type that's been deleted
+                            since, still render it so the select doesn't blank. */}
+                        {profileType && !profileTypes.some(t => t.name === profileType) && (
+                          <option value={profileType}>{profileType}</option>
+                        )}
+                      </select>
+                      {/* Always-visible swatch for the selected type. Opens the
+                          picker; PATCHes on Done, reverts on Cancel. Works for
+                          both system and user types - recoloring is cosmetic. */}
+                      <FanProfileColorPicker
+                        color={pendingTypeColor ?? selectedTypeColor}
+                        onChange={handleRecolorChange}
+                        onDone={handleRecolorDone}
+                        onCancel={handleRecolorCancel}
+                        label="Badge color"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleStartAddType}
+                        className="action-button edit-button"
+                        title="Add a new profile type"
+                        disabled={loading}
+                      >
+                        <Plus size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteType}
+                        className="action-button delete-button"
+                        title={
+                          selectedTypeIsSystem
+                            ? 'System profile types cannot be deleted'
+                            : 'Delete this profile type'
+                        }
+                        disabled={loading || selectedTypeIsSystem}
+                      >
+                        <X size={16} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               <div className="form-group">

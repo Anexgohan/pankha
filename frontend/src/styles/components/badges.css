@@ -143,16 +143,22 @@
   color: var(--color-primary);
 }
 
-.badge.global {
-  background: color-mix(in srgb, var(--color-success), transparent 92%);
-  border-color: color-mix(in srgb, var(--color-success), transparent 85%);
-  color: var(--color-success);
-}
-
 .badge.active {
   background: color-mix(in srgb, var(--color-warning), transparent 92%);
   border-color: color-mix(in srgb, var(--color-warning), transparent 85%);
   color: var(--color-warning);
+}
+
+/* Profile type tag (Silent, Balanced, Optimal, Performance, Custom, plus any
+   user-defined type). Color is driven by an inline --badge-color custom
+   property the renderer sets from fan_profile_types.color. The fallback hex
+   matches the neutral grey returned by the manager when no color is stored.
+   Shape language mirrors .badge.type-default (12% tint, 15% border). */
+
+.badge.profile-type {
+  background: color-mix(in srgb, var(--badge-color, #9E9E9E), transparent 88%);
+  border-color: color-mix(in srgb, var(--badge-color, #9E9E9E), transparent 78%);
+  color: var(--badge-color, #9E9E9E);
 }
 
 /* Read-Only Badge (License Limit) */

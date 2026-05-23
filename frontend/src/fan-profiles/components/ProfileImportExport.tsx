@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import {
   downloadFanProfilesExport,
   importFanProfiles,
@@ -35,7 +36,6 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
   const [showDefaultsDialog, setShowDefaultsDialog] = useState(false);
   const [resolveConflicts, setResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('rename');
   const [defaultResolveConflicts, setDefaultResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('skip');
-  const [makeGlobal, setMakeGlobal] = useState(false);
   const [defaultProfiles, setDefaultProfiles] = useState<DefaultProfileInfo[]>([]);
   const [selectedDefaults, setSelectedDefaults] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,7 +180,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
       const result = await importFanProfiles({
         profiles: profilesToImport,
         resolve_conflicts: resolveConflicts,
-        make_global: makeGlobal
+        make_global: true
       });
       setImportResult(result);
       if (result.success && result.imported_count > 0) {
@@ -245,7 +245,7 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                 title="Reset library to system default fan curves"
               >
                 {isLoadingDefaults ? <RefreshCw size={16} className="spin" /> : <RefreshCw size={16} />}
-                <span>{isLoadingDefaults ? 'Loading...' : 'Restore All Defaults'}</span>
+                <span>{isLoadingDefaults ? 'Loading...' : 'Restore All System Defaults'}</span>
               </button>
               <button
                 onClick={() => setShowDefaultsDialog(true)}
@@ -272,8 +272,20 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
         </p>
       </div>
 
-      {/* Defaults Library Dialog */}
-      {showDefaultsDialog && (
+      {/* Defaults Library Dialog and Import Profile Set Dialog
+       *
+       * Both are rendered into document.body via portals because the parent
+       * `.profile-import-export` panel has `backdrop-filter: blur(12px)`,
+       * which in modern browsers establishes a containing block for
+       * `position: fixed` descendants. Without the portal, the overlay
+       * would be scoped to the panel's box (not the viewport) and its
+       * z-index battle would happen against the panel's siblings instead
+       * of against the whole page, leaving it visually trapped under
+       * adjacent panels. createPortal escapes the React tree without
+       * changing event bubbling semantics, so the close handlers keep
+       * working unchanged.
+       */}
+      {showDefaultsDialog && ReactDOM.createPortal(
         <div className="standard-dialog-overlay">
           <div className="standard-dialog">
             <div className="dialog-header">
@@ -284,16 +296,18 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
               <div className="defaults-list">
                 {defaultProfiles.map((profile: DefaultProfileInfo) => (
                   <div key={profile.profile_name} className="default-item">
-                    <label className="checkbox-wrap">
+                    <label className="item-label">
                       <input
                         type="checkbox"
                         checked={selectedDefaults.has(profile.profile_name)}
                         onChange={() => toggleDefaultSelection(profile.profile_name)}
                       />
-                      <div className="item-meta">
-                        <span className="profile-name">{profile.profile_name}</span>
-                        {profile.exists_in_db && <span className="status-tag">In Library</span>}
-                        {profile.description && <p className="desc">{profile.description}</p>}
+                      <div className="item-info">
+                        <div className="item-main">
+                          <span className="profile-name">{profile.profile_name}</span>
+                          {profile.exists_in_db && <span className="existing-badge">In Library</span>}
+                        </div>
+                        {profile.description && <p className="profile-desc">{profile.description}</p>}
                       </div>
                     </label>
                   </div>
@@ -315,11 +329,13 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* File Import Dialog */}
-      {showImportDialog && (
+      {/* File Import Dialog - portaled to document.body for the same
+       * containing-block reason as the Defaults Library Dialog above. */}
+      {showImportDialog && ReactDOM.createPortal(
         <div className="standard-dialog-overlay">
           <div className="standard-dialog">
             <div className="dialog-header">
@@ -327,9 +343,11 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
               <button onClick={() => setShowImportDialog(false)} className="close-btn"><X size={18} /></button>
             </div>
             <div className="dialog-content">
-              <div className="file-drop-zone" onClick={() => fileInputRef.current?.click()}>
-                <div className="drop-icon"><FileJson size={32} /></div>
-                <div className="drop-text">Click to browse for .json export files</div>
+              <div className="file-drop-area" onClick={() => fileInputRef.current?.click()}>
+                <div className="drop-zone-content">
+                  <div className="drop-icon"><FileJson size={32} /></div>
+                  <div className="drop-label">Click to browse for .json export files</div>
+                </div>
                 <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileSelect} style={{ display: 'none' }} />
               </div>
               <div className="dialog-options">
@@ -341,39 +359,36 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
                     <option value="overwrite">System Overwrite</option>
                   </select>
                 </div>
-                <div className="option-row checkbox">
-                  <input type="checkbox" id="global-import" checked={makeGlobal} onChange={(e) => setMakeGlobal(e.target.checked)} />
-                  <label htmlFor="global-import">Grant Global Access to Imported Profiles</label>
-                </div>
               </div>
             </div>
             <div className="dialog-footer">
               <button onClick={() => setShowImportDialog(false)} className="btn-cancel">Dismiss</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {importResult && (
-        <div className="import-result-summary">
-          <div className="result-header">
+        <div className="import-results">
+          <div className="results-header">
             <h4>Import Summary</h4>
-            <button onClick={() => setImportResult(null)} className="close-btn"><X size={18} /></button>
-          </div>
-          <div className="stats-row">
-            <div className="stat success"><span><CheckCircle2 size={14} /></span> {importResult.imported_count} Successful</div>
-            <div className="stat skip"><span><SkipForward size={14} /></span> {importResult.skipped_count} Skipped</div>
-            <div className="stat error"><span><AlertCircle size={14} /></span> {importResult.error_count} Faults</div>
+            <div className="summary-pills">
+              <div className="pill success"><CheckCircle2 size={14} /> {importResult.imported_count} Successful</div>
+              <div className="pill skip"><SkipForward size={14} /> {importResult.skipped_count} Skipped</div>
+              <div className="pill error"><AlertCircle size={14} /> {importResult.error_count} Faults</div>
+            </div>
+            <button onClick={() => setImportResult(null)} className="clear-results" title="Dismiss"><X size={18} /></button>
           </div>
           {importResult.profiles.length > 0 && (
-            <div className="import-details-log">
+            <div className="results-list">
               {importResult.profiles.map((profile: any, index: number) => (
-                <div key={index} className="log-entry">
-                  <span className="status-bullet" style={{ color: getImportStatusColor(profile.status) }}>
+                <div key={index} className="result-line">
+                  <span className="line-icon" style={{ color: getImportStatusColor(profile.status) }}>
                     {getStatusIcon(profile.status)}
                   </span>
-                  <span className="target-name">{profile.name}</span>
-                  {profile.message && <span className="log-msg"> - {profile.message}</span>}
+                  <span className="line-name">{profile.name}</span>
+                  {profile.message && <span className="line-message"> - {profile.message}</span>}
                 </div>
               ))}
             </div>

@@ -23,6 +23,8 @@ import {
   assignProfileToFan,
   type FanProfile,
 } from "../../services/fanProfilesApi";
+import { getFanProfileTypes } from "../../services/fanProfileTypesApi";
+import type { FanProfileType } from "../../services/fanProfileTypesApi";
 import {
   setFanSensor,
   getFanConfigurations,
@@ -110,6 +112,11 @@ const SystemCard: React.FC<SystemCardProps> = ({
   );
   const [showHidden, setShowHidden] = useState(false);
   const [fanProfiles, setFanProfiles] = useState<FanProfile[]>([]);
+  // Lookup `profile_type` -> hex color for the dropdown. Populated once on
+  // mount from /api/fan-profile-types; the catalog rarely changes during a
+  // session so we don't refresh on profile create/delete - a stale entry
+  // here just means the dot falls back to neutral grey, not a broken UI.
+  const [typeColorMap, setTypeColorMap] = useState<Record<string, string | null>>({});
   const [selectedSensors, setSelectedSensors] = useState<
     Record<string, string>
   >({});
@@ -215,6 +222,47 @@ const SystemCard: React.FC<SystemCardProps> = ({
     () => system.current_temperatures?.map(s => s.id).sort().join(',') || '',
     [system.current_temperatures]
   );
+
+  // Load the profile-type color catalog once. Done in a separate effect
+  // (not bundled with the per-fan profile-assignment loader below) because
+  // the catalog isn't tied to fanIdsKey - we want it whether or not fans
+  // have been discovered, so the dropdown is ready to render correct colors
+  // the moment any profile is selectable.
+  useEffect(() => {
+    let cancelled = false;
+    getFanProfileTypes()
+      .then(types => {
+        if (cancelled) return;
+        setTypeColorMap(
+          types.reduce<Record<string, string | null>>((acc, t: FanProfileType) => {
+            acc[t.name] = t.color;
+            return acc;
+          }, {})
+        );
+      })
+      .catch(err => {
+        // Non-fatal: dropdown still renders, just without color cues.
+        console.error('Failed to load fan profile types for color map:', err);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Sorted + grouped profile lists for the fan-profile dropdown.
+  // Order in the popup: Manual placeholder -> System (A-Z) -> User (A-Z).
+  // Memoised so the sort only re-runs when fanProfiles changes, not on
+  // every render of this card.
+  const { systemProfiles, userProfiles } = useMemo(() => {
+    const system: FanProfile[] = [];
+    const user: FanProfile[] = [];
+    for (const p of fanProfiles) {
+      (p.created_by === 'system' ? system : user).push(p);
+    }
+    const byName = (a: FanProfile, b: FanProfile) =>
+      a.profile_name.localeCompare(b.profile_name);
+    system.sort(byName);
+    user.sort(byName);
+    return { systemProfiles: system, userProfiles: user };
+  }, [fanProfiles]);
 
   // Load fan profiles, assignments, and configurations on mount and when hardware structure changes
   useEffect(() => {
@@ -1708,13 +1756,59 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           </div>
                         </div>
 
-                        {/* Profile Selection Dropdown */}
+                        {/* Profile Selection Dropdown
+                         *
+                         * Closed `.select-display` shows a real status-dot
+                         * (.profile-color-dot) tinted by the selected
+                         * profile's profile_type color, plus the name and a
+                         * (System|User) badge-style suffix.
+                         *
+                         * The native popup is sorted into Manual -> System
+                         * (A-Z) -> User (A-Z) via <optgroup>; each <option>
+                         * is text-coloured by profile_type so the user sees
+                         * the same hue used by the profile-type badges in
+                         * the Fan Profile Manager. The trailing bullet (U+25CF,
+                         * BLACK CIRCLE) reinforces the colour cue inside the
+                         * option text since native <option> cannot host a
+                         * separate styled element.
+                         */}
                         <div className="fan-control-row">
                           <label className="control-label">Fan Profile:</label>
                           <div className="stealth-select-wrapper fan-profile-select">
+                            {/* Closed-state visible chip. Real styled
+                             * `.profile-color-dot` span + name + (type)
+                             * suffix. The dot uses profile_type colour,
+                             * the text inherits the regular text colour.
+                             */}
                             <div className="select-display">
-                              {fanProfiles.find(p => p.id === selectedProfiles[representativeFan.id])?.profile_name || 'No Profile'}
+                              {(() => {
+                                const selected = fanProfiles.find(p => p.id === selectedProfiles[representativeFan.id]);
+                                if (!selected) return 'No Profile';
+                                const dotColor = typeColorMap[selected.profile_type] || null;
+                                return (
+                                  <>
+                                    {dotColor && (
+                                      <span
+                                        className="profile-color-dot"
+                                        style={{ background: dotColor }}
+                                      />
+                                    )}
+                                    <span className="profile-name-label">{selected.profile_name}</span>
+                                    <span className="profile-type-label">({selected.profile_type})</span>
+                                  </>
+                                );
+                              })()}
                             </div>
+                            {/* Native popup uses the sensor-select grouping
+                             * pattern: disabled separator + disabled label
+                             * row act as section headers. The whole option
+                             * text is profile_type-coloured (native <option>
+                             * cannot scope colour to just the U+25CF
+                             * trailing bullet, so the entire row inherits
+                             * the colour) - the closed state above is
+                             * where the "only dot coloured" appearance
+                             * lives, in a real DOM element.
+                             */}
                             <select
                               className="select-engine"
                               value={selectedProfiles[representativeFan.id] || ""}
@@ -1744,13 +1838,36 @@ const SystemCard: React.FC<SystemCardProps> = ({
                               }
                             >
                               <option value="">No Profile (Manual)</option>
-                              {fanProfiles.map((profile: FanProfile) => (
-                                <option key={profile.id} value={profile.id}
-                                  title={profile.description || profile.profile_name}
-                                >
-                                  {profile.profile_name} ({profile.created_by === 'system' ? 'default' : 'custom'})
-                                </option>
-                              ))}
+                              {systemProfiles.length > 0 && (
+                                <>
+                                  <option disabled>────────────────────</option>
+                                  <option disabled>(System)</option>
+                                  {systemProfiles.map((profile: FanProfile) => (
+                                    <option
+                                      key={profile.id}
+                                      value={profile.id}
+                                      title={profile.description || profile.profile_name}
+                                    >
+                                      {profile.profile_name} ({profile.profile_type})
+                                    </option>
+                                  ))}
+                                </>
+                              )}
+                              {userProfiles.length > 0 && (
+                                <>
+                                  <option disabled>────────────────────</option>
+                                  <option disabled>(User)</option>
+                                  {userProfiles.map((profile: FanProfile) => (
+                                    <option
+                                      key={profile.id}
+                                      value={profile.id}
+                                      title={profile.description || profile.profile_name}
+                                    >
+                                      {profile.profile_name} ({profile.profile_type})
+                                    </option>
+                                  ))}
+                                </>
+                              )}
                             </select>
                           </div>
                           {loading === zoneLoadingKey && (
@@ -2053,12 +2170,36 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       </div>
                     </div>
 
-                    {/* Profile Selection Dropdown */}
+                    {/* Profile Selection Dropdown
+                     *
+                     * Mirror of the zone-level dropdown above - see the
+                     * comment block there for the design rationale. Same
+                     * sort, same colour cues, same label format.
+                     */}
                     <div className="fan-control-row">
                       <label className="control-label">Fan Profile:</label>
                       <div className="stealth-select-wrapper fan-profile-select">
+                        {/* Mirror of the zone-level dropdown above; same
+                         * sensor-pattern grouping and same closed-state
+                         * rendering. See that block for design notes. */}
                         <div className="select-display">
-                          {fanProfiles.find(p => p.id === selectedProfiles[fan.id])?.profile_name || 'No Profile'}
+                          {(() => {
+                            const selected = fanProfiles.find(p => p.id === selectedProfiles[fan.id]);
+                            if (!selected) return 'No Profile';
+                            const dotColor = typeColorMap[selected.profile_type] || null;
+                            return (
+                              <>
+                                {dotColor && (
+                                  <span
+                                    className="profile-color-dot"
+                                    style={{ background: dotColor }}
+                                  />
+                                )}
+                                <span className="profile-name-label">{selected.profile_name}</span>
+                                <span className="profile-type-label">({selected.profile_type})</span>
+                              </>
+                            );
+                          })()}
                         </div>
                         <select
                           className="select-engine"
@@ -2089,15 +2230,36 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           }
                         >
                           <option value="">No Profile (Manual)</option>
-                          {fanProfiles.map((profile: FanProfile) => (
-                            <option
-                              key={profile.id}
-                              value={profile.id}
-                              title={profile.description || profile.profile_name}
-                            >
-                              {profile.profile_name} ({profile.created_by === 'system' ? 'default' : 'custom'})
-                            </option>
-                          ))}
+                          {systemProfiles.length > 0 && (
+                            <>
+                              <option disabled>────────────────────</option>
+                              <option disabled>(System)</option>
+                              {systemProfiles.map((profile: FanProfile) => (
+                                <option
+                                  key={profile.id}
+                                  value={profile.id}
+                                  title={profile.description || profile.profile_name}
+                                >
+                                  {profile.profile_name} ({profile.profile_type})
+                                </option>
+                              ))}
+                            </>
+                          )}
+                          {userProfiles.length > 0 && (
+                            <>
+                              <option disabled>────────────────────</option>
+                              <option disabled>(User)</option>
+                              {userProfiles.map((profile: FanProfile) => (
+                                <option
+                                  key={profile.id}
+                                  value={profile.id}
+                                  title={profile.description || profile.profile_name}
+                                >
+                                  {profile.profile_name} ({profile.profile_type})
+                                </option>
+                              ))}
+                            </>
+                          )}
                         </select>
                       </div>
                       {loading === `fan-profile-${fan.id}` && (

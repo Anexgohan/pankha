@@ -49,21 +49,13 @@ export class FanProfileManager extends EventEmitter {
         LEFT JOIN fan_profile_assignments fpa ON fp.id = fpa.profile_id AND fpa.is_active = TRUE
       `;
 
-      const params: any[] = [];
+      // Profiles are no longer scoped per-system or by is_global - every profile
+      // is shared. systemId/includeGlobal are kept for signature compatibility
+      // with existing callers but no longer filter the result.
 
-      if (systemId && includeGlobal) {
-        sql += ` WHERE (fp.system_id = $1 OR fp.is_global = TRUE)`;
-        params.push(systemId);
-      } else if (systemId) {
-        sql += ` WHERE fp.system_id = $1`;
-        params.push(systemId);
-      } else if (includeGlobal) {
-        sql += ` WHERE fp.is_global = TRUE`;
-      }
-      
-      sql += ` GROUP BY fp.id ORDER BY fp.profile_type, fp.profile_name`;
-      
-      const profiles = await this.db.all(sql, params);
+      sql += ` GROUP BY fp.id ORDER BY fp.profile_name`;
+
+      const profiles = await this.db.all(sql);
       
       // Get curve points for each profile
       for (const profile of profiles) {
@@ -121,8 +113,8 @@ export class FanProfileManager extends EventEmitter {
           request.profile_name,
           request.description || null,
           request.profile_type || 'custom',
-          request.is_global || false,
-          'user'
+          request.is_global ?? true,
+          request.created_by || 'user'
         ]
       );
 
@@ -145,7 +137,7 @@ export class FanProfileManager extends EventEmitter {
 
     } catch (error) {
       log.error('Error creating fan profile', 'FanProfileManager', error);
-      throw error;
+      throw this.translateCurvePointError(error);
     }
   }
 
@@ -206,8 +198,31 @@ export class FanProfileManager extends EventEmitter {
 
     } catch (error) {
       log.error('Error updating fan profile', 'FanProfileManager', error);
-      throw error;
+      throw this.translateCurvePointError(error);
     }
+  }
+
+  /**
+   * Map a low-level Postgres error from the fan_curve_points unique index into
+   * a human-readable message that survives the route -> API -> editor toast
+   * chain (which all just pass `error.message` through). Anything that isn't
+   * recognisably the curve-point dup is returned as-is so we don't mask other
+   * failures. Defensive net for the validation in `validateCurvePoints`: if a
+   * future code path skips validation, the user still gets a useful message
+   * instead of the raw constraint name.
+   */
+  private translateCurvePointError(error: unknown): Error {
+    const e = error as { code?: string; constraint?: string; message?: string };
+    if (
+      e?.code === '23505' &&
+      (e.constraint === 'fan_curve_points_profile_id_temperature_key' ||
+       (e.message && e.message.includes('fan_curve_points_profile_id_temperature_key')))
+    ) {
+      return new Error(
+        'Fan curve cannot have two points at the same temperature - please give each point a unique temperature value'
+      );
+    }
+    return error instanceof Error ? error : new Error(String(error));
   }
 
   /**
@@ -392,23 +407,35 @@ export class FanProfileManager extends EventEmitter {
     if (points.length < 2) {
       throw new Error('Fan curve must have at least 2 points');
     }
-    
-    // Sort by temperature for validation
-    const sortedPoints = [...points].sort((a, b) => a.temperature - b.temperature);
-    
-    // Check for duplicate temperatures
-    for (let i = 0; i < sortedPoints.length - 1; i++) {
-      if (sortedPoints[i].temperature === sortedPoints[i + 1].temperature) {
-        throw new Error('Fan curve cannot have duplicate temperature points');
+
+    // Normalise temperatures before duplicate-check.
+    //
+    // pg returns DECIMAL columns as JS strings by default, so points loaded
+    // from the DB arrive here as e.g. "40.00" while points the user just
+    // added via the chart are numeric 40. A strict `===` would treat those
+    // as different and pass validation - then the DB stores both at
+    // DECIMAL(8,2) precision and raises a unique-constraint violation with
+    // an unreadable message. Coercing to Number and rounding to the same
+    // precision the column uses keeps the comparison consistent with what
+    // the DB will actually see.
+    const normalisedTemps = points.map(p => Math.round(Number(p.temperature) * 100) / 100);
+    const sortedTemps = [...normalisedTemps].sort((a, b) => a - b);
+    for (let i = 0; i < sortedTemps.length - 1; i++) {
+      if (sortedTemps[i] === sortedTemps[i + 1]) {
+        throw new Error(
+          `Fan curve cannot have two points at the same temperature (found duplicate at ${sortedTemps[i]}°C)`
+        );
       }
     }
-    
+
     // Validate ranges
     for (const point of points) {
-      if (point.temperature < 0 || point.temperature > 150) {
+      const t = Number(point.temperature);
+      const s = Number(point.fan_speed);
+      if (Number.isNaN(t) || t < 0 || t > 150) {
         throw new Error('Temperature must be between 0°C and 150°C');
       }
-      if (point.fan_speed < 0 || point.fan_speed > 100) {
+      if (Number.isNaN(s) || s < 0 || s > 100) {
         throw new Error('Fan speed must be between 0% and 100%');
       }
     }
@@ -422,42 +449,24 @@ export class FanProfileManager extends EventEmitter {
       const totalProfiles = await this.db.get(
         'SELECT COUNT(*) as count FROM fan_profiles'
       );
-      
-      const globalProfiles = await this.db.get(
-        'SELECT COUNT(*) as count FROM fan_profiles WHERE is_global = TRUE'
-      );
 
       const systemProfiles = await this.db.get(
-        'SELECT COUNT(*) as count FROM fan_profiles WHERE is_global = FALSE'
+        "SELECT COUNT(*) as count FROM fan_profiles WHERE created_by = 'system'"
+      );
+
+      const userProfiles = await this.db.get(
+        "SELECT COUNT(*) as count FROM fan_profiles WHERE created_by IS DISTINCT FROM 'system'"
       );
 
       const activeAssignments = await this.db.get(
         'SELECT COUNT(*) as count FROM fan_profile_assignments WHERE is_active = TRUE'
       );
-      
-      const profilesByType = await this.db.all(
-        'SELECT profile_type, COUNT(*) as count FROM fan_profiles GROUP BY profile_type'
-      );
-      
-      const typeStats = {
-        silent: 0,
-        balanced: 0,
-        performance: 0,
-        custom: 0
-      };
-      
-      for (const row of profilesByType) {
-        if (row.profile_type in typeStats) {
-          typeStats[row.profile_type as keyof typeof typeStats] = row.count;
-        }
-      }
-      
+
       return {
         total_profiles: totalProfiles.count,
-        global_profiles: globalProfiles.count,
         system_profiles: systemProfiles.count,
-        active_assignments: activeAssignments.count,
-        profiles_by_type: typeStats
+        user_profiles: userProfiles.count,
+        active_assignments: activeAssignments.count
       };
 
     } catch (error) {
@@ -595,13 +604,16 @@ export class FanProfileManager extends EventEmitter {
         })) || []
       }));
 
-      log.info(`📥 Loading ${normalizedProfiles.length} default fan profiles`, 'FanProfileManager');
+      log.info(`Loading ${normalizedProfiles.length} default fan profiles`, 'FanProfileManager');
 
-      // Use existing import logic
+      // Use existing import logic. Re-seeded defaults must keep their 'system'
+      // ownership so demo-mode delete protection and the system/user stat split
+      // continue to work after a Restore.
       const result = await this.importFanProfiles({
         profiles: normalizedProfiles,
         resolve_conflicts: options.resolve_conflicts,
-        make_global: true
+        make_global: true,
+        created_by_override: 'system'
       });
 
       return result;
@@ -653,7 +665,7 @@ export class FanProfileManager extends EventEmitter {
         profiles: exportableProfiles
       };
 
-      log.info(`📤 Exported ${exportableProfiles.length} fan profiles`, 'FanProfileManager');
+      log.info(`Exported ${exportableProfiles.length} fan profiles`, 'FanProfileManager');
       this.emit('profilesExported', { count: exportableProfiles.length });
 
       return exportData;
@@ -677,7 +689,7 @@ export class FanProfileManager extends EventEmitter {
         profiles: []
       };
 
-      log.info(`📥 Starting import of ${request.profiles.length} fan profiles`, 'FanProfileManager');
+      log.info(`Starting import of ${request.profiles.length} fan profiles`, 'FanProfileManager');
 
       for (const profileData of request.profiles) {
         try {
@@ -722,14 +734,16 @@ export class FanProfileManager extends EventEmitter {
             continue;
           }
 
-          // Create new profile
+          // Create new profile. If the caller supplied a created_by_override (e.g. the
+          // default-profile loader passing 'system'), thread it through so the seeded
+          // row is attributed correctly.
           const createRequest: CreateFanProfileRequest = {
             profile_name: profileData.profile_name,
             description: profileData.description,
             profile_type: profileData.profile_type || 'custom',
-            is_global: request.make_global || false,
-            system_id: request.make_global ? undefined : undefined,
-            curve_points: profileData.curve_points
+            is_global: true,
+            curve_points: profileData.curve_points,
+            ...(request.created_by_override ? { created_by: request.created_by_override } : {})
           };
 
           const createdProfile = await this.createFanProfile(createRequest);
@@ -754,7 +768,7 @@ export class FanProfileManager extends EventEmitter {
 
       result.success = result.error_count === 0;
 
-      log.info(`📥 Import completed: ${result.imported_count} imported, ${result.skipped_count} skipped, ${result.error_count} errors`, 'FanProfileManager');
+      log.info(`Import completed: ${result.imported_count} imported, ${result.skipped_count} skipped, ${result.error_count} errors`, 'FanProfileManager');
       this.emit('profilesImported', result);
 
       return result;
@@ -776,6 +790,6 @@ export class FanProfileManager extends EventEmitter {
     this.activeProfileCalculations.clear();
 
     this.removeAllListeners();
-    log.info('🧹 FanProfileManager cleaned up', 'FanProfileManager');
+    log.info('FanProfileManager cleaned up', 'FanProfileManager');
   }
 }

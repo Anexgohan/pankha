@@ -123,6 +123,41 @@ CREATE TABLE IF NOT EXISTS fan_curve_points (
   UNIQUE(profile_id, point_order)
 );
 
+-- Fan Profile Types (Lookup table of available profile_type values)
+-- `is_system=true` rows are seeded from this schema and cannot be deleted via
+-- the API. User-defined types live in this table too with `is_system=false`.
+CREATE TABLE IF NOT EXISTS fan_profile_types (
+  name VARCHAR(50) PRIMARY KEY,
+  is_system BOOLEAN DEFAULT false,
+  color VARCHAR(7),
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Migration: ensure `color` exists before the seed INSERT below runs. On
+-- fresh installs the CREATE TABLE above already includes it, so this is a
+-- no-op. On upgrades from versions that predate the color column, the table
+-- already exists without it and CREATE TABLE IF NOT EXISTS is skipped, so we
+-- must add the column here before the INSERT references it. The backfill
+-- UPDATEs near the bottom of this file (alongside other late migrations)
+-- populate the system hex values once the column exists.
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'fan_profile_types' AND column_name = 'color'
+  ) THEN
+    ALTER TABLE fan_profile_types ADD COLUMN color VARCHAR(7);
+    RAISE NOTICE 'Migration: Added color column to fan_profile_types';
+  END IF;
+END $$;
+
+INSERT INTO fan_profile_types (name, is_system, color) VALUES
+  ('silent', true, '#7E57C2'),
+  ('balanced', true, '#FDD835'),
+  ('optimal', true, '#4CAF50'),
+  ('performance', true, '#F44336'),
+  ('custom', true, '#8D6E63')
+ON CONFLICT (name) DO NOTHING;
+
 -- Fan Profile Assignments (Which fans use which profiles)
 CREATE TABLE IF NOT EXISTS fan_profile_assignments (
   id SERIAL PRIMARY KEY,
@@ -384,6 +419,16 @@ DO $$ BEGIN
     RAISE NOTICE 'Migration: Added architecture column to systems table';
   END IF;
 END $$;
+
+-- Backfill `color` for system rows that existed before the column was
+-- added. Fresh installs get colors via the seed INSERT near the top; this
+-- only catches upgrades where the rows existed but `color` was added later.
+-- Guarded by `color IS NULL` so user edits to system colors survive.
+UPDATE fan_profile_types SET color = '#7E57C2' WHERE name = 'silent'      AND is_system = true AND color IS NULL;
+UPDATE fan_profile_types SET color = '#FDD835' WHERE name = 'balanced'    AND is_system = true AND color IS NULL;
+UPDATE fan_profile_types SET color = '#4CAF50' WHERE name = 'optimal'     AND is_system = true AND color IS NULL;
+UPDATE fan_profile_types SET color = '#F44336' WHERE name = 'performance' AND is_system = true AND color IS NULL;
+UPDATE fan_profile_types SET color = '#8D6E63' WHERE name = 'custom'      AND is_system = true AND color IS NULL;
 
 -- Migration: Add is_hidden column to fans table (user fan visibility toggle)
 DO $$ BEGIN

@@ -315,30 +315,23 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
     onPointRemove(pointIndex);
   }, [interactive, onPointRemove, curvePoints.length]);
 
-  // Handle double-click on curve line to add points
-  const handleCurveDoubleClick = useCallback((event: React.MouseEvent) => {
-    if (!interactive || !onPointAdd) return;
-    
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
+  // Double-click adds a point at the position the tooltip is already previewing.
+  // The hover handler keeps `hoveredData` populated with either a snapped point
+  // or the interpolated value on the curve, so we just read from it - no need
+  // to recompute coords here. Anywhere inside the chart bounds is fair game.
+  const handleChartDoubleClick = useCallback(() => {
+    if (!interactive || !onPointAdd || !hoveredData) return;
 
-    const mouseX = event.clientX - rect.left - margin.left;
-    const mouseY = event.clientY - rect.top - margin.top;
+    const newTemp = hoveredData.temp;
+    const newSpeed = hoveredData.speed;
 
-    // Constrain to chart bounds
-    const clampedX = Math.max(0, Math.min(chartWidth, mouseX));
-    const clampedY = Math.max(0, Math.min(chartHeight, mouseY));
+    // Collision guard: validateForm rejects duplicate temperatures on save, so
+    // a silent no-op here is friendlier than a save-time error. Snapped hovers
+    // over an existing point land in this branch.
+    if (curvePoints.some(p => Math.round(p.temperature) === newTemp)) return;
 
-    // Convert mouse coordinates to temperature and fan speed
-    const temperature = Math.round(inverseScaleX(clampedX));
-    const fanSpeed = Math.round(inverseScaleY(clampedY));
-
-    // Constrain values to valid ranges
-    const constrainedTemp = Math.max(0, Math.min(100, temperature));
-    const constrainedSpeed = Math.max(0, Math.min(100, fanSpeed));
-
-    onPointAdd(constrainedTemp, constrainedSpeed);
-  }, [interactive, onPointAdd, margin.left, margin.top, chartWidth, chartHeight, inverseScaleX, inverseScaleY]);
+    onPointAdd(newTemp, newSpeed);
+  }, [interactive, onPointAdd, hoveredData, curvePoints]);
 
   // Generate curve path
   const generatePath = () => {
@@ -454,6 +447,7 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
         onMouseLeave={handleMouseLeave}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        onDoubleClick={handleChartDoubleClick}
         style={{ 
           cursor: dragState.isDragging ? 'grabbing' : 'default',
           overflow: 'visible',
@@ -465,7 +459,10 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
           {/* Grid lines */}
           {generateGridLines()}
           
-                {/* Curve line */}
+                {/* Curve line. Note: the double-click-to-add handler lives on
+                    the parent <svg> now (see onDoubleClick on the svg element);
+                    pinning it to this 2px stroke required the user to land
+                    exactly on the line. */}
                 <path
                   d={generatePath()}
                   fill="none"
@@ -473,7 +470,6 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
                   strokeWidth="2"
                   strokeLinejoin="round"
                   style={{ cursor: interactive ? 'crosshair' : 'default' }}
-                  onDoubleClick={handleCurveDoubleClick}
                 />
 
                 {/* Vertical Ruler & Interpolation Point */}

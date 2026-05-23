@@ -1,0 +1,264 @@
+/* =====================================================================
+   Fan Profile Color Picker styles.
+
+   This is a fan-profile-specific copy of the picker styles in
+   settings/styles/settings.css. Class names use the `fpc-` prefix so the
+   two pickers can coexist without bleeding into each other and so changes
+   here never propagate back to settings. Source-of-truth comparisons:
+     settings.css L1799+    custom-color-picker-container, picker-trigger,
+                            trigger-preview, trigger-hex, picker-dropdown,
+                            picker-header, picker-label, picker-presets,
+                            picker-preset-swatch, sv-area, sv-gradient,
+                            sv-pointer, hue-slider, hue-track, hue-pointer,
+                            picker-controls, hex-manual, picker-actions,
+                            .done-btn, .cancel-btn, animate-in.
+
+   Differences from the settings picker:
+   - No trigger-hex; the trigger is a pure swatch sized to match the
+     action-button slots in the fan profile editor.
+   ===================================================================== */
+
+.fpc-container {
+  position: relative;
+  display: inline-block;
+}
+
+/* Trigger sized to match `.action-button` (used by the +/x buttons in the
+   profile-type row) so the swatch reads as a peer of those controls
+   rather than a separate widget. */
+.fpc-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.fpc-trigger:hover {
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 5%, var(--bg-tertiary));
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-accent-dynamic), transparent 90%);
+  transform: translateY(-1px);
+}
+
+.fpc-trigger-preview {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background-color: var(--current-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 10px var(--current-color);
+}
+
+.fpc-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 240px;
+  padding: var(--spacing-lg);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  background: var(--bg-panels_01);
+  box-shadow: var(--shadow-2xl);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  user-select: none;
+}
+
+.fpc-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.fpc-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-bold);
+}
+
+.fpc-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fpc-preset-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+  padding: 0;
+}
+
+.fpc-preset-swatch:hover {
+  transform: scale(1.2);
+}
+
+.fpc-preset-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.fpc-sv-area {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  cursor: crosshair;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fpc-sv-gradient {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.fpc-sv-white {
+  background: linear-gradient(to right, #fff, rgba(255, 255, 255, 0));
+}
+
+.fpc-sv-black {
+  background: linear-gradient(to top, #000, rgba(0, 0, 0, 0));
+}
+
+.fpc-sv-pointer {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.fpc-hue-slider {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.fpc-hue-track {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.fpc-hue-pointer {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border: 2px solid var(--border-color);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+.fpc-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.fpc-hex-manual {
+  flex: 1;
+}
+
+.fpc-hex-manual input {
+  width: 100%;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  padding: 6px 4px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-primary);
+  text-align: center;
+  transition: border-color 0.2s;
+}
+
+.fpc-hex-manual input:focus {
+  outline: none;
+  border-color: var(--color-accent-dynamic);
+}
+
+.fpc-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  flex-shrink: 0;
+}
+
+.fpc-actions .fpc-done-btn,
+.fpc-actions .fpc-cancel-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.fpc-actions .fpc-done-btn {
+  background: var(--color-accent-dynamic);
+  color: #fff;
+  min-width: 60px;
+}
+
+.fpc-actions .fpc-cancel-btn {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  min-width: 60px;
+}
+
+.fpc-actions .fpc-done-btn:hover {
+  filter: brightness(1.2);
+}
+
+.fpc-actions .fpc-cancel-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+}
+
+.fpc-animate-in {
+  animation: fpcPickerIn 0.2s ease-out;
+}
+
+@keyframes fpcPickerIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}

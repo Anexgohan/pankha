@@ -7,7 +7,7 @@
     {
       "profile_name": "GPU Optimal",
       "description": "Minimise Noise and RPM below 50°C and ramp up above 70°C when performance is needed,\nGreat for GPU.",
-      "profile_type": "custom",
+      "profile_type": "optimal",
       "curve_points": [
         {
           "temperature": "0.00",
@@ -38,7 +38,7 @@
     {
       "profile_name": "Lazy",
       "description": "Stays at zero RPM till 50°C, kicks in after 50°C, stays silent till 70°C and goes full blast at 80°C.\nGood for PCH, Chipset and High RPM 8000RPM+ fans",
-      "profile_type": "custom",
+      "profile_type": "silent",
       "curve_points": [
         {
           "temperature": "0.00",
@@ -69,7 +69,7 @@
     {
       "profile_name": "Optimal",
       "description": "Minimise Noise and RPM below 50°C and ramp up above 60°C when performance is needed,\nBest of Both worlds",
-      "profile_type": "custom",
+      "profile_type": "optimal",
       "curve_points": [
         {
           "temperature": "0.00",
@@ -100,7 +100,7 @@
     {
       "profile_name": "Performance",
       "description": "Cooling is a priority, ramp fans to higher RPM faster",
-      "profile_type": "custom",
+      "profile_type": "performance",
       "curve_points": [
         {
           "temperature": "0.00",
@@ -135,7 +135,7 @@
     {
       "profile_name": "Raspberry Pi 5",
       "description": "Stays at zero RPM till 45°C, kicks in after 45°C, stays silent till 60°C and goes full blast at 75°C. Good for SystemOnChipset (SOC) and ARM boards and High RPM 6000RPM+ fans.\nSpecially designed for Raspberry Pi 5 Models to keep Noise Low but give Performance when needed, basically mostly silent but noisy when needed. (Select the CPU sensor not ADC or Highest Temperature)",
-      "profile_type": "custom",
+      "profile_type": "silent",
       "curve_points": [
         {
           "temperature": "0.00",
@@ -166,7 +166,7 @@
     {
       "profile_name": "Standard",
       "description": "Standard curve for most systems. Noisier than Optimal but quieter than Performance.",
-      "profile_type": "custom",
+      "profile_type": "balanced",
       "curve_points": [
         {
           "temperature": "0.00",
@@ -194,6 +194,41 @@
         },
         {
           "temperature": "80.00",
+          "fan_speed": 100
+        }
+      ]
+    },
+    {
+      "profile_name": "Server-Optimal",
+      "description": "Conservative server curve. Quiet at idle, gradual ramp through 70°C, full blast at 85°C.\nDesigned for rack chassis with deep airflow runs.",
+      "profile_type": "balanced",
+      "curve_points": [
+        {
+          "temperature": "0.00",
+          "fan_speed": 0
+        },
+        {
+          "temperature": "40.00",
+          "fan_speed": 10
+        },
+        {
+          "temperature": "50.00",
+          "fan_speed": 21
+        },
+        {
+          "temperature": "60.00",
+          "fan_speed": 30
+        },
+        {
+          "temperature": "70.00",
+          "fan_speed": 50
+        },
+        {
+          "temperature": "80.00",
+          "fan_speed": 75
+        },
+        {
+          "temperature": "85.00",
           "fan_speed": 100
         }
       ]

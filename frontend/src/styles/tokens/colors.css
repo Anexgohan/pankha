@@ -31,6 +31,14 @@
   --color-info: #2196F3;
   --color-info-hover: #1976D2;
 
+  /* Accent Colors - used by profile-type badges and other tertiary surfaces */
+  --color-accent-yellow: #FDD835;
+  --color-accent-yellow-hover: #F9A825;
+  --color-accent-purple: #7E57C2;
+  --color-accent-purple-hover: #6A4BAA;
+  --color-accent-brown: #8D6E63;
+  --color-accent-brown-hover: #6D4C41;
+
   /* Neutral Colors - Dark Theme (Default) */
   --neutral-50: #1a1a1a;
   --neutral-100: #242424;
