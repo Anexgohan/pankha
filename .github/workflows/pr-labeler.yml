@@ -16,3 +16,47 @@ jobs:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
         configuration-path: .github/workflows/configs/labeler.yml
         sync-labels: true # Removes labels if files are removed from PR
+
+    # Apply intent label (feature / fix / breaking-change) from branch name or
+    # PR title prefix. The categoriser in compose-release-notes.sh promotes these
+    # above the area labels (dependencies, ci, devops) and avoids feature PRs
+    # being folded under "Dependencies, CI, and chores".
+    - name: Apply intent label
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_REF: ${{ github.head_ref }}
+        PR_TITLE: ${{ github.event.pull_request.title }}
+        PR_BODY: ${{ github.event.pull_request.body }}
+      run: |
+        set -eu
+        intent=""
+
+        # 1. Branch-name prefix (primary signal: project convention)
+        case "$HEAD_REF" in
+          feature/*|feat/*)            intent="feature" ;;
+          fix/*|bugfix/*|hotfix/*)     intent="fix" ;;
+          breaking/*|break/*)          intent="breaking-change" ;;
+        esac
+
+        # 2. PR title prefix (fallback: Conventional Commits)
+        if [ -z "$intent" ]; then
+          case "$PR_TITLE" in
+            'feat!:'*|'feat('*')!:'*)  intent="breaking-change" ;;
+            'fix!:'*|'fix('*')!:'*)    intent="breaking-change" ;;
+            'feat:'*|'feat('*'):'*)    intent="feature" ;;
+            'fix:'*|'fix('*'):'*)      intent="fix" ;;
+          esac
+        fi
+
+        # 3. Body trailer override (Conventional Commits BREAKING CHANGE footer)
+        if [ -n "${PR_BODY:-}" ] && printf '%s' "$PR_BODY" | grep -qE '(^|[[:space:]])BREAKING CHANGE:'; then
+          intent="breaking-change"
+        fi
+
+        if [ -n "$intent" ]; then
+          echo "Applying intent label: $intent"
+          gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label "$intent"
+        else
+          echo "No intent prefix detected on branch ($HEAD_REF) or title ($PR_TITLE); skipping."
+        fi

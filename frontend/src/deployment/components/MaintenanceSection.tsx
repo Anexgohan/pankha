@@ -59,7 +59,7 @@ const compareSemver = (a: string, b: string): number => {
     const nb = pb[i] || 0;
     if (na !== nb) return na - nb;
   }
-  return parsePreRelease(cleanA) - parsePreRelease(cleanB);
+  return (parsePreRelease(cleanA) - parsePreRelease(cleanB)) || 0;
 };
 
 const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
