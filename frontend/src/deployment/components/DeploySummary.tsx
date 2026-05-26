@@ -387,10 +387,24 @@ const DeploySummary: React.FC<DeploySummaryProps> = React.memo(({
 
       <section className="deployment-section release-notes-panel">
         <div className="release-notes-header">
-          <span className="release-notes-eyebrow">
-            <FileText size={12} aria-hidden="true" />
-            <span>Release notes</span>
-          </span>
+          <div className="release-notes-header-top">
+            <span className="release-notes-eyebrow">
+              <FileText size={12} aria-hidden="true" />
+              <span>Release notes</span>
+            </span>
+            {releaseTagForLink && (
+              <a
+                className="release-notes-full-link"
+                href={`${githubRepo}/releases/tag/${releaseTagForLink}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open ${releaseTagForLink} on GitHub`}
+              >
+                <ExternalLink size={12} aria-hidden="true" />
+                <span>Full changelog</span>
+              </a>
+            )}
+          </div>
           <div className="release-notes-meta">
             <span className={`release-notes-badge release-notes-badge-${channel}`}>
               <Tag size={10} aria-hidden="true" />
@@ -404,18 +418,6 @@ const DeploySummary: React.FC<DeploySummaryProps> = React.memo(({
               </>
             )}
           </div>
-          {releaseTagForLink && (
-            <a
-              className="release-notes-full-link"
-              href={`${githubRepo}/releases/tag/${releaseTagForLink}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={`Open ${releaseTagForLink} on GitHub`}
-            >
-              <span>Full changelog</span>
-              <ExternalLink size={12} aria-hidden="true" />
-            </a>
-          )}
         </div>
         <div className="release-notes-body">
           {trimmedBody ? (

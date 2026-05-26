@@ -2655,11 +2655,15 @@
 
 .release-notes-header {
   display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.release-notes-header-top {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-md);
-  flex-wrap: wrap;
-  row-gap: var(--spacing-xs);
 }
 
 .release-notes-eyebrow {
@@ -2683,9 +2687,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
-  flex: 1;
   min-width: 0;
-  flex-wrap: wrap;
 }
 
 .release-notes-badge {
