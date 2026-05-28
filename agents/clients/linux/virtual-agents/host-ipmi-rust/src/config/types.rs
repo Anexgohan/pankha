@@ -36,6 +36,12 @@ pub struct HardwareSettings {
     pub emergency_temp: f64,         // 70-100°C - used for local failsafe mode
     #[serde(default = "default_failsafe_speed")]
     pub failsafe_speed: u8,          // 0-100% - fan speed during failsafe mode
+    // Backend-pushed list of sensor IDs the user has hidden. Honored by the
+    // offline failsafe so hiding a sensor in the UI also excludes it from the
+    // local emergency calc when the backend is unreachable. #[serde(default)]
+    // makes this non-breaking for existing v0.5.2 config.json files.
+    #[serde(default)]
+    pub excluded_sensors: Vec<String>,
 }
 
 pub fn default_failsafe_speed() -> u8 { 70 }
@@ -95,6 +101,7 @@ impl Default for AgentConfig {
                 hysteresis_temp: 3.0,
                 emergency_temp: 85.0,
                 failsafe_speed: 70,
+                excluded_sensors: Vec::new(),
             },
             logging: LoggingSettings {
                 enable_file_logging: true,

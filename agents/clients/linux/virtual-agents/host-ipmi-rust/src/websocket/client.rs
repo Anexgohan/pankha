@@ -56,7 +56,7 @@ impl WebSocketClient {
         let failsafe_speed = config.hardware.failsafe_speed;
         drop(config);
 
-        warn!("⚠️ ENTERING FAILSAFE MODE - Backend disconnected");
+        warn!("ENTERING FAILSAFE MODE - Backend disconnected");
         warn!("Setting all fans to {}% (failsafe speed)", failsafe_speed);
 
         // Set all fans to failsafe speed
@@ -92,20 +92,32 @@ impl WebSocketClient {
     }
 
     /// Check emergency temperature while in failsafe mode
-    /// If any sensor >= emergency_temp, set all fans to 100%
+    /// If any sensor >= emergency_temp, set all fans to 100%. Excludes any
+    /// sensor IDs the user has hidden (pushed by the backend, persisted in
+    /// config) so hide selection is honored even when the backend is gone.
     async fn check_emergency_temp(&self) -> Result<()> {
-        let config = self.config.read().await;
-        let emergency_temp = config.hardware.emergency_temp;
-        drop(config);
+        let (emergency_temp, excluded) = {
+            let config = self.config.read().await;
+            (config.hardware.emergency_temp, config.hardware.excluded_sensors.clone())
+        };
 
-        // Read current sensor temps
         let sensors = self.hardware_monitor.discover_sensors().await?;
-        let max_temp = sensors.iter()
+        let excluded_set: std::collections::HashSet<&String> = excluded.iter().collect();
+        let considered: Vec<_> = sensors.iter()
+            .filter(|s| !excluded_set.contains(&s.id))
+            .collect();
+
+        if considered.is_empty() {
+            warn!("All discovered sensors are excluded - failsafe cannot detect emergency. \
+                   Holding failsafe_speed without escalation.");
+            return Ok(());
+        }
+
+        let max_temp = considered.iter()
             .map(|s| s.temperature)
             .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or(0.0);
 
-        // If emergency temp reached, override to 100%
         if max_temp >= emergency_temp {
             warn!("🚨 FAILSAFE EMERGENCY: {:.1}°C >= {:.1}°C threshold - ALL FANS TO 100%",
                   max_temp, emergency_temp);

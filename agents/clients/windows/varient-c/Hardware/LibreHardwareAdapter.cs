@@ -166,6 +166,9 @@ public class LibreHardwareAdapter : IHardwareMonitor
             if (!sensor.Value.HasValue)
                 continue;
 
+            if (IsThresholdPseudoSensor(sensor.Name))
+                continue;
+
             var sensorModel = new Sensor
             {
                 Id = GenerateSensorId(hardware, sensor),
@@ -190,6 +193,17 @@ public class LibreHardwareAdapter : IHardwareMonitor
             sensorModel.UpdateStatus();
             sensors.Add(sensorModel);
         }
+    }
+
+    // LibreHardwareMonitor exposes device spec thresholds (NVMe WCTEMP/CCTEMP,
+    // GPU shutdown limits, etc.) as Temperature sensors. They are constants, not
+    // readings, and tripped a false 109C emergency on a real machine.
+    private static bool IsThresholdPseudoSensor(string sensorName)
+    {
+        if (string.IsNullOrEmpty(sensorName)) return false;
+        var n = sensorName.ToLowerInvariant();
+        return n.Contains("warning") || n.Contains("critical")
+            || n.Contains("limit") || n.Contains("throttle");
     }
 
     private string GenerateSensorId(IHardware hardware, ISensor sensor)
@@ -680,7 +694,7 @@ public class LibreHardwareAdapter : IHardwareMonitor
     public async Task EnterFailsafeModeAsync()
     {
         var failsafeSpeed = _settings.FailsafeSpeed;
-        _logger.Warning("⚠️ ENTERING FAILSAFE MODE - Backend disconnected");
+        _logger.Warning("ENTERING FAILSAFE MODE - Backend disconnected");
 
         var tasks = new List<Task>();
 
@@ -728,17 +742,30 @@ public class LibreHardwareAdapter : IHardwareMonitor
     }
 
     /// <summary>
-    /// Get the maximum temperature across all sensors
-    /// Used by ConnectionWatchdog for emergency temperature detection during failsafe mode
+    /// Max sensor temperature for the emergency_temp check that runs during
+    /// failsafe mode. Filters user-hidden sensors so hide is honored offline.
+    /// Single caller: ConnectionWatchdog. Not a general-purpose max getter.
     /// </summary>
     public async Task<double> GetMaxTemperatureAsync()
     {
-        // NOTE: Sensors are discovered fresh each call, no cache needed
         var sensors = await DiscoverSensorsAsync();
-        
         if (!sensors.Any())
             return 0.0;
-        
+
+        var excluded = _settings.ExcludedSensors;
+        if (excluded != null && excluded.Count > 0)
+        {
+            var excludedSet = new HashSet<string>(excluded, StringComparer.OrdinalIgnoreCase);
+            var filtered = sensors.Where(s => !excludedSet.Contains(s.Id)).ToList();
+            if (filtered.Count == 0)
+            {
+                _logger.Warning("All discovered sensors are excluded - failsafe cannot detect emergency. " +
+                                "Holding failsafe_speed without escalation.");
+                return 0.0;
+            }
+            return filtered.Max(s => s.Temperature);
+        }
+
         return sensors.Max(s => s.Temperature);
     }
 

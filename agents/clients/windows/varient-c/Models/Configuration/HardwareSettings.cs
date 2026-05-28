@@ -26,6 +26,12 @@ public class HardwareSettings
     [JsonProperty("emergency_temp")]
     public double EmergencyTemp { get; set; } = 85.0; // Celsius
 
+    // Backend-pushed list of sensor IDs the user has hidden. Honored by the
+    // offline failsafe so hiding a sensor in the UI also excludes it from the
+    // local emergency calc when the backend is unreachable.
+    [JsonProperty("excluded_sensors")]
+    public List<string> ExcludedSensors { get; set; } = new();
+
     public void Validate()
     {
         if (FailsafeSpeed < 0 || FailsafeSpeed > 100)

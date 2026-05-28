@@ -328,7 +328,7 @@ export class AgentManager extends EventEmitter {
       }
     } else {
       log.info(
-        `⚠️  Agent status not found in memory for ${agentId}, skipping status update`,
+        `Agent (${agentId}) status not found in memory, skipping status update`,
         "AgentManager"
       );
       log.info(
@@ -469,7 +469,7 @@ export class AgentManager extends EventEmitter {
         await this.persistSystemPresence(agentId, "offline");
 
         log.info(
-          `⚠️  Agent ${agentId} marked as offline (last seen: ${status.lastSeen.toISOString()})`,
+          `Agent (${agentId}) marked as offline (last seen: ${status.lastSeen.toISOString()})`,
           "AgentManager"
         );
         this.emit("agentOffline", { agentId, status });

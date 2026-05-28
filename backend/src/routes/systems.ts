@@ -1610,9 +1610,10 @@ router.put(
       }
 
       // Verify system exists
-      const system = await db.get("SELECT id FROM systems WHERE id = $1", [
-        systemId,
-      ]);
+      const system = await db.get(
+        "SELECT id, agent_id FROM systems WHERE id = $1",
+        [systemId]
+      );
       if (!system) {
         return res.status(404).json({ error: "System not found" });
       }
@@ -1627,6 +1628,10 @@ router.put(
         `Sensor ${sensorId} visibility updated: is_hidden=${is_hidden}`,
         "systems"
       );
+
+      if (system.agent_id) {
+        commandDispatcher.syncExcludedSensors(system.agent_id);
+      }
 
       res.json({
         message: "Sensor visibility updated successfully",
@@ -1654,9 +1659,10 @@ router.put(
       }
 
       // Verify system exists
-      const system = await db.get("SELECT id FROM systems WHERE id = $1", [
-        systemId,
-      ]);
+      const system = await db.get(
+        "SELECT id, agent_id FROM systems WHERE id = $1",
+        [systemId]
+      );
       if (!system) {
         return res.status(404).json({ error: "System not found" });
       }
@@ -1674,6 +1680,10 @@ router.put(
         `Sensor group ${groupName} visibility updated: is_hidden=${is_hidden}`,
         "systems"
       );
+
+      if (system.agent_id) {
+        commandDispatcher.syncExcludedSensors(system.agent_id);
+      }
 
       res.json({
         message: "Sensor group visibility updated successfully",

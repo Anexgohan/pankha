@@ -100,7 +100,8 @@ export interface FanControlCommand {
     | "selfUpdate"
     | "getDiagnostics"
     | "executeRawIpmi"
-    | "reloadProfile";
+    | "reloadProfile"
+    | "setExcludedSensors";
   payload: {
     fanId?: string;
     speed?: number;
@@ -121,6 +122,7 @@ export interface FanControlCommand {
     name?: string; // For setAgentName command
     version?: string | null; // For selfUpdate command (hub version, e.g., "v0.3.2")
     bytes?: string; // For executeRawIpmi command (hex bytes like "0x30 0x70 0x66")
+    excludedSensors?: string[]; // For setExcludedSensors command - sensor IDs to skip in failsafe
   };
   timestamp: number;
   priority: "low" | "normal" | "high" | "emergency";
