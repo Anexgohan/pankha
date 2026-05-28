@@ -5,10 +5,10 @@
 services:
   pankha-app:
     container_name: pankha_app
-    image: anexgohan/pankha:latest # :latest = stable | :beta = absolute latest | :testing = pre-release
+    image: anexgohan/pankha:latest # :latest=(stable) | :beta=(absolute latest) | :testing=(pre-release)
     # Log rotation: managed by your Docker daemon config (/etc/docker/daemon.json)
     ports:
-      - "${PANKHA_PORT:-3143}:3143" # Web server (host:container) (change left side only, set to your desired port, or set PANKHA_PORT environment variable)
+      - "${PANKHA_PORT:-3143}:3143" # External Port (set to your desired port in .env file PANKHA_PORT environment variable)
     environment:
       # Timezone: set TIMEZONE in .env (list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
       - TZ=${TIMEZONE:-UTC}
@@ -53,7 +53,7 @@ services:
       - .env
     volumes:
       - ./docker-data/backend/database/postgres_data:/var/lib/postgresql
-# disabled ports for security (no external access), set in the .env instead
+# disabled ports for security (no external access), if needed uncomment below and set in the .env file
 #    ports:
 #      - "${POSTGRES_PORT:-5432}:5432"
     healthcheck:
