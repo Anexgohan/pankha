@@ -307,20 +307,27 @@ export class FanProfileController {
       this.emergencyState.set(fanKey, false);
     }
 
-    // Get current state
-    const currentSpeed = this.lastAppliedSpeeds.get(fanKey) || 0;
-    const lastTemp = this.lastSignificantTemp.get(fanKey);
-
-    // Initialize if first run
-    if (currentSpeed === 0 && lastTemp === undefined) {
-      this.lastAppliedSpeeds.set(fanKey, targetSpeed);
+    // Get current state. On first loop / after reconnect we have no internal
+    // record, so seed from the agent's reported actual speed instead of 0 - a
+    // diverged fan (e.g. left at 100% by failsafe) is then stepped back down.
+    // A correct fan reports == target and the "already at target" branch below
+    // short-circuits without disturbing it.
+    const hasRecord = this.lastAppliedSpeeds.has(fanKey);
+    let currentSpeed: number;
+    if (hasRecord) {
+      currentSpeed = this.lastAppliedSpeeds.get(fanKey)!;
+    } else {
+      // For OS agents, fanName is the per-fan id. For IPMI agents, fanName is
+      // the zone_id; fans expose their parent zone via the `zone` field, and
+      // every fan in a zone shares the same Tier-3 speed, so picking any one
+      // gives the right value.
+      const systemData = this.dataAggregator.getSystemData(agentId);
+      const reportedFan =
+        systemData?.fans?.find(f => f.id === fanName) ??
+        systemData?.fans?.find(f => f.zone === fanName);
+      currentSpeed = reportedFan?.speed ?? 0;
+      this.lastAppliedSpeeds.set(fanKey, currentSpeed);
       this.lastSpeedChangeTime.set(fanKey, Date.now());
-      await this.sendFanSpeedCommand(agentId, fanName, targetSpeed);
-      log.debug(
-        `Fan ${fanName} initialized: temp=${currentTemp.toFixed(1)}°C, speed=${targetSpeed}%`,
-        'FanProfileController'
-      );
-      return;
     }
 
     // Note: Hysteresis is now handled in control loop before calling this method

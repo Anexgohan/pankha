@@ -43,7 +43,7 @@ const SensorItem: React.FC<SensorItemProps> = ({
         <button
           className="rack-visibility"
           onClick={() => onToggleVisibility(sensor.id, sensor.dbId)}
-          title={isHidden ? "Show sensor" : "Hide sensor"}
+          title={isHidden ? "Show sensor" : "Hide sensor, Disables from Usage and Calculations"}
           aria-label={isHidden ? "Show sensor" : "Hide sensor"}
         >
           {/* {isHidden ? "🚫" : "🟢"} */}

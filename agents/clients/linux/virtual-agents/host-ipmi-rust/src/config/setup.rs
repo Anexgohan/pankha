@@ -185,6 +185,7 @@ pub async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
             hysteresis_temp: 3.0,
             emergency_temp: 85.0,
             failsafe_speed,
+            excluded_sensors: Vec::new(),
         },
         logging: LoggingSettings {
             enable_file_logging: true,

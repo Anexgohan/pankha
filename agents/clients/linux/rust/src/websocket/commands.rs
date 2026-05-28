@@ -150,6 +150,20 @@ impl super::client::WebSocketClient {
                     (false, Some("Missing or invalid name".to_string()), serde_json::json!({}))
                 }
             }
+            "setExcludedSensors" => {
+                if let Some(arr) = payload.get("excludedSensors").and_then(|v| v.as_array()) {
+                    let excluded: Vec<String> = arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect();
+                    let count = excluded.len();
+                    match self.set_excluded_sensors(excluded).await {
+                        Ok(_) => (true, None, serde_json::json!({"count": count})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid excludedSensors".to_string()), serde_json::json!({}))
+                }
+            }
             "selfUpdate" => {
                 // Extract version from payload for comparison
                 let target_version = payload.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -253,7 +267,7 @@ impl super::client::WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("✏️  Fan Step changed → {}%", step);
+        info!("Fan Step changed → {}%", step);
         Ok(())
     }
 
@@ -277,7 +291,7 @@ impl super::client::WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("✏️  Hysteresis changed → {}°C", hysteresis);
+        info!("Hysteresis changed → {}°C", hysteresis);
         Ok(())
     }
 
@@ -302,7 +316,7 @@ impl super::client::WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("✏️  Emergency Temp changed → {}°C", temp);
+        info!("Emergency Temp changed → {}°C", temp);
         Ok(())
     }
 
@@ -346,11 +360,11 @@ impl super::client::WebSocketClient {
 
         if let Some(handle) = RELOAD_HANDLE.get() {
             match handle.reload(EnvFilter::new(filter)) {
-                Ok(_) => info!("✏️  Log Level changed: {} → {}", old_level, level.to_uppercase()),
+                Ok(_) => info!("Log Level changed: {} → {}", old_level, level.to_uppercase()),
                 Err(e) => error!("Failed to reload log level filter: {}", e),
             }
         } else {
-            warn!("✏️  Log Level changed: {} → {} (filter reload unavailable)", old_level, level.to_uppercase());
+            warn!("Log Level changed: {} → {} (filter reload unavailable)", old_level, level.to_uppercase());
         }
 
         Ok(())
@@ -378,7 +392,24 @@ impl super::client::WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("✏️  Failsafe Speed changed: {}% → {}%", old_speed, speed);
+        info!("Failsafe Speed changed: {}% → {}%", old_speed, speed);
+        Ok(())
+    }
+
+    pub(crate) async fn set_excluded_sensors(&self, excluded: Vec<String>) -> Result<()> {
+        let count = excluded.len();
+        {
+            let mut config = self.config.write().await;
+            config.hardware.excluded_sensors = excluded;
+        }
+
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
+
+        info!("Excluded sensors updated: {} sensor(s)", count);
         Ok(())
     }
 
@@ -401,7 +432,7 @@ impl super::client::WebSocketClient {
 
         let status = if enabled { "enabled" } else { "disabled" };
         let old_status = if old_enabled { "enabled" } else { "disabled" };
-        info!("✏️  Fan Control changed: {} → {}", old_status, status);
+        info!("Fan Control changed: {} → {}", old_status, status);
         Ok(())
     }
 
@@ -431,7 +462,7 @@ impl super::client::WebSocketClient {
 
         save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
 
-        info!("✏️  Agent Name changed: {} → {}", old_name, trimmed_name);
+        info!("Agent Name changed: {} → {}", old_name, trimmed_name);
         Ok(())
     }
 }

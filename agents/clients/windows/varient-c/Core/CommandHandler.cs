@@ -68,6 +68,9 @@ public class CommandHandler
                 case "setAgentName":
                     return await HandleSetAgentNameAsync(commandId, payload);
 
+                case "setExcludedSensors":
+                    return HandleSetExcludedSensorsAsync(commandId, payload);
+
                 case "ping":
                     return CreateSuccessResponse(commandId, new { pong = true });
 
@@ -127,7 +130,7 @@ public class CommandHandler
         _config.Agent.UpdateInterval = interval;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("✏️ Update Interval changed: {Old}s → {New}s", oldInterval, interval);
+        _logger.Information("Update Interval changed: {Old}s → {New}s", oldInterval, interval);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { interval }));
     }
@@ -146,7 +149,7 @@ public class CommandHandler
         _config.Hardware.FanStepPercent = step;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("✏️ Fan Step changed: {Old}% → {New}%", oldStep, step);
+        _logger.Information("Fan Step changed: {Old}% → {New}%", oldStep, step);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { step }));
     }
@@ -165,7 +168,7 @@ public class CommandHandler
         _config.Hardware.HysteresisTemp = hysteresis;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("✏️ Hysteresis changed: {Old}°C → {New}°C", oldHysteresis, hysteresis);
+        _logger.Information("Hysteresis changed: {Old}°C → {New}°C", oldHysteresis, hysteresis);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { hysteresis }));
     }
@@ -184,7 +187,7 @@ public class CommandHandler
         _config.Hardware.EmergencyTemp = temp;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("✏️ Emergency Temp changed: {Old}°C → {New}°C", oldTemp, temp);
+        _logger.Information("Emergency Temp changed: {Old}°C → {New}°C", oldTemp, temp);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { temp = temp }));
     }
@@ -220,7 +223,7 @@ public class CommandHandler
         // Update the global LoggingLevelSwitch - this dynamically changes ALL loggers
         Pankha.WindowsAgent.Program.LogLevelSwitch.MinimumLevel = serilogLevel;
 
-        _logger.Information("✏️ Log Level changed: {Old} → {New}", oldLevel, upperLevel);
+        _logger.Information("Log Level changed: {Old} → {New}", oldLevel, upperLevel);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { level = upperLevel }));
     }
@@ -239,7 +242,7 @@ public class CommandHandler
         _config.Hardware.FailsafeSpeed = speed;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("✏️ Failsafe Speed changed: {Old}% → {New}%", oldSpeed, speed);
+        _logger.Information("Failsafe Speed changed: {Old}% → {New}%", oldSpeed, speed);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { speed }));
     }
@@ -254,7 +257,7 @@ public class CommandHandler
 
         var status = enabled ? "enabled" : "disabled";
         var oldStatus = oldEnabled ? "enabled" : "disabled";
-        _logger.Information("✏️ Fan Control changed: {Old} → {New}", oldStatus, status);
+        _logger.Information("Fan Control changed: {Old} → {New}", oldStatus, status);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { enabled }));
     }
@@ -280,9 +283,23 @@ public class CommandHandler
         _config.Agent.Name = trimmedName;
         _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
 
-        _logger.Information("✏️ Agent Name changed: {Old} → {New}", oldName, trimmedName);
+        _logger.Information("Agent Name changed: {Old} → {New}", oldName, trimmedName);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { name = trimmedName }));
+    }
+
+    private CommandResponse HandleSetExcludedSensorsAsync(string commandId, Dictionary<string, object> payload)
+    {
+        // List of sensor IDs the user has hidden in the UI. We persist it so
+        // the offline failsafe (GetMaxTemperatureAsync) honors hidden even
+        // when the backend is unreachable.
+        var excluded = GetPayloadValue<List<string>>(payload, "excludedSensors") ?? new List<string>();
+        _config.Hardware.ExcludedSensors = excluded;
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
+
+        _logger.Information("Excluded sensors updated: {Count} sensor(s)", excluded.Count);
+
+        return CreateSuccessResponse(commandId, new { count = excluded.Count });
     }
 
     private async Task<CommandResponse> HandleGetDiagnosticsAsync(string commandId)

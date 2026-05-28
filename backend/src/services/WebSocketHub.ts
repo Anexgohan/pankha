@@ -172,7 +172,7 @@ export class WebSocketHub extends EventEmitter {
     // This ensures the first update after reconnection sends full state with all enriched data
     this.agentCommunication.on("agentDisconnected", (agentId: string) => {
       log.info(
-        `🔄 Agent disconnected, clearing delta state for: ${agentId}`,
+        `Agent disconnected, clearing delta state for: ${agentId}`,
         "WebSocketHub"
       );
       this.deltaComputer.clearAgentState(agentId);
@@ -318,7 +318,7 @@ export class WebSocketHub extends EventEmitter {
       if (client.metadata.isAgent && client.metadata.agentId) {
         const agentId = client.metadata.agentId;
         log.info(
-          `🔌 Agent disconnected via WebSocket: ${agentId} (${clientId})`,
+          `Agent disconnected via WebSocket: ${agentId} (${clientId})`,
           "WebSocketHub"
         );
 
@@ -800,6 +800,14 @@ export class WebSocketHub extends EventEmitter {
             }, 2000);
           }
         }
+
+        // Sync excluded-sensor list to agent so its offline failsafe respects
+        // the user's hide selection. Sent after registered confirmation so the
+        // agent has finished applying initial config first. Same 2000ms delay
+        // as the reloadProfile sync above for consistency.
+        setTimeout(() => {
+          this.commandDispatcher.syncExcludedSensors(agentId);
+        }, 2000);
 
         // Notify other clients about new agent
         this.broadcast("agentRegistered", agentConfig, ["agents:all"]);

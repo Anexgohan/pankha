@@ -4,6 +4,7 @@ import Database from "../database/database";
 import { FanControlCommand } from "../types/agent";
 import { AgentManager } from "./AgentManager";
 import { log } from "../utils/logger";
+import { deriveChipName } from "../utils/sensorUtils";
 import {
   validFanSteps,
   validHysteresis,
@@ -144,7 +145,7 @@ export class CommandDispatcher extends EventEmitter {
 
     if (safeSpeed !== speed) {
       log.warn(
-        `⚠️  Fan speed adjusted for safety: ${speed}% -> ${safeSpeed}% for fan ${fanId}`,
+        `Fan speed adjusted for safety: ${speed}% -> ${safeSpeed}% for fan ${fanId}`,
         "CommandDispatcher"
       );
     }
@@ -316,6 +317,74 @@ export class CommandDispatcher extends EventEmitter {
       { enabled },
       priority
     );
+  }
+
+  /**
+   * Build the effective hidden-sensor ID list for a system (sensor.is_hidden OR
+   * its chip group hidden). Mirrors DataAggregator.enrichAggregatedData.
+   */
+  private async getExcludedSensorsForAgent(agentId: string): Promise<string[]> {
+    const system = await this.db.get(
+      "SELECT id FROM systems WHERE agent_id = $1",
+      [agentId]
+    );
+    if (!system) return [];
+
+    const systemId = system.id;
+
+    const directRows = await this.db.all(
+      "SELECT sensor_name FROM sensors WHERE system_id = $1 AND is_hidden = true",
+      [systemId]
+    );
+    const excluded = new Set<string>(directRows.map((r: any) => r.sensor_name));
+
+    const hiddenGroups = await this.db.all(
+      "SELECT group_name FROM sensor_group_visibility WHERE system_id = $1 AND is_hidden = true",
+      [systemId]
+    );
+    if (hiddenGroups.length > 0) {
+      const hiddenGroupNames = new Set(hiddenGroups.map((g: any) => g.group_name));
+      const allSensors = await this.db.all(
+        "SELECT sensor_name FROM sensors WHERE system_id = $1",
+        [systemId]
+      );
+      for (const s of allSensors) {
+        if (hiddenGroupNames.has(deriveChipName(s.sensor_name))) {
+          excluded.add(s.sensor_name);
+        }
+      }
+    }
+
+    return Array.from(excluded);
+  }
+
+  /**
+   * Push the effective excluded-sensor list to an agent. The agent persists it
+   * to config.json and honors it in its offline failsafe max-temp calc, so a
+   * user-hidden sensor stays hidden even when the backend is unreachable.
+   * `sendCommand` already logs rejections internally, so the catch is silent
+   * here to avoid duplicate noise from pre-feature agents that don't know
+   * the command yet.
+   */
+  public async syncExcludedSensors(agentId: string): Promise<void> {
+    try {
+      const excludedSensors = await this.getExcludedSensorsForAgent(agentId);
+      log.debug(
+        `Syncing excluded sensors to agent ${agentId}: ${excludedSensors.length} sensor(s)`,
+        "CommandDispatcher"
+      );
+      await this.sendCommand(
+        agentId,
+        "setExcludedSensors",
+        { excludedSensors },
+        "normal"
+      ).catch(() => { /* logged by sendCommand */ });
+    } catch (error) {
+      log.warn(
+        `Failed to sync excluded sensors for ${agentId}: ${error instanceof Error ? error.message : String(error)}`,
+        "CommandDispatcher"
+      );
+    }
   }
 
   /**
@@ -578,6 +647,7 @@ export class CommandDispatcher extends EventEmitter {
       await this.logCommand(command, "sent");
     } catch (error) {
       log.error(`Failed to execute command`, "CommandDispatcher", {
+        agentId: command.agentId,
         commandId: command.commandId,
         commandType: command.type,
         error,
@@ -736,7 +806,7 @@ export class CommandDispatcher extends EventEmitter {
       });
     } else {
       log.error(
-        ` Command failed: ${pendingCommand.command.type} (${commandId}) - ${response.error}`,
+        `Agent (${pendingCommand.command.agentId}) command failed: ${pendingCommand.command.type} (${commandId}) - ${response.error}`,
         "CommandDispatcher"
       );
       pendingCommand.reject(new Error(response.error));
@@ -758,7 +828,7 @@ export class CommandDispatcher extends EventEmitter {
       // Retry command
       pendingCommand.retries++;
       log.warn(
-        `⏰ Command timeout, retrying (${pendingCommand.retries}/${this.maxRetries}): ${commandId}`,
+        `Agent (${pendingCommand.command.agentId}) command timeout, retrying (${pendingCommand.retries}/${this.maxRetries}): ${pendingCommand.command.type} (${commandId})`,
         "CommandDispatcher"
       );
 
@@ -771,7 +841,7 @@ export class CommandDispatcher extends EventEmitter {
     } else {
       // Max retries reached
       log.error(
-        ` Command timeout after ${this.maxRetries} retries: ${commandId}`,
+        `Agent (${pendingCommand.command.agentId}) command timeout after ${this.maxRetries} retries: ${pendingCommand.command.type} (${commandId})`,
         "CommandDispatcher"
       );
       this.pendingCommands.delete(commandId);
