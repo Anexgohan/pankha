@@ -592,8 +592,10 @@ public class LibreHardwareAdapter : IHardwareMonitor
             return;
         }
 
-        // Deduplication: skip if same value
-        if (fan.LastPwmValue == speed)
+        // Deduplication: compare against ACTUAL speed (fan.Speed, refreshed each
+        // update), NOT our last command - so an external mover (EC, GPU auto-curve)
+        // doesn't get a re-assert wrongly skipped.
+        if (fan.Speed == speed)
         {
             _logger.Debug("Skipping duplicate fan speed for {FanId} (already {Speed}%)", fanId, speed);
             return;
