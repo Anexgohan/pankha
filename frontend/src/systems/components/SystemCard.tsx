@@ -1445,14 +1445,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                 title={
                                   isGroupHiddenState
                                     ? "Show group"
-                                    : "Hide group"
+                                    : "Hide group, Disables from Usage and Calculations"
                                 }
                               >
                                 {/* {isGroupHiddenState ? "👁️🗨️" : "👁️"} */}
                                 {isGroupHiddenState ? (
-                                  <img src="/icons/toggle-off-01.png" width={24} height={24} title="Hidden" alt="Hidden" style={{ opacity: 0.75 }} />
+                                  <img src="/icons/toggle-off-01.png" width={24} height={24} alt="Hidden" style={{ opacity: 0.75 }} />
                                 ) : (
-                                  <img src="/icons/toggle-on-01.png" width={24} height={24} title="Visible" alt="Visible" style={{ opacity: 0.90 }} />
+                                  <img src="/icons/toggle-on-01.png" width={24} height={24} alt="Visible" style={{ opacity: 0.90 }} />
                                 )}
                               </button>
                               <span className="sensor-count">

@@ -48,9 +48,9 @@ const SensorItem: React.FC<SensorItemProps> = ({
         >
           {/* {isHidden ? "🚫" : "🟢"} */}
           {isHidden ? (
-            <img src="/icons/toggle-off-01.png" width={20} height={20} title="Hidden" alt="Hidden" style={{ opacity: 0.65 }} />
+            <img src="/icons/toggle-off-01.png" width={20} height={20} alt="Hidden" style={{ opacity: 0.65 }} />
           ) : (
-            <img src="/icons/toggle-on-01.png" width={20} height={20} title="Visible" alt="Visible" style={{ opacity: 0.75 }}/>
+            <img src="/icons/toggle-on-01.png" width={20} height={20} alt="Visible" style={{ opacity: 0.75 }}/>
           )}
         </button>
       </div>
