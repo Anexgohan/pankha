@@ -26,6 +26,10 @@ interface CurvePoint {
   fan_speed: number;
 }
 
+// Re-assert tolerance (% points of duty). Ignore gaps this small (pwm<->percent
+// rounding + noise); real external-controller drags are far larger.
+const REASSERT_TOLERANCE_PERCENT = 5;
+
 /**
  * Fan Profile Controller
  *
@@ -345,8 +349,16 @@ export class FanProfileController {
       // Need to decrease speed
       nextSpeed = Math.max(currentSpeed - fanStep, targetSpeed);
     } else {
-      // Already at target
-      return;
+      // At target: re-assert only if the reported ACTUAL speed diverged past
+      // tolerance - catches an external controller (e.g. RPi kernel thermal
+      // governor) moving the fan out from under us. See REASSERT_TOLERANCE_PERCENT.
+      const reported = this.dataAggregator.getSystemData(agentId)?.fans
+        ?.find(f => f.id === fanName || f.zone === fanName)?.speed;
+      if (reported === undefined ||
+          Math.abs(reported - targetSpeed) <= REASSERT_TOLERANCE_PERCENT) {
+        return; // in sync (or no telemetry yet) - nothing to do
+      }
+      nextSpeed = targetSpeed; // diverged - re-send the held target (no re-step)
     }
 
     // Apply the speed change

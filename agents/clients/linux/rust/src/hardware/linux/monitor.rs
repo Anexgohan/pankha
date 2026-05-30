@@ -354,11 +354,15 @@ impl HardwareMonitor for LinuxHardwareMonitor {
         let fan_info = fan_map.get(fan_id)
             .ok_or_else(|| anyhow::anyhow!("Fan not found: {}", fan_id))?;
 
-        // DEDUPLICATION: Check if value unchanged
+        // DEDUPLICATION: skip only if the ACTUAL hardware pwm matches. Comparing
+        // against our last *intended* write would wrongly skip a re-assert when
+        // an external controller (see cooling-device note below) moved the pin.
+        // Reading it back makes the agent self-correcting; on read error, write.
         {
-            let last_value = fan_info.last_pwm_value.read().await;
-            if *last_value == Some(pwm_value) {
-                debug!("Fan {} already at PWM {}, skipping write", fan_id, pwm_value);
+            let actual = self.read_file(&fan_info.pwm_path).await.ok()
+                .and_then(|s| s.parse::<u8>().ok());
+            if actual == Some(pwm_value) {
+                debug!("Fan {} already at PWM {} (hardware), skipping write", fan_id, pwm_value);
                 return Ok(());
             }
         }
@@ -376,6 +380,11 @@ impl HardwareMonitor for LinuxHardwareMonitor {
             *last_time = now;
         }
 
+        // NOTE: on some systems (e.g. RPi5) this PWM is also a kernel thermal
+        // cooling device; its governor writes the same register on temp-trip
+        // crossings and overrides us (symptom: fan won't hold high / "snaps back"
+        // near 100%). pwm_enable=1 (manual) does NOT prevent it. x86 Super I/O
+        // fans aren't cooling devices, so this doesn't occur there.
         // Enable manual PWM mode if needed (with deduplication)
         if let Some(enable_path) = &fan_info.pwm_enable_path {
             let current_enable = self.read_file(enable_path).await.ok();
