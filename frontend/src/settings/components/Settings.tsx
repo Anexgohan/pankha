@@ -65,7 +65,7 @@ interface PricingData {
   enterprise: TierPricing;
 }
 
-// Advertised discount data — populated from /api/license/promo (Worker → Dodo)
+// Advertised discount data - populated from /api/license/promo (Worker → Dodo)
 interface PromoOffer {
   code: string;
   name: string;
@@ -138,7 +138,7 @@ function formatDateTooltip(dateInput: string | null, fallback = ''): string {
   const local = new Intl.DateTimeFormat('en-US', { ...fmt, timeZone: userTz }).format(d);
   const utc = new Intl.DateTimeFormat('en-US', { ...fmt, timeZone: 'UTC' }).format(d);
 
-  // Relative — pick the best unit so values like "in 8 hours" or "2 days ago" feel natural
+  // Relative - pick the best unit so values like "in 8 hours" or "2 days ago" feel natural
   const diffSec = (d.getTime() - Date.now()) / 1000;
   const absSec = Math.abs(diffSec);
   const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
@@ -887,7 +887,7 @@ const Settings: React.FC = () => {
     { name: 'Mistic Water', color: '#0FEEEE' },
   ];
 
-  // Temperature-themed presets per status level. Kept short on purpose —
+  // Temperature-themed presets per status level. Kept short on purpose -
   // these guide the user toward sane hues, not give every shade.
   const tempColorPresets: Record<'normal' | 'caution' | 'warning' | 'critical', { name: string; color: string }[]> = {
     normal: [
@@ -930,6 +930,20 @@ const Settings: React.FC = () => {
       setActiveTab('general');
     }
   }, [isDemoMode, activeTab]);
+
+  // Tick once a minute so the "Grace - <countdown>" badge stays current on an
+  // otherwise idle screen. Settings is React.memo'd (no longer re-renders on
+  // sensor deltas), so without this the countdown would only recompute on a
+  // license refetch. Runs only while a paid token hasn't fully expired (active
+  // approaching expiry, or in grace); the interval is already ticking before the
+  // time-based active->grace crossover, and unmounts with the Settings tab.
+  const [, setGraceTick] = useState(0);
+  useEffect(() => {
+    const graceEnd = license?.graceExpiresAt ? new Date(license.graceExpiresAt).getTime() : null;
+    if (graceEnd === null || Date.now() >= graceEnd) return; // lifetime/free, or fully expired: nothing to tick
+    const id = setInterval(() => setGraceTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, [license?.expiresAt, license?.graceExpiresAt]);
 
   const scalePresets = [
     { label: '1h', value: 1 },
@@ -1090,7 +1104,7 @@ const Settings: React.FC = () => {
   };
 
   // Compose Account Details as plain text for the "Copy All" button. The token
-  // is intentionally excluded — users with paranoid clipboards / screen-share
+  // is intentionally excluded - users with paranoid clipboards / screen-share
   // contexts can copy it separately via the dedicated token copy button.
   const composeAccountDetails = (info: LicenseInfo): string => {
     const lines: string[] = ['Account Details'];
@@ -1235,7 +1249,7 @@ const Settings: React.FC = () => {
         if (result.upgraded) {
           message = 'License renewed! Your subscription is active again.';
         } else if (result.changed) {
-          message = 'License updated — new expiry applied.';
+          message = 'License updated - new expiry applied.';
         } else if (wasExpired) {
           message = 'No renewal available yet. If you paid recently, give it a minute and try again, or check your email for the renewal token.';
         } else {
@@ -1266,7 +1280,7 @@ const Settings: React.FC = () => {
 
   /**
    * Force-renew license via worker /renew (vendor-independent recovery).
-   * Used when Sync alone can't recover the license — e.g., Dodo's webhook
+   * Used when Sync alone can't recover the license - e.g., Dodo's webhook
    * never fired but the customer paid. Subject to 15min cooldown + 3/day cap.
    */
   const handleRenewLicense = async () => {
@@ -1307,7 +1321,7 @@ const Settings: React.FC = () => {
   // Renew is enabled when the local license is in a state Sync alone may not recover:
   //  1. Demoted to Free with a licenseId on file (hard-expired past 3-day grace)
   //  2. Token's exp has passed (covers the 3-day grace window before validator demotes)
-  // Disabled otherwise — Sync handles the normal path.
+  // Disabled otherwise - Sync handles the normal path.
   const canRenew = !!license?.licenseId && (
     license.tier === 'Free' ||
     (!!license.expiresAt && new Date(license.expiresAt).getTime() < Date.now())
@@ -1318,9 +1332,16 @@ const Settings: React.FC = () => {
   };
 
   /**
-   * Format remaining time dynamically and return urgency level
+   * Format remaining time dynamically and return urgency level. Three states:
+   *  - Active: time left until token exp (green/amber/red by closeness)
+   *  - Grace:  exp passed but still within the offline grace window (amber),
+   *            "Grace - <Xd/Xh/Xm left>", with a grace-end tooltip
+   *  - Expired: past grace (red)
    */
-  const formatRemaining = (expiresAt: string | null): { text: string; urgency: 'normal' | 'caution' | 'critical' } => {
+  const formatRemaining = (
+    expiresAt: string | null,
+    graceExpiresAt: string | null
+  ): { text: string; urgency: 'normal' | 'caution' | 'critical'; tooltip?: string } => {
     if (!expiresAt) {
       return { text: 'Lifetime', urgency: 'normal' };
     }
@@ -1328,8 +1349,24 @@ const Settings: React.FC = () => {
     const now = new Date();
     const expires = new Date(expiresAt);
     const diffMs = expires.getTime() - now.getTime();
-    
+
     if (diffMs <= 0) {
+      // Past token exp: still entitled while within grace, hard-expired after.
+      const graceEnd = graceExpiresAt ? new Date(graceExpiresAt) : null;
+      const graceMs = graceEnd ? graceEnd.getTime() - now.getTime() : 0;
+      if (graceEnd && graceMs > 0) {
+        const mins = Math.floor(graceMs / (1000 * 60));
+        const left = mins >= 1440
+          ? `${Math.floor(mins / 1440)}d left`
+          : mins >= 60
+            ? `${Math.floor(mins / 60)}h left`
+            : `${Math.max(1, mins)}m left`;
+        return {
+          text: `Grace - ${left}`,
+          urgency: 'caution',
+          tooltip: `Grace period ends ${formatDateTooltip(graceExpiresAt)}`,
+        };
+      }
       return { text: 'Expired', urgency: 'critical' };
     }
 
@@ -1611,7 +1648,7 @@ const Settings: React.FC = () => {
                     <div className="setting-info-wrapper">
                       <span className="setting-label">Accent Color</span>
                       <span className="setting-description">
-                        Primary brand color — buttons, focus rings, tab underlines, active states.
+                        Primary brand color - buttons, focus rings, tab underlines, active states.
                       </span>
                     </div>
                     <div className="appearance-color-control">
@@ -1704,7 +1741,7 @@ const Settings: React.FC = () => {
                     <div className="setting-info-wrapper">
                       <span className="setting-label">Secondary Font</span>
                       <span className="setting-description">
-                        Monospace face — temperatures, fan speeds, hex codes, code blocks.
+                        Monospace face - temperatures, fan speeds, hex codes, code blocks.
                       </span>
                     </div>
                     <div className="appearance-font-control">
@@ -1728,7 +1765,7 @@ const Settings: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Temperature Thresholds — wide row */}
+                  {/* Temperature Thresholds - wide row */}
                   {(() => {
                     const isTypeTab =
                       activeThresholdType === 'cpu' ||
@@ -1749,7 +1786,7 @@ const Settings: React.FC = () => {
                       } else if (activeThresholdType === 'global') {
                         updateTempThresholds(next);
                       }
-                      // 'customise' is a meta-tab — drag/edits are disabled until a type is picked.
+                      // 'customise' is a meta-tab - drag/edits are disabled until a type is picked.
                     };
 
                     const handleTabClick = (key: ThresholdTab) => {
@@ -1824,7 +1861,7 @@ const Settings: React.FC = () => {
                         />
 
                         <div className="appearance-threshold-chips">
-                          {/* Normal — color only */}
+                          {/* Normal - color only */}
                           <div className="appearance-threshold-chip" style={{ borderLeftColor: tempColors.normal }}>
                             <div className="appearance-threshold-chip-head">
                               <span className="threshold-color-dot" style={{ backgroundColor: tempColors.normal }} />
@@ -1890,14 +1927,14 @@ const Settings: React.FC = () => {
                         <div className="appearance-threshold-foot">
                           <span className="appearance-threshold-hint">
                             {activeThresholdType === 'global' && (
-                              <>Editing the <strong>Global</strong> baseline — applies to all sensors.</>
+                              <>Editing the <strong>Global</strong> baseline - applies to all sensors.</>
                             )}
                             {isCustomiseTab && (
-                              <>Per-type overrides <strong>enabled</strong> — pick a sensor type to edit its thresholds.</>
+                              <>Per-type overrides <strong>enabled</strong> - pick a sensor type to edit its thresholds.</>
                             )}
                             {isTypeTab && (
                               <>
-                                Editing override for <strong>{activeThresholdType.toUpperCase()}</strong> — falls back to Global where unset.
+                                Editing override for <strong>{activeThresholdType.toUpperCase()}</strong> - falls back to Global where unset.
                               </>
                             )}
                           </span>
@@ -1959,7 +1996,7 @@ const Settings: React.FC = () => {
                 {/* Tier benefits, agent limits, retention, and prices below all flow from
                     backend/src/license/tiers.ts via /api/license/pricing. The `|| N` price
                     fallbacks only render during the brief loading window before the API
-                    responds — keep them in sync with tiers.ts pricing if you change it. */}
+                    responds - keep them in sync with tiers.ts pricing if you change it. */}
                 <div className="pricing-section">
                   {promo && promo.offers.length > 0 && (
                     <>
@@ -2014,7 +2051,7 @@ const Settings: React.FC = () => {
                           else barUrgency = 'normal';
                         }
 
-                        // Stamp tier — drives the big "%" amount color so it
+                        // Stamp tier - drives the big "%" amount color so it
                         // matches the rarity color of the highest tier this
                         // discount applies to. Highest rarity wins:
                         // lifetime > enterprise > pro.
@@ -2419,7 +2456,7 @@ const Settings: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    <div className="limit-item" title={formatDateTooltip(license.expiresAt, 'Lifetime — never expires')}>
+                    <div className="limit-item" title={formatDateTooltip(license.expiresAt, 'Lifetime - never expires')}>
                       <span className="limit-label">Expires</span>
                       <div className="limit-value-group">
                         <span className="limit-value">
@@ -2431,10 +2468,11 @@ const Settings: React.FC = () => {
                       </div>
                     </div>
                     {(() => {
-                      const remaining = formatRemaining(license.expiresAt);
-                      const remainingTooltip = license.billing === 'lifetime'
-                        ? 'Lifetime — unlimited access'
-                        : formatDateTooltip(license.nextBillingDate, 'No upcoming renewal scheduled');
+                      const remaining = formatRemaining(license.expiresAt, license.graceExpiresAt);
+                      const remainingTooltip = remaining.tooltip
+                        ?? (license.billing === 'lifetime'
+                          ? 'Lifetime - unlimited access'
+                          : formatDateTooltip(license.nextBillingDate, 'No upcoming renewal scheduled'));
                       return (
                         <div className={`limit-item remaining-${remaining.urgency}`} title={remainingTooltip}>
                           <span className="limit-label">Remaining</span>
@@ -2698,7 +2736,7 @@ const Settings: React.FC = () => {
                         <div className="license-field license-field--full">
                           <div className="license-field-header">
                             <span className="license-field-label">License Token</span>
-                            <span className="license-field-hint">Keep this secret — it authenticates your client.</span>
+                            <span className="license-field-hint">Keep this secret - it authenticates your client.</span>
                           </div>
                           <div className="license-field-input license-field-input--token">
                             <span className="license-field-value license-field-value--mono license-field-value--token">
@@ -2751,4 +2789,8 @@ const Settings: React.FC = () => {
   );
 };
 
-export default Settings;
+// Memoized: Settings takes no props, so this prevents the every-~3s re-render it
+// would otherwise inherit from SystemsPage on each live sensor delta. It still
+// re-renders on context changes (license/dashboard-settings) and its own state
+// (including the grace tick above).
+export default React.memo(Settings);

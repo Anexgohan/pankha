@@ -8,13 +8,14 @@
  * - Convenience methods for checking tier limits
  */
 
-import { LicenseValidator, ValidationResult } from './LicenseValidator';
+import { LicenseValidator, ValidationResult, GRACE_PERIOD_SECONDS } from './LicenseValidator';
 import { TIERS, TierConfig, getTier } from './tiers';
 import { LICENSE_API_URL } from './license-config';
 import Database from '../database/database';
 import { log } from '../utils/logger';
+import { EventEmitter } from 'events';
 
-export class LicenseManager {
+export class LicenseManager extends EventEmitter {
   private validator: LicenseValidator;
   private cachedTier: TierConfig;
   private cacheExpiry: Date;
@@ -24,18 +25,24 @@ export class LicenseManager {
   private customerName: string | null = null;
   private customerEmail: string | null = null;
   private licenseId: string | null = null;  // License ID for /status lookups
-  private subscriptionId: string | null = null;  // From JWT `sid` claim — Dodo subscription identifier (subscriptions only)
+  private subscriptionId: string | null = null;  // From JWT `sid` claim - Dodo subscription identifier (subscriptions only)
   private customerId: string | null = null;  // Dodo persistent customer identifier (from /status sync)
-  private licenseKey: string | null = null;  // Raw JWT token — exposed read-only via getLicenseInfo for user copy/backup
+  private licenseKey: string | null = null;  // Raw JWT token - exposed read-only via getLicenseInfo for user copy/backup
   private nextBillingDate: Date | null = null;  // Next payment date (subscriptions)
   private discountCode: string | null = null;  // Applied promo code
   private discountCyclesRemaining: number | null = null;  // Remaining discounted renewals
-  private periodInterval: string | null = null;  // From JWT period_interval claim — billing cadence display ("Day"|"Week"|"Month"|"Year")
-  private periodCount: number | null = null;     // From JWT period_count claim — e.g. 1, 7
+  private periodInterval: string | null = null;  // From JWT period_interval claim - billing cadence display ("Day"|"Week"|"Month"|"Year")
+  private periodCount: number | null = null;     // From JWT period_count claim - e.g. 1, 7
   private lastSyncAt: Date | null = null;  // Last successful sync with license server
   private readonly CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
+  // Autonomous background sync loop (self-rescheduling; see startAutoSync)
+  private autoSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private autoSyncInProgress = false;        // guards against overlapping ticks
+  private autoSyncStopped = true;            // false only while the loop is running
+  private readonly AUTO_SYNC_IDLE_INTERVAL_MS = 6 * 60 * 60 * 1000; // re-check cadence when no paid token / expiry unknown
 
   constructor() {
+    super();
     this.validator = new LicenseValidator();
     this.cachedTier = TIERS.free;
     this.cacheExpiry = new Date(0); // Expired by default
@@ -50,7 +57,7 @@ export class LicenseManager {
 
   /**
    * Whether we have a stored token from a paid (non-lifetime) purchase.
-   * Drives sync eligibility independently of the current cached tier — so
+   * Drives sync eligibility independently of the current cached tier - so
    * a token that expired past grace can still recover via /status.
    */
   private hasPaidTokenOnFile(): boolean {
@@ -103,7 +110,7 @@ export class LicenseManager {
     }
 
     try {
-      // Save to database — reset last_sync_at so the fresh license starts
+      // Save to database - reset last_sync_at so the fresh license starts
       // with a clean sync history (prevents stale cooldown from prior token).
       await this.getPool().query(`
         INSERT INTO license_config (id, license_key, updated_at, last_sync_at)
@@ -114,6 +121,13 @@ export class LicenseManager {
       // Cache locally
       await this.cacheResult(key, result);
       this.lastSyncAt = null;
+
+      // Re-pace the background loop to the new token's expiry (no-op if not started)
+      this.scheduleNextAutoSync();
+
+      // Notify connected clients to refresh (covers manual activation AND the
+      // autonomous replacement path, which routes through here).
+      this.emit('licenseUpdated');
 
       return { success: true, tier: result.tier };
     } catch (error) {
@@ -148,6 +162,11 @@ export class LicenseManager {
       this.periodCount = null;
       this.lastSyncAt = null;
       this.cacheExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+      // Loop idles now that no paid token is on file (no-op if not started)
+      this.scheduleNextAutoSync();
+
+      this.emit('licenseUpdated');
 
       log.info('License removed, reverted to free tier', 'LicenseManager');
       return { success: true };
@@ -245,6 +264,7 @@ export class LicenseManager {
     apiAccess: string;
     showBranding: boolean;
     expiresAt: string | null;
+    graceExpiresAt: string | null;  // expiresAt + offline grace; UI derives the Grace badge/countdown from this
     activatedAt: string | null;
     nextBillingDate: string | null;
     discountCode: string | null;
@@ -273,6 +293,11 @@ export class LicenseManager {
       apiAccess: tier.apiAccess,
       showBranding: tier.showBranding,
       expiresAt: this.licenseExpiresAt ? this.licenseExpiresAt.toISOString() : null,
+      // Grace end = token exp + offline grace. Only meaningful for paid,
+      // non-lifetime tokens with a known expiry; null otherwise (lifetime/free).
+      graceExpiresAt: (this.licenseExpiresAt && this.licenseBilling && this.licenseBilling !== 'lifetime')
+        ? new Date(this.licenseExpiresAt.getTime() + GRACE_PERIOD_SECONDS * 1000).toISOString()
+        : null,
       activatedAt: this.licenseActivatedAt ? this.licenseActivatedAt.toISOString() : null,
       nextBillingDate: this.nextBillingDate ? this.nextBillingDate.toISOString() : null,
       discountCode: this.discountCode,
@@ -298,7 +323,7 @@ export class LicenseManager {
     error?: string;
   }> {
     // Skip sync for lifetime licenses or when no paid token is on file.
-    // Note: do NOT gate on cachedTier — a hard-expired paid token still
+    // Note: do NOT gate on cachedTier - a hard-expired paid token still
     // qualifies for sync so we can recover the renewed license from /status.
     if (!this.hasPaidTokenOnFile()) {
       return { success: true, changed: false };
@@ -352,7 +377,7 @@ export class LicenseManager {
 
       // Same-lid token refresh: D1 holds a fresher JWT for our existing license
       // (e.g. after a Dodo subscription.renewed UPDATEd the row in place, or
-      // after /renew). Identity-preserving — same lid, possibly new tier/billing
+      // after /renew). Identity-preserving - same lid, possibly new tier/billing
       // from a plan change. Worker enforces the lineage rules; trust the field.
       if (status.replacementToken) {
         log.info('Token replacement detected (same-lid refresh)', 'LicenseManager');
@@ -384,6 +409,8 @@ export class LicenseManager {
         this.licenseExpiresAt = serverExpiry;
         this.cacheExpiry = new Date(Date.now() + this.CACHE_DURATION_MS);
         log.info(`Expiry updated via sync: ${serverExpiry.toISOString()}`, 'LicenseManager');
+        // Renewal picked up without a token swap; tell clients to refresh.
+        this.emit('licenseUpdated');
       }
 
       // Update other fields
@@ -496,7 +523,7 @@ export class LicenseManager {
         };
       }
 
-      log.info('Renewal succeeded — applying new token', 'LicenseManager');
+      log.info('Renewal succeeded - applying new token', 'LicenseManager');
       const applyResult = await this.setLicenseKey(result.newToken);
       if (!applyResult.success) {
         return {
@@ -529,60 +556,114 @@ export class LicenseManager {
   }
 
   /**
-   * Check if auto-sync is needed based on time-to-expiry
-   * Progressive frequency: closer to expiry = more frequent syncs
+   * Progressive sync cadence. Returns the minimum spacing (ms) between license-
+   * server syncs for a given time-to-expiry: relaxed when far out, tightening as
+   * expiry nears so a renewal token is picked up promptly.
    *
    * Schedule:
-   * - 7+ days out: every 24 hours
-   * - 3-7 days out: every 24 hours
-   * - 2-3 days out: every 12 hours
-   * - 1-2 days out: every 6 hours
-   * - 12h-1 day out: every 1 hour
-   * - < 12 hours out: every 15 minutes
+   * - 3+ days out:     every 24 hours
+   * - 2-3 days out:    every 12 hours
+   * - 1-2 days out:    every 6 hours
+   * - 12h-1 day out:   every 1 hour
+   * - < 12 hours out:  every 15 minutes
+   *
+   * A negative timeToExpiry (already expired, in or past grace) falls into the
+   * tightest (< 12h) bucket so we recover as fast as possible. Single source of
+   * truth for both the lazy on-access path (checkAutoSync) and the autonomous
+   * background loop (scheduleNextAutoSync / autoSyncTick).
    */
-  private async checkAutoSync(): Promise<void> {
-    // Same gate as syncWithLicenseServer — paid (non-lifetime) token must
-    // be on file. Demoted-to-Free state with a hard-expired token still
-    // passes, allowing recovery via /status.
-    if (!this.hasPaidTokenOnFile()) {
-      return;
-    }
-
-    // Need expiry date to compute interval
-    if (!this.licenseExpiresAt) {
-      return;
-    }
-
-    const now = Date.now();
-    const expiryTime = this.licenseExpiresAt.getTime();
-    const timeToExpiry = expiryTime - now;
-    const lastSync = this.lastSyncAt?.getTime() || 0;
-    const timeSinceLastSync = now - lastSync;
-
-    // Calculate required sync interval based on time-to-expiry
-    let requiredInterval: number | null = null;
-
+  private computeSyncInterval(timeToExpiry: number): number {
     const HOUR = 60 * 60 * 1000;
     const DAY = 24 * HOUR;
+    if (timeToExpiry <= 12 * HOUR) return 15 * 60 * 1000; // 15 minutes
+    if (timeToExpiry <= 1 * DAY) return 1 * HOUR;          // 1 hour
+    if (timeToExpiry <= 2 * DAY) return 6 * HOUR;          // 6 hours
+    if (timeToExpiry <= 3 * DAY) return 12 * HOUR;         // 12 hours
+    return 24 * HOUR;                                      // 3+ days out: once per day
+  }
 
-    if (timeToExpiry <= 12 * HOUR) {
-      requiredInterval = 15 * 60 * 1000; // 15 minutes
-    } else if (timeToExpiry <= 1 * DAY) {
-      requiredInterval = 1 * HOUR; // 1 hour
-    } else if (timeToExpiry <= 2 * DAY) {
-      requiredInterval = 6 * HOUR; // 6 hours
-    } else if (timeToExpiry <= 3 * DAY) {
-      requiredInterval = 12 * HOUR; // 12 hours
-    } else if (timeToExpiry <= 7 * DAY) {
-      requiredInterval = 24 * HOUR; // 24 hours
-    } else {
-      requiredInterval = 24 * HOUR; // 7+ days: sync once per day
-    }
+  /**
+   * Sync if the progressive interval has elapsed since the last sync. Invoked
+   * from getLicenseInfo() (lazy, on-access) and from the background loop.
+   */
+  private async checkAutoSync(): Promise<void> {
+    // Paid (non-lifetime) token must be on file. A demoted-to-Free state with a
+    // hard-expired token still passes, allowing recovery via /status.
+    if (!this.hasPaidTokenOnFile()) return;
+    if (!this.licenseExpiresAt) return; // need expiry to compute interval
 
-    // Sync if interval exceeded
-    if (requiredInterval && timeSinceLastSync >= requiredInterval) {
+    const now = Date.now();
+    const timeToExpiry = this.licenseExpiresAt.getTime() - now;
+    const timeSinceLastSync = now - (this.lastSyncAt?.getTime() || 0);
+    const requiredInterval = this.computeSyncInterval(timeToExpiry);
+
+    if (timeSinceLastSync >= requiredInterval) {
+      const HOUR = 60 * 60 * 1000;
       log.info(`Auto-sync triggered (${Math.round(timeToExpiry / HOUR)}h to expiry, ${Math.round(timeSinceLastSync / 60000)}min since last sync)`, 'LicenseManager');
       await this.syncWithLicenseServer();
+    }
+  }
+
+  /**
+   * Start the autonomous background sync loop. Self-rescheduling: each tick
+   * sleeps exactly the progressive interval for the current time-to-expiry, so a
+   * healthy license is checked ~once/day and only ramps to every 15 min in the
+   * final 12h before expiry. This is what lets a renewed token in D1 be picked
+   * up with no open browser, no manual Refresh, and no container restart.
+   * Idempotent - safe to call once at startup.
+   */
+  startAutoSync(): void {
+    if (!this.autoSyncStopped) return; // already running
+    this.autoSyncStopped = false;
+    this.scheduleNextAutoSync();
+    log.info('License auto-sync loop started', 'LicenseManager');
+  }
+
+  /** Stop the background sync loop (graceful shutdown). */
+  stopAutoSync(): void {
+    this.autoSyncStopped = true;
+    if (this.autoSyncTimer) {
+      clearTimeout(this.autoSyncTimer);
+      this.autoSyncTimer = null;
+    }
+  }
+
+  /**
+   * Arm the timer for the next sync. Delay = progressive interval when a paid
+   * token with a known expiry is on file; otherwise a relaxed idle re-check so a
+   * later activation is still picked up. No fixed-interval polling.
+   */
+  private scheduleNextAutoSync(): void {
+    if (this.autoSyncStopped) return;
+    if (this.autoSyncTimer) {
+      clearTimeout(this.autoSyncTimer);
+      this.autoSyncTimer = null;
+    }
+
+    const delay = (this.hasPaidTokenOnFile() && this.licenseExpiresAt)
+      ? this.computeSyncInterval(this.licenseExpiresAt.getTime() - Date.now())
+      : this.AUTO_SYNC_IDLE_INTERVAL_MS;
+
+    this.autoSyncTimer = setTimeout(() => { void this.autoSyncTick(); }, delay);
+    // Never keep the event loop alive solely for this background timer.
+    this.autoSyncTimer.unref?.();
+  }
+
+  /** One background sync attempt (guarded against overlap), then reschedule. */
+  private async autoSyncTick(): Promise<void> {
+    this.autoSyncTimer = null;
+    if (this.autoSyncInProgress) {
+      this.scheduleNextAutoSync();
+      return;
+    }
+    this.autoSyncInProgress = true;
+    try {
+      await this.checkAutoSync();
+    } catch (error) {
+      log.error('Auto-sync tick failed', 'LicenseManager', error);
+    } finally {
+      this.autoSyncInProgress = false;
+      this.scheduleNextAutoSync();
     }
   }
 

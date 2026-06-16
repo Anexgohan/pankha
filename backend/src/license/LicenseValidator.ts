@@ -17,19 +17,27 @@
 
 import * as crypto from 'crypto';
 
+/**
+ * Offline grace window applied after a token's `exp`: the license stays valid
+ * (tier enforced) for this long past expiry so transient renewal-sync failures
+ * don't lock out a paying customer. Single source of truth, consumed by
+ * validate() and surfaced to the UI as a grace-end timestamp via LicenseManager.
+ */
+export const GRACE_PERIOD_SECONDS = 3 * 24 * 60 * 60; // 3 days
+
 export interface ValidationResult {
   valid: boolean;
   tier: string;
   billing?: 'monthly' | 'yearly' | 'lifetime';
   licenseId?: string;
-  subscriptionId?: string;    // From JWT `sid` claim — Dodo subscription identifier; absent for lifetime/one-time
+  subscriptionId?: string;    // From JWT `sid` claim - Dodo subscription identifier; absent for lifetime/one-time
   expiresAt: Date | null;
   isGracePeriod: boolean;      // New field: true if currently in 3-day buffer
   activatedAt: Date | null;  // When license was issued
   customerName?: string;
   customerEmail?: string;
-  periodInterval?: string;   // From JWT period_interval claim — "Day" | "Week" | "Month" | "Year"; absent for lifetime/legacy tokens
-  periodCount?: number;      // From JWT period_count claim — e.g. 1, 7
+  periodInterval?: string;   // From JWT period_interval claim - "Day" | "Week" | "Month" | "Year"; absent for lifetime/legacy tokens
+  periodCount?: number;      // From JWT period_count claim - e.g. 1, 7
   error?: string;
 }
 
@@ -41,7 +49,7 @@ interface LicensePayload {
   name?: string;   // Customer name
   oid?: string;    // Order ID
   sid?: string;    // Dodo subscription ID (subscription products only)
-  period_interval?: string;  // "Day"|"Week"|"Month"|"Year" — Dodo payment_frequency_interval; absent for lifetime/pre-2026-05-11 tokens
+  period_interval?: string;  // "Day"|"Week"|"Month"|"Year" - Dodo payment_frequency_interval; absent for lifetime/pre-2026-05-11 tokens
   period_count?: number;     // Dodo payment_frequency_count
 
   // Core fields (both v1 and v2)
@@ -196,7 +204,6 @@ export class LicenseValidator {
       const payload: LicensePayload = JSON.parse(payloadJson);
 
       // Check expiration with 3-day grace period for offline users
-      const GRACE_PERIOD_SECONDS = 3 * 24 * 60 * 60; // 3 days
       const now = Math.floor(Date.now() / 1000);
       const isLifetime = payload.exp === 0;
       const isHardExpired = !isLifetime && !!payload.exp && (payload.exp + GRACE_PERIOD_SECONDS) < now;

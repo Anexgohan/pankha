@@ -37,6 +37,20 @@ export function subscribeToSystemDelta(
   };
 }
 
+// Module-level pub/sub for the backend's `licenseUpdated` push, so the
+// LicenseProvider (outside this hook) can refresh without owning a socket.
+type LicenseUpdatedListener = () => void;
+const licenseUpdatedListeners = new Set<LicenseUpdatedListener>();
+
+export function subscribeToLicenseUpdated(
+  listener: LicenseUpdatedListener
+): () => void {
+  licenseUpdatedListeners.add(listener);
+  return () => {
+    licenseUpdatedListeners.delete(listener);
+  };
+}
+
 interface UseWebSocketDataReturn {
   systems: SystemData[];
   isConnected: boolean;
@@ -469,6 +483,9 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     wsRef.current.on("agentConfigUpdated", (data: unknown) =>
       handleAgentConfigUpdated(data as { agentId: string; config: any })
     );
+    wsRef.current.on("licenseUpdated", () => {
+      for (const listener of licenseUpdatedListeners) listener();
+    });
 
     // Connect
     wsRef.current
