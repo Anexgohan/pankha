@@ -229,6 +229,13 @@ export class WebSocketHub extends EventEmitter {
         "commands:all",
       ]);
     });
+
+    // License changed (autonomous renewal pickup, manual activate/remove): tell
+    // clients to refetch /api/license so an always-open screen updates without a
+    // reload. Same push channel the dashboard already uses for live data.
+    licenseManager.on("licenseUpdated", () => {
+      this.broadcast("licenseUpdated", {}, ["systems:all"]);
+    });
   }
 
   /**

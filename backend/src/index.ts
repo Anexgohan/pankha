@@ -115,6 +115,10 @@ async function initializeServices() {
     // Initialize license manager
     await licenseManager.initialize();
 
+    // Start the autonomous license sync loop so renewed tokens in D1 are pulled
+    // without an open browser, a manual Refresh, or a container restart.
+    licenseManager.startAutoSync();
+
     // Initialize WebSocket server (attached to HTTP server at /websocket)
     // server instance will be provided in startServer()
 
@@ -300,6 +304,7 @@ process.on('SIGINT', async () => {
     try {
       services.fanProfileController.stop(); // Stop fan controller first
       services.downsamplingService.stop(); // Stop downsampling scheduler
+      licenseManager.stopAutoSync(); // Stop background license sync loop
       services.commandDispatcher.cleanup();
       services.dataAggregator.cleanup();
       services.agentManager.cleanup();
