@@ -44,7 +44,7 @@ export class Database {
       max: 50,                        // Scale up to 50 under load
       idleTimeoutMillis: 30000,       // Drop idle connections after 30s
       connectionTimeoutMillis: 5000,  // Wait 5s before timeout (prevents pool exhaustion under burst)
-      // P3: abort any single query still running after 15s so a runaway/locked
+      // Abort any single query still running after 15s so a runaway or locked
       // query can't pin a pooled connection and starve the control loop. Well
       // above every control-loop/API query (all sub-second). Long maintenance
       // queries (schema migration, downsampling, retention cleanup) opt out
@@ -71,7 +71,7 @@ export class Database {
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
     try {
-      // P3: run the schema (CREATE TABLE IF NOT EXISTS + migrations) with the
+      // Run the schema (CREATE TABLE IF NOT EXISTS + migrations) with the
       // pool-wide statement_timeout disabled for this transaction only - a
       // migration/ALTER on a large existing DB can legitimately exceed 15s.
       // SET LOCAL reverts when the transaction ends. The schema is

@@ -173,9 +173,9 @@ export class DownsamplingService extends EventEmitter {
       // - Newer than 30 days (Tier 3 will handle those)
       // - Not already downsampled (we use a simple heuristic: if there's
       //   already a row at the 5-min boundary, skip)
-      // P3: exempt this maintenance txn from the pool-wide statement_timeout -
-      // the GROUP BY aggregation + bulk DELETE over the history table can run
-      // long at scale. SET LOCAL reverts when the txn ends, so the pooled
+      // Exempt this maintenance txn from the pool-wide statement_timeout - the
+      // GROUP BY aggregation + bulk DELETE over the history table can run long
+      // at scale. SET LOCAL reverts when the txn ends, so the pooled
       // connection's normal timeout is intact afterward.
       await client.query("SET LOCAL statement_timeout = 0");
       const result = await client.query(`
@@ -240,7 +240,7 @@ export class DownsamplingService extends EventEmitter {
 
     try {
       await client.query("BEGIN");
-      // P3: exempt this maintenance txn from the pool-wide statement_timeout
+      // Exempt this maintenance txn from the pool-wide statement_timeout
       // (see downsampleTier2). SET LOCAL reverts when the txn ends.
       await client.query("SET LOCAL statement_timeout = 0");
 
@@ -298,7 +298,7 @@ export class DownsamplingService extends EventEmitter {
    * Retention days come from license tier (SST)
    */
   private async cleanupExpiredData(retentionDays: number): Promise<number> {
-    // P3: run the retention DELETE in its own txn with the pool-wide
+    // Run the retention DELETE in its own txn with the pool-wide
     // statement_timeout disabled - on a large history table this can run long.
     // A bare pool.query() can't scope SET LOCAL, so we take a client. SET LOCAL
     // reverts when the txn ends, leaving the pooled connection's timeout intact.

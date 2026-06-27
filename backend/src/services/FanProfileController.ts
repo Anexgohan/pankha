@@ -48,7 +48,7 @@ export class FanProfileController {
   private updateInterval: number = 2000; // Default 2 seconds
   private isRunning: boolean = false;
   private intervalTimer: NodeJS.Timeout | null = null;
-  private loopRunning: boolean = false; // P1: overlap guard for controlLoop()
+  private loopRunning: boolean = false; // prevents overlapping controlLoop() ticks
   private consecutiveErrors: number = 0;
   private maxConsecutiveErrors: number = 5;
 
@@ -363,9 +363,9 @@ export class FanProfileController {
    * Main control loop - runs every updateInterval milliseconds
    */
   private async controlLoop(): Promise<void> {
-    // P1: overlap guard - never start a new tick while the previous one is
-    // still running. Stops control loops stacking (and saturating the DB pool
-    // and the single event loop) once a tick exceeds the interval under load.
+    // Never start a new tick while the previous one is still running - once a
+    // tick exceeds the interval under load, overlapping loops would stack and
+    // saturate the DB pool and the single event loop.
     if (this.loopRunning) {
       log.trace('control loop still running, skipping tick', 'FanProfileController');
       return;
@@ -380,9 +380,9 @@ export class FanProfileController {
         return;
       }
 
-      // P2: batch-fetch curve points for every assigned profile in ONE query
-      // instead of one query per assignment (was an N+1: ~one query per fan
-      // each tick). Rebuilt fresh every tick, so there is no cache to invalidate.
+      // Fetch curve points for every assigned profile in one query rather than
+      // one query per assignment (the old N+1: ~one query per fan each tick).
+      // Rebuilt fresh every tick, so there is no cache to invalidate.
       const profileIds = [...new Set(assignments.map(a => a.profile_id))];
       const curvesByProfile = new Map<number, CurvePoint[]>();
       try {
@@ -556,7 +556,7 @@ export class FanProfileController {
         this.stop();
       }
     } finally {
-      // P1: always release the guard, even on throw, so a failed tick can never
+      // Always release the guard, even on throw, so a failed tick can never
       // freeze fan control permanently.
       this.loopRunning = false;
     }
