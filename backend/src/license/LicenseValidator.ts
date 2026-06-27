@@ -16,6 +16,7 @@
  */
 
 import * as crypto from 'crypto';
+import { log } from '../utils/logger';
 
 /**
  * Offline grace window applied after a token's `exp`: the license stays valid
@@ -132,7 +133,7 @@ export class LicenseValidator {
    * Algorithm: ES256 (ECDSA P-256 + SHA-256)
    */
   async validate(licenseToken: string): Promise<ValidationResult> {
-    console.log(`[LicenseValidator] Validating license token...`);
+    log.debug('Validating license token', 'LicenseValidator');
 
     // ================================================================
     // OPTION C HYBRID: Uncomment to try API first, then fall back to JWT
@@ -148,7 +149,7 @@ export class LicenseValidator {
     try {
       // Check if public key is configured
       if (this.publicKey.includes('PLACEHOLDER')) {
-        console.warn('[LicenseValidator] Public key not configured yet');
+        log.warn('Public key not configured yet', 'LicenseValidator');
         return {
           valid: false,
           tier: 'free',
@@ -247,7 +248,7 @@ export class LicenseValidator {
       const expiresAt = isLifetime ? null : (payload.exp ? new Date(payload.exp * 1000) : null);
       const licenseId = payload.lid || payload.sub;
       
-      console.log(`[LicenseValidator] License valid: ${payload.tier} tier (${billing}), expires ${isLifetime ? 'LIFETIME' : expiresAt?.toISOString()}`);
+      log.info(`License valid: ${payload.tier} tier (${billing}), expires ${isLifetime ? 'LIFETIME' : expiresAt?.toISOString()}`, 'LicenseValidator');
       
       return {
         valid: true,
@@ -264,7 +265,7 @@ export class LicenseValidator {
         periodCount: payload.period_count,
       };
     } catch (error) {
-      console.error('[LicenseValidator] Validation error:', error);
+      log.error('Validation error', 'LicenseValidator', error);
       return {
         valid: false,
         tier: 'free',

@@ -6,6 +6,7 @@ import { log } from '../utils/logger';
 export class Database {
   private pool: Pool;
   private static instance: Database;
+  private poolMonitorInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
     // Priority: Construct URL from individual env vars with URL-encoding (supports special chars)
@@ -44,6 +45,12 @@ export class Database {
       max: 50,                        // Scale up to 50 under load
       idleTimeoutMillis: 30000,       // Drop idle connections after 30s
       connectionTimeoutMillis: 5000,  // Wait 5s before timeout (prevents pool exhaustion under burst)
+      // Abort any single query still running after 15s so a runaway or locked
+      // query can't pin a pooled connection and starve the control loop. Well
+      // above every control-loop/API query (all sub-second). Long maintenance
+      // queries (schema migration, downsampling, retention cleanup) opt out
+      // per-transaction via `SET LOCAL statement_timeout = 0`.
+      statement_timeout: 15000,
     });
 
     this.pool.on('error', (err) => {
@@ -51,6 +58,29 @@ export class Database {
     });
 
     log.info('Connected to PostgreSQL database', 'Database');
+
+    this.startPoolMonitor();
+  }
+
+  /**
+   * Periodically report connection-pool pressure. Warns only when requests are
+   * queued waiting for a free connection (waitingCount > 0) - the early sign of
+   * pool saturation, exactly the contention that stalls the control loop. Emits
+   * a quiet heartbeat at debug otherwise. The timer is unref'd so it never holds
+   * the process open during shutdown.
+   */
+  private startPoolMonitor(): void {
+    this.poolMonitorInterval = setInterval(() => {
+      const total = this.pool.totalCount;
+      const idle = this.pool.idleCount;
+      const waiting = this.pool.waitingCount;
+      if (waiting > 0) {
+        log.warn('PostgreSQL pool saturated: requests waiting for a connection', 'Database', { total, idle, waiting });
+      } else {
+        log.debug('PostgreSQL pool stats', 'Database', { total, idle, waiting });
+      }
+    }, 30000);
+    this.poolMonitorInterval.unref();
   }
 
   public static getInstance(): Database {
@@ -65,7 +95,24 @@ export class Database {
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
     try {
-      await this.pool.query(schema);
+      // Run the schema (CREATE TABLE IF NOT EXISTS + migrations) with the
+      // pool-wide statement_timeout disabled for this transaction only - a
+      // migration/ALTER on a large existing DB can legitimately exceed 15s.
+      // SET LOCAL reverts when the transaction ends. The schema is
+      // transaction-safe (no CONCURRENTLY/VACUUM) and previously ran as one
+      // implicit transaction, so atomicity is unchanged.
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL statement_timeout = 0');
+        await client.query(schema);
+        await client.query('COMMIT');
+      } catch (schemaError) {
+        await client.query('ROLLBACK');
+        throw schemaError;
+      } finally {
+        client.release();
+      }
       log.info('Database schema initialized successfully', 'Database');
 
       // Load default profiles on first run
@@ -206,6 +253,10 @@ export class Database {
 
   // Close the pool
   public async close(): Promise<void> {
+    if (this.poolMonitorInterval) {
+      clearInterval(this.poolMonitorInterval);
+      this.poolMonitorInterval = null;
+    }
     try {
       await this.pool.end();
       log.info('Database connection pool closed', 'Database');

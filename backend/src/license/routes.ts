@@ -15,6 +15,7 @@ import { Router, Request, Response } from 'express';
 import { licenseManager } from './LicenseManager';
 import { TIERS } from './tiers';
 import { LICENSE_API_URL } from './license-config';
+import { log } from '../utils/logger';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get('/', async (req: Request, res: Response) => {
     const licenseInfo = await licenseManager.getLicenseInfo();
     res.json(licenseInfo);
   } catch (error) {
-    console.error('[License API] Error getting license info:', error);
+    log.error('Error getting license info', 'License API', error);
     res.status(500).json({ error: 'Failed to get license info' });
   }
 });
@@ -76,7 +77,7 @@ router.get('/pricing', async (req: Request, res: Response) => {
     };
     res.json(pricing);
   } catch (error) {
-    console.error('[License API] Error getting pricing:', error);
+    log.error('Error getting pricing', 'License API', error);
     res.status(500).json({ error: 'Failed to get pricing info' });
   }
 });
@@ -113,7 +114,7 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
   } catch (error) {
-    console.error('[License API] Error setting license:', error);
+    log.error('Error setting license', 'License API', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to validate license' 
@@ -141,7 +142,7 @@ router.post('/sync', async (req: Request, res: Response) => {
       res.json(result);
     }
   } catch (error) {
-    console.error('[License API] Sync error:', error);
+    log.error('Sync error', 'License API', error);
     res.status(500).json({
       success: false,
       error: 'Sync failed'
@@ -171,7 +172,7 @@ router.post('/renew', async (req: Request, res: Response) => {
       res.status(status).json(result);
     }
   } catch (error) {
-    console.error('[License API] Renew error:', error);
+    log.error('Renew error', 'License API', error);
     res.status(500).json({
       success: false,
       error: 'Renew failed',
@@ -197,7 +198,7 @@ router.get('/promo', async (req: Request, res: Response) => {
     const data = await r.json();
     res.json(data);
   } catch (error) {
-    console.error('[License API] Promo proxy error:', error);
+    log.error('Promo proxy error', 'License API', error);
     res.json({ offers: [], fetchedAt: null });
   }
 });
@@ -233,7 +234,7 @@ router.post('/checkout', async (req: Request, res: Response) => {
     const data = await r.json();
     res.status(r.status).json(data);
   } catch (error) {
-    console.error('[License API] Checkout proxy error:', error);
+    log.error('Checkout proxy error', 'License API', error);
     res.status(502).json({
       ok: false,
       error: 'dodo_error',
@@ -263,7 +264,7 @@ router.delete('/', async (req: Request, res: Response) => {
       });
     }
   } catch (error) {
-    console.error('[License API] Error removing license:', error);
+    log.error('Error removing license', 'License API', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to remove license' 

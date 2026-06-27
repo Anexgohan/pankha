@@ -6,6 +6,7 @@ import { AgentManager } from "./AgentManager";
 import { CommandDispatcher } from "./CommandDispatcher";
 import { AgentCommunication } from "./AgentCommunication";
 import { DeltaComputer } from "./DeltaComputer";
+import Database from "../database/database";
 import type { AggregatedSystemData } from "../types/aggregatedData";
 import { licenseManager } from "../license";
 import { log } from "../utils/logger";
@@ -49,6 +50,11 @@ export class WebSocketHub extends EventEmitter {
   private static instance: WebSocketHub;
   private wss: WebSocketServer | null = null;
   private clients: Map<string, ClientConnection> = new Map();
+  // Reverse lookup of subscription -> subscribed clientIds, so broadcast() can
+  // reach a channel's subscribers without scanning every connection. Mirrors
+  // the per-client `subscriptions` Sets; keep them in sync only through
+  // add/removeClientSubscription and removeClientFromIndex.
+  private subscriptionIndex: Map<string, Set<string>> = new Map();
   private dataAggregator: DataAggregator;
   private agentManager: AgentManager;
   private commandDispatcher: CommandDispatcher;
@@ -340,7 +346,6 @@ export class WebSocketHub extends EventEmitter {
         } else {
           this.agentManager.markAgentOffline(agentId);
 
-          const Database = (await import("../database/database")).default;
           const db = Database.getInstance();
           const presenceHeartbeatSeconds = Math.max(
             5,
@@ -387,6 +392,7 @@ export class WebSocketHub extends EventEmitter {
         log.info(` Frontend client disconnected: ${clientId}`, "WebSocketHub");
       }
 
+      this.removeClientFromIndex(client); // before removing the client itself
       this.clients.delete(clientId);
       this.emit("clientDisconnected", { clientId, client });
     }
@@ -561,7 +567,7 @@ export class WebSocketHub extends EventEmitter {
     if (!client) return;
 
     for (const subscription of subscriptions) {
-      client.subscriptions.add(subscription);
+      this.addClientSubscription(client, subscription);
     }
 
     log.info(
@@ -641,7 +647,6 @@ export class WebSocketHub extends EventEmitter {
         );
 
         // Load saved configuration from database
-        const Database = (await import("../database/database")).default;
         const db = Database.getInstance();
         const system = await db.get(
           "SELECT config_data FROM systems WHERE agent_id = $1",
@@ -847,7 +852,7 @@ export class WebSocketHub extends EventEmitter {
     if (!client) return;
 
     for (const subscription of subscriptions) {
-      client.subscriptions.delete(subscription);
+      this.removeClientSubscription(client, subscription);
     }
 
     log.info(
@@ -1043,8 +1048,49 @@ export class WebSocketHub extends EventEmitter {
     }
   }
 
+  // The only places a client's subscriptions are mutated. Each updates the
+  // per-client Set and `subscriptionIndex` together so they stay consistent;
+  // route any new (un)subscribe path through these rather than touching
+  // `client.subscriptions` directly.
+
+  /** Add one subscription for a client, mirroring it into the index. */
+  private addClientSubscription(client: ClientConnection, subscription: string): void {
+    client.subscriptions.add(subscription);
+    let ids = this.subscriptionIndex.get(subscription);
+    if (!ids) {
+      ids = new Set();
+      this.subscriptionIndex.set(subscription, ids);
+    }
+    ids.add(client.id);
+  }
+
+  /** Remove one subscription for a client, mirroring it into the index. */
+  private removeClientSubscription(client: ClientConnection, subscription: string): void {
+    client.subscriptions.delete(subscription);
+    const ids = this.subscriptionIndex.get(subscription);
+    if (ids) {
+      ids.delete(client.id);
+      if (ids.size === 0) this.subscriptionIndex.delete(subscription); // drop empty channels (dynamic system:<id> ones accumulate otherwise)
+    }
+  }
+
+  /** Remove a client from every subscription set it belonged to (on disconnect). */
+  private removeClientFromIndex(client: ClientConnection): void {
+    for (const subscription of client.subscriptions) {
+      const ids = this.subscriptionIndex.get(subscription);
+      if (ids) {
+        ids.delete(client.id);
+        if (ids.size === 0) this.subscriptionIndex.delete(subscription);
+      }
+    }
+  }
+
   /**
-   * Broadcast message to all subscribed clients
+   * Broadcast a message to every client subscribed to any of the given
+   * channels. Recipient ids are resolved through `subscriptionIndex` and
+   * unioned into a Set, so a client subscribed to several of the target
+   * channels still receives a single copy. Each recipient is re-checked for an
+   * open socket, so a stale index entry is harmless.
    */
   private broadcast(type: string, data: any, subscriptions: string[]): void {
     const message = {
@@ -1056,27 +1102,30 @@ export class WebSocketHub extends EventEmitter {
     const messageStr = JSON.stringify(message);
     let sentCount = 0;
 
-    for (const [clientId, client] of this.clients.entries()) {
-      if (client.websocket.readyState !== WebSocket.OPEN) {
+    // Union the clientIds across all target subscriptions (dedup => one send each).
+    const recipientIds = new Set<string>();
+    for (const subscription of subscriptions) {
+      const ids = this.subscriptionIndex.get(subscription);
+      if (ids) {
+        for (const id of ids) recipientIds.add(id);
+      }
+    }
+
+    for (const clientId of recipientIds) {
+      const client = this.clients.get(clientId);
+      // Skip vanished or closing connections (stale index entries are harmless).
+      if (!client || client.websocket.readyState !== WebSocket.OPEN) {
         continue;
       }
-
-      // Check if client is subscribed to any of the relevant subscriptions
-      const isSubscribed = subscriptions.some((sub) =>
-        client.subscriptions.has(sub)
-      );
-
-      if (isSubscribed) {
-        try {
-          client.websocket.send(messageStr);
-          sentCount++;
-        } catch (error) {
-          log.error(
-            `Error broadcasting to client ${clientId}`,
-            "WebSocketHub",
-            error
-          );
-        }
+      try {
+        client.websocket.send(messageStr);
+        sentCount++;
+      } catch (error) {
+        log.error(
+          `Error broadcasting to client ${clientId}`,
+          "WebSocketHub",
+          error
+        );
       }
     }
 
@@ -1352,6 +1401,7 @@ export class WebSocketHub extends EventEmitter {
     }
 
     this.clients.clear();
+    this.subscriptionIndex.clear();
 
     if (this.wss) {
       this.wss.close();

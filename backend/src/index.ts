@@ -37,6 +37,29 @@ const app = express();
 // 3. 3143 (default fallback / brand port)
 const PORT = process.env.PORT || process.env.PANKHA_PORT || 3143;
 
+// Periodic heap-usage check. Warns only when heapUsed exceeds the threshold
+// (default 1024MB, tunable via MEMORY_WARN_THRESHOLD_MB) - high enough to stay
+// silent in normal operation, so a warning signals an abnormal climb (leak).
+// Emits a quiet heartbeat at debug otherwise. Unref'd so it never holds the
+// process open during shutdown.
+let memoryMonitorInterval: NodeJS.Timeout | null = null;
+
+function startMemoryMonitor(): void {
+  const thresholdMb = parseInt(process.env.MEMORY_WARN_THRESHOLD_MB || '1024', 10) || 1024;
+  memoryMonitorInterval = setInterval(() => {
+    const mem = process.memoryUsage();
+    const heapUsedMb = Math.round(mem.heapUsed / 1048576);
+    const heapTotalMb = Math.round(mem.heapTotal / 1048576);
+    const rssMb = Math.round(mem.rss / 1048576);
+    if (heapUsedMb > thresholdMb) {
+      log.warn('High heap usage (possible memory leak)', 'index', { heapUsedMb, heapTotalMb, rssMb, thresholdMb });
+    } else {
+      log.debug('Memory usage', 'index', { heapUsedMb, heapTotalMb, rssMb });
+    }
+  }, 60000);
+  memoryMonitorInterval.unref();
+}
+
 function parseCompressionThresholdBytes(value: string | undefined): number {
   if (!value) return 1024;
   const parsed = parseInt(value.trim(), 10);
@@ -296,9 +319,17 @@ app.post('/api/emergency-stop', async (req, res) => {
   }
 });
 
-// Graceful shutdown handler
-process.on('SIGINT', async () => {
-  log.info(' Shutting down Pankha backend...', 'index');
+// Graceful shutdown - shared by SIGINT (Ctrl+C) and SIGTERM (docker stop / systemd).
+let shuttingDown = false;
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (shuttingDown) return; // ignore repeat/secondary signals once shutdown has begun
+  shuttingDown = true;
+  log.info(` Shutting down Pankha backend (${signal})...`, 'index');
+
+  if (memoryMonitorInterval) {
+    clearInterval(memoryMonitorInterval);
+    memoryMonitorInterval = null;
+  }
 
   if (services) {
     try {
@@ -317,7 +348,10 @@ process.on('SIGINT', async () => {
   }
 
   process.exit(0);
-});
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Start server
 async function startServer() {
@@ -341,7 +375,9 @@ async function startServer() {
       log.info(` Health check: http://localhost:${PORT}/health`, 'index');
       log.info(` System overview: http://localhost:${PORT}/api/overview`, 'index');
     });
-    
+
+    startMemoryMonitor();
+
   } catch (error) {
     log.error(' Failed to start server:', 'index', error);
     process.exit(1);

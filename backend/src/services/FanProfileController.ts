@@ -48,6 +48,7 @@ export class FanProfileController {
   private updateInterval: number = 2000; // Default 2 seconds
   private isRunning: boolean = false;
   private intervalTimer: NodeJS.Timeout | null = null;
+  private loopRunning: boolean = false; // prevents overlapping controlLoop() ticks
   private consecutiveErrors: number = 0;
   private maxConsecutiveErrors: number = 5;
 
@@ -230,25 +231,6 @@ export class FanProfileController {
   }
 
   /**
-   * Get fan profile curve points
-   */
-  private async getProfileCurvePoints(profileId: number): Promise<CurvePoint[]> {
-    try {
-      const points = await this.db.all(`
-        SELECT temperature, fan_speed
-        FROM fan_curve_points
-        WHERE profile_id = $1
-        ORDER BY point_order ASC
-      `, [profileId]);
-
-      return points;
-    } catch (error) {
-      log.error(`Error fetching curve points for profile ${profileId}`, 'FanProfileController', error);
-      return [];
-    }
-  }
-
-  /**
    * Send fan speed command to agent
    */
   private async sendFanSpeedCommand(
@@ -381,6 +363,14 @@ export class FanProfileController {
    * Main control loop - runs every updateInterval milliseconds
    */
   private async controlLoop(): Promise<void> {
+    // Never start a new tick while the previous one is still running - once a
+    // tick exceeds the interval under load, overlapping loops would stack and
+    // saturate the DB pool and the single event loop.
+    if (this.loopRunning) {
+      log.trace('Control loop still running, skipping tick', 'FanProfileController');
+      return;
+    }
+    this.loopRunning = true;
     try {
       // Get all active fan profile assignments
       const assignments = await this.getActiveFanAssignments();
@@ -388,6 +378,35 @@ export class FanProfileController {
       if (assignments.length === 0) {
         // No active assignments, nothing to do
         return;
+      }
+
+      // Fetch curve points for every assigned profile in one query rather than
+      // one query per assignment (the old N+1: ~one query per fan each tick).
+      // Rebuilt fresh every tick, so there is no cache to invalidate.
+      const profileIds = [...new Set(assignments.map(a => a.profile_id))];
+      const curvesByProfile = new Map<number, CurvePoint[]>();
+      try {
+        const rows = await this.db.all(`
+          SELECT profile_id, temperature, fan_speed
+          FROM fan_curve_points
+          WHERE profile_id = ANY($1)
+          ORDER BY point_order ASC
+        `, [profileIds]);
+        for (const row of rows) {
+          let points = curvesByProfile.get(row.profile_id);
+          if (!points) {
+            points = [];
+            curvesByProfile.set(row.profile_id, points);
+          }
+          points.push({ temperature: row.temperature, fan_speed: row.fan_speed });
+        }
+      } catch (error) {
+        // On failure leave the map empty: each assignment then hits the existing
+        // "no curve points -> skip with warning" path and fans hold their last
+        // speed, self-healing next tick. Deliberately NOT falling back to
+        // per-assignment queries - that would refire the N+1 into an
+        // already-stressed pool.
+        log.error('Error batch-fetching curve points', 'FanProfileController', error);
       }
 
       // Zone deduplication: when multiple fans share a zone_id, only process once per zone.
@@ -450,8 +469,8 @@ export class FanProfileController {
           }
           this.sensorAvailabilityState.set(stateKey, true);
 
-          // Get fan profile curve points
-          const curvePoints = await this.getProfileCurvePoints(assignment.profile_id);
+          // Get fan profile curve points (from the per-tick batch fetched above)
+          const curvePoints = curvesByProfile.get(assignment.profile_id) ?? [];
 
           if (curvePoints.length === 0) {
             log.warn(
@@ -536,6 +555,10 @@ export class FanProfileController {
         );
         this.stop();
       }
+    } finally {
+      // Always release the guard, even on throw, so a failed tick can never
+      // freeze fan control permanently.
+      this.loopRunning = false;
     }
   }
 
