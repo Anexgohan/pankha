@@ -8,3 +8,5 @@ pub mod sensors;
 pub mod fans;
 #[cfg(target_os = "linux")]
 pub mod diagnostics;
+#[cfg(target_os = "linux")]
+pub(crate) mod nvidia;

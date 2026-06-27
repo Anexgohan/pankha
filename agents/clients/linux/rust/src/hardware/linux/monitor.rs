@@ -12,6 +12,7 @@ use tracing::{debug, error, warn};
 use crate::config::types::HardwareSettings;
 use crate::hardware::types::*;
 use crate::hardware::HardwareMonitor;
+use super::nvidia::NvmlSource;
 
 #[cfg(target_os = "linux")]
 pub(crate) struct FanInfo {
@@ -52,6 +53,8 @@ pub struct LinuxHardwareMonitor {
     pub(crate) cpu_brand: String,
     pub(crate) motherboard_name: String,
     pub(crate) storage_cache: Arc<RwLock<HashMap<String, String>>>,
+    /// Optional NVIDIA GPU source (NVML). `None` on non-NVIDIA hosts.
+    pub(crate) nvml: Option<NvmlSource>,
 }
 
 #[cfg(target_os = "linux")]
@@ -97,6 +100,7 @@ impl LinuxHardwareMonitor {
             cpu_brand,
             motherboard_name: String::new(),
             storage_cache: Arc::new(RwLock::new(HashMap::new())),
+            nvml: NvmlSource::try_init(),
         };
 
         // Initialize other static hardware names
@@ -268,7 +272,7 @@ impl HardwareMonitor for LinuxHardwareMonitor {
         let cached_count = *self.cached_hwmon_count.read().await;
         let cache_empty = self.discovered_sensors.read().await.is_empty();
 
-        let sensors = if current_hwmon_count != cached_count || cache_empty {
+        let mut sensors = if current_hwmon_count != cached_count || cache_empty {
             // Hardware changed or cache empty - full rediscovery
             debug!("Sensor discovery triggered: hwmon_count {} -> {} (cache_empty: {})",
                    cached_count, current_hwmon_count, cache_empty);
@@ -307,12 +311,24 @@ impl HardwareMonitor for LinuxHardwareMonitor {
             self.read_sensors_from_cache().await?
         };
 
+        // Append NVIDIA GPU temperature sensor(s) via NVML. Read fresh each cycle - never
+        // inserted into the hwmon path-cache, which reuses `source` as the sysfs file path.
+        if let Some(nvml) = &self.nvml {
+            sensors.extend(nvml.discover_sensors());
+        }
+
         Ok(sensors)
     }
 
     async fn discover_fans(&self) -> Result<Vec<Fan>> {
         // Always perform fresh fan discovery (no caching)
-        let fans = self.discover_hwmon_fans().await?;
+        let mut fans = self.discover_hwmon_fans().await?;
+
+        // Append NVIDIA GPU fan(s) via NVML (sysfs exposes no writable pwm for them).
+        if let Some(nvml) = &self.nvml {
+            fans.extend(nvml.discover_fans());
+        }
+
         Ok(fans)
     }
 
@@ -347,6 +363,14 @@ impl HardwareMonitor for LinuxHardwareMonitor {
     }
 
     async fn set_fan_speed(&self, fan_id: &str, speed: u8) -> Result<()> {
+        // Route NVIDIA GPU fans to NVML (sysfs exposes no writable pwm for them).
+        if NvmlSource::owns_fan(fan_id) {
+            return match &self.nvml {
+                Some(nvml) => nvml.set_fan_speed(fan_id, speed),
+                None => anyhow::bail!("GPU fan {} requested but NVML is unavailable", fan_id),
+            };
+        }
+
         let speed = speed.min(100);
         let pwm_value = (speed as f32 / 100.0 * 255.0) as u8;
 
@@ -412,16 +436,28 @@ impl HardwareMonitor for LinuxHardwareMonitor {
     }
 
     async fn emergency_stop(&self) -> Result<()> {
-        let fan_map = self.discovered_fans.read().await;
+        // Use the full fan list (sysfs + NVML GPU) so emergency covers the GPU too;
+        // set_fan_speed routes each id to the correct backend.
+        let fans = self.discover_fans().await?;
 
-        for (fan_id, _) in fan_map.iter() {
-            if let Err(e) = self.set_fan_speed(fan_id, 100).await {
-                error!("Failed to set fan {} to 100%: {}", fan_id, e);
+        for fan in &fans {
+            if let Err(e) = self.set_fan_speed(&fan.id, 100).await {
+                error!("Failed to set fan {} to 100%: {}", fan.id, e);
             }
         }
 
         warn!("EMERGENCY STOP: All fans set to 100%");
         Ok(())
+    }
+
+    async fn restore_fan_to_auto(&self, fan_id: &str) -> Result<bool> {
+        if NvmlSource::owns_fan(fan_id) {
+            if let Some(nvml) = &self.nvml {
+                nvml.restore_to_auto(fan_id)?;
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     async fn invalidate_cache(&self) {
