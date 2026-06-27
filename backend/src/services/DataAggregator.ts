@@ -361,7 +361,9 @@ export class DataAggregator extends EventEmitter {
    */
   private async bufferDataPoints(
     systemId: number,
-    data: AgentDataPacket
+    data: AgentDataPacket,
+    sensorIdByName?: Map<string, number>,
+    fanIdByName?: Map<string, number>
   ): Promise<void> {
     const timestamp = new Date(data.timestamp);
 
@@ -376,43 +378,50 @@ export class DataAggregator extends EventEmitter {
 
     const buffer = this.dataBuffer.get(systemId)!;
 
-    // Buffer sensor data points
+    // Buffer sensor data points. Reuse the DB id resolved during enrichment when
+    // the caller supplies it; only query for ids not supplied (e.g. a sensor
+    // seen for the first time this push, created just above by ensureSensorsExist,
+    // or any caller that passes no map - same query path as before).
     for (const sensor of data.sensors) {
-      const sensorRecord = await this.db.get(
-        "SELECT id FROM sensors WHERE system_id = $1 AND sensor_name = $2",
-        [systemId, sensor.id]
-      );
-
-      if (sensorRecord) {
-        if (!buffer.sensors.has(sensorRecord.id)) {
-          buffer.sensors.set(sensorRecord.id, []);
-        }
-
-        buffer.sensors.get(sensorRecord.id)!.push({
-          temperature: sensor.temperature,
-          timestamp: timestamp,
-        });
+      let sensorId = sensorIdByName?.get(sensor.id);
+      if (sensorId === undefined) {
+        const sensorRecord = await this.db.get(
+          "SELECT id FROM sensors WHERE system_id = $1 AND sensor_name = $2",
+          [systemId, sensor.id]
+        );
+        if (!sensorRecord) continue;
+        sensorId = sensorRecord.id as number;
       }
+
+      if (!buffer.sensors.has(sensorId)) {
+        buffer.sensors.set(sensorId, []);
+      }
+      buffer.sensors.get(sensorId)!.push({
+        temperature: sensor.temperature,
+        timestamp: timestamp,
+      });
     }
 
-    // Buffer fan data points
+    // Buffer fan data points (same id-reuse-with-query-fallback strategy).
     for (const fan of data.fans) {
-      const fanRecord = await this.db.get(
-        "SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2",
-        [systemId, fan.id]
-      );
-
-      if (fanRecord) {
-        if (!buffer.fans.has(fanRecord.id)) {
-          buffer.fans.set(fanRecord.id, []);
-        }
-
-        buffer.fans.get(fanRecord.id)!.push({
-          speed: fan.speed,
-          rpm: fan.rpm,
-          timestamp: timestamp,
-        });
+      let fanId = fanIdByName?.get(fan.id);
+      if (fanId === undefined) {
+        const fanRecord = await this.db.get(
+          "SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2",
+          [systemId, fan.id]
+        );
+        if (!fanRecord) continue;
+        fanId = fanRecord.id as number;
       }
+
+      if (!buffer.fans.has(fanId)) {
+        buffer.fans.set(fanId, []);
+      }
+      buffer.fans.get(fanId)!.push({
+        speed: fan.speed,
+        rpm: fan.rpm,
+        timestamp: timestamp,
+      });
     }
   }
 
@@ -821,6 +830,21 @@ export class DataAggregator extends EventEmitter {
       // Enrich with database information (adds dbId, isHidden flag to sensors)
       await this.enrichAggregatedData(aggregatedData);
 
+      // Reuse the sensor/fan DB ids enrichment just resolved so bufferDataPoints
+      // does not re-query for the same ids. Sensors/fans appearing for the first
+      // time this push are absent here (enrichment runs before ensureSensorsExist)
+      // and fall back to a query inside bufferDataPoints. Ids are stable within a
+      // push (ensure*Exist only upserts, never deletes), so a reused id cannot go
+      // stale mid-cycle.
+      const sensorIdByName = new Map<string, number>();
+      for (const s of aggregatedData.sensors) {
+        if (s.dbId !== undefined) sensorIdByName.set(s.id, s.dbId);
+      }
+      const fanIdByName = new Map<string, number>();
+      for (const f of aggregatedData.fans) {
+        if (f.dbId !== undefined) fanIdByName.set(f.id, f.dbId);
+      }
+
       this.aggregatedData.set(agentId, aggregatedData);
       log.debug(`Updated aggregated data`, "DataAggregator", {
         agentId,
@@ -835,7 +859,7 @@ export class DataAggregator extends EventEmitter {
         await this.ensureFansExist(system.id, dataPacket.fans);
 
         // Buffer data points for aggregation (raw data still sent to dashboard)
-        await this.bufferDataPoints(system.id, dataPacket);
+        await this.bufferDataPoints(system.id, dataPacket, sensorIdByName, fanIdByName);
 
         // Update current sensor readings
         await this.updateSensorReadings(system.id, dataPacket.sensors);
