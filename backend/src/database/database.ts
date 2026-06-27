@@ -44,6 +44,12 @@ export class Database {
       max: 50,                        // Scale up to 50 under load
       idleTimeoutMillis: 30000,       // Drop idle connections after 30s
       connectionTimeoutMillis: 5000,  // Wait 5s before timeout (prevents pool exhaustion under burst)
+      // P3: abort any single query still running after 15s so a runaway/locked
+      // query can't pin a pooled connection and starve the control loop. Well
+      // above every control-loop/API query (all sub-second). Long maintenance
+      // queries (schema migration, downsampling, retention cleanup) opt out
+      // per-transaction via `SET LOCAL statement_timeout = 0`.
+      statement_timeout: 15000,
     });
 
     this.pool.on('error', (err) => {
@@ -65,7 +71,24 @@ export class Database {
     const schema = fs.readFileSync(schemaPath, 'utf8');
 
     try {
-      await this.pool.query(schema);
+      // P3: run the schema (CREATE TABLE IF NOT EXISTS + migrations) with the
+      // pool-wide statement_timeout disabled for this transaction only - a
+      // migration/ALTER on a large existing DB can legitimately exceed 15s.
+      // SET LOCAL reverts when the transaction ends. The schema is
+      // transaction-safe (no CONCURRENTLY/VACUUM) and previously ran as one
+      // implicit transaction, so atomicity is unchanged.
+      const client = await this.pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query('SET LOCAL statement_timeout = 0');
+        await client.query(schema);
+        await client.query('COMMIT');
+      } catch (schemaError) {
+        await client.query('ROLLBACK');
+        throw schemaError;
+      } finally {
+        client.release();
+      }
       log.info('Database schema initialized successfully', 'Database');
 
       // Load default profiles on first run

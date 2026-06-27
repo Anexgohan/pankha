@@ -173,6 +173,11 @@ export class DownsamplingService extends EventEmitter {
       // - Newer than 30 days (Tier 3 will handle those)
       // - Not already downsampled (we use a simple heuristic: if there's
       //   already a row at the 5-min boundary, skip)
+      // P3: exempt this maintenance txn from the pool-wide statement_timeout -
+      // the GROUP BY aggregation + bulk DELETE over the history table can run
+      // long at scale. SET LOCAL reverts when the txn ends, so the pooled
+      // connection's normal timeout is intact afterward.
+      await client.query("SET LOCAL statement_timeout = 0");
       const result = await client.query(`
         WITH time_buckets AS (
           SELECT 
@@ -232,10 +237,13 @@ export class DownsamplingService extends EventEmitter {
    */
   private async downsampleTier3(): Promise<{ processed: number; created: number }> {
     const client = await this.pool.connect();
-    
+
     try {
       await client.query("BEGIN");
-      
+      // P3: exempt this maintenance txn from the pool-wide statement_timeout
+      // (see downsampleTier2). SET LOCAL reverts when the txn ends.
+      await client.query("SET LOCAL statement_timeout = 0");
+
       const result = await client.query(`
         WITH time_buckets AS (
           SELECT 
@@ -290,11 +298,25 @@ export class DownsamplingService extends EventEmitter {
    * Retention days come from license tier (SST)
    */
   private async cleanupExpiredData(retentionDays: number): Promise<number> {
-    const result = await this.pool.query(`
-      DELETE FROM monitoring_data
-      WHERE "timestamp" < NOW() - INTERVAL '${retentionDays} days'
-    `);
-    
-    return result.rowCount || 0;
+    // P3: run the retention DELETE in its own txn with the pool-wide
+    // statement_timeout disabled - on a large history table this can run long.
+    // A bare pool.query() can't scope SET LOCAL, so we take a client. SET LOCAL
+    // reverts when the txn ends, leaving the pooled connection's timeout intact.
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL statement_timeout = 0");
+      const result = await client.query(`
+        DELETE FROM monitoring_data
+        WHERE "timestamp" < NOW() - INTERVAL '${retentionDays} days'
+      `);
+      await client.query("COMMIT");
+      return result.rowCount || 0;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 }
