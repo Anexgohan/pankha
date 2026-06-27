@@ -319,9 +319,12 @@ app.post('/api/emergency-stop', async (req, res) => {
   }
 });
 
-// Graceful shutdown handler
-process.on('SIGINT', async () => {
-  log.info(' Shutting down Pankha backend...', 'index');
+// Graceful shutdown - shared by SIGINT (Ctrl+C) and SIGTERM (docker stop / systemd).
+let shuttingDown = false;
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (shuttingDown) return; // ignore repeat/secondary signals once shutdown has begun
+  shuttingDown = true;
+  log.info(` Shutting down Pankha backend (${signal})...`, 'index');
 
   if (memoryMonitorInterval) {
     clearInterval(memoryMonitorInterval);
@@ -345,7 +348,10 @@ process.on('SIGINT', async () => {
   }
 
   process.exit(0);
-});
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 // Start server
 async function startServer() {
