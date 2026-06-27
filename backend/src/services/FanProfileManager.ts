@@ -1,4 +1,6 @@
 import { EventEmitter } from 'events';
+import * as fs from 'fs';
+import * as path from 'path';
 import Database from '../database/database';
 import { log } from '../utils/logger';
 import {
@@ -523,9 +525,6 @@ export class FanProfileManager extends EventEmitter {
     exists_in_db: boolean;
   }>> {
     try {
-      const fs = await import('fs');
-      const path = await import('path');
-      
       // Path to defaults file (in backend/src/config, copied to backend/config in Docker)
       const defaultsPath = path.resolve(__dirname, '../config/fan-profiles-defaults.json');
       
@@ -567,9 +566,6 @@ export class FanProfileManager extends EventEmitter {
     resolve_conflicts: 'skip' | 'rename' | 'overwrite';
   }): Promise<ImportResult> {
     try {
-      const fs = await import('fs');
-      const path = await import('path');
-      
       // Path to defaults file (in backend/src/config, copied to backend/config in Docker)
       const defaultsPath = path.resolve(__dirname, '../config/fan-profiles-defaults.json');
       

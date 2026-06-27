@@ -6,6 +6,7 @@ import { log } from '../utils/logger';
 export class Database {
   private pool: Pool;
   private static instance: Database;
+  private poolMonitorInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
     // Priority: Construct URL from individual env vars with URL-encoding (supports special chars)
@@ -57,6 +58,29 @@ export class Database {
     });
 
     log.info('Connected to PostgreSQL database', 'Database');
+
+    this.startPoolMonitor();
+  }
+
+  /**
+   * Periodically report connection-pool pressure. Warns only when requests are
+   * queued waiting for a free connection (waitingCount > 0) - the early sign of
+   * pool saturation, exactly the contention that stalls the control loop. Emits
+   * a quiet heartbeat at debug otherwise. The timer is unref'd so it never holds
+   * the process open during shutdown.
+   */
+  private startPoolMonitor(): void {
+    this.poolMonitorInterval = setInterval(() => {
+      const total = this.pool.totalCount;
+      const idle = this.pool.idleCount;
+      const waiting = this.pool.waitingCount;
+      if (waiting > 0) {
+        log.warn('PostgreSQL pool saturated: requests waiting for a connection', 'Database', { total, idle, waiting });
+      } else {
+        log.debug('PostgreSQL pool stats', 'Database', { total, idle, waiting });
+      }
+    }, 30000);
+    this.poolMonitorInterval.unref();
   }
 
   public static getInstance(): Database {
@@ -229,6 +253,10 @@ export class Database {
 
   // Close the pool
   public async close(): Promise<void> {
+    if (this.poolMonitorInterval) {
+      clearInterval(this.poolMonitorInterval);
+      this.poolMonitorInterval = null;
+    }
     try {
       await this.pool.end();
       log.info('Database connection pool closed', 'Database');

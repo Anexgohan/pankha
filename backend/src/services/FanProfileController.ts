@@ -367,7 +367,7 @@ export class FanProfileController {
     // tick exceeds the interval under load, overlapping loops would stack and
     // saturate the DB pool and the single event loop.
     if (this.loopRunning) {
-      log.trace('control loop still running, skipping tick', 'FanProfileController');
+      log.trace('Control loop still running, skipping tick', 'FanProfileController');
       return;
     }
     this.loopRunning = true;

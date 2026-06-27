@@ -6,6 +6,7 @@ import { AgentManager } from "./AgentManager";
 import { CommandDispatcher } from "./CommandDispatcher";
 import { AgentCommunication } from "./AgentCommunication";
 import { DeltaComputer } from "./DeltaComputer";
+import Database from "../database/database";
 import type { AggregatedSystemData } from "../types/aggregatedData";
 import { licenseManager } from "../license";
 import { log } from "../utils/logger";
@@ -345,7 +346,6 @@ export class WebSocketHub extends EventEmitter {
         } else {
           this.agentManager.markAgentOffline(agentId);
 
-          const Database = (await import("../database/database")).default;
           const db = Database.getInstance();
           const presenceHeartbeatSeconds = Math.max(
             5,
@@ -647,7 +647,6 @@ export class WebSocketHub extends EventEmitter {
         );
 
         // Load saved configuration from database
-        const Database = (await import("../database/database")).default;
         const db = Database.getInstance();
         const system = await db.get(
           "SELECT config_data FROM systems WHERE agent_id = $1",
