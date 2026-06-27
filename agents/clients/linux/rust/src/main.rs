@@ -316,6 +316,9 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
+    // Keep a handle to restore GPU fans to driver-auto on shutdown (no-op for sysfs/IPMI).
+    let hw_for_shutdown = Arc::clone(&hardware_monitor);
+
     // Create and run WebSocket client
     let client = WebSocketClient::new(config, hardware_monitor);
     let client = Arc::new(client);
@@ -359,11 +362,34 @@ async fn main() -> Result<()> {
         });
     }
 
-    // Setup signal handler with proper cancellation
+    // Setup signal handler with proper cancellation (SIGINT + SIGTERM).
+    // SIGTERM matters here: `systemctl stop` / `--stop` send it, and without trapping it
+    // the process would exit via the kernel default and leave a manually-controlled GPU
+    // fan pinned. Trapping it lets us restore the GPU to the driver's auto curve below.
     let client_clone = Arc::clone(&client);
     let shutdown_signal = tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.ok();
-        info!("Shutdown signal received (Ctrl+C)");
+        #[cfg(target_os = "linux")]
+        {
+            use tokio::signal::unix::{signal, SignalKind};
+            match signal(SignalKind::terminate()) {
+                Ok(mut sigterm) => {
+                    tokio::select! {
+                        _ = tokio::signal::ctrl_c() => info!("Shutdown signal received (SIGINT)"),
+                        _ = sigterm.recv() => info!("Shutdown signal received (SIGTERM)"),
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to setup SIGTERM handler ({}); SIGINT only", e);
+                    tokio::signal::ctrl_c().await.ok();
+                    info!("Shutdown signal received (SIGINT)");
+                }
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            tokio::signal::ctrl_c().await.ok();
+            info!("Shutdown signal received (Ctrl+C)");
+        }
         client_clone.stop().await;
     });
 
@@ -377,6 +403,19 @@ async fn main() -> Result<()> {
         _ = shutdown_signal => {
             info!("Shutdown signal handled");
         }
+    }
+
+    // On shutdown, hand any agent-controlled GPU fan back to the driver's auto curve.
+    // No-op for sysfs/IPMI fans; only NVML-owned GPU fans respond (Ok(true)).
+    match hw_for_shutdown.discover_fans().await {
+        Ok(fans) => {
+            for fan in &fans {
+                if let Err(e) = hw_for_shutdown.restore_fan_to_auto(&fan.id).await {
+                    warn!("Failed to restore fan {} to auto on shutdown: {}", fan.id, e);
+                }
+            }
+        }
+        Err(e) => warn!("Could not enumerate fans for shutdown restore: {}", e),
     }
 
     // Clean up PID file after shutdown

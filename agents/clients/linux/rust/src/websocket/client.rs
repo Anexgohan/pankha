@@ -70,10 +70,21 @@ impl WebSocketClient {
     /// Exit failsafe mode - backend connection restored
     async fn exit_failsafe_mode(&self) {
         let mut failsafe = self.failsafe_active.write().await;
-        if *failsafe {
-            *failsafe = false;
-            info!("✅ EXITING FAILSAFE MODE - Backend connection restored");
-            info!("Backend will resume fan control");
+        if !*failsafe {
+            return;
+        }
+        *failsafe = false;
+        drop(failsafe);
+        info!("✅ EXITING FAILSAFE MODE - Backend connection restored");
+        info!("Backend will resume fan control");
+
+        // Hand any GPU fan back to the driver's auto curve so an unassigned GPU isn't left
+        // pinned (e.g. at 100% after a failsafe emergency). The backend re-commands it
+        // within a cycle if a profile is assigned. No-op for sysfs/IPMI fans.
+        if let Ok(fans) = self.hardware_monitor.discover_fans().await {
+            for fan in &fans {
+                let _ = self.hardware_monitor.restore_fan_to_auto(&fan.id).await;
+            }
         }
     }
 
@@ -84,6 +95,22 @@ impl WebSocketClient {
         let mut fail_count = 0;
 
         for fan in fans.iter() {
+            // Hybrid failsafe: GPU / driver-auto-capable fans are handed back to their own
+            // driver curve (more trustworthy than a fixed %); all other fans get the
+            // configured failsafe speed. Mirrors the Windows agent's EnterFailsafeMode.
+            match self.hardware_monitor.restore_fan_to_auto(&fan.id).await {
+                Ok(true) => {
+                    debug!("Fan {} handed back to driver auto (failsafe)", fan.id);
+                    success_count += 1;
+                    continue;
+                }
+                Ok(false) => {}
+                Err(e) => warn!(
+                    "restore_fan_to_auto({}) failed: {} - falling back to failsafe speed",
+                    fan.id, e
+                ),
+            }
+
             match self.hardware_monitor.set_fan_speed(&fan.id, speed).await {
                 Ok(_) => {
                     debug!("Set fan {} to {}%", fan.id, speed);

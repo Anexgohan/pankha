@@ -30,6 +30,15 @@ pub trait HardwareMonitor: Send + Sync {
     /// Emergency stop - set all fans to maximum
     async fn emergency_stop(&self) -> Result<()>;
 
+    /// Hand a fan back to hardware/driver automatic control.
+    ///
+    /// Returns `Ok(true)` if this backend owns the fan and restored it (e.g. an NVIDIA
+    /// GPU fan via NVML), `Ok(false)` if the fan is not auto-restorable here (sysfs/IPMI)
+    /// so the caller should apply `failsafe_speed` instead. Default: not owned.
+    async fn restore_fan_to_auto(&self, _fan_id: &str) -> Result<bool> {
+        Ok(false)
+    }
+
     /// Invalidate hardware cache (call on startup/reconnection to force rediscovery)
     async fn invalidate_cache(&self);
 
