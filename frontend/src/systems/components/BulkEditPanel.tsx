@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import type { FanReading, SensorReading } from '../../types/api';
 import type { FanProfile } from '../../services/fanProfilesApi';
+import { useContextualPanel } from '../hooks/useContextualPanel';
 import { sortSensorGroupIds, deriveSensorGroupId } from '../../utils/sensorUtils';
 import { formatTemperature } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
@@ -59,9 +60,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   const [bulkSensorId, setBulkSensorId] = useState<string>('');
   const [bulkProfileId, setBulkProfileId] = useState<number | undefined>(undefined);
   const [loading, setLoading] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [panelStyles, setPanelStyles] = useState<React.CSSProperties>({});
-  const panelRef = useRef<HTMLDivElement>(null);
+  const { isMobile, panelStyles, panelRef, contextual } = useContextualPanel(isOpen, anchorRect, onClose);
 
   // Zone detection - same pattern as SystemCard L1346
   const hasZones = fans.some(f => f.zone);
@@ -78,63 +77,6 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
     return groups;
   }, [fans, hasZones]);
 
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Calculate position contextually
-  useLayoutEffect(() => {
-    if (!isOpen || isMobile || !anchorRect || !panelRef.current) {
-      setPanelStyles({});
-      return;
-    }
-
-    const panelWidth = panelRef.current.offsetWidth;
-    const gap = 12;
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    // Default: Align to right side of card
-    let left = anchorRect.right + gap;
-
-    // If overflows right, try placing it to the left of the card
-    if (left + panelWidth > viewportWidth - 10) {
-      left = anchorRect.left - panelWidth - gap;
-
-      // Safety: If it overflows left now, clamp to edge
-      if (left < 10) {
-        left = 10;
-      }
-    }
-
-    // Vertical positioning: Align tops, then clamp to viewport
-    const panelHeight = panelRef.current.offsetHeight;
-    let top = anchorRect.top;
-
-    // Ensure the whole panel is visible vertically
-    if (top + panelHeight > viewportHeight - 10) {
-      top = viewportHeight - panelHeight - 10;
-    }
-
-    // Never go above safety margin
-    if (top < 10) top = 10;
-
-    setPanelStyles({
-      position: 'fixed',
-      top: `${top}px`,
-      left: `${left}px`,
-      margin: 0,
-      transform: 'none'
-      // Width is handled by CSS to allow fit-content to work correctly
-    });
-  }, [isOpen, isMobile, anchorRect]);
-
   // Reset state when panel closes
   useEffect(() => {
     if (!isOpen) {
@@ -144,17 +86,6 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
       setBulkProfileId(undefined);
     }
   }, [isOpen]);
-
-  // Handle ESC key to close
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
 
   // --- OS Agent handlers (per-fan) ---
 
@@ -432,7 +363,7 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   const selectionUnit = hasZones ? 'zone' : 'fan';
 
   return createPortal(
-    <div className={`bulk-edit-modal-root ${anchorRect && !isMobile ? 'contextual' : ''}`}>
+    <div className={`bulk-edit-modal-root ${contextual ? 'contextual' : ''}`}>
       <div className="bulk-edit-backdrop" onClick={onClose} />
       <div className="bulk-edit-modal-container" onClick={(e) => e.stopPropagation()} style={panelStyles}>
         <div ref={panelRef} className={`bulk-edit-panel ${isMobile ? 'mobile' : 'desktop'}`}>

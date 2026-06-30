@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SensorReading, HistoryDataPoint, VirtualSensor } from '../../types/api';
 import { getVirtualSensors } from '../../services/virtualSensorsApi';
-import { computeAggregate } from '../../utils/sensorUtils';
+import { computeAggregate, deriveChipName } from '../../utils/sensorUtils';
+import { getSensorDisplayName } from '../../utils/displayNames';
 
-// User-facing operation word used in the row subtitle ("max of ...", "middle of ...").
+// User-facing operation word used in the row subtitle / tooltip ("Average of ...").
 const OP_WORD: Record<VirtualSensor['operation'], string> = {
-  max: 'max',
-  avg: 'avg',
-  median: 'middle',
+  max: 'Max',
+  avg: 'Average',
+  median: 'Middle',
 };
 
 // Tier-0 live buffer window (matches the dashboard's live sensor buffer).
@@ -16,7 +17,8 @@ const BUFFER_MS = 15 * 60 * 1000;
 export interface VirtualSensorRow {
   def: VirtualSensor;          // raw definition (id, name, operation, members)
   reading: SensorReading;      // synthetic row for <SensorItem>
-  subtitle: string;            // e.g. "max of Tctl, nvme_sensor_5"
+  subtitle: string;            // concise, e.g. "Average of 8 sensors"
+  tooltip: string;             // full hover text, members grouped by chip per line
   history: HistoryDataPoint[]; // client-side Tier-0 buffer (no DB history in v1)
 }
 
@@ -54,16 +56,16 @@ export function useVirtualSensors(
   // Recompute synthetic readings and append to the Tier-0 buffer whenever the
   // member temperatures or the definitions change.
   useEffect(() => {
-    const tempByDbId = new Map<number, number>();
+    const readingByDbId = new Map<number, SensorReading>();
     for (const s of currentTemperatures ?? []) {
-      if (s.dbId != null) tempByDbId.set(s.dbId, s.temperature);
+      if (s.dbId != null) readingByDbId.set(s.dbId, s);
     }
     const nowIso = new Date().toISOString();
     const cutoff = Date.now() - BUFFER_MS;
 
     const next: VirtualSensorRow[] = defs.map((def) => {
       const memberTemps = def.members
-        .map((m) => tempByDbId.get(m.sensor_id))
+        .map((m) => readingByDbId.get(m.sensor_id)?.temperature)
         .filter((t): t is number => t != null);
       const value = computeAggregate(def.operation, memberTemps);
 
@@ -84,10 +86,24 @@ export function useVirtualSensors(
         memberIds: def.members.map((m) => m.sensor_id),
       };
 
+      const word = OP_WORD[def.operation];
+      // Tooltip: members grouped by chip, one line per group, for readability.
+      const byChip = new Map<string, string[]>();
+      for (const m of def.members) {
+        const r = readingByDbId.get(m.sensor_id);
+        const chip = r ? deriveChipName(r.id) : 'unavailable';
+        const display = r ? getSensorDisplayName(r.id, r.name, r.label) : m.sensor_name;
+        const arr = byChip.get(chip) ?? [];
+        arr.push(display);
+        byChip.set(chip, arr);
+      }
+      const tooltip = `${word} of:\n` + [...byChip.values()].map((names) => names.join(', ')).join('\n');
+
       return {
         def,
         reading,
-        subtitle: `${OP_WORD[def.operation]} of ${def.members.map((m) => m.sensor_name).join(', ')}`,
+        subtitle: `${word} of ${def.members.length} sensor${def.members.length === 1 ? '' : 's'}`,
+        tooltip,
         history: [...buf],
       };
     });

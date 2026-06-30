@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, CheckSquare, Square } from 'lucide-react';
 import type { SensorReading, VirtualSensor } from '../../types/api';
+import { useContextualPanel } from '../hooks/useContextualPanel';
 import { getValues } from '../../utils/uiOptions';
 import {
   groupSensorsByChip,
   sortSensorGroupIds,
   computeAggregate,
+  fuzzyMatch,
   type SensorAggregateOp,
 } from '../../utils/sensorUtils';
 import { getSensorDisplayName } from '../../utils/displayNames';
@@ -27,6 +29,7 @@ interface SensorBuilderModalProps {
   systemId: number;
   sensors: SensorReading[]; // the system's sensors; only real ones can be members
   editing?: VirtualSensor | null; // present => edit mode
+  anchorRect: DOMRect | null; // card rect for contextual side-anchored positioning
   getChipDisplayName: (chipId: string, chipSensors?: SensorReading[]) => string;
   onClose: () => void;
   onSaved: () => void; // parent reloads its virtual sensors
@@ -41,29 +44,28 @@ const SensorBuilderModal: React.FC<SensorBuilderModalProps> = ({
   systemId,
   sensors,
   editing,
+  anchorRect,
   getChipDisplayName,
   onClose,
   onSaved,
 }) => {
   const operationOptions = getValues('virtualSensorOperation') as unknown as OperationOption[];
 
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { isMobile, panelStyles, panelRef, contextual } = useContextualPanel(true, anchorRect, onClose);
   const [name, setName] = useState(editing?.name ?? '');
   const [operation, setOperation] = useState<SensorAggregateOp>(editing?.operation ?? 'max');
   const [selected, setSelected] = useState<Set<number>>(
     new Set((editing?.members ?? []).map((m) => m.sensor_id))
   );
+  const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
 
   // Members are real sensors only (have a DB id); never other virtual sensors.
   const realSensors = sensors.filter((s) => s.dbId != null && !s.isVirtual);
-  const groups = groupSensorsByChip(realSensors);
+  const visibleSensors = realSensors.filter(
+    (s) => fuzzyMatch(search, getSensorDisplayName(s.id, s.name, s.label)) || fuzzyMatch(search, s.id)
+  );
+  const groups = groupSensorsByChip(visibleSensors);
   const groupIds = sortSensorGroupIds(Object.keys(groups));
 
   const toggle = (dbId: number) => {
@@ -71,6 +73,18 @@ const SensorBuilderModal: React.FC<SensorBuilderModalProps> = ({
       const next = new Set(prev);
       if (next.has(dbId)) next.delete(dbId);
       else next.add(dbId);
+      return next;
+    });
+  };
+
+  // Select / deselect every (currently visible) member of a chip group at once.
+  const toggleGroup = (chipId: string) => {
+    const ids = (groups[chipId] ?? []).map((s) => s.dbId).filter((id): id is number => id != null);
+    const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
       return next;
     });
   };
@@ -108,10 +122,15 @@ const SensorBuilderModal: React.FC<SensorBuilderModalProps> = ({
   };
 
   return createPortal(
-    <div className="bulk-edit-modal-root">
+    <div className={`bulk-edit-modal-root ${contextual ? 'contextual' : ''}`}>
       <div className="bulk-edit-backdrop" onClick={onClose} />
-      <div className="bulk-edit-modal-container">
-        <div className={`bulk-edit-panel ${isMobile ? 'mobile' : 'desktop'}`}>
+      <div className="bulk-edit-modal-container" onClick={(e) => e.stopPropagation()} style={panelStyles}>
+        <div ref={panelRef} className={`bulk-edit-panel vs-panel ${isMobile ? 'mobile' : 'desktop'}`}>
+          {isMobile && (
+            <div className="bulk-edit-drag-handle">
+              <div className="drag-indicator" />
+            </div>
+          )}
           <div className="bulk-edit-header">
             <h3>{editing ? 'Edit virtual sensor' : 'New virtual sensor'}</h3>
             <button className="bulk-edit-close" onClick={onClose} aria-label="Close">
@@ -155,9 +174,26 @@ const SensorBuilderModal: React.FC<SensorBuilderModalProps> = ({
               {realSensors.length === 0 ? (
                 <p className="vs-op-desc">No sensors available on this system yet.</p>
               ) : (
-                groupIds.map((chipId) => (
+                <>
+                  <div className="form-group">
+                    <input
+                      type="text"
+                      value={search}
+                      placeholder="Search sensors"
+                      onChange={(e) => setSearch(e.target.value)}
+                    />
+                  </div>
+                  {groupIds.map((chipId) => {
+                    const ids = groups[chipId].map((s) => s.dbId).filter((id): id is number => id != null);
+                    const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));
+                    return (
                   <div key={chipId}>
-                    <div className="vs-group-label">{getChipDisplayName(chipId, groups[chipId])}</div>
+                    <div className="vs-group-label">
+                      <span>{getChipDisplayName(chipId, groups[chipId])}</span>
+                      <button type="button" className="vs-group-select" onClick={() => toggleGroup(chipId)}>
+                        {allSelected ? 'Deselect group' : 'Select group'}
+                      </button>
+                    </div>
                     {groups[chipId].map((s) => {
                       const isSel = s.dbId != null && selected.has(s.dbId);
                       return (
@@ -176,7 +212,9 @@ const SensorBuilderModal: React.FC<SensorBuilderModalProps> = ({
                       );
                     })}
                   </div>
-                ))
+                    );
+                  })}
+                </>
               )}
             </div>
 

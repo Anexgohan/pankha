@@ -21,8 +21,15 @@ export type UpdateVirtualSensorPayload = Partial<{
 
 const BASE = `${API_BASE_URL}/api/virtual-sensors`;
 
-async function parseOrThrow(response: Response, fallback: string): Promise<any> {
-  const body = await response.json().catch(() => ({}));
+interface ApiEnvelope {
+  success?: boolean;
+  error?: string;
+  message?: string;
+  data?: unknown;
+}
+
+async function parseOrThrow(response: Response, fallback: string): Promise<ApiEnvelope> {
+  const body = (await response.json().catch(() => ({}))) as ApiEnvelope;
   if (!response.ok) {
     throw new Error(body.error || body.message || fallback);
   }
@@ -33,7 +40,7 @@ async function parseOrThrow(response: Response, fallback: string): Promise<any> 
 export const getVirtualSensors = async (systemId: number): Promise<VirtualSensor[]> => {
   const response = await fetch(`${BASE}/${systemId}`);
   const body = await parseOrThrow(response, 'Failed to fetch virtual sensors');
-  return body.data || [];
+  return (body.data as VirtualSensor[]) || [];
 };
 
 /** Create a virtual sensor. Returns the new id. */
@@ -44,7 +51,7 @@ export const createVirtualSensor = async (payload: CreateVirtualSensorPayload): 
     body: JSON.stringify(payload),
   });
   const body = await parseOrThrow(response, 'Failed to create virtual sensor');
-  return body.data?.id;
+  return (body.data as { id: number } | undefined)?.id as number;
 };
 
 /** Update a virtual sensor (any subset of name / operation / sensor_ids). */
@@ -61,12 +68,12 @@ export const updateVirtualSensor = async (id: number, payload: UpdateVirtualSens
 export const deleteVirtualSensor = async (id: number): Promise<VirtualSensorUsage[]> => {
   const response = await fetch(`${BASE}/${id}`, { method: 'DELETE' });
   const body = await parseOrThrow(response, 'Failed to delete virtual sensor');
-  return body.data?.unassigned_fans || [];
+  return (body.data as { unassigned_fans?: VirtualSensorUsage[] } | undefined)?.unassigned_fans || [];
 };
 
 /** Fans currently controlled by this virtual sensor (for the delete confirmation). */
 export const getVirtualSensorUsage = async (id: number): Promise<VirtualSensorUsage[]> => {
   const response = await fetch(`${BASE}/${id}/usage`);
   const body = await parseOrThrow(response, 'Failed to fetch usage');
-  return body.data || [];
+  return (body.data as VirtualSensorUsage[]) || [];
 };

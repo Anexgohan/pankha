@@ -61,6 +61,22 @@ export function deriveSensorGroupId(sensor: SensorReading): string {
   return deriveChipName(sensor.id);
 }
 
+/**
+ * Cheap fuzzy match: true if every char of `query` appears in `text` in order
+ * (case-insensitive subsequence). No scoring/deps - good enough for filtering a
+ * short sensor list. Empty query matches everything.
+ */
+export function fuzzyMatch(query: string, text: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const t = text.toLowerCase();
+  let i = 0;
+  for (let j = 0; j < t.length && i < q.length; j++) {
+    if (t[j] === q[i]) i++;
+  }
+  return i === q.length;
+}
+
 export type SensorAggregateOp = 'max' | 'avg' | 'median';
 
 /**
