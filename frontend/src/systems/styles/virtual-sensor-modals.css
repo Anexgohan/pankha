@@ -24,15 +24,22 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin: 12px 0 4px;
+  margin: 12px 0 6px;
+  padding: 5px 8px;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--text-secondary);
+  /* Subtle header band so the chip group stands out above its member rows */
+  background: var(--bg-panels_02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
 }
 
 .vs-group-select {
+  flex-shrink: 0;
+  white-space: nowrap;
   font-size: 0.72rem;
   font-weight: 600;
   text-transform: none;
@@ -45,6 +52,14 @@
   border-radius: var(--radius-sm);
 }
 .vs-group-select:hover { background: var(--bg-hover); }
+
+/* Group name truncates instead of pushing the Select-group button to a 2nd line */
+.vs-group-label > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .vs-member-row {
   display: flex;
@@ -81,6 +96,72 @@
   font-size: 0.8rem;
   color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
+}
+
+/* Group container: one border encompasses the header band + its sensor rows so
+ * each chip reads as a single group. Used in both Builder and Manage modals. */
+.vs-group {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+/* Header becomes the group's flush top band (drop its own box border/radius). */
+.vs-group .vs-group-label {
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid var(--border-color);
+  border-radius: 0;
+}
+
+/* Rows sit flush inside the group (no per-row box). */
+.vs-group .vs-member-row,
+.vs-group .vs-manage-row {
+  margin: 0;
+  border-radius: 0;
+  border-top: 0;
+  border-right: 0;
+}
+/* Manage rows keep a left accent + hairline divider. */
+.vs-group .vs-manage-row {
+  border-left: 4px solid transparent;
+  border-bottom: 1px solid var(--border-color-dimmed);
+}
+.vs-group .vs-manage-row:last-child { border-bottom: 0; }
+/* Builder member rows are borderless; selection shows via bg tint + checkbox. */
+.vs-group .vs-member-row {
+  border-left: 0;
+  border-bottom: 0;
+}
+
+/* Hover/selected give state without sliding the row out of the group border. */
+.vs-group .vs-member-row:hover,
+.vs-group .vs-manage-row:hover {
+  transform: none;
+  background: var(--bg-hover);
+  border-left-color: var(--color-accent-dynamic);
+}
+.vs-group .vs-member-row.selected { border-left-color: var(--color-info); }
+
+/* Divider inside the merged summary section (between Name/Operation and Preview) */
+.vs-summary-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 10px 0;
+}
+
+/* Footer with a left-aligned Delete (edit mode); spacer pushes Cancel/Save right */
+.vs-footer-spacer { flex: 1; }
+
+/* Wrapper around the Save button so its tooltip works while disabled */
+.vs-save-wrap { display: inline-flex; }
+
+/* Align the trash icon + label inside the footer's red Delete button */
+.vs-footer .btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* Live preview line above the footer */
@@ -158,7 +239,4 @@
   transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
 }
 .vs-icon-btn:hover { color: var(--text-primary); background: var(--bg-hover); border-color: var(--border-color); }
-.vs-icon-btn.danger:hover { color: var(--color-critical); border-color: var(--color-critical); }
-
-.vs-delete-fans { margin: 6px 0; padding-left: 18px; }
-.vs-delete-fans li { font-size: 0.85rem; color: var(--text-primary); }
+.vs-icon-btn.danger:hover { color: var(--color-error); border-color: var(--color-error); }

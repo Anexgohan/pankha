@@ -538,7 +538,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
       case "acpi":
         return <Thermometer size={20} />;
       case "virtual":
-        return <img src="/icons/transistor-01.png" width={24} height={24} title="Virtual Sensor" alt="Virtual Sensor" />;
+        return <img src="/icons/motion-sensor-01.png" width={24} height={24} title="Virtual Sensor" alt="Virtual Sensor" />;
       default:
         return <Search size={20} />;
     }

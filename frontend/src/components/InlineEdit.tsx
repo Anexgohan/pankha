@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { SquarePen, Check, X } from "lucide-react";
 import "./InlineEdit.css";
 
 interface InlineEditProps {
@@ -116,16 +117,18 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
             disabled={isSaving}
             className="inline-edit-save"
             title="Save (Enter)"
+            aria-label="Save"
           >
-            ✓
+            <Check size={14} />
           </button>
           <button
             onClick={handleCancel}
             disabled={isSaving}
             className="inline-edit-cancel"
             title="Cancel (Esc)"
+            aria-label="Cancel"
           >
-            ✗
+            <X size={14} />
           </button>
         </div>
         {error && <div className="inline-edit-error">{error}</div>}
@@ -142,7 +145,7 @@ export const InlineEdit: React.FC<InlineEditProps> = ({
     >
       <span className="inline-edit-value">
         {value || placeholder}
-        <span className="inline-edit-icon">✏️</span>
+        <span className="inline-edit-icon"><SquarePen size={12} /></span>
       </span>
       {showHardwareId && <div className="inline-edit-hardware-id">{hardwareId}</div>}
     </div>

@@ -27,7 +27,9 @@
 
 .inline-edit-icon {
   opacity: 0;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-primary);
   transition: opacity 0.2s;
 }
 
@@ -69,6 +71,9 @@
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.2s;
   font-weight: 500;
 }

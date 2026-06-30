@@ -9,11 +9,7 @@ import { groupSensorsByChip, sortSensorGroupIds, fuzzyMatch } from '../../utils/
 import { getSensorDisplayName } from '../../utils/displayNames';
 import { formatTemperature } from '../../utils/formatters';
 import { InlineEdit } from '../../components/InlineEdit';
-import {
-  deleteVirtualSensor,
-  getVirtualSensorUsage,
-  type VirtualSensorUsage,
-} from '../../services/virtualSensorsApi';
+import { deleteVirtualSensor, getVirtualSensorUsage } from '../../services/virtualSensorsApi';
 import { toast } from '../../utils/toast';
 import '../styles/bulk-edit-panel.css';
 import '../styles/virtual-sensor-modals.css';
@@ -52,8 +48,29 @@ const ManageSensorsModal: React.FC<ManageSensorsModalProps> = ({
 }) => {
   const { isMobile, panelStyles, panelRef, contextual } = useContextualPanel(true, anchorRect, onClose);
   const [search, setSearch] = useState('');
-  const [confirm, setConfirm] = useState<{ vs: VirtualSensor; fans: VirtualSensorUsage[] } | null>(null);
-  const [busy, setBusy] = useState(false);
+
+  // Native confirm() like the rest of the app; lists the fans that get unassigned.
+  const handleDeleteVirtual = async (vs: VirtualSensor) => {
+    let usageNote = '';
+    try {
+      const fans = await getVirtualSensorUsage(vs.id);
+      if (fans.length > 0) {
+        usageNote =
+          `\n\nControl sensor for ${fans.length} fan(s):\n` +
+          fans.map((f) => `- ${f.fan} (${f.system})`).join('\n') +
+          `\n\nThey will fall back to no control sensor.`;
+      }
+    } catch { /* best-effort usage info */ }
+
+    if (!confirm(`Delete the "${vs.name}" virtual sensor?${usageNote}\n\nThis action cannot be undone.`)) return;
+    try {
+      await deleteVirtualSensor(vs.id);
+      toast.success(`Deleted "${vs.name}"`);
+      onVirtualDeleted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete virtual sensor');
+    }
+  };
 
   // op value -> clean label (Max / Avg / Middle), sourced from ui-options.
   const opLabel = useMemo(() => {
@@ -71,36 +88,8 @@ const ManageSensorsModal: React.FC<ManageSensorsModalProps> = ({
   const groups = groupSensorsByChip(filtered);
   const groupIds = sortSensorGroupIds(Object.keys(groups));
 
-  const askDelete = async (vs: VirtualSensor) => {
-    setBusy(true);
-    try {
-      const fans = await getVirtualSensorUsage(vs.id);
-      setConfirm({ vs, fans });
-    } catch {
-      setConfirm({ vs, fans: [] });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!confirm || busy) return;
-    setBusy(true);
-    try {
-      await deleteVirtualSensor(confirm.vs.id);
-      toast.success(`Deleted "${confirm.vs.name}"`);
-      setConfirm(null);
-      onVirtualDeleted();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete virtual sensor');
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return createPortal(
-    <>
-      <div className={`bulk-edit-modal-root ${contextual ? 'contextual' : ''}`}>
+    <div className={`bulk-edit-modal-root ${contextual ? 'contextual' : ''}`}>
         <div className="bulk-edit-backdrop" onClick={onClose} />
         <div className="bulk-edit-modal-container" onClick={(e) => e.stopPropagation()} style={panelStyles}>
           <div ref={panelRef} className={`bulk-edit-panel vs-panel ${isMobile ? 'mobile' : 'desktop'}`}>
@@ -130,7 +119,7 @@ const ManageSensorsModal: React.FC<ManageSensorsModalProps> = ({
                 ) : (
                   virtualRows.map(({ def, reading }) => (
                     <div key={def.id} className="vs-manage-row">
-                      <img src="/icons/transistor-01.png" width={20} height={20} alt="Virtual sensor" />
+                      <img src="/icons/motion-sensor-01.png" width={20} height={20} alt="Virtual sensor" />
                       <span className="vs-member-name">{def.name}</span>
                       <span className="vs-op-badge">{opLabel[def.operation] ?? def.operation}</span>
                       <span className="vs-member-temp">
@@ -139,7 +128,7 @@ const ManageSensorsModal: React.FC<ManageSensorsModalProps> = ({
                       <button className="vs-icon-btn" onClick={() => onEditVirtual(def)} aria-label="Edit" title="Edit">
                         <Pencil size={16} />
                       </button>
-                      <button className="vs-icon-btn danger" onClick={() => askDelete(def)} disabled={busy} aria-label="Delete" title="Delete">
+                      <button className="vs-icon-btn danger" onClick={() => handleDeleteVirtual(def)} aria-label="Delete" title="Delete">
                         <Trash2 size={16} />
                       </button>
                     </div>
@@ -159,7 +148,7 @@ const ManageSensorsModal: React.FC<ManageSensorsModalProps> = ({
                   />
                 </div>
                 {groupIds.map((chipId) => (
-                  <div key={chipId}>
+                  <div key={chipId} className="vs-group">
                     <div className="vs-group-label">{getChipDisplayName(chipId, groups[chipId])}</div>
                     {groups[chipId].map((s) => {
                       const hidden = isSensorHidden(s.id);
@@ -197,48 +186,7 @@ const ManageSensorsModal: React.FC<ManageSensorsModalProps> = ({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Delete confirmation */}
-      {confirm && (
-        <div className="bulk-edit-modal-root">
-          <div className="bulk-edit-backdrop" onClick={() => !busy && setConfirm(null)} />
-          <div className="bulk-edit-modal-container">
-            <div className={`bulk-edit-panel vs-panel ${isMobile ? 'mobile' : 'desktop'}`}>
-              <div className="bulk-edit-header">
-                <h3>Delete "{confirm.vs.name}"?</h3>
-                <button className="bulk-edit-close" onClick={() => !busy && setConfirm(null)} aria-label="Close">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="bulk-edit-content">
-                {confirm.fans.length > 0 ? (
-                  <>
-                    <p>This virtual sensor controls {confirm.fans.length} fan(s):</p>
-                    <ul className="vs-delete-fans">
-                      {confirm.fans.map((f, i) => (
-                        <li key={i}>{f.fan} ({f.system})</li>
-                      ))}
-                    </ul>
-                    <p className="vs-op-desc">
-                      Deleting unassigns their control sensor; those fans fall back to no control sensor.
-                    </p>
-                  </>
-                ) : (
-                  <p>This virtual sensor isn't used by any fan.</p>
-                )}
-              </div>
-              <div className="bulk-edit-footer">
-                <button className="btn btn-secondary" onClick={() => setConfirm(null)} disabled={busy}>Cancel</button>
-                <button className="btn btn-primary" onClick={confirmDelete} disabled={busy}>
-                  {busy ? 'Deleting...' : confirm.fans.length > 0 ? 'Delete & unassign' : 'Delete'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>,
+      </div>,
     document.body
   );
 };
