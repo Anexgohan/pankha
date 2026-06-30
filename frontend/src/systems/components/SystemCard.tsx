@@ -49,7 +49,8 @@ import {
   Thermometer,
   ThermometerSun,
   Lock as LockIcon,
-  Search
+  Search,
+  Sigma
 } from 'lucide-react';
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
@@ -515,6 +516,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
         return <img src="/icons/hdd-01.png" width={24} height={24} title="Storage" alt="Storage" />;
       case "acpi":
         return <Thermometer size={20} />;
+      case "virtual":
+        return <Sigma size={20} />;
       default:
         return <Search size={20} />;
     }

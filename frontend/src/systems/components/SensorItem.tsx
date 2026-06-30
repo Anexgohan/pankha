@@ -15,6 +15,8 @@ interface SensorItemProps {
   onLabelSave: (sensorDbId: number, newLabel: string) => Promise<void>;
   getTemperatureClass: (temp: number, maxTemp?: number, critTemp?: number) => string;
   getSensorIcon: (type: string) => React.ReactNode;
+  isVirtual?: boolean; // Synthetic virtual-sensor row (computed client-side)
+  subtitle?: string;   // For virtual rows: text shown in place of "type: id" (e.g. "max of Tctl, nvme_5")
 }
 
 const SensorItem: React.FC<SensorItemProps> = ({
@@ -26,6 +28,8 @@ const SensorItem: React.FC<SensorItemProps> = ({
   onLabelSave,
   getTemperatureClass,
   getSensorIcon,
+  isVirtual = false,
+  subtitle,
 }) => {
   const tempClass = getTemperatureClass(
     sensor.temperature,
@@ -67,6 +71,12 @@ const SensorItem: React.FC<SensorItemProps> = ({
                 value={getSensorDisplayName(sensor.id, sensor.name, sensor.label)}
                 hardwareId={sensor.id}
                 onSave={async (newLabel) => {
+                  if (isVirtual) {
+                    // Virtual rows have no sensors-table dbId; the parent's handler
+                    // routes to the virtual rename endpoint using its own captured id.
+                    await onLabelSave(sensor.dbId ?? 0, newLabel);
+                    return;
+                  }
                   if (!sensor.dbId) {
                     throw new Error("Sensor not registered in database");
                   }
@@ -80,10 +90,16 @@ const SensorItem: React.FC<SensorItemProps> = ({
             {/* Row 2: Type: hardware_id */}
             <div
               className="sensor-type-row"
-              title={`${sensor.type}: ${sensor.id}`}
+              title={isVirtual ? subtitle : `${sensor.type}: ${sensor.id}`}
             >
-              <span className="sensor-type-label">{sensor.type}:</span>
-              <span className="sensor-hardware-id">{sensor.id}</span>
+              {isVirtual ? (
+                <span className="sensor-hardware-id">{subtitle}</span>
+              ) : (
+                <>
+                  <span className="sensor-type-label">{sensor.type}:</span>
+                  <span className="sensor-hardware-id">{sensor.id}</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -118,6 +134,8 @@ export default React.memo(SensorItem, (prevProps, nextProps) => {
     prevProps.sensor.label === nextProps.sensor.label &&
     prevProps.sensor.name === nextProps.sensor.name &&
     prevProps.isHidden === nextProps.isHidden &&
+    prevProps.isVirtual === nextProps.isVirtual &&
+    prevProps.subtitle === nextProps.subtitle &&
     prevProps.history === nextProps.history
   );
 });

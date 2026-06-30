@@ -61,6 +61,24 @@ export function deriveSensorGroupId(sensor: SensorReading): string {
   return deriveChipName(sensor.id);
 }
 
+export type SensorAggregateOp = 'max' | 'avg' | 'median';
+
+/**
+ * Aggregate a set of temperatures by operation. Returns null for an empty set.
+ * Mirrors the backend resolver in FanProfileController.getSensorTemperature() so
+ * the dashboard display and the control loop agree on a virtual sensor's value.
+ */
+export function computeAggregate(op: SensorAggregateOp, temps: number[]): number | null {
+  if (temps.length === 0) return null;
+  if (op === 'avg') return temps.reduce((a, b) => a + b, 0) / temps.length;
+  if (op === 'median') {
+    const sorted = [...temps].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  return Math.max(...temps);
+}
+
 /**
  * Group sensors by chip type for organized display.
  * Returns a record mapping chip IDs to arrays of sensors.

@@ -1,0 +1,55 @@
+/* Virtual Sensor modals (Sensor Builder / Manage Sensors).
+ *
+ * The modal frame, buttons (.btn/.btn-primary/.btn-secondary), header/footer and
+ * the .bulk-edit-select dropdown are all REUSED from bulk-edit-panel.css. The Name
+ * field reuses .form-group from styles/components/forms.css. Only the two pieces
+ * unique to these modals live here, and they use shared theme tokens so dark/light
+ * both work with no extra rules. */
+
+/* Inline one-line description of the selected operation (under the dropdown). */
+.vs-op-desc {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+/* Member sensor picker */
+.vs-group-label {
+  margin: 10px 0 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.vs-member-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  background: var(--bg-panels_01);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.vs-member-row:hover { border-color: var(--text-secondary); }
+.vs-member-row.selected { border-color: var(--color-info); }
+
+.vs-member-name { flex: 1; font-size: 0.85rem; }
+
+.vs-member-temp {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Live preview line above the footer */
+.vs-preview { font-size: 0.85rem; color: var(--text-primary); }
+.vs-preview-empty { font-size: 0.8rem; color: var(--text-secondary); }

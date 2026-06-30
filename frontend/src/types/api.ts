@@ -49,6 +49,11 @@ export interface SensorReading {
   hardwareName?: string; // Full hardware name (e.g., "AMD Ryzen 9 3900X", "NVIDIA GeForce RTX 2070 SUPER")
   dbId?: number; // Database record ID for fan_profile_assignments
   isHidden?: boolean; // Sensor is hidden by user (individually or via group)
+  // Virtual sensor fields (only set on synthetic rows the frontend builds for virtual sensors).
+  // The value is computed client-side from member temperatures; not reported by any agent.
+  isVirtual?: boolean;
+  operation?: "max" | "avg" | "median"; // How member sensors are combined
+  memberIds?: number[]; // Member sensor dbIds used to compute `temperature`
 }
 
 export interface FanReading {
@@ -62,6 +67,21 @@ export interface FanReading {
   dbId?: number; // Database record ID for fan_profile_assignments
   zone?: string; // Fan zone ID for IPMI agents (e.g., "cpu_zone", "peripheral_zone")
   isHidden?: boolean; // Fan is hidden by user
+}
+
+export interface VirtualSensorMember {
+  sensor_id: number; // sensor DB id
+  sensor_name: string;
+}
+
+// A user-built aggregate sensor (max/avg of member sensors). HUB-side only.
+export interface VirtualSensor {
+  id: number;
+  system_id: number;
+  name: string;
+  operation: "max" | "avg" | "median";
+  sort_order?: number | null;
+  members: VirtualSensorMember[];
 }
 
 export interface SystemOverview {

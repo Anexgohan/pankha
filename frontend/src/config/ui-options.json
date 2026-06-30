@@ -140,6 +140,17 @@
         { "value": 10.0, "label": "10.0°C", "cleanLabel": "10.0°C" }
       ],
       "default": 2.0
+    },
+    "virtualSensorOperation": {
+      "label": "Operation",
+      "description": "How a virtual sensor combines its member sensors.",
+      "tooltip": "\"Operation\" is how a virtual sensor combines its member sensors into one temperature.\nMax / Highest: the hottest member - reacts to the worst hotspot (default).\nAverage: the mean of all members - tracks overall load.\nMiddle: the middle reading - ignores one odd sensor that Max or Average would chase.",
+      "values": [
+        { "value": "max", "label": "Max / Highest", "cleanLabel": "Max", "description": "Uses the hottest member - reacts to the worst hotspot." },
+        { "value": "avg", "label": "Average", "cleanLabel": "Avg", "description": "Mean of all members - tracks overall load." },
+        { "value": "median", "label": "Middle", "cleanLabel": "Middle", "description": "The middle reading - ignores one odd sensor that Max or Average would chase." }
+      ],
+      "default": "max"
     }
   }
 }
