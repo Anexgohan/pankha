@@ -3,6 +3,7 @@ import { PoolClient } from 'pg';
 import { Database } from '../database/database';
 import { FanProfileController } from '../services/FanProfileController';
 import { log } from '../utils/logger';
+import { reorderRows } from '../utils/reorder';
 
 const router = Router();
 const db = Database.getInstance();
@@ -169,6 +170,26 @@ router.post('/', async (req: Request, res: Response) => {
     }
     log.error('Error creating virtual sensor', 'virtualSensors', error);
     res.status(500).json({ success: false, error: 'Failed to create virtual sensor' });
+  }
+});
+
+/**
+ * PUT /api/virtual-sensors/order
+ * Body: { systemId, orderedIds: number[] } - virtual-sensor ids in their new order.
+ * Registered before PUT /:id so the literal '/order' wins under Express 5.
+ */
+router.put('/order', async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.body?.systemId);
+    if (isNaN(systemId)) return res.status(400).json({ success: false, error: 'Invalid systemId' });
+    const orderedIds = normalizeSensorIds(req.body?.orderedIds);
+    await db.transaction(async (client: PoolClient) => {
+      await reorderRows(client, 'virtual_sensors', systemId, orderedIds);
+    });
+    res.json({ success: true, data: { count: orderedIds.length } });
+  } catch (error) {
+    log.error('Error updating virtual sensor order', 'virtualSensors', error);
+    res.status(500).json({ success: false, error: 'Failed to update virtual sensor order' });
   }
 });
 

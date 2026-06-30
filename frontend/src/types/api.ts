@@ -84,6 +84,13 @@ export interface VirtualSensor {
   members: VirtualSensorMember[];
 }
 
+// Shared/DB-backed display order for a system (Phase 2). Keyed by sensor dbId and by
+// group_name (incl the reserved '__virtual__' group). Absent = unordered -> default order.
+export interface SensorOrderMaps {
+  sensors: Record<number, number>;
+  groups: Record<string, number>;
+}
+
 export interface SystemOverview {
   totalSystems: number;
   onlineSystems: number;

@@ -77,3 +77,16 @@ export const getVirtualSensorUsage = async (id: number): Promise<VirtualSensorUs
   const body = await parseOrThrow(response, 'Failed to fetch usage');
   return (body.data as VirtualSensorUsage[]) || [];
 };
+
+/** Reorder a system's virtual sensors. `orderedIds` is the new top-to-bottom order. */
+export const updateVirtualSensorOrder = async (
+  systemId: number,
+  orderedIds: number[],
+): Promise<void> => {
+  const response = await fetch(`${BASE}/order`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ systemId, orderedIds }),
+  });
+  await parseOrThrow(response, 'Failed to reorder virtual sensors');
+};

@@ -16,6 +16,8 @@ import {
   updateSensorVisibility,
   updateGroupVisibility,
   updateFanVisibility,
+  updateSensorOrder,
+  updateSensorGroupOrder,
 } from "../../services/api";
 import { useVisibility } from "../../contexts/VisibilityContext";
 import {
@@ -30,7 +32,8 @@ import {
   getFanConfigurations,
 } from "../../services/fanConfigurationsApi";
 import { getChipDisplayName, getSensorLabel } from "../../config/sensorLabels";
-import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
+import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip, compareSensorGroups } from "../../utils/sensorUtils";
+import { sortByOrder } from "../../utils/ordering";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen, USER_TIMEZONE } from "../../utils/formatters";
@@ -60,7 +63,8 @@ import { BulkEditPanel } from "./BulkEditPanel";
 import SensorBuilderModal from "./SensorBuilderModal";
 import ManageSensorsModal from "./ManageSensorsModal";
 import { useVirtualSensors } from "../hooks/useVirtualSensors";
-import { updateVirtualSensor } from "../../services/virtualSensorsApi";
+import { useSensorOrder } from "../hooks/useSensorOrder";
+import { updateVirtualSensor, updateVirtualSensorOrder } from "../../services/virtualSensorsApi";
 import type { VirtualSensor } from "../../types/api";
 import SensorItem from "./SensorItem";
 import BmcProfilePicker from "./BmcProfilePicker";
@@ -224,6 +228,36 @@ const SystemCard: React.FC<SystemCardProps> = ({
     system.id,
     system.current_temperatures
   );
+
+  // Shared/DB-backed sensor + group display order (Phase 2). Fetched off the WebSocket
+  // path and refetched after a reorder; NULL positions fall back to the default order.
+  const { order: sensorOrder, refetch: refetchSensorOrder } = useSensorOrder(system.id);
+
+  const handleReorderSensors = async (orderedSensorIds: number[]) => {
+    try {
+      await updateSensorOrder(system.id, orderedSensorIds);
+      await refetchSensorOrder();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reorder sensors");
+    }
+  };
+  const handleReorderGroups = async (orderedGroupNames: string[]) => {
+    try {
+      await updateSensorGroupOrder(system.id, orderedGroupNames);
+      await refetchSensorOrder();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reorder groups");
+    }
+  };
+  const handleReorderVirtual = async (orderedIds: number[]) => {
+    try {
+      await updateVirtualSensorOrder(system.id, orderedIds);
+      await Promise.all([reloadVirtualSensors(), refetchSensorOrder()]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reorder virtual sensors");
+    }
+  };
+
   const [builderOpen, setBuilderOpen] = useState(false);
   const [builderEditing, setBuilderEditing] = useState<VirtualSensor | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
@@ -1468,8 +1502,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       ? filteredSensors.find((s) => s.hardwareName)?.hardwareName ?? null
                       : null;
 
-                    const renderedGroups = visibleGroups.map(([chipId, chipSensors]) => {
+                    const renderedGroups = visibleGroups.map(([chipId, chipSensorsRaw]) => {
                       const isGroupHiddenState = isGroupHidden(chipId);
+                      // Order sensors within the group by the shared sort_order (NULL -> default).
+                      const chipSensors = sortByOrder(
+                        chipSensorsRaw,
+                        (s: SensorReading) => (s.dbId != null ? sensorOrder.sensors[s.dbId] : undefined)
+                      );
                       return (
                         <div
                           key={chipId}
@@ -1584,6 +1623,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         </div>
                       ) : null;
 
+                    // Interleave hardware + virtual groups by the shared group order
+                    // ('__virtual__' = the virtual group). NULL -> default: hardware A-Z, virtual last.
+                    const orderedGroupEls = sortByOrder(
+                      [
+                        ...visibleGroups.map(([chipId], i) => ({ name: chipId, el: renderedGroups[i], isVirtual: false })),
+                        ...(virtualGroup ? [{ name: "__virtual__", el: virtualGroup, isVirtual: true }] : []),
+                      ],
+                      (g) => sensorOrder.groups[g.name],
+                      (a, b) => (a.isVirtual ? 1 : b.isVirtual ? -1 : compareSensorGroups(a.name, b.name))
+                    ).map((g) => g.el);
+
                     if (isIpmiAgent) {
                       return (
                         <div className="ipmi-sensor-banner">
@@ -1591,13 +1641,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             IPMI: {ipmiHardwareName ?? 'BMC'}
                           </div>
                           <div className="ipmi-banner-body">
-                            {renderedGroups}
-                            {virtualGroup}
+                            {orderedGroupEls}
                           </div>
                         </div>
                       );
                     }
-                    return <>{renderedGroups}{virtualGroup}</>;
+                    return <>{orderedGroupEls}</>;
                   })()}
                 </div>
               </>
@@ -2513,6 +2562,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
         <ManageSensorsModal
           sensors={system.current_temperatures || []}
           virtualRows={virtualRows}
+          sensorOrder={sensorOrder}
+          onReorderSensors={handleReorderSensors}
+          onReorderGroups={handleReorderGroups}
+          onReorderVirtual={handleReorderVirtual}
           anchorRect={anchorRect}
           isSensorHidden={isSensorHidden}
           onToggleSensorVisibility={handleToggleSensorVisibility}

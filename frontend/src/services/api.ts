@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { SystemData, SystemOverview, SystemHealth, HistoryDataPoint } from "../types/api";
+import type { SystemData, SystemOverview, SystemHealth, HistoryDataPoint, SensorOrderMaps } from "../types/api";
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -332,6 +332,32 @@ export const updateGroupVisibility = async (
   await api.put(`/api/systems/${systemId}/sensor-groups/${groupId}/visibility`, {
     is_hidden: isHidden,
   });
+};
+
+// Sensor / group ordering (Phase 2). Shared/DB-backed display order, fetched off the
+// WebSocket path; absent positions fall back to the default order client-side.
+export const getSensorOrder = async (systemId: number): Promise<SensorOrderMaps> => {
+  const response = await api.get<{ data?: SensorOrderMaps }>(
+    `/api/systems/${systemId}/sensor-order`
+  );
+  return {
+    sensors: response.data?.data?.sensors ?? {},
+    groups: response.data?.data?.groups ?? {},
+  };
+};
+
+export const updateSensorOrder = async (
+  systemId: number,
+  orderedSensorIds: number[]
+): Promise<void> => {
+  await api.put(`/api/systems/${systemId}/sensors/order`, { orderedSensorIds });
+};
+
+export const updateSensorGroupOrder = async (
+  systemId: number,
+  orderedGroupNames: string[]
+): Promise<void> => {
+  await api.put(`/api/systems/${systemId}/sensor-groups/order`, { orderedGroupNames });
 };
 
 // Historical Data

@@ -484,3 +484,28 @@ DO $$ BEGIN
     RAISE NOTICE 'Migration: Added last_sync_at column to license_config';
   END IF;
 END $$;
+
+-- Migration: Add sort_order to sensors (Phase 2 - per-sensor display order within its chip group).
+-- NULL = unordered (falls back to the default sensor_type, sensor_name order).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'sensors' AND column_name = 'sort_order'
+  ) THEN
+    ALTER TABLE sensors ADD COLUMN sort_order INTEGER;
+    RAISE NOTICE 'Migration: Added sort_order column to sensors';
+  END IF;
+END $$;
+
+-- Migration: Add sort_order to sensor_group_visibility (Phase 2 - sensor-group display order).
+-- The synthetic Virtual Sensors group is ordered via a reserved group_name = '__virtual__' row
+-- (is_hidden stays false, so it never appears in the hidden-groups query or as a real chip).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'sensor_group_visibility' AND column_name = 'sort_order'
+  ) THEN
+    ALTER TABLE sensor_group_visibility ADD COLUMN sort_order INTEGER;
+    RAISE NOTICE 'Migration: Added sort_order column to sensor_group_visibility';
+  END IF;
+END $$;

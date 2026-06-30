@@ -8,6 +8,8 @@ import { FanProfileController } from "../services/FanProfileController";
 import { WebSocketHub } from "../services/WebSocketHub";
 import { licenseManager } from "../license/LicenseManager";
 import UpdateDownloadService from "../services/UpdateDownloadService";
+import { PoolClient } from "pg";
+import { reorderRows } from "../utils/reorder";
 import { log, logger } from "../utils/logger";
 import { createDemoLockResponse, isDemoMode } from "../utils/mode";
 import {
@@ -1732,6 +1734,93 @@ router.get("/:id/sensor-visibility", async (req: Request, res: Response) => {
   } catch (error) {
     log.error("Error fetching sensor visibility:", "systems", error);
     res.status(500).json({ error: "Failed to fetch sensor visibility" });
+  }
+});
+
+// GET /api/systems/:id/sensor-order - sensor + group display order (Phase 2 ordering).
+// Shared/DB-backed, fetched off the WebSocket path (see task_11 mechanism B). Only rows
+// with an explicit sort_order are returned; everything else falls back to default order.
+router.get("/:id/sensor-order", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    if (isNaN(systemId)) {
+      return res.status(400).json({ error: "Invalid system ID" });
+    }
+    const sensorRows = await db.all(
+      "SELECT id, sort_order FROM sensors WHERE system_id = $1 AND sort_order IS NOT NULL",
+      [systemId]
+    );
+    const groupRows = await db.all(
+      "SELECT group_name, sort_order FROM sensor_group_visibility WHERE system_id = $1 AND sort_order IS NOT NULL",
+      [systemId]
+    );
+    const sensors: Record<number, number> = {};
+    for (const r of sensorRows) sensors[r.id] = r.sort_order;
+    const groups: Record<string, number> = {};
+    for (const r of groupRows) groups[r.group_name] = r.sort_order;
+    res.json({ success: true, data: { sensors, groups } });
+  } catch (error) {
+    log.error("Error fetching sensor order:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch sensor order" });
+  }
+});
+
+// PUT /api/systems/:id/sensors/order - reorder sensors within one chip group.
+// Body: { orderedSensorIds: number[] } - the group's sensor dbIds in their new order.
+router.put("/:id/sensors/order", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    if (isNaN(systemId)) {
+      return res.status(400).json({ error: "Invalid system ID" });
+    }
+    const { orderedSensorIds } = req.body;
+    if (!Array.isArray(orderedSensorIds) || orderedSensorIds.some((n: unknown) => !Number.isInteger(n))) {
+      return res.status(400).json({ error: "orderedSensorIds must be an array of sensor ids" });
+    }
+    const system = await db.get("SELECT id FROM systems WHERE id = $1", [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+    await db.transaction(async (client: PoolClient) => {
+      await reorderRows(client, "sensors", systemId, orderedSensorIds);
+    });
+    res.json({ message: "Sensor order updated", count: orderedSensorIds.length });
+  } catch (error) {
+    log.error("Error updating sensor order:", "systems", error);
+    res.status(500).json({ error: "Failed to update sensor order" });
+  }
+});
+
+// PUT /api/systems/:id/sensor-groups/order - reorder sensor groups, including the
+// reserved '__virtual__' group. Body: { orderedGroupNames: string[] } in new order.
+// Upserts so a group with no visibility row yet still gets an order.
+router.put("/:id/sensor-groups/order", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    if (isNaN(systemId)) {
+      return res.status(400).json({ error: "Invalid system ID" });
+    }
+    const { orderedGroupNames } = req.body;
+    if (!Array.isArray(orderedGroupNames) || orderedGroupNames.some((g: unknown) => typeof g !== "string")) {
+      return res.status(400).json({ error: "orderedGroupNames must be an array of group names" });
+    }
+    const system = await db.get("SELECT id FROM systems WHERE id = $1", [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+    const positions = orderedGroupNames.map((_: string, i: number) => i);
+    await db.run(
+      `INSERT INTO sensor_group_visibility (system_id, group_name, sort_order, updated_at)
+       SELECT $1, g.name, g.ord, CURRENT_TIMESTAMP
+         FROM unnest($2::text[], $3::int[]) AS g(name, ord)
+       ON CONFLICT (system_id, group_name)
+       DO UPDATE SET sort_order = EXCLUDED.sort_order, updated_at = CURRENT_TIMESTAMP`,
+      [systemId, orderedGroupNames, positions]
+    );
+    res.json({ message: "Sensor group order updated", count: orderedGroupNames.length });
+  } catch (error) {
+    log.error("Error updating sensor group order:", "systems", error);
+    res.status(500).json({ error: "Failed to update sensor group order" });
   }
 });
 

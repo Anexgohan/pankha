@@ -53,12 +53,21 @@
 }
 .vs-group-select:hover { background: var(--bg-hover); }
 
-/* Group name truncates instead of pushing the Select-group button to a 2nd line */
+/* Group name truncates instead of pushing the adjacent button to a 2nd line, and
+ * grows so it sits next to a leading reorder control rather than being flung right. */
 .vs-group-label > span {
+  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The leading reorder arrows are also a direct <span> of the header, so exempt them
+ * from the grow/truncate rules above - only the name span should flex and ellipsize. */
+.vs-group-label > .vs-reorder {
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .vs-member-row {
@@ -205,7 +214,7 @@
 .vs-manage-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   padding: 8px 6px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
@@ -240,3 +249,47 @@
 }
 .vs-icon-btn:hover { color: var(--text-primary); background: var(--bg-hover); border-color: var(--border-color); }
 .vs-icon-btn.danger:hover { color: var(--color-error); border-color: var(--color-error); }
+
+/* Up/down reorder arrows (Manage Sensors). Compact stacked pair; dim + inert at ends. */
+.vs-reorder {
+  display: inline-flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.vs-reorder-btn { padding: 0 3px; }
+.vs-reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.vs-reorder-btn:disabled:hover {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+/* --- Manage Sensors: indented tree with dashboard-style group headers ---
+ * Scoped to .vs-manage-list so the Builder's bordered-card member picker is untouched.
+ * The group header matches the dashboard's .sensor-group-header (contrast band + info
+ * left accent) so it stands out from its sensors; the rows indent beneath it. */
+.vs-manage-list .vs-group {
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+  margin-bottom: 12px;
+}
+.vs-manage-list .vs-group .vs-group-label {
+  margin: 0 0 4px;
+  border: 0;
+  border-left: 3px solid var(--color-accent-dynamic);
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.85rem;
+}
+/* Children indent beneath the header so the hierarchy reads; drop the per-row hairline. */
+.vs-manage-list .vs-group .vs-manage-row {
+  margin-left: 8px;
+  border-bottom: 0;
+}
