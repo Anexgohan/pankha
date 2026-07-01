@@ -186,6 +186,31 @@ CREATE TABLE IF NOT EXISTS fan_configurations (
   FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE SET NULL
 );
 
+-- Virtual Sensors (user-built aggregate sensors: max/avg of N real sensors)
+-- Resolved by FanProfileController via the "__virtual__<id>" sensor_identifier,
+-- exactly like "__highest__"/"__group__<name>". HUB-side only; agents are unaware.
+CREATE TABLE IF NOT EXISTS virtual_sensors (
+  id          SERIAL PRIMARY KEY,
+  system_id   INTEGER NOT NULL,
+  name        VARCHAR(255) NOT NULL,            -- user-facing label
+  operation   VARCHAR(16) NOT NULL DEFAULT 'max', -- 'max' | 'avg'
+  sort_order  INTEGER,                          -- Phase 2 (ordering); unused in Phase 1
+  created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
+  UNIQUE (system_id, name)
+);
+
+-- Members of a virtual sensor (the real sensors it aggregates)
+CREATE TABLE IF NOT EXISTS virtual_sensor_members (
+  id                 SERIAL PRIMARY KEY,
+  virtual_sensor_id  INTEGER NOT NULL,
+  sensor_id          INTEGER NOT NULL,
+  FOREIGN KEY (virtual_sensor_id) REFERENCES virtual_sensors(id) ON DELETE CASCADE,
+  FOREIGN KEY (sensor_id)         REFERENCES sensors(id)         ON DELETE CASCADE,
+  UNIQUE (virtual_sensor_id, sensor_id)
+);
+
 -- Historical Monitoring Data
 CREATE TABLE IF NOT EXISTS monitoring_data (
   id SERIAL PRIMARY KEY,
@@ -217,6 +242,8 @@ CREATE INDEX IF NOT EXISTS idx_fan_curve_points_temperature ON fan_curve_points(
 CREATE INDEX IF NOT EXISTS idx_fan_profile_assignments_fan_id ON fan_profile_assignments(fan_id);
 CREATE INDEX IF NOT EXISTS idx_fan_profile_assignments_profile_id ON fan_profile_assignments(profile_id);
 CREATE INDEX IF NOT EXISTS idx_fan_configurations_fan_id ON fan_configurations(fan_id);
+CREATE INDEX IF NOT EXISTS idx_virtual_sensors_system_id ON virtual_sensors(system_id);
+CREATE INDEX IF NOT EXISTS idx_virtual_sensor_members_vsid ON virtual_sensor_members(virtual_sensor_id);
 
 -- Functions for updating timestamps (PostgreSQL style)
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -455,5 +482,30 @@ DO $$ BEGIN
   ) THEN
     ALTER TABLE license_config ADD COLUMN last_sync_at TIMESTAMPTZ;
     RAISE NOTICE 'Migration: Added last_sync_at column to license_config';
+  END IF;
+END $$;
+
+-- Migration: Add sort_order to sensors (Phase 2 - per-sensor display order within its chip group).
+-- NULL = unordered (falls back to the default sensor_type, sensor_name order).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'sensors' AND column_name = 'sort_order'
+  ) THEN
+    ALTER TABLE sensors ADD COLUMN sort_order INTEGER;
+    RAISE NOTICE 'Migration: Added sort_order column to sensors';
+  END IF;
+END $$;
+
+-- Migration: Add sort_order to sensor_group_visibility (Phase 2 - sensor-group display order).
+-- The synthetic Virtual Sensors group is ordered via a reserved group_name = '__virtual__' row
+-- (is_hidden stays false, so it never appears in the hidden-groups query or as a real chip).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'sensor_group_visibility' AND column_name = 'sort_order'
+  ) THEN
+    ALTER TABLE sensor_group_visibility ADD COLUMN sort_order INTEGER;
+    RAISE NOTICE 'Migration: Added sort_order column to sensor_group_visibility';
   END IF;
 END $$;

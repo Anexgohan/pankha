@@ -30,6 +30,13 @@ interface CurvePoint {
 // rounding + noise); real external-controller drags are far larger.
 const REASSERT_TOLERANCE_PERCENT = 5;
 
+// Median of a non-empty array (even length -> mean of the two middle values).
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 /**
  * Fan Profile Controller
  *
@@ -63,6 +70,10 @@ export class FanProfileController {
   private lastSignificantTemp: Map<string, number> = new Map();
   private lastSpeedChangeTime: Map<string, number> = new Map();
   private lastTargetSpeeds: Map<string, number> = new Map(); // Track target speed for hysteresis
+
+  // Virtual sensor defs for the current control tick (id -> {operation, member dbIds}).
+  // Rebuilt fresh each tick from the DB, like the curve-points batch - no cache to invalidate.
+  private virtualDefs: Map<number, { operation: 'max' | 'avg' | 'median'; memberDbIds: number[] }> = new Map();
 
   private constructor() {
     this.db = Database.getInstance();
@@ -214,6 +225,22 @@ export class FanProfileController {
             return Math.max(...temperatures);
           }
           return null;
+        }
+
+        // Handle "__virtual__<id>" - max/avg of the virtual sensor's member sensors.
+        // Members are matched by dbId and INCLUDED even if hidden (explicit user choice,
+        // unlike __highest__/__group__). Defs are batch-loaded per tick into this.virtualDefs.
+        if (sensorIdentifier.startsWith('__virtual__')) {
+          const vid = parseInt(sensorIdentifier.slice('__virtual__'.length), 10);
+          const def = this.virtualDefs.get(vid);
+          if (!def || def.memberDbIds.length === 0) return null;
+          const temps = systemData.sensors
+            .filter(s => s.dbId != null && def.memberDbIds.includes(s.dbId))
+            .map(s => s.temperature);
+          if (temps.length === 0) return null;
+          if (def.operation === 'avg') return temps.reduce((a, b) => a + b, 0) / temps.length;
+          if (def.operation === 'median') return median(temps);
+          return Math.max(...temps);
         }
       }
 
@@ -407,6 +434,39 @@ export class FanProfileController {
         // per-assignment queries - that would refire the N+1 into an
         // already-stressed pool.
         log.error('Error batch-fetching curve points', 'FanProfileController', error);
+      }
+
+      // Batch-load virtual sensor definitions referenced this tick (one query),
+      // mirroring the curve-points batch above. Rebuilt fresh each tick.
+      this.virtualDefs.clear();
+      const virtualIds = [...new Set(
+        assignments
+          .map(a => a.sensor_identifier)
+          .filter((sid): sid is string => !!sid && sid.startsWith('__virtual__'))
+          .map(sid => parseInt(sid.slice('__virtual__'.length), 10))
+          .filter(n => !isNaN(n))
+      )];
+      if (virtualIds.length > 0) {
+        try {
+          const rows = await this.db.all(`
+            SELECT vs.id AS virtual_sensor_id, vs.operation,
+                   ARRAY_AGG(vm.sensor_id) AS member_ids
+            FROM virtual_sensors vs
+            JOIN virtual_sensor_members vm ON vm.virtual_sensor_id = vs.id
+            WHERE vs.id = ANY($1)
+            GROUP BY vs.id, vs.operation
+          `, [virtualIds]);
+          for (const row of rows) {
+            this.virtualDefs.set(row.virtual_sensor_id, {
+              operation: row.operation === 'avg' || row.operation === 'median' ? row.operation : 'max',
+              memberDbIds: (row.member_ids || []).map((n: any) => Number(n)),
+            });
+          }
+        } catch (error) {
+          // Leave virtualDefs empty on failure: affected assignments hit the existing
+          // "sensor unavailable -> skip" path and fans hold their last speed.
+          log.error('Error batch-fetching virtual sensor definitions', 'FanProfileController', error);
+        }
       }
 
       // Zone deduplication: when multiple fans share a zone_id, only process once per zone.

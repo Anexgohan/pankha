@@ -221,7 +221,7 @@
 }
 
 .bulk-edit-select:hover {
-  border-color: var(--text-secondary);
+  border-color: var(--color-accent-dynamic);
 }
 
 .bulk-edit-select:focus {
@@ -233,18 +233,19 @@
 /* Select All Button */
 .select-all-btn {
   padding: 6px 12px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
+  background-color: transparent;
+  color: var(--color-info);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
 .select-all-btn:hover {
-  background-color: #45a049;
+  background-color: var(--bg-hover);
+  border-color: var(--color-accent-dynamic);
 }
 
 .select-all-btn:active {
@@ -273,13 +274,17 @@
 }
 
 .bulk-edit-fan-item:hover {
-  border-color: var(--color-info);
+  border-color: var(--color-accent-dynamic);
   background-color: var(--bg-hover);
 }
 
 .bulk-edit-fan-item.selected {
   border-color: var(--color-info);
-  background-color: var(--bg-hover);
+  background-color: color-mix(in srgb, var(--color-info) 10%, var(--bg-primary));
+}
+
+.bulk-edit-fan-item.selected:hover {
+  background-color: color-mix(in srgb, var(--color-info) 16%, var(--bg-primary));
 }
 
 .fan-checkbox {
@@ -328,13 +333,17 @@
 }
 
 .bulk-edit-zone-item:hover {
-  border-color: var(--color-info);
+  border-color: var(--color-accent-dynamic);
   background-color: var(--bg-hover);
 }
 
 .bulk-edit-zone-item.selected {
   border-color: var(--color-info);
-  background-color: var(--bg-hover);
+  background-color: color-mix(in srgb, var(--color-info) 10%, var(--bg-primary));
+}
+
+.bulk-edit-zone-item.selected:hover {
+  background-color: color-mix(in srgb, var(--color-info) 16%, var(--bg-primary));
 }
 
 .zone-header-row {
@@ -446,6 +455,15 @@
 
 .btn-primary:hover:not(:disabled) {
   background-color: var(--color-info-hover);
+}
+
+.btn-danger {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--color-error-hover);
 }
 
 /* Mobile-specific adjustments */

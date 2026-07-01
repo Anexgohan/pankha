@@ -16,6 +16,8 @@ import {
   updateSensorVisibility,
   updateGroupVisibility,
   updateFanVisibility,
+  updateSensorOrder,
+  updateSensorGroupOrder,
 } from "../../services/api";
 import { useVisibility } from "../../contexts/VisibilityContext";
 import {
@@ -30,7 +32,8 @@ import {
   getFanConfigurations,
 } from "../../services/fanConfigurationsApi";
 import { getChipDisplayName, getSensorLabel } from "../../config/sensorLabels";
-import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip } from "../../utils/sensorUtils";
+import { sortSensorGroups, deriveSensorGroupId, groupSensorsByChip, compareSensorGroups } from "../../utils/sensorUtils";
+import { sortByOrder } from "../../utils/ordering";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen, USER_TIMEZONE } from "../../utils/formatters";
@@ -49,12 +52,20 @@ import {
   Thermometer,
   ThermometerSun,
   Lock as LockIcon,
-  Search
+  Search,
+  Plus,
+  Sliders
 } from 'lucide-react';
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
 import AnimatedFanIcon from "../../components/icons/AnimatedFanIcon";
 import { BulkEditPanel } from "./BulkEditPanel";
+import SensorBuilderModal from "./SensorBuilderModal";
+import ManageSensorsModal from "./ManageSensorsModal";
+import { useVirtualSensors } from "../hooks/useVirtualSensors";
+import { useSensorOrder } from "../hooks/useSensorOrder";
+import { updateVirtualSensor, updateVirtualSensorOrder } from "../../services/virtualSensorsApi";
+import type { VirtualSensor } from "../../types/api";
 import SensorItem from "./SensorItem";
 import BmcProfilePicker from "./BmcProfilePicker";
 import { useSensorHistory } from "../hooks/useSensorHistory";
@@ -210,6 +221,71 @@ const SystemCard: React.FC<SystemCardProps> = ({
   useEffect(() => {
     setHistoryExpanded(expandedSensors);
   }, [expandedSensors, setHistoryExpanded]);
+
+  // Virtual sensors (user-built aggregates). Values are computed client-side from
+  // member temps by the hook, which also keeps a 15-min sparkline buffer.
+  const { rows: virtualRows, reload: reloadVirtualSensors } = useVirtualSensors(
+    system.id,
+    system.current_temperatures
+  );
+
+  // Shared/DB-backed sensor + group display order (Phase 2). Fetched off the WebSocket
+  // path and refetched after a reorder; NULL positions fall back to the default order.
+  const { order: sensorOrder, refetch: refetchSensorOrder } = useSensorOrder(system.id);
+
+  const handleReorderSensors = async (orderedSensorIds: number[]) => {
+    try {
+      await updateSensorOrder(system.id, orderedSensorIds);
+      await refetchSensorOrder();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reorder sensors");
+    }
+  };
+  const handleReorderGroups = async (orderedGroupNames: string[]) => {
+    try {
+      await updateSensorGroupOrder(system.id, orderedGroupNames);
+      await refetchSensorOrder();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reorder groups");
+    }
+  };
+  const handleReorderVirtual = async (orderedIds: number[]) => {
+    try {
+      await updateVirtualSensorOrder(system.id, orderedIds);
+      await Promise.all([reloadVirtualSensors(), refetchSensorOrder()]);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed to reorder virtual sensors");
+    }
+  };
+
+  // Control Sensor dropdown ordering (Phase 2): make the picker agree with the dashboard.
+  // Groups by group order (then alpha); individual sensors by group order, then sensor
+  // order within the group, then name. The `!==` guards avoid Infinity - Infinity = NaN.
+  const orderGroupIds = (ids: string[]): string[] =>
+    sortByOrder(ids, (g) => sensorOrder.groups[g], (a, b) => compareSensorGroups(a, b));
+  const compareSensorsForDropdown = (a: SensorReading, b: SensorReading): number => {
+    const ga = deriveSensorGroupId(a);
+    const gb = deriveSensorGroupId(b);
+    if (ga !== gb) {
+      const oa = sensorOrder.groups[ga] ?? Infinity;
+      const ob = sensorOrder.groups[gb] ?? Infinity;
+      if (oa !== ob) return oa - ob;
+      return compareSensorGroups(ga, gb);
+    }
+    const sa = (a.dbId != null ? sensorOrder.sensors[a.dbId] : undefined) ?? Infinity;
+    const sb = (b.dbId != null ? sensorOrder.sensors[b.dbId] : undefined) ?? Infinity;
+    if (sa !== sb) return sa - sb;
+    return a.id.localeCompare(b.id);
+  };
+
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const [builderEditing, setBuilderEditing] = useState<VirtualSensor | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
+  // Capture the card rect so these modals anchor beside the card (desktop), like Bulk Edit.
+  const captureAnchor = () => { if (cardRef.current) setAnchorRect(cardRef.current.getBoundingClientRect()); };
+  const openNewVirtual = () => { captureAnchor(); setBuilderEditing(null); setBuilderOpen(true); };
+  const openEditVirtual = (vs: VirtualSensor) => { captureAnchor(); setBuilderEditing(vs); setBuilderOpen(true); };
+  const openManage = () => { captureAnchor(); setManageOpen(true); };
 
   // Stable identity keys - reload configs only when the set of fans/sensors changes,
   // not on every temperature/RPM value update (which fires every agent update interval).
@@ -515,6 +591,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
         return <img src="/icons/hdd-01.png" width={24} height={24} title="Storage" alt="Storage" />;
       case "acpi":
         return <Thermometer size={20} />;
+      case "virtual":
+        return <img src="/icons/motion-sensor-01.png" width={24} height={24} title="Virtual Sensor" alt="Virtual Sensor" />;
       default:
         return <Search size={20} />;
     }
@@ -1400,6 +1478,25 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
             {expandedSensors && (
               <>
+                {!isReadOnly && (
+                  <div className="vs-toolbar">
+                    <button
+                      className="system-stats-button"
+                      onClick={openNewVirtual}
+                      disabled={system.status !== "online"}
+                      title="Build a virtual sensor from existing sensors"
+                    >
+                      <Plus size={14} /> Sensor Builder
+                    </button>
+                    <button
+                      className="system-stats-button"
+                      onClick={openManage}
+                      title="Manage sensors and virtual sensors"
+                    >
+                      <Sliders size={14} /> Manage
+                    </button>
+                  </div>
+                )}
                 <div className="sensors-list">
                   {(() => {
                     const filteredSensors = system.current_temperatures.filter(
@@ -1425,8 +1522,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       ? filteredSensors.find((s) => s.hardwareName)?.hardwareName ?? null
                       : null;
 
-                    const renderedGroups = visibleGroups.map(([chipId, chipSensors]) => {
+                    const renderedGroups = visibleGroups.map(([chipId, chipSensorsRaw]) => {
                       const isGroupHiddenState = isGroupHidden(chipId);
+                      // Order sensors within the group by the shared sort_order (NULL -> default).
+                      const chipSensors = sortByOrder(
+                        chipSensorsRaw,
+                        (s: SensorReading) => (s.dbId != null ? sensorOrder.sensors[s.dbId] : undefined)
+                      );
                       return (
                         <div
                           key={chipId}
@@ -1487,6 +1589,71 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       );
                     });
 
+                    // Virtual Sensors render as one more group (reusing SensorItem),
+                    // appended after the hardware groups. Hidden behind the same
+                    // group-visibility toggle as real groups (group id "virtual").
+                    const virtualGroupHidden = isGroupHidden("virtual");
+                    const virtualGroup =
+                      virtualRows.length > 0 && (showHidden || !virtualGroupHidden) ? (
+                        <div
+                          key="virtual"
+                          className={`sensor-group ${virtualGroupHidden ? "group-hidden" : ""}`}
+                        >
+                          <div className="sensor-group-header">
+                            <h5>Virtual Sensors</h5>
+                            <div className="group-header-right">
+                              <button
+                                className="visibility-toggle"
+                                onClick={() => handleToggleGroupVisibility("virtual")}
+                                title={virtualGroupHidden ? "Show group" : "Hide group"}
+                              >
+                                {virtualGroupHidden ? (
+                                  <img src="/icons/toggle-off-01.png" width={24} height={24} alt="Hidden" style={{ opacity: 0.75 }} />
+                                ) : (
+                                  <img src="/icons/toggle-on-01.png" width={24} height={24} alt="Visible" style={{ opacity: 0.90 }} />
+                                )}
+                              </button>
+                              <span className="sensor-count">
+                                {virtualRows.length} sensor{virtualRows.length > 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="sensor-group-items">
+                            {virtualRows.map(({ def, reading, subtitle, tooltip, history: vHistory }) => (
+                              <SensorItem
+                                key={reading.id}
+                                sensor={reading}
+                                systemId={system.id}
+                                isHidden={isSensorHidden(reading.id)}
+                                isVirtual
+                                subtitle={subtitle}
+                                subtitleTooltip={tooltip}
+                                onEdit={isReadOnly ? undefined : () => openEditVirtual(def)}
+                                onToggleVisibility={handleToggleSensorVisibility}
+                                onLabelSave={async (_dbId, newLabel) => {
+                                  await updateVirtualSensor(def.id, { name: newLabel });
+                                  await reloadVirtualSensors();
+                                }}
+                                getTemperatureClass={(temp, _maxTemp, critTemp) => getTemperatureClass(temp, critTemp, tempThresholds)}
+                                getSensorIcon={getSensorIcon}
+                                history={vHistory}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ) : null;
+
+                    // Interleave hardware + virtual groups by the shared group order
+                    // ('__virtual__' = the virtual group). NULL -> default: hardware A-Z, virtual last.
+                    const orderedGroupEls = sortByOrder(
+                      [
+                        ...visibleGroups.map(([chipId], i) => ({ name: chipId, el: renderedGroups[i], isVirtual: false })),
+                        ...(virtualGroup ? [{ name: "__virtual__", el: virtualGroup, isVirtual: true }] : []),
+                      ],
+                      (g) => sensorOrder.groups[g.name],
+                      (a, b) => (a.isVirtual ? 1 : b.isVirtual ? -1 : compareSensorGroups(a.name, b.name))
+                    ).map((g) => g.el);
+
                     if (isIpmiAgent) {
                       return (
                         <div className="ipmi-sensor-banner">
@@ -1494,12 +1661,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             IPMI: {ipmiHardwareName ?? 'BMC'}
                           </div>
                           <div className="ipmi-banner-body">
-                            {renderedGroups}
+                            {orderedGroupEls}
                           </div>
                         </div>
                       );
                     }
-                    return renderedGroups;
+                    return <>{orderedGroupEls}</>;
                   })()}
                 </div>
               </>
@@ -1669,6 +1836,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                     <span className="sensor-select-temp">({formatTemperature(highestTemperature, '0.0°C')})</span>
                                   </>
                                 );
+                                if (val.startsWith("__virtual__")) {
+                                  const vrow = virtualRows.find(r => r.reading.id === val);
+                                  return (
+                                    <>
+                                      <span className="sensor-select-name">{vrow ? vrow.def.name : val}</span>
+                                      {vrow && !Number.isNaN(vrow.reading.temperature) && (
+                                        <span className="sensor-select-temp">({formatTemperature(vrow.reading.temperature)})</span>
+                                      )}
+                                    </>
+                                  );
+                                }
                                 if (val.startsWith("__group__")) {
                                   const groupId = val.replace("__group__", "");
                                   const visibleSensorsForGroups = system.current_temperatures?.filter(
@@ -1708,20 +1886,27 @@ const SystemCard: React.FC<SystemCardProps> = ({
                               <option value="__highest__" title="Use the Highest Temperature on the system">
                                 Highest ({formatTemperature(highestTemperature, '0.0°C')})
                               </option>
-                              <option disabled>────────────────────</option>
+                              {virtualRows.length > 0 && (
+                                <optgroup label="Virtual">
+                                  {virtualRows.map(({ def, reading }) => (
+                                    <option key={reading.id} value={reading.id} title="Virtual sensor">
+                                      {def.name}{!Number.isNaN(reading.temperature) ? ` (${formatTemperature(reading.temperature)})` : ''}
+                                    </option>
+                                  ))}
+                                </optgroup>
+                              )}
                               {(() => {
                                 const visibleSensors = system.current_temperatures?.filter(
                                   (sensor: SensorReading) => !isSensorOrGroupHidden(sensor)
                                 ) || [];
                                 const sensorGroups = groupSensorsByChip(visibleSensors);
-                                const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
+                                const sortedGroupIds = orderGroupIds(Object.keys(sensorGroups));
                                 const groupsWithMultipleSensors = sortedGroupIds.filter(
                                   (groupId) => sensorGroups[groupId].length > 1
                                 );
                                 if (groupsWithMultipleSensors.length === 0) return null;
                                 return (
-                                  <>
-                                    <option disabled>(Groups)</option>
+                                  <optgroup label="Groups">
                                     {groupsWithMultipleSensors.map((groupId) => {
                                       const groupSensors = sensorGroups[groupId];
                                       const highestTemp = Math.max(...groupSensors.map((s) => s.temperature));
@@ -1733,25 +1918,20 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                         </option>
                                       );
                                     })}
-                                    <option disabled>────────────────────</option>
-                                  </>
+                                  </optgroup>
                                 );
                               })()}
-                              <option disabled>(Sensors)</option>
-                              {system.current_temperatures
-                                ?.filter((sensor: SensorReading) => !isSensorOrGroupHidden(sensor))
-                                .sort((a: SensorReading, b: SensorReading) => {
-                                  const groupA = deriveSensorGroupId(a);
-                                  const groupB = deriveSensorGroupId(b);
-                                  if (groupA !== groupB) return groupA.localeCompare(groupB);
-                                  return a.id.localeCompare(b.id);
-                                })
-                                .map((sensor: SensorReading) => (
-                                  <option key={sensor.id} value={sensor.id}>
-                                    {getSensorDisplayName(sensor.id, sensor.name, sensor.label)}{" "}
-                                    ({formatTemperature(sensor.temperature)})
-                                  </option>
-                                ))}
+                              <optgroup label="Sensors">
+                                {system.current_temperatures
+                                  ?.filter((sensor: SensorReading) => !isSensorOrGroupHidden(sensor))
+                                  .sort(compareSensorsForDropdown)
+                                  .map((sensor: SensorReading) => (
+                                    <option key={sensor.id} value={sensor.id}>
+                                      {getSensorDisplayName(sensor.id, sensor.name, sensor.label)}{" "}
+                                      ({formatTemperature(sensor.temperature)})
+                                    </option>
+                                  ))}
+                              </optgroup>
                             </select>
                           </div>
                         </div>
@@ -2018,6 +2198,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                 <span className="sensor-select-temp">({formatTemperature(highestTemperature, '0.0°C')})</span>
                               </>
                             );
+                            if (val.startsWith("__virtual__")) {
+                              const vrow = virtualRows.find(r => r.reading.id === val);
+                              return (
+                                <>
+                                  <span className="sensor-select-name">{vrow ? vrow.def.name : val}</span>
+                                  {vrow && !Number.isNaN(vrow.reading.temperature) && (
+                                    <span className="sensor-select-temp">({formatTemperature(vrow.reading.temperature)})</span>
+                                  )}
+                                </>
+                              );
+                            }
                             if (val.startsWith("__group__")) {
                               const groupId = val.replace("__group__", "");
                               const visibleSensorsForGroups = system.current_temperatures?.filter(
@@ -2094,8 +2285,16 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           Highest ({formatTemperature(highestTemperature, '0.0°C')})
                         </option>
 
-                        {/* Separator */}
-                        <option disabled>────────────────────</option>
+                        {/* Virtual Sensors */}
+                        {virtualRows.length > 0 && (
+                          <optgroup label="Virtual">
+                            {virtualRows.map(({ def, reading }) => (
+                              <option key={reading.id} value={reading.id} title="Virtual sensor">
+                                {def.name}{!Number.isNaN(reading.temperature) ? ` (${formatTemperature(reading.temperature)})` : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
 
                         {/* Sensor Groups Header and Options */}
                         {(() => {
@@ -2107,7 +2306,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
                           const sensorGroups =
                             groupSensorsByChip(visibleSensors);
-                          const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
+                          const sortedGroupIds = orderGroupIds(Object.keys(sensorGroups));
 
                           const groupsWithMultipleSensors =
                             sortedGroupIds.filter(
@@ -2118,8 +2317,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             return null;
 
                           return (
-                            <>
-                              <option disabled>(Groups)</option>
+                            <optgroup label="Groups">
                               {groupsWithMultipleSensors.map((groupId) => {
                                 const groupSensors = sensorGroups[groupId];
                                 const highestTemp = Math.max(
@@ -2136,36 +2334,29 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                   </option>
                                 );
                               })}
-                              <option disabled>────────────────────</option>
-                            </>
+                            </optgroup>
                           );
                         })()}
 
-                        {/* Individual Sensors Header */}
-                        <option disabled>(Sensors)</option>
-
                         {/* Individual Sensors (sorted by group, then by ID) */}
-                        {system.current_temperatures
-                          ?.filter(
-                            (sensor: SensorReading) =>
-                              !isSensorOrGroupHidden(sensor)
-                          )
-                          .sort((a: SensorReading, b: SensorReading) => {
-                            const groupA = deriveSensorGroupId(a);
-                            const groupB = deriveSensorGroupId(b);
-                            if (groupA !== groupB) return groupA.localeCompare(groupB);
-                            return a.id.localeCompare(b.id);
-                          })
-                          .map((sensor: SensorReading) => (
-                            <option key={sensor.id} value={sensor.id}>
-                              {getSensorDisplayName(
-                                sensor.id,
-                                sensor.name,
-                                sensor.label
-                              )}{" "}
-                              ({formatTemperature(sensor.temperature)})
-                            </option>
-                          ))}
+                        <optgroup label="Sensors">
+                          {system.current_temperatures
+                            ?.filter(
+                              (sensor: SensorReading) =>
+                                !isSensorOrGroupHidden(sensor)
+                            )
+                            .sort(compareSensorsForDropdown)
+                            .map((sensor: SensorReading) => (
+                              <option key={sensor.id} value={sensor.id}>
+                                {getSensorDisplayName(
+                                  sensor.id,
+                                  sensor.name,
+                                  sensor.label
+                                )}{" "}
+                                ({formatTemperature(sensor.temperature)})
+                              </option>
+                            ))}
+                        </optgroup>
                       </select>
                       </div>
                     </div>
@@ -2352,6 +2543,41 @@ const SystemCard: React.FC<SystemCardProps> = ({
         anchorRect={anchorRect}
         onClose={() => setIsBulkEditOpen(false)}
       />
+
+      {/* Virtual Sensor modals */}
+      {builderOpen && (
+        <SensorBuilderModal
+          systemId={system.id}
+          sensors={system.current_temperatures || []}
+          editing={builderEditing}
+          anchorRect={anchorRect}
+          getChipDisplayName={getChipDisplayName}
+          onClose={() => setBuilderOpen(false)}
+          onSaved={reloadVirtualSensors}
+        />
+      )}
+      {manageOpen && (
+        <ManageSensorsModal
+          sensors={system.current_temperatures || []}
+          virtualRows={virtualRows}
+          sensorOrder={sensorOrder}
+          onReorderSensors={handleReorderSensors}
+          onReorderGroups={handleReorderGroups}
+          onReorderVirtual={handleReorderVirtual}
+          anchorRect={anchorRect}
+          isSensorHidden={isSensorHidden}
+          onToggleSensorVisibility={handleToggleSensorVisibility}
+          onRenameSensor={async (dbId, label) => {
+            await updateSensorLabel(system.id, dbId, label);
+            onUpdate();
+          }}
+          getChipDisplayName={getChipDisplayName}
+          onNewVirtual={openNewVirtual}
+          onEditVirtual={openEditVirtual}
+          onVirtualDeleted={reloadVirtualSensors}
+          onClose={() => setManageOpen(false)}
+        />
+      )}
     </div>
   );
 };

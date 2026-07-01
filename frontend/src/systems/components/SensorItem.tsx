@@ -1,4 +1,5 @@
 import React from "react";
+import { Pencil } from "lucide-react";
 import type { SensorReading, HistoryDataPoint } from "../../types/api";
 import { InlineEdit } from "../../components/InlineEdit";
 import { getSensorDisplayName } from "../../utils/displayNames";
@@ -15,6 +16,10 @@ interface SensorItemProps {
   onLabelSave: (sensorDbId: number, newLabel: string) => Promise<void>;
   getTemperatureClass: (temp: number, maxTemp?: number, critTemp?: number) => string;
   getSensorIcon: (type: string) => React.ReactNode;
+  isVirtual?: boolean; // Synthetic virtual-sensor row (computed client-side)
+  subtitle?: string;   // For virtual rows: concise text shown in place of "type: id" (e.g. "Average of 8 sensors")
+  subtitleTooltip?: string; // For virtual rows: full hover text (grouped member list)
+  onEdit?: () => void; // For virtual rows: quick-edit button in the rack
 }
 
 const SensorItem: React.FC<SensorItemProps> = ({
@@ -26,6 +31,10 @@ const SensorItem: React.FC<SensorItemProps> = ({
   onLabelSave,
   getTemperatureClass,
   getSensorIcon,
+  isVirtual = false,
+  subtitle,
+  subtitleTooltip,
+  onEdit,
 }) => {
   const tempClass = getTemperatureClass(
     sensor.temperature,
@@ -53,6 +62,16 @@ const SensorItem: React.FC<SensorItemProps> = ({
             <img src="/icons/toggle-on-01.png" width={20} height={20} alt="Visible" style={{ opacity: 0.75 }}/>
           )}
         </button>
+        {isVirtual && onEdit && (
+          <button
+            className="rack-edit"
+            onClick={onEdit}
+            title="Edit virtual sensor"
+            aria-label="Edit virtual sensor"
+          >
+            <Pencil size={16} />
+          </button>
+        )}
       </div>
 
       {/* === CARD (Contains Content + Value + Sparkline) === */}
@@ -67,6 +86,12 @@ const SensorItem: React.FC<SensorItemProps> = ({
                 value={getSensorDisplayName(sensor.id, sensor.name, sensor.label)}
                 hardwareId={sensor.id}
                 onSave={async (newLabel) => {
+                  if (isVirtual) {
+                    // Virtual rows have no sensors-table dbId; the parent's handler
+                    // routes to the virtual rename endpoint using its own captured id.
+                    await onLabelSave(sensor.dbId ?? 0, newLabel);
+                    return;
+                  }
                   if (!sensor.dbId) {
                     throw new Error("Sensor not registered in database");
                   }
@@ -80,10 +105,16 @@ const SensorItem: React.FC<SensorItemProps> = ({
             {/* Row 2: Type: hardware_id */}
             <div
               className="sensor-type-row"
-              title={`${sensor.type}: ${sensor.id}`}
+              title={isVirtual ? (subtitleTooltip ?? subtitle) : `${sensor.type}: ${sensor.id}`}
             >
-              <span className="sensor-type-label">{sensor.type}:</span>
-              <span className="sensor-hardware-id">{sensor.id}</span>
+              {isVirtual ? (
+                <span className="sensor-hardware-id">{subtitle}</span>
+              ) : (
+                <>
+                  <span className="sensor-type-label">{sensor.type}:</span>
+                  <span className="sensor-hardware-id">{sensor.id}</span>
+                </>
+              )}
             </div>
           </div>
 
@@ -118,6 +149,9 @@ export default React.memo(SensorItem, (prevProps, nextProps) => {
     prevProps.sensor.label === nextProps.sensor.label &&
     prevProps.sensor.name === nextProps.sensor.name &&
     prevProps.isHidden === nextProps.isHidden &&
+    prevProps.isVirtual === nextProps.isVirtual &&
+    prevProps.subtitle === nextProps.subtitle &&
+    prevProps.subtitleTooltip === nextProps.subtitleTooltip &&
     prevProps.history === nextProps.history
   );
 });

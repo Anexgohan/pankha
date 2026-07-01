@@ -107,6 +107,31 @@
   /* outline-offset: 1px; */
 }
 
+/* Quick-edit button in the rack (virtual sensors only) - mirrors .rack-visibility */
+.rack-edit {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.rack-edit:hover {
+  background: var(--bg-hover);
+  border-color: var(--color-accent-dynamic);
+  transform: translateX(-4px);
+  box-shadow: 0 0 15px -2px var(--color-accent-dynamic);
+  z-index: 2;
+}
+
 /* === CARD (Main sensor display) === */
 .sensor-card {
   flex: 1;

@@ -718,3 +718,11 @@
   border-top: 1px solid var(--border-color);
   background-color: color-mix(in srgb, var(--color-info) 4%, var(--bg-panels_01));
 }
+
+/* Virtual Sensors toolbar (Sensor Builder / Manage) at top of the expanded sensors body */
+.vs-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
