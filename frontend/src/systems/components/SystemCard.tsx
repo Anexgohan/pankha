@@ -32,7 +32,7 @@ import {
   getFanConfigurations,
 } from "../../services/fanConfigurationsApi";
 import { getChipDisplayName, getSensorLabel } from "../../config/sensorLabels";
-import { sortSensorGroups, sortSensorGroupIds, deriveSensorGroupId, groupSensorsByChip, compareSensorGroups } from "../../utils/sensorUtils";
+import { sortSensorGroups, deriveSensorGroupId, groupSensorsByChip, compareSensorGroups } from "../../utils/sensorUtils";
 import { sortByOrder } from "../../utils/ordering";
 import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
@@ -256,6 +256,26 @@ const SystemCard: React.FC<SystemCardProps> = ({
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to reorder virtual sensors");
     }
+  };
+
+  // Control Sensor dropdown ordering (Phase 2): make the picker agree with the dashboard.
+  // Groups by group order (then alpha); individual sensors by group order, then sensor
+  // order within the group, then name. The `!==` guards avoid Infinity - Infinity = NaN.
+  const orderGroupIds = (ids: string[]): string[] =>
+    sortByOrder(ids, (g) => sensorOrder.groups[g], (a, b) => compareSensorGroups(a, b));
+  const compareSensorsForDropdown = (a: SensorReading, b: SensorReading): number => {
+    const ga = deriveSensorGroupId(a);
+    const gb = deriveSensorGroupId(b);
+    if (ga !== gb) {
+      const oa = sensorOrder.groups[ga] ?? Infinity;
+      const ob = sensorOrder.groups[gb] ?? Infinity;
+      if (oa !== ob) return oa - ob;
+      return compareSensorGroups(ga, gb);
+    }
+    const sa = (a.dbId != null ? sensorOrder.sensors[a.dbId] : undefined) ?? Infinity;
+    const sb = (b.dbId != null ? sensorOrder.sensors[b.dbId] : undefined) ?? Infinity;
+    if (sa !== sb) return sa - sb;
+    return a.id.localeCompare(b.id);
   };
 
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -1883,7 +1903,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                   (sensor: SensorReading) => !isSensorOrGroupHidden(sensor)
                                 ) || [];
                                 const sensorGroups = groupSensorsByChip(visibleSensors);
-                                const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
+                                const sortedGroupIds = orderGroupIds(Object.keys(sensorGroups));
                                 const groupsWithMultipleSensors = sortedGroupIds.filter(
                                   (groupId) => sensorGroups[groupId].length > 1
                                 );
@@ -1909,12 +1929,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                               <option disabled>(Sensors)</option>
                               {system.current_temperatures
                                 ?.filter((sensor: SensorReading) => !isSensorOrGroupHidden(sensor))
-                                .sort((a: SensorReading, b: SensorReading) => {
-                                  const groupA = deriveSensorGroupId(a);
-                                  const groupB = deriveSensorGroupId(b);
-                                  if (groupA !== groupB) return groupA.localeCompare(groupB);
-                                  return a.id.localeCompare(b.id);
-                                })
+                                .sort(compareSensorsForDropdown)
                                 .map((sensor: SensorReading) => (
                                   <option key={sensor.id} value={sensor.id}>
                                     {getSensorDisplayName(sensor.id, sensor.name, sensor.label)}{" "}
@@ -2300,7 +2315,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
                           const sensorGroups =
                             groupSensorsByChip(visibleSensors);
-                          const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
+                          const sortedGroupIds = orderGroupIds(Object.keys(sensorGroups));
 
                           const groupsWithMultipleSensors =
                             sortedGroupIds.filter(
@@ -2343,12 +2358,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             (sensor: SensorReading) =>
                               !isSensorOrGroupHidden(sensor)
                           )
-                          .sort((a: SensorReading, b: SensorReading) => {
-                            const groupA = deriveSensorGroupId(a);
-                            const groupB = deriveSensorGroupId(b);
-                            if (groupA !== groupB) return groupA.localeCompare(groupB);
-                            return a.id.localeCompare(b.id);
-                          })
+                          .sort(compareSensorsForDropdown)
                           .map((sensor: SensorReading) => (
                             <option key={sensor.id} value={sensor.id}>
                               {getSensorDisplayName(
