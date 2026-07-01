@@ -1886,17 +1886,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                               <option value="__highest__" title="Use the Highest Temperature on the system">
                                 Highest ({formatTemperature(highestTemperature, '0.0°C')})
                               </option>
-                              <option disabled>────────────────────</option>
                               {virtualRows.length > 0 && (
-                                <>
-                                  <option disabled>(Virtual)</option>
+                                <optgroup label="Virtual">
                                   {virtualRows.map(({ def, reading }) => (
                                     <option key={reading.id} value={reading.id} title="Virtual sensor">
                                       {def.name}{!Number.isNaN(reading.temperature) ? ` (${formatTemperature(reading.temperature)})` : ''}
                                     </option>
                                   ))}
-                                  <option disabled>────────────────────</option>
-                                </>
+                                </optgroup>
                               )}
                               {(() => {
                                 const visibleSensors = system.current_temperatures?.filter(
@@ -1909,8 +1906,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                 );
                                 if (groupsWithMultipleSensors.length === 0) return null;
                                 return (
-                                  <>
-                                    <option disabled>(Groups)</option>
+                                  <optgroup label="Groups">
                                     {groupsWithMultipleSensors.map((groupId) => {
                                       const groupSensors = sensorGroups[groupId];
                                       const highestTemp = Math.max(...groupSensors.map((s) => s.temperature));
@@ -1922,20 +1918,20 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                         </option>
                                       );
                                     })}
-                                    <option disabled>────────────────────</option>
-                                  </>
+                                  </optgroup>
                                 );
                               })()}
-                              <option disabled>(Sensors)</option>
-                              {system.current_temperatures
-                                ?.filter((sensor: SensorReading) => !isSensorOrGroupHidden(sensor))
-                                .sort(compareSensorsForDropdown)
-                                .map((sensor: SensorReading) => (
-                                  <option key={sensor.id} value={sensor.id}>
-                                    {getSensorDisplayName(sensor.id, sensor.name, sensor.label)}{" "}
-                                    ({formatTemperature(sensor.temperature)})
-                                  </option>
-                                ))}
+                              <optgroup label="Sensors">
+                                {system.current_temperatures
+                                  ?.filter((sensor: SensorReading) => !isSensorOrGroupHidden(sensor))
+                                  .sort(compareSensorsForDropdown)
+                                  .map((sensor: SensorReading) => (
+                                    <option key={sensor.id} value={sensor.id}>
+                                      {getSensorDisplayName(sensor.id, sensor.name, sensor.label)}{" "}
+                                      ({formatTemperature(sensor.temperature)})
+                                    </option>
+                                  ))}
+                              </optgroup>
                             </select>
                           </div>
                         </div>
@@ -2289,20 +2285,15 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           Highest ({formatTemperature(highestTemperature, '0.0°C')})
                         </option>
 
-                        {/* Separator */}
-                        <option disabled>────────────────────</option>
-
                         {/* Virtual Sensors */}
                         {virtualRows.length > 0 && (
-                          <>
-                            <option disabled>(Virtual)</option>
+                          <optgroup label="Virtual">
                             {virtualRows.map(({ def, reading }) => (
                               <option key={reading.id} value={reading.id} title="Virtual sensor">
                                 {def.name}{!Number.isNaN(reading.temperature) ? ` (${formatTemperature(reading.temperature)})` : ''}
                               </option>
                             ))}
-                            <option disabled>────────────────────</option>
-                          </>
+                          </optgroup>
                         )}
 
                         {/* Sensor Groups Header and Options */}
@@ -2326,8 +2317,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             return null;
 
                           return (
-                            <>
-                              <option disabled>(Groups)</option>
+                            <optgroup label="Groups">
                               {groupsWithMultipleSensors.map((groupId) => {
                                 const groupSensors = sensorGroups[groupId];
                                 const highestTemp = Math.max(
@@ -2344,31 +2334,29 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                   </option>
                                 );
                               })}
-                              <option disabled>────────────────────</option>
-                            </>
+                            </optgroup>
                           );
                         })()}
 
-                        {/* Individual Sensors Header */}
-                        <option disabled>(Sensors)</option>
-
                         {/* Individual Sensors (sorted by group, then by ID) */}
-                        {system.current_temperatures
-                          ?.filter(
-                            (sensor: SensorReading) =>
-                              !isSensorOrGroupHidden(sensor)
-                          )
-                          .sort(compareSensorsForDropdown)
-                          .map((sensor: SensorReading) => (
-                            <option key={sensor.id} value={sensor.id}>
-                              {getSensorDisplayName(
-                                sensor.id,
-                                sensor.name,
-                                sensor.label
-                              )}{" "}
-                              ({formatTemperature(sensor.temperature)})
-                            </option>
-                          ))}
+                        <optgroup label="Sensors">
+                          {system.current_temperatures
+                            ?.filter(
+                              (sensor: SensorReading) =>
+                                !isSensorOrGroupHidden(sensor)
+                            )
+                            .sort(compareSensorsForDropdown)
+                            .map((sensor: SensorReading) => (
+                              <option key={sensor.id} value={sensor.id}>
+                                {getSensorDisplayName(
+                                  sensor.id,
+                                  sensor.name,
+                                  sensor.label
+                                )}{" "}
+                                ({formatTemperature(sensor.temperature)})
+                              </option>
+                            ))}
+                        </optgroup>
                       </select>
                       </div>
                     </div>
