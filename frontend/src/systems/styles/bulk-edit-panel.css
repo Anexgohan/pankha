@@ -230,6 +230,16 @@
   box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
 }
 
+/* Design1 trigger in a control group - old .bulk-edit-select footprint.
+ * Not Phase 5 delete scope. */
+.control-group .pk-select-trigger {
+  width: 100%;
+  padding: 10px 12px;
+  padding-right: 24px; /* chevron room */
+  font-size: 14px;
+  background-color: var(--bg-primary);
+}
+
 /* Select All Button */
 .select-all-btn {
   padding: 6px 12px;

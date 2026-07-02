@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import type { FanReading, SensorReading } from '../../types/api';
-import type { FanProfile } from '../../services/fanProfilesApi';
+import type { FanReading } from '../../types/api';
 import { useContextualPanel } from '../hooks/useContextualPanel';
-import { sortSensorGroupIds, deriveSensorGroupId } from '../../utils/sensorUtils';
-import { formatTemperature } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
+import { Select } from '../../components/ui/Select';
+import type { SelectGroup, SelectOption } from '../../components/ui/Select';
+import { NO_PROFILE } from './profileSelectOptions';
+import { renderSensorTrigger, renderSensorOption } from './sensorSelectOptions';
 import {
   X,
   CheckSquare,
@@ -16,14 +17,19 @@ import '../styles/bulk-edit-panel.css';
 
 interface BulkEditPanelProps {
   fans: FanReading[];
-  sensors: SensorReading[];
-  profiles: FanProfile[];
   onApply: (fanIds: string[], sensorId?: string, profileId?: number) => Promise<void>;
-  getSensorDisplayName: (id: string, name: string, label: string) => string;
   getFanDisplayName: (id: string, name: string, label: string) => string;
-  getChipDisplayName: (chipId: string) => string;
-  groupSensorsByChip: (sensors: SensorReading[]) => Record<string, SensorReading[]>;
-  highestTemperature: number | null;
+  // Option lists + renderers built by SystemCard - same content as the
+  // per-fan Control Sensor / Fan Profile dropdowns, "" row = "Don't change"
+  sensorOptions: SelectGroup<string>[];
+  profileOptions: SelectGroup<number>[];
+  profileRenderers: {
+    renderTrigger: (selected: SelectOption<number> | null) => React.ReactNode;
+    renderOption: (
+      opt: SelectOption<number>,
+      state: { active: boolean; selected: boolean }
+    ) => React.ReactNode;
+  };
   isOpen: boolean;
   anchorRect: DOMRect | null;
   onClose: () => void;
@@ -43,14 +49,11 @@ const formatZoneName = (zoneId: string): string => {
  */
 export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   fans,
-  sensors,
-  profiles,
   onApply,
-  getSensorDisplayName,
   getFanDisplayName,
-  getChipDisplayName,
-  groupSensorsByChip,
-  highestTemperature,
+  sensorOptions,
+  profileOptions,
+  profileRenderers,
   isOpen,
   anchorRect,
   onClose
@@ -176,60 +179,17 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   const renderSensorDropdown = () => (
     <div className="control-group" title="The sensor used to control the speed of selected fans">
       <label htmlFor="bulk-sensor">Set Control Sensor:</label>
-      <select
+      <Select
         id="bulk-sensor"
-        className="bulk-edit-select"
         value={bulkSensorId}
-        onChange={(e) => setBulkSensorId(e.target.value)}
-      >
-        <option value="">Don't change</option>
-        <option value="__highest__">
-          Highest ({formatTemperature(highestTemperature, '0.0°C')})
-        </option>
-        <option disabled>────────────────────</option>
-
-        {(() => {
-          const sensorGroups = groupSensorsByChip(sensors);
-          const sortedGroupIds = sortSensorGroupIds(Object.keys(sensorGroups));
-          const groupsWithMultipleSensors = sortedGroupIds.filter(
-            groupId => sensorGroups[groupId].length > 1
-          );
-
-          if (groupsWithMultipleSensors.length === 0) return null;
-
-          return (
-            <>
-              <option disabled>(Groups)</option>
-              {groupsWithMultipleSensors.map(groupId => {
-                const groupSensors = sensorGroups[groupId];
-                const highestTemp = Math.max(...groupSensors.map(s => s.temperature));
-                return (
-                  <option
-                    key={`group-${groupId}`}
-                    value={`__group__${groupId}`}
-                    title="Selecting a group uses the Highest Temperature of that group"
-                  >
-                    {getChipDisplayName(groupId)} ({formatTemperature(highestTemp)})
-                  </option>
-                );
-              })}
-              <option disabled>────────────────────</option>
-            </>
-          );
-        })()}
-
-        <option disabled>(Sensors)</option>
-        {[...sensors].sort((a, b) => {
-          const groupA = deriveSensorGroupId(a);
-          const groupB = deriveSensorGroupId(b);
-          if (groupA !== groupB) return groupA.localeCompare(groupB);
-          return a.id.localeCompare(b.id);
-        }).map((sensor) => (
-          <option key={sensor.id} value={sensor.id}>
-            {getSensorDisplayName(sensor.id, sensor.name, sensor.label)} ({formatTemperature(sensor.temperature)})
-          </option>
-        ))}
-      </select>
+        onChange={setBulkSensorId}
+        options={sensorOptions}
+        renderTrigger={renderSensorTrigger}
+        renderOption={renderSensorOption}
+        searchable
+        menuMaxHeight={320}
+        ariaLabel="Set Control Sensor"
+      />
     </div>
   );
 
@@ -237,19 +197,16 @@ export const BulkEditPanel: React.FC<BulkEditPanelProps> = ({
   const renderProfileDropdown = () => (
     <div className="control-group" title="The behavior curve or manual speed to apply to selected fans">
       <label htmlFor="bulk-profile">Set Fan Profile:</label>
-      <select
+      <Select
         id="bulk-profile"
-        className="bulk-edit-select"
-        value={bulkProfileId || ''}
-        onChange={(e) => setBulkProfileId(e.target.value ? parseInt(e.target.value) : undefined)}
-      >
-        <option value="">Don't change</option>
-        {profiles.map((profile) => (
-          <option key={profile.id} value={profile.id}>
-            {profile.profile_name} ({profile.created_by === 'system' ? 'default' : 'custom'})
-          </option>
-        ))}
-      </select>
+        value={bulkProfileId ?? NO_PROFILE}
+        onChange={(v) => setBulkProfileId(v === NO_PROFILE ? undefined : v)}
+        options={profileOptions}
+        renderTrigger={profileRenderers.renderTrigger}
+        renderOption={profileRenderers.renderOption}
+        searchable
+        ariaLabel="Set Fan Profile"
+      />
     </div>
   );
 

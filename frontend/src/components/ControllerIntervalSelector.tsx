@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { getControllerStatus, setControllerInterval } from '../services/api';
 import { toast } from '../utils/toast';
 import { Loader2 } from 'lucide-react';
+import { Select } from './ui/Select';
+import type { SelectOption } from './ui/Select';
 
 interface ControllerIntervalOption {
   value: number;
@@ -17,6 +19,10 @@ const controllerIntervalOptions: ControllerIntervalOption[] = [
   { value: 5000, label: 'Slow (5s)', icon: 'clock' },
   { value: 10000, label: 'Very Slow (10s)', icon: 'history' }
 ];
+
+const selectOptions: SelectOption<number>[] = controllerIntervalOptions.map(
+  (option) => ({ value: option.value, label: option.label })
+);
 
 const ControllerIntervalSelector: React.FC = () => {
   const [currentInterval, setCurrentInterval] = useState<number>(2000); // Default 2s
@@ -35,9 +41,7 @@ const ControllerIntervalSelector: React.FC = () => {
     fetchStatus();
   }, []);
 
-  const handleIntervalChange = async (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const newInterval = parseInt(event.target.value);
-
+  const handleIntervalChange = async (newInterval: number) => {
     setLoading(true);
     try {
       await setControllerInterval(newInterval);
@@ -59,20 +63,15 @@ const ControllerIntervalSelector: React.FC = () => {
       <label htmlFor="controller-interval" className="controller-interval-label">
         System Responsiveness (CPU Load)
       </label>
-      <select
+      <Select
         id="controller-interval"
-        className="controller-interval-dropdown"
         value={currentInterval}
         onChange={handleIntervalChange}
+        options={selectOptions}
         disabled={loading}
-        aria-label="Select system responsiveness"
-      >
-        {controllerIntervalOptions.map(option => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        width={180}
+        ariaLabel="Select system responsiveness"
+      />
       {loading && <Loader2 className="animate-spin" size={14} />}
     </div>
   );

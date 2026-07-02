@@ -559,6 +559,21 @@
   background: var(--text-tertiary);
 }
 
+/* Dot-to-name gap parity with the old .select-display (Design1 trigger).
+ * Not Phase 5 delete scope; footprint lives in sensors-fans.css. */
+.pk-select-trigger.fan-profile-select .pk-select-value {
+  gap: var(--spacing-sm);
+}
+
+/* Design1 trigger in the settings grid - Design0's fixed 100x25 footprint.
+ * Not Phase 5 delete scope. */
+.command-item .pk-select-trigger {
+  width: 100px;
+  height: 25px;
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-medium);
+}
+
 /* 3.7 Footer Stats */
 .system-stats {
   display: flex;

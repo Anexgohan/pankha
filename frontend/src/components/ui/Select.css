@@ -1,0 +1,298 @@
+/* Select (Design1) - in-house dropdown. Tokens only; light/dark via existing
+ * semantic vars. Class namespace pk-select-* (distinct from Design0's
+ * .select-engine / .select-display so both coexist during migration). */
+
+/* ---- Trigger (closed state) ---- */
+
+.pk-select-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  padding-right: 24px; /* room for the chevron (matches Design0 .select-display) */
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Chevron - same masked svg as Design0 (forms.css .stealth-select-wrapper::after) */
+.pk-select-trigger::after {
+  content: "";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 6px;
+  background-color: var(--text-primary);
+  opacity: 0.6;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1L5 5L9 1' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
+  mask-size: contain;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1L5 5L9 1' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
+  -webkit-mask-size: contain;
+  pointer-events: none;
+  transition: all 0.2s ease;
+}
+
+/* Hover - Design0's accent treatment (forms.css stealth-select hover) */
+.pk-select-trigger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 8%, var(--bg-secondary));
+  border-color: var(--color-accent-dynamic);
+}
+
+.pk-select-trigger:hover:not(:disabled)::after {
+  opacity: 1;
+  background-color: var(--color-accent-dynamic);
+}
+
+/* Focus ring - same tokens as Design0 (.select-engine:focus) */
+.pk-select-trigger:focus-visible {
+  outline: none;
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+/* Accent ring while open, mouse or keyboard (Design0 engine-focus parity) */
+.pk-select-trigger[aria-expanded="true"] {
+  border-color: var(--color-accent-dynamic);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.pk-select-trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pk-select-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.pk-select-placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ---- Menu (desktop popover, open state) ---- */
+
+.pk-select-menu {
+  position: fixed;
+  z-index: 2100; /* above bulk-edit panel (2001) so a Select works inside it */
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 40px rgba(0, 0, 15, 0.35), 0 0 20px rgba(0, 0, 0, 0.2);
+  animation: pk-select-in 0.12s ease-out;
+}
+
+@keyframes pk-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Search input (searchable menus) - above the list */
+.pk-select-search {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.pk-select-search-icon {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.pk-select-search-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  padding: 2px 0;
+}
+
+.pk-select-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.pk-select-empty {
+  padding: var(--spacing-sm);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+  user-select: none;
+}
+
+.pk-select-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--spacing-xs);
+  overflow-y: auto;
+  overscroll-behavior: contain; /* menu scroll must not chain to the page */
+  min-height: 0; /* let the sheet's flex column actually shrink the list */
+}
+
+/* Group headers - "bands + rail" design; rationale + rejected variants in
+ * task_12 taskfile. Text stays --text-primary (accent = selected/interactive) */
+.pk-select-group-label {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  /* Full bleed across the list's inner padding */
+  margin: var(--spacing-sm) calc(-1 * var(--spacing-xs)) 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  user-select: none;
+}
+
+/* No dead air at the very top of the list */
+.pk-select-group-label:first-child {
+  margin-top: calc(-1 * var(--spacing-xs));
+}
+
+.pk-select-option {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Group rail - --border-light (--border-color = --bg-tertiary and vanishes);
+ * square left corners so hover/selection backgrounds meet the rail */
+.pk-select-option.in-group {
+  margin-left: var(--spacing-sm);
+  border-left: 1px solid var(--border-light);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.pk-select-option.active {
+  background: var(--bg-hover);
+}
+
+/* Selected row - accent left bar (inset shadow: no layout shift) + accent
+ * check; text stays full-contrast (accent text was hard to read) */
+.pk-select-option.selected {
+  box-shadow: inset 3px 0 0 0 var(--color-accent-dynamic);
+  /* square left corners so the bar isn't clipped by the radius */
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.pk-select-option.selected .pk-select-check {
+  color: var(--color-accent-dynamic);
+}
+
+.pk-select-option.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pk-select-check {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ---- Mobile bottom sheet (open state, <768px) ---- */
+
+.pk-select-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2099;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+/* Mirrors the bulk-edit mobile sheet look; own classes, no feature coupling */
+.pk-select-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 2100;
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -10px 40px rgba(0, 0, 15, 0.5);
+  animation: pk-select-sheet-up 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes pk-select-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.pk-select-sheet .pk-select-list {
+  padding: var(--spacing-sm);
+}
+
+/* Thumb-friendly tap targets on mobile */
+.pk-select-sheet .pk-select-option {
+  min-height: 44px;
+}
+
+.pk-select-sheet .pk-select-search {
+  padding: var(--spacing-sm);
+}
+
+/* Sheet list pads wider (spacing-sm) - keep the band full-bleed */
+.pk-select-sheet .pk-select-group-label {
+  margin-left: calc(-1 * var(--spacing-sm));
+  margin-right: calc(-1 * var(--spacing-sm));
+  padding-left: var(--spacing-md, 12px);
+}
+
+.pk-select-sheet .pk-select-search-input {
+  min-height: 32px;
+}
+
+/* ---- Accessibility ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .pk-select-menu,
+  .pk-select-sheet {
+    animation: none;
+  }
+  .pk-select-trigger,
+  .pk-select-trigger::after {
+    transition: none;
+  }
+}

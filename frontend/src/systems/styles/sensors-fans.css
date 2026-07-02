@@ -567,6 +567,17 @@
   box-sizing: border-box;
 }
 
+/* Design1 trigger in a fan control row - same footprint as the Design0
+ * wrapper above (fill row, fixed 25px). Not Phase 5 delete scope. */
+.fan-control-row .pk-select-trigger {
+  flex: 1;
+  min-width: 0;
+  height: 25px;
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-medium);
+  box-sizing: border-box;
+}
+
 .sensor-select-display {
   display: flex !important;
   gap: var(--spacing-xs);
@@ -583,6 +594,17 @@
 .sensor-select-temp {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* Control Sensor open rows: temp right-aligns as a column; the check yields
+ * its auto margin to it. Not Phase 5 delete scope. */
+.pk-select-option .sensor-select-temp {
+  margin-left: auto;
+  color: var(--text-secondary);
+}
+
+.pk-select-option:has(.sensor-select-temp) .pk-select-check {
+  margin-left: 0;
 }
 
 .fan-dropdown:hover:not(:disabled) {
