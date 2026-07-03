@@ -327,6 +327,7 @@ export class LicenseManager extends EventEmitter {
     licenseId: string | null;
     subscriptionId: string | null;
     customerId: string | null;
+    instanceId: string | null;
     token: string | null;
     agentLimit: number;
     retentionDays: number;
@@ -349,6 +350,15 @@ export class LicenseManager extends EventEmitter {
     // Check if auto-sync is needed before returning info
     await this.checkAutoSync();
 
+    // Install identity for the System ID field (seat-dispute reference).
+    // Non-fatal: a DB hiccup yields null rather than failing the endpoint.
+    let instanceId: string | null = null;
+    try {
+      instanceId = await this.getInstanceId();
+    } catch {
+      instanceId = null;
+    }
+
     const tier = await this.getCurrentTier();
     return {
       tier: tier.name,
@@ -358,6 +368,7 @@ export class LicenseManager extends EventEmitter {
       licenseId: this.licenseId,
       subscriptionId: this.subscriptionId,
       customerId: this.customerId,
+      instanceId,
       token: this.licenseKey,
       agentLimit: tier.agentLimit === Infinity ? -1 : tier.agentLimit,
       retentionDays: tier.retentionDays,

@@ -1152,6 +1152,22 @@ const Settings: React.FC = () => {
     return `${t.slice(0, 24)}${'.'.repeat(12)}${t.slice(-12)}`;
   };
 
+  // Per-field reveal for the other sensitive Account Details values (email,
+  // IDs, discount code). Hidden by default, same rationale as the token.
+  const [revealedFields, setRevealedFields] = useState<Set<string>>(new Set());
+  const toggleFieldReveal = (key: string) => {
+    setRevealedFields((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  // Short-value mask: first 4 + dots + last 4 (tokens use maskToken above).
+  const maskValue = (v: string): string =>
+    v.length <= 8 ? '.'.repeat(8) : `${v.slice(0, 4)}${'.'.repeat(6)}${v.slice(-4)}`;
+
   // Compose Account Details as plain text for the "Copy All" button. The token
   // is intentionally excluded - users with paranoid clipboards / screen-share
   // contexts can copy it separately via the dedicated token copy button.
@@ -1162,6 +1178,7 @@ const Settings: React.FC = () => {
     if (info.licenseId) lines.push(`License ID: ${info.licenseId}`);
     if (info.subscriptionId) lines.push(`Subscription ID: ${info.subscriptionId}`);
     if (info.customerId) lines.push(`Customer ID: ${info.customerId}`);
+    if (info.instanceId) lines.push(`System ID: ${info.instanceId}`);
     if (info.discountCode) {
       const cycles = info.discountCyclesRemaining;
       const cyclesPart = cycles != null && cycles > 0 ? `, ${cycles} cycles remaining` : '';
@@ -2875,8 +2892,19 @@ const Settings: React.FC = () => {
                             <span className="license-field-label">Email</span>
                           </div>
                           <div className="license-field-input">
-                            <span className="license-field-value">{license.customerEmail}</span>
+                            <span className="license-field-value">
+                              {revealedFields.has('email') ? license.customerEmail : maskValue(license.customerEmail)}
+                            </span>
                             <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => toggleFieldReveal('email')}
+                                title={revealedFields.has('email') ? 'Hide email' : 'Show email'}
+                                aria-label={revealedFields.has('email') ? 'Hide email' : 'Show email'}
+                              >
+                                {revealedFields.has('email') ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
                               <button
                                 type="button"
                                 className="license-details-icon-button"
@@ -2896,8 +2924,19 @@ const Settings: React.FC = () => {
                             <span className="license-field-label">License ID</span>
                           </div>
                           <div className="license-field-input">
-                            <span className="license-field-value license-field-value--mono">{license.licenseId}</span>
+                            <span className="license-field-value license-field-value--mono">
+                              {revealedFields.has('licenseId') ? license.licenseId : maskValue(license.licenseId)}
+                            </span>
                             <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => toggleFieldReveal('licenseId')}
+                                title={revealedFields.has('licenseId') ? 'Hide License ID' : 'Show License ID'}
+                                aria-label={revealedFields.has('licenseId') ? 'Hide License ID' : 'Show License ID'}
+                              >
+                                {revealedFields.has('licenseId') ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
                               <button
                                 type="button"
                                 className="license-details-icon-button"
@@ -2917,8 +2956,19 @@ const Settings: React.FC = () => {
                             <span className="license-field-label">Subscription ID</span>
                           </div>
                           <div className="license-field-input">
-                            <span className="license-field-value license-field-value--mono">{license.subscriptionId}</span>
+                            <span className="license-field-value license-field-value--mono">
+                              {revealedFields.has('subscriptionId') ? license.subscriptionId : maskValue(license.subscriptionId)}
+                            </span>
                             <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => toggleFieldReveal('subscriptionId')}
+                                title={revealedFields.has('subscriptionId') ? 'Hide Subscription ID' : 'Show Subscription ID'}
+                                aria-label={revealedFields.has('subscriptionId') ? 'Hide Subscription ID' : 'Show Subscription ID'}
+                              >
+                                {revealedFields.has('subscriptionId') ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
                               <button
                                 type="button"
                                 className="license-details-icon-button"
@@ -2938,14 +2988,57 @@ const Settings: React.FC = () => {
                             <span className="license-field-label">Customer ID</span>
                           </div>
                           <div className="license-field-input">
-                            <span className="license-field-value license-field-value--mono">{license.customerId}</span>
+                            <span className="license-field-value license-field-value--mono">
+                              {revealedFields.has('customerId') ? license.customerId : maskValue(license.customerId)}
+                            </span>
                             <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => toggleFieldReveal('customerId')}
+                                title={revealedFields.has('customerId') ? 'Hide Customer ID' : 'Show Customer ID'}
+                                aria-label={revealedFields.has('customerId') ? 'Hide Customer ID' : 'Show Customer ID'}
+                              >
+                                {revealedFields.has('customerId') ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
                               <button
                                 type="button"
                                 className="license-details-icon-button"
                                 onClick={() => copyToClipboard(license.customerId!, 'account')}
                                 title="Copy Customer ID"
                                 aria-label="Copy Customer ID"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {license.instanceId && (
+                        <div className="license-field">
+                          <div className="license-field-header">
+                            <span className="license-field-label">System ID</span>
+                          </div>
+                          <div className="license-field-input">
+                            <span className="license-field-value license-field-value--mono">
+                              {revealedFields.has('instanceId') ? license.instanceId : maskValue(license.instanceId)}
+                            </span>
+                            <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => toggleFieldReveal('instanceId')}
+                                title={revealedFields.has('instanceId') ? 'Hide System ID' : 'Show System ID'}
+                                aria-label={revealedFields.has('instanceId') ? 'Hide System ID' : 'Show System ID'}
+                              >
+                                {revealedFields.has('instanceId') ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => copyToClipboard(license.instanceId!, 'account')}
+                                title="Copy System ID"
+                                aria-label="Copy System ID"
                               >
                                 <Copy size={14} />
                               </button>
@@ -2962,8 +3055,19 @@ const Settings: React.FC = () => {
                             )}
                           </div>
                           <div className="license-field-input">
-                            <span className="license-field-value license-field-value--mono">{license.discountCode}</span>
+                            <span className="license-field-value license-field-value--mono">
+                              {revealedFields.has('discount') ? license.discountCode : maskValue(license.discountCode)}
+                            </span>
                             <div className="license-field-actions">
+                              <button
+                                type="button"
+                                className="license-details-icon-button"
+                                onClick={() => toggleFieldReveal('discount')}
+                                title={revealedFields.has('discount') ? 'Hide discount code' : 'Show discount code'}
+                                aria-label={revealedFields.has('discount') ? 'Hide discount code' : 'Show discount code'}
+                              >
+                                {revealedFields.has('discount') ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
                               <button
                                 type="button"
                                 className="license-details-icon-button"
