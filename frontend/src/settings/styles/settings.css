@@ -939,6 +939,82 @@
   font-family: var(--font-primary);
 }
 
+/* Font menu rows: name in UI font, dimmed specimen in the option's typeface.
+ * Desktop menu capped; the mobile sheet keeps its full width. */
+.pk-select-menu.font-select-menu {
+  max-width: min(420px, calc(100vw - 16px));
+}
+
+.font-option-name {
+  flex-shrink: 0;
+}
+
+.font-option-preview {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+
+/* The specimen takes the check's auto margin (same pattern as sensor temps) */
+.pk-select-option:has(.font-option-preview) .pk-select-check {
+  margin-left: 0;
+}
+
+/* Font size stepper */
+.font-scale-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.font-scale-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+/* Explicit size: Firefox collapses attribute-sized svg flex items in buttons to 0 width */
+.font-scale-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.font-scale-btn:hover:not(:disabled) {
+  border-color: var(--color-accent-dynamic);
+  color: var(--text-primary);
+}
+
+.font-scale-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.font-scale-value {
+  min-width: 48px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.font-scale-value:hover {
+  color: var(--color-accent-dynamic);
+}
+
 .accent-swatches {
     display: flex;
     gap: 0.5rem;
@@ -2784,19 +2860,29 @@
   justify-content: flex-end;
 }
 
+/* Two-line specimen (caps + lowercase); shrinks with ellipsis when space runs out */
 .appearance-font-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
   font-size: var(--font-size-base);
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
   padding-right: var(--spacing-md);
   border-right: 1px solid var(--border-color-dimmed);
 }
 
-.appearance-font-control .font-select {
-  min-width: 200px;
+.appearance-font-sample > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+/* Fixed trigger footprint - width:100% would squeeze the specimen out of the row */
+.appearance-font-control .pk-select-trigger.font-select {
+  width: 240px;
+  flex: none;
   margin: 0;
 }
 
@@ -3095,7 +3181,6 @@
   }
 
   .appearance-font-sample {
-    white-space: normal;
     max-width: 100%;
     padding: var(--spacing-xs) var(--spacing-sm);
     border-right: none;
@@ -3104,12 +3189,17 @@
     background: color-mix(in srgb, var(--color-accent-dynamic) 4%, transparent);
   }
 
+  .appearance-font-sample > span {
+    white-space: normal;
+    text-align: left; /* right-align reads wrong against the accent bar */
+  }
+
   .appearance-font-control {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .appearance-font-control .font-select {
+  .appearance-font-control .pk-select-trigger.font-select {
     width: 100%;
     min-height: 44px;
   }

@@ -40,6 +40,7 @@ export interface SelectProps<V extends string | number = string> {
   menuMaxHeight?: number; // px; list scrolls past this (default 320)
   searchable?: boolean; // built-in filter input at the top of the menu
   align?: 'start' | 'end'; // menu edge alignment (default 'start')
+  menuClassName?: string; // extra class on the menu / sheet container
 
   // ---- double-representation (omit for a plain dropdown) ----
   renderTrigger?: (selected: SelectOption<V> | null) => React.ReactNode;
@@ -86,6 +87,7 @@ export function Select<V extends string | number = string>(props: SelectProps<V>
     menuMaxHeight = 320,
     searchable,
     align = 'start',
+    menuClassName,
     renderTrigger,
     renderOption,
   } = props;
@@ -536,7 +538,11 @@ export function Select<V extends string | number = string>(props: SelectProps<V>
       {open &&
         !isMobile &&
         createPortal(
-          <div ref={menuRef} className="pk-select-menu" style={menuStyle}>
+          <div
+            ref={menuRef}
+            className={menuClassName ? `pk-select-menu ${menuClassName}` : 'pk-select-menu'}
+            style={menuStyle}
+          >
             {searchBox}
             {list}
           </div>,
@@ -547,7 +553,11 @@ export function Select<V extends string | number = string>(props: SelectProps<V>
         isMobile &&
         createPortal(
           <div className="pk-select-backdrop">
-            <div ref={menuRef} className="pk-select-sheet" style={sheetStyle}>
+            <div
+              ref={menuRef}
+              className={menuClassName ? `pk-select-sheet ${menuClassName}` : 'pk-select-sheet'}
+              style={sheetStyle}
+            >
               {searchBox}
               {list}
             </div>
