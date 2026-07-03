@@ -552,25 +552,15 @@
   flex-shrink: 0;
 }
 
-.fan-dropdown,
-.fan-control-row .stealth-select-wrapper {
+/* Design1 trigger in a fan control row - Design0 wrapper footprint
+ * (fill row, fixed 25px). */
+.fan-control-row .pk-select-trigger {
   flex: 1;
   min-width: 0;
-  padding: 4px var(--spacing-sm);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
+  height: 25px;
   font-size: var(--font-size-sm2);
-  cursor: pointer;
-  transition: all 0.2s ease;
+  font-weight: var(--font-weight-medium);
   box-sizing: border-box;
-}
-
-.sensor-select-display {
-  display: flex !important;
-  gap: var(--spacing-xs);
-  min-width: 0;
 }
 
 .sensor-select-name {
@@ -585,20 +575,15 @@
   white-space: nowrap;
 }
 
-.fan-dropdown:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-info) 8%, var(--bg-secondary));
-  border-color: var(--color-info);
+/* Control Sensor open rows: temp right-aligns as a column; the check yields
+ * its auto margin to it. */
+.pk-select-option .sensor-select-temp {
+  margin-left: auto;
+  color: var(--text-secondary);
 }
 
-.fan-dropdown:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
-}
-
-.fan-dropdown:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.pk-select-option:has(.sensor-select-temp) .pk-select-check {
+  margin-left: 0;
 }
 
 .speed-control {

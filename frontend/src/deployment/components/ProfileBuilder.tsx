@@ -12,6 +12,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { toast } from '../../utils/toast';
+import { Select } from '../../components/ui/Select';
 import {
   executeRawIpmi,
   saveCustomProfile,
@@ -610,32 +611,30 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
             <p className="profile-builder-hint">
               Select the bare IPMI agent deployed on your server.
             </p>
-            <div className="stealth-select-wrapper profile-select-wrapper" style={{ maxWidth: 400 }}>
-              <select
-                className="select-engine"
-                value={selectedSystemId ?? ''}
-                onChange={(e) =>
-                  setSelectedSystemId(e.target.value ? Number(e.target.value) : null)
-                }
-              >
-                <option value="">
-                  {onlineAgents.length === 0
+            <div style={{ maxWidth: 400 }}>
+              <Select
+                value={selectedSystemId != null ? String(selectedSystemId) : ''}
+                onChange={(v) => setSelectedSystemId(v ? Number(v) : null)}
+                options={[
+                  {
+                    value: '',
+                    label: onlineAgents.length === 0 ? 'No agents online' : 'Select agent...',
+                  },
+                  ...onlineAgents.map((s) => ({
+                    value: String(s.id),
+                    label: `${s.name || s.agent_id} (${s.agent_id})`,
+                  })),
+                ]}
+                renderTrigger={() =>
+                  selectedSystem
+                    ? `${selectedSystem.name || selectedSystem.agent_id}`
+                    : onlineAgents.length === 0
                     ? 'No agents online'
-                    : 'Select agent...'}
-                </option>
-                {onlineAgents.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name || s.agent_id} ({s.agent_id})
-                  </option>
-                ))}
-              </select>
-              <div className="select-display">
-                {selectedSystem
-                  ? `${selectedSystem.name || selectedSystem.agent_id}`
-                  : onlineAgents.length === 0
-                  ? 'No agents online'
-                  : 'Select agent...'}
-              </div>
+                    : 'Select agent...'
+                }
+                className="profile-select"
+                ariaLabel="Target Agent"
+              />
             </div>
           </div>
 
@@ -648,28 +647,30 @@ const ProfileBuilder: React.FC<ProfileBuilderProps> = ({ systems }) => {
             <div className="profile-builder-metadata-grid">
               <div className="builder-group">
                 <span className="builder-label">Vendor</span>
-                <div className="stealth-select-wrapper profile-select-wrapper">
-                  <select
-                    className="select-engine"
-                    value={vendorSelection}
-                    onChange={(e) => { setVendorSelection(e.target.value); if (e.target.value !== '__custom__') setCustomVendor(''); }}
-                  >
-                    <option value="">Select vendor...</option>
-                    {KNOWN_VENDORS.map(v => (
-                      <option key={v} value={v}>
-                        {v}{VENDOR_HINTS[v]?.unsupported ? ' (unsupported)' : ''}
-                      </option>
-                    ))}
-                    <option value="__custom__">Custom...</option>
-                  </select>
-                  <div className="select-display">
-                    {vendorSelection === '__custom__'
+                <Select
+                  value={vendorSelection}
+                  onChange={(v) => {
+                    setVendorSelection(v);
+                    if (v !== '__custom__') setCustomVendor('');
+                  }}
+                  options={[
+                    { value: '', label: 'Select vendor...' },
+                    ...KNOWN_VENDORS.map(v => ({
+                      value: v,
+                      label: `${v}${VENDOR_HINTS[v]?.unsupported ? ' (unsupported)' : ''}`,
+                    })),
+                    { value: '__custom__', label: 'Custom...' },
+                  ]}
+                  renderTrigger={() =>
+                    vendorSelection === '__custom__'
                       ? (customVendor || 'Custom...')
                       : vendorSelection
                         ? `${vendorSelection}${hints?.unsupported ? ' (unsupported)' : ''}`
-                        : 'Select vendor...'}
-                  </div>
-                </div>
+                        : 'Select vendor...'
+                  }
+                  className="profile-select"
+                  ariaLabel="Vendor"
+                />
                 {vendorSelection === '__custom__' && (
                   <input
                     className="hub-url-input"

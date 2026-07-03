@@ -27,6 +27,10 @@ import {
 } from "../../services/fanProfilesApi";
 import { getFanProfileTypes } from "../../services/fanProfileTypesApi";
 import type { FanProfileType } from "../../services/fanProfileTypesApi";
+import { Select } from "../../components/ui/Select";
+import type { SelectOption } from "../../components/ui/Select";
+import { buildProfileOptions, makeProfileRenderers, NO_PROFILE } from "./profileSelectOptions";
+import { buildSensorOptions, renderSensorTrigger, renderSensorOption } from "./sensorSelectOptions";
 import {
   setFanSensor,
   getFanConfigurations,
@@ -34,7 +38,7 @@ import {
 import { getChipDisplayName, getSensorLabel } from "../../config/sensorLabels";
 import { sortSensorGroups, deriveSensorGroupId, groupSensorsByChip, compareSensorGroups } from "../../utils/sensorUtils";
 import { sortByOrder } from "../../utils/ordering";
-import { getSensorDisplayName, getFanDisplayName } from "../../utils/displayNames";
+import { getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen, USER_TIMEZONE } from "../../utils/formatters";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
@@ -71,6 +75,20 @@ import BmcProfilePicker from "./BmcProfilePicker";
 import { useSensorHistory } from "../hooks/useSensorHistory";
 import { assignProfileToAgent } from "../../services/api";
 import { getOption, getValues, getLabel, getCleanLabel, getDefault, interpolateTooltip } from "../../utils/uiOptions";
+
+// Settings-select options from the ui-options.json SST (static per session)
+const toSelectOptions = <T extends string | number>(key: Parameters<typeof getValues>[0]) =>
+  (getValues(key) as { value: T; label: string }[]).map(
+    (o): SelectOption<T> => ({ value: o.value, label: o.label })
+  );
+const SETTING_OPTIONS = {
+  logLevel: toSelectOptions<string>('logLevel'),
+  emergencyTemp: toSelectOptions<number>('emergencyTemp'),
+  failsafeSpeed: toSelectOptions<number>('failsafeSpeed'),
+  updateInterval: toSelectOptions<number>('updateInterval'),
+  fanStep: toSelectOptions<number>('fanStep'),
+  hysteresis: toSelectOptions<number>('hysteresis'),
+};
 
 interface SystemCardProps {
   system: SystemData;
@@ -339,6 +357,22 @@ const SystemCard: React.FC<SystemCardProps> = ({
     user.sort(byName);
     return { systemProfiles: system, userProfiles: user };
   }, [fanProfiles]);
+
+  // Design1 <Select> parts for the Fan Profile dropdowns (zone + per-fan).
+  const profileSelectGroups = useMemo(
+    () => buildProfileOptions(systemProfiles, userProfiles),
+    [systemProfiles, userProfiles]
+  );
+  const profileRenderers = useMemo(() => makeProfileRenderers(typeColorMap), [typeColorMap]);
+  // Bulk-edit variants: same lists, "" row reads "Don't change"
+  const bulkProfileGroups = useMemo(
+    () => buildProfileOptions(systemProfiles, userProfiles, "Don't change"),
+    [systemProfiles, userProfiles]
+  );
+  const bulkProfileRenderers = useMemo(
+    () => makeProfileRenderers(typeColorMap, "Don't change"),
+    [typeColorMap]
+  );
 
   // Load fan profiles, assignments, and configurations on mount and when hardware structure changes
   useEffect(() => {
@@ -1051,6 +1085,24 @@ const SystemCard: React.FC<SystemCardProps> = ({
     return isGroupHidden(chipName);
   };
 
+  // Control Sensor dropdown (Design1 <Select>) - one option list shared by
+  // the zone + per-fan dropdowns. Recomputed per render, like the Design0
+  // inline <option> lists were, so temperatures stay live while open.
+  const dropdownSensors =
+    system.current_temperatures?.filter(
+      (sensor: SensorReading) => !isSensorOrGroupHidden(sensor)
+    ) || [];
+  const dropdownSensorGroups = groupSensorsByChip(dropdownSensors);
+  const sensorOptionInputs = {
+    highestTemperature,
+    virtualRows,
+    sensorGroups: dropdownSensorGroups,
+    sortedGroupIds: orderGroupIds(Object.keys(dropdownSensorGroups)),
+    sortedSensors: [...dropdownSensors].sort(compareSensorsForDropdown),
+  };
+  const sensorSelectGroups = buildSensorOptions(sensorOptionInputs);
+  const bulkSensorGroups = buildSensorOptions({ ...sensorOptionInputs, emptyLabel: "Don't change" });
+
   // Helper to check if agent is read-only (over license limit OR IPMI without profile)
   const isIpmiNoProfile = (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') && !system.profile_id && system.status === 'online';
   const isReadOnly = system.read_only === true || isIpmiNoProfile;
@@ -1298,19 +1350,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <Activity size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('logLevel')}</span>
                 </div>
-                <div className="stealth-select-wrapper">
-                  <div className="select-display">{getCleanLabel('logLevel', logLevel)}</div>
-                  <select
-                    className="select-engine"
-                    value={logLevel}
-                    onChange={(e) => handleLogLevelChange(e.target.value)}
-                    disabled={loading === "log-level" || isReadOnly}
-                  >
-                    {(getValues('logLevel') as { value: string; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  value={logLevel}
+                  onChange={handleLogLevelChange}
+                  options={SETTING_OPTIONS.logLevel}
+                  renderTrigger={() => getCleanLabel('logLevel', logLevel)}
+                  disabled={loading === "log-level" || isReadOnly}
+                  ariaLabel={getLabel('logLevel')}
+                />
               </div>
 
               {/* Row 2: Emergency Temp, Failsafe Speed */}
@@ -1319,19 +1366,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <Thermometer size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('emergencyTemp')}</span>
                 </div>
-                <div className="stealth-select-wrapper">
-                  <div className="select-display">{getCleanLabel('emergencyTemp', emergencyTemp)}</div>
-                  <select
-                    className="select-engine"
-                    value={emergencyTemp}
-                    onChange={(e) => handleEmergencyTempChange(parseFloat(e.target.value))}
-                    disabled={loading === "emergency-temp" || isReadOnly}
-                  >
-                    {(getValues('emergencyTemp') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  value={emergencyTemp}
+                  onChange={handleEmergencyTempChange}
+                  options={SETTING_OPTIONS.emergencyTemp}
+                  renderTrigger={() => getCleanLabel('emergencyTemp', emergencyTemp)}
+                  disabled={loading === "emergency-temp" || isReadOnly}
+                  ariaLabel={getLabel('emergencyTemp')}
+                />
               </div>
 
               <div className="command-item" title={interpolateTooltip(getOption('failsafeSpeed').tooltip, tooltipContext)}>
@@ -1339,19 +1381,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <Wind size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('failsafeSpeed')}</span>
                 </div>
-                <div className="stealth-select-wrapper">
-                  <div className="select-display">{getCleanLabel('failsafeSpeed', failsafeSpeed)}</div>
-                  <select
-                    className="select-engine"
-                    value={failsafeSpeed}
-                    onChange={(e) => handleFailsafeSpeedChange(parseFloat(e.target.value))}
-                    disabled={loading === "failsafe-speed" || isReadOnly}
-                  >
-                    {(getValues('failsafeSpeed') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  value={failsafeSpeed}
+                  onChange={handleFailsafeSpeedChange}
+                  options={SETTING_OPTIONS.failsafeSpeed}
+                  renderTrigger={() => getCleanLabel('failsafeSpeed', failsafeSpeed)}
+                  disabled={loading === "failsafe-speed" || isReadOnly}
+                  ariaLabel={getLabel('failsafeSpeed')}
+                />
               </div>
 
               {/* Row 3: Agent Rate, Fan Step, Hysteresis */}
@@ -1360,19 +1397,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <Activity size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('updateInterval')}</span>
                 </div>
-                <div className="stealth-select-wrapper">
-                  <div className="select-display">{getCleanLabel('updateInterval', agentInterval)}</div>
-                  <select
-                    className="select-engine"
-                    value={agentInterval}
-                    onChange={(e) => handleAgentIntervalChange(parseFloat(e.target.value))}
-                    disabled={loading === "agent-interval" || isReadOnly}
-                  >
-                    {(getValues('updateInterval') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  value={agentInterval}
+                  onChange={handleAgentIntervalChange}
+                  options={SETTING_OPTIONS.updateInterval}
+                  renderTrigger={() => getCleanLabel('updateInterval', agentInterval)}
+                  disabled={loading === "agent-interval" || isReadOnly}
+                  ariaLabel={getLabel('updateInterval')}
+                />
               </div>
 
               <div className="command-item" title={interpolateTooltip(getOption('fanStep').tooltip, tooltipContext)}>
@@ -1380,19 +1412,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <ChevronRight size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('fanStep')}</span>
                 </div>
-                <div className="stealth-select-wrapper">
-                  <div className="select-display">{getCleanLabel('fanStep', fanStep)}</div>
-                  <select
-                    className="select-engine"
-                    value={fanStep}
-                    onChange={(e) => handleFanStepChange(parseFloat(e.target.value))}
-                    disabled={loading === "fan-step" || isReadOnly}
-                  >
-                    {(getValues('fanStep') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  value={fanStep}
+                  onChange={handleFanStepChange}
+                  options={SETTING_OPTIONS.fanStep}
+                  renderTrigger={() => getCleanLabel('fanStep', fanStep)}
+                  disabled={loading === "fan-step" || isReadOnly}
+                  ariaLabel={getLabel('fanStep')}
+                />
               </div>
 
               <div className="command-item" title={interpolateTooltip(getOption('hysteresis').tooltip, tooltipContext)}>
@@ -1400,19 +1427,14 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <Thermometer size={12} className="label-icon" />
                   <span className="stat-label">{getLabel('hysteresis')}</span>
                 </div>
-                <div className="stealth-select-wrapper">
-                  <div className="select-display">{getCleanLabel('hysteresis', hysteresis)}</div>
-                  <select
-                    className="select-engine"
-                    value={hysteresis}
-                    onChange={(e) => handleHysteresisChange(parseFloat(e.target.value))}
-                    disabled={loading === "hysteresis" || isReadOnly}
-                  >
-                    {(getValues('hysteresis') as { value: number; label: string }[]).map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  value={hysteresis}
+                  onChange={handleHysteresisChange}
+                  options={SETTING_OPTIONS.hysteresis}
+                  renderTrigger={() => getCleanLabel('hysteresis', hysteresis)}
+                  disabled={loading === "hysteresis" || isReadOnly}
+                  ariaLabel={getLabel('hysteresis')}
+                />
               </div>
             </div>
           </div>
@@ -1825,231 +1847,67 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         {/* Sensor Selection Dropdown */}
                         <div className="fan-control-row">
                           <label className="control-label">Control Sensor:</label>
-                          <div className="stealth-select-wrapper sensor-select">
-                            <div className="select-display sensor-select-display">
-                              {(() => {
-                                const val = selectedSensors[representativeFan.id] || "";
-                                if (!val) return <span className="sensor-select-name">Select Sensor...</span>;
-                                if (val === "__highest__") return (
-                                  <>
-                                    <span className="sensor-select-name">Highest</span>
-                                    <span className="sensor-select-temp">({formatTemperature(highestTemperature, '0.0°C')})</span>
-                                  </>
-                                );
-                                if (val.startsWith("__virtual__")) {
-                                  const vrow = virtualRows.find(r => r.reading.id === val);
-                                  return (
-                                    <>
-                                      <span className="sensor-select-name">{vrow ? vrow.def.name : val}</span>
-                                      {vrow && !Number.isNaN(vrow.reading.temperature) && (
-                                        <span className="sensor-select-temp">({formatTemperature(vrow.reading.temperature)})</span>
-                                      )}
-                                    </>
-                                  );
-                                }
-                                if (val.startsWith("__group__")) {
-                                  const groupId = val.replace("__group__", "");
-                                  const visibleSensorsForGroups = system.current_temperatures?.filter(
-                                    (s: SensorReading) => !isSensorOrGroupHidden(s)
-                                  ) || [];
-                                  const groups = groupSensorsByChip(visibleSensorsForGroups);
-                                  const groupSensors = groups[groupId] || [];
-                                  const temp = groupSensors.length > 0
-                                    ? Math.max(...groupSensors.map(s => s.temperature))
-                                    : null;
-                                  return (
-                                    <>
-                                      <span className="sensor-select-name">{getChipDisplayName(groupId, groupSensors)}</span>
-                                      {temp !== null && <span className="sensor-select-temp">({formatTemperature(temp)})</span>}
-                                    </>
-                                  );
-                                }
-                                const sensor = system.current_temperatures?.find((s: SensorReading) => s.id === val);
-                                if (sensor) return (
-                                  <>
-                                    <span className="sensor-select-name">{getSensorDisplayName(sensor.id, sensor.name, sensor.label)}</span>
-                                    <span className="sensor-select-temp">({formatTemperature(sensor.temperature)})</span>
-                                  </>
-                                );
-                                return <span className="sensor-select-name">{val}</span>;
-                              })()}
-                            </div>
-                            <select
-                              className="select-engine"
-                              value={selectedSensors[representativeFan.id] || ""}
-                              onChange={async (e) => {
-                                await handleZoneSensorChange(zoneFans, e.target.value);
-                              }}
-                              disabled={system.status !== "online" || isReadOnly}
-                            >
-                              <option value="">Select Sensor...</option>
-                              <option value="__highest__" title="Use the Highest Temperature on the system">
-                                Highest ({formatTemperature(highestTemperature, '0.0°C')})
-                              </option>
-                              {virtualRows.length > 0 && (
-                                <optgroup label="Virtual">
-                                  {virtualRows.map(({ def, reading }) => (
-                                    <option key={reading.id} value={reading.id} title="Virtual sensor">
-                                      {def.name}{!Number.isNaN(reading.temperature) ? ` (${formatTemperature(reading.temperature)})` : ''}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              )}
-                              {(() => {
-                                const visibleSensors = system.current_temperatures?.filter(
-                                  (sensor: SensorReading) => !isSensorOrGroupHidden(sensor)
-                                ) || [];
-                                const sensorGroups = groupSensorsByChip(visibleSensors);
-                                const sortedGroupIds = orderGroupIds(Object.keys(sensorGroups));
-                                const groupsWithMultipleSensors = sortedGroupIds.filter(
-                                  (groupId) => sensorGroups[groupId].length > 1
-                                );
-                                if (groupsWithMultipleSensors.length === 0) return null;
-                                return (
-                                  <optgroup label="Groups">
-                                    {groupsWithMultipleSensors.map((groupId) => {
-                                      const groupSensors = sensorGroups[groupId];
-                                      const highestTemp = Math.max(...groupSensors.map((s) => s.temperature));
-                                      return (
-                                        <option key={`group-${groupId}`} value={`__group__${groupId}`}
-                                          title="Selecting a group uses the Highest Temperature of that group"
-                                        >
-                                          {getChipDisplayName(groupId, groupSensors)} ({formatTemperature(highestTemp)})
-                                        </option>
-                                      );
-                                    })}
-                                  </optgroup>
-                                );
-                              })()}
-                              <optgroup label="Sensors">
-                                {system.current_temperatures
-                                  ?.filter((sensor: SensorReading) => !isSensorOrGroupHidden(sensor))
-                                  .sort(compareSensorsForDropdown)
-                                  .map((sensor: SensorReading) => (
-                                    <option key={sensor.id} value={sensor.id}>
-                                      {getSensorDisplayName(sensor.id, sensor.name, sensor.label)}{" "}
-                                      ({formatTemperature(sensor.temperature)})
-                                    </option>
-                                  ))}
-                              </optgroup>
-                            </select>
-                          </div>
+                          {/* Control Sensor (Design1 <Select>) - grouped
+                            * Virtual / Groups / Sensors options with search;
+                            * name + temp on the trigger and on every open
+                            * row. Options built once per render in
+                            * sensorSelectGroups (shared with per-fan). */}
+                          <Select
+                            value={selectedSensors[representativeFan.id] || ""}
+                            onChange={(newSensorId) => {
+                              void handleZoneSensorChange(zoneFans, newSensorId);
+                            }}
+                            options={sensorSelectGroups}
+                            renderTrigger={renderSensorTrigger}
+                            renderOption={renderSensorOption}
+                            searchable
+                            menuMaxHeight={320}
+                            disabled={system.status !== "online" || isReadOnly}
+                            ariaLabel="Control Sensor"
+                            className="sensor-select"
+                          />
                         </div>
 
-                        {/* Profile Selection Dropdown
+                        {/* Profile Selection Dropdown (Design1 <Select>)
                          *
-                         * Closed `.select-display` shows a real status-dot
-                         * (.profile-color-dot) tinted by the selected
-                         * profile's profile_type color, plus the name and a
-                         * (System|User) badge-style suffix.
-                         *
-                         * The native popup is sorted into Manual -> System
-                         * (A-Z) -> User (A-Z) via <optgroup>; each <option>
-                         * is text-coloured by profile_type so the user sees
-                         * the same hue used by the profile-type badges in
-                         * the Fan Profile Manager. The trailing bullet (U+25CF,
-                         * BLACK CIRCLE) reinforces the colour cue inside the
-                         * option text since native <option> cannot host a
-                         * separate styled element.
+                         * Closed trigger and open rows share the same cues:
+                         * .profile-color-dot tinted by profile_type + name +
+                         * (type) suffix. The open list is our own DOM
+                         * (pk-select-*), so the dot cue works there too -
+                         * the old native popup could not host a styled
+                         * element. Order: Manual -> System (A-Z) -> User
+                         * (A-Z), via headerless + labeled option groups.
                          */}
                         <div className="fan-control-row">
                           <label className="control-label">Fan Profile:</label>
-                          <div className="stealth-select-wrapper fan-profile-select">
-                            {/* Closed-state visible chip. Real styled
-                             * `.profile-color-dot` span + name + (type)
-                             * suffix. The dot uses profile_type colour,
-                             * the text inherits the regular text colour.
-                             */}
-                            <div className="select-display">
-                              {(() => {
-                                const selected = fanProfiles.find(p => p.id === selectedProfiles[representativeFan.id]);
-                                if (!selected) return 'No Profile';
-                                const dotColor = typeColorMap[selected.profile_type] || null;
-                                return (
-                                  <>
-                                    {dotColor && (
-                                      <span
-                                        className="profile-color-dot"
-                                        style={{ background: dotColor }}
-                                      />
-                                    )}
-                                    <span className="profile-name-label">{selected.profile_name}</span>
-                                    <span className="profile-type-label">({selected.profile_type})</span>
-                                  </>
-                                );
-                              })()}
-                            </div>
-                            {/* Native popup uses the sensor-select grouping
-                             * pattern: disabled separator + disabled label
-                             * row act as section headers. The whole option
-                             * text is profile_type-coloured (native <option>
-                             * cannot scope colour to just the U+25CF
-                             * trailing bullet, so the entire row inherits
-                             * the colour) - the closed state above is
-                             * where the "only dot coloured" appearance
-                             * lives, in a real DOM element.
-                             */}
-                            <select
-                              className="select-engine"
-                              value={selectedProfiles[representativeFan.id] || ""}
-                              onChange={(e) => {
-                                const profileId = e.target.value;
-                                if (profileId) {
-                                  handleZoneProfileAssignment(zoneFans, parseInt(profileId));
-                                } else {
-                                  // Clear profile for all fans in zone
-                                  const updates: Record<string, number> = {};
+                          <Select
+                            value={selectedProfiles[representativeFan.id] ?? NO_PROFILE}
+                            onChange={(profileId) => {
+                              if (profileId !== NO_PROFILE) {
+                                handleZoneProfileAssignment(zoneFans, profileId);
+                              } else {
+                                // Clear profile for all fans in zone
+                                setSelectedProfiles(prev => {
+                                  const updated = { ...prev };
                                   for (const f of zoneFans) {
-                                    delete updates[f.id];
+                                    delete updated[f.id];
                                   }
-                                  setSelectedProfiles(prev => {
-                                    const updated = { ...prev };
-                                    for (const f of zoneFans) {
-                                      delete updated[f.id];
-                                    }
-                                    return updated;
-                                  });
-                                }
-                              }}
-                              disabled={
-                                loading === zoneLoadingKey ||
-                                system.status !== "online" ||
-                                isReadOnly
+                                  return updated;
+                                });
                               }
-                            >
-                              <option value="">No Profile (Manual)</option>
-                              {systemProfiles.length > 0 && (
-                                <>
-                                  <option disabled>────────────────────</option>
-                                  <option disabled>(System)</option>
-                                  {systemProfiles.map((profile: FanProfile) => (
-                                    <option
-                                      key={profile.id}
-                                      value={profile.id}
-                                      title={profile.description || profile.profile_name}
-                                    >
-                                      {profile.profile_name} ({profile.profile_type})
-                                    </option>
-                                  ))}
-                                </>
-                              )}
-                              {userProfiles.length > 0 && (
-                                <>
-                                  <option disabled>────────────────────</option>
-                                  <option disabled>(User)</option>
-                                  {userProfiles.map((profile: FanProfile) => (
-                                    <option
-                                      key={profile.id}
-                                      value={profile.id}
-                                      title={profile.description || profile.profile_name}
-                                    >
-                                      {profile.profile_name} ({profile.profile_type})
-                                    </option>
-                                  ))}
-                                </>
-                              )}
-                            </select>
-                          </div>
+                            }}
+                            options={profileSelectGroups}
+                            renderTrigger={profileRenderers.renderTrigger}
+                            renderOption={profileRenderers.renderOption}
+                            searchable
+                            disabled={
+                              loading === zoneLoadingKey ||
+                              system.status !== "online" ||
+                              isReadOnly
+                            }
+                            ariaLabel="Fan Profile"
+                            className="fan-profile-select"
+                          />
                           {loading === zoneLoadingKey && (
                             <Loader2 className="animate-spin" size={14} />
                           )}
@@ -2187,60 +2045,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     {/* Sensor Selection Dropdown */}
                     <div className="fan-control-row">
                       <label className="control-label">Control Sensor:</label>
-                      <div className="stealth-select-wrapper sensor-select">
-                        <div className="select-display sensor-select-display">
-                          {(() => {
-                            const val = selectedSensors[fan.id] || "";
-                            if (!val) return <span className="sensor-select-name">Select Sensor...</span>;
-                            if (val === "__highest__") return (
-                              <>
-                                <span className="sensor-select-name">Highest</span>
-                                <span className="sensor-select-temp">({formatTemperature(highestTemperature, '0.0°C')})</span>
-                              </>
-                            );
-                            if (val.startsWith("__virtual__")) {
-                              const vrow = virtualRows.find(r => r.reading.id === val);
-                              return (
-                                <>
-                                  <span className="sensor-select-name">{vrow ? vrow.def.name : val}</span>
-                                  {vrow && !Number.isNaN(vrow.reading.temperature) && (
-                                    <span className="sensor-select-temp">({formatTemperature(vrow.reading.temperature)})</span>
-                                  )}
-                                </>
-                              );
-                            }
-                            if (val.startsWith("__group__")) {
-                              const groupId = val.replace("__group__", "");
-                              const visibleSensorsForGroups = system.current_temperatures?.filter(
-                                (s: SensorReading) => !isSensorOrGroupHidden(s)
-                              ) || [];
-                              const groups = groupSensorsByChip(visibleSensorsForGroups);
-                              const groupSensors = groups[groupId] || [];
-                              const temp = groupSensors.length > 0
-                                ? Math.max(...groupSensors.map(s => s.temperature))
-                                : null;
-                              return (
-                                <>
-                                  <span className="sensor-select-name">{getChipDisplayName(groupId, groupSensors)}</span>
-                                  {temp !== null && <span className="sensor-select-temp">({formatTemperature(temp)})</span>}
-                                </>
-                              );
-                            }
-                            const sensor = system.current_temperatures?.find((s: SensorReading) => s.id === val);
-                            if (sensor) return (
-                              <>
-                                <span className="sensor-select-name">{getSensorDisplayName(sensor.id, sensor.name, sensor.label)}</span>
-                                <span className="sensor-select-temp">({formatTemperature(sensor.temperature)})</span>
-                              </>
-                            );
-                            return <span className="sensor-select-name">{val}</span>;
-                          })()}
-                        </div>
-                      <select
-                        className="select-engine"
+                      {/* Control Sensor (Design1 <Select>) - mirror of the
+                        * zone-level dropdown above; same shared options,
+                        * search, and renderers. */}
+                      <Select
                         value={selectedSensors[fan.id] || ""}
-                        onChange={async (e) => {
-                          const newSensorId = e.target.value;
+                        onChange={async (newSensorId) => {
                           setSelectedSensors((prev) => ({
                             ...prev,
                             [fan.id]: newSensorId,
@@ -2273,186 +2083,51 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             }
                           }
                         }}
+                        options={sensorSelectGroups}
+                        renderTrigger={renderSensorTrigger}
+                        renderOption={renderSensorOption}
+                        searchable
+                        menuMaxHeight={320}
                         disabled={system.status !== "online" || isReadOnly}
-                      >
-                        <option value="">Select Sensor...</option>
-
-                        {/* Highest Temperature Option */}
-                        <option
-                          value="__highest__"
-                          title="Use the Highest Temperature on the system"
-                        >
-                          Highest ({formatTemperature(highestTemperature, '0.0°C')})
-                        </option>
-
-                        {/* Virtual Sensors */}
-                        {virtualRows.length > 0 && (
-                          <optgroup label="Virtual">
-                            {virtualRows.map(({ def, reading }) => (
-                              <option key={reading.id} value={reading.id} title="Virtual sensor">
-                                {def.name}{!Number.isNaN(reading.temperature) ? ` (${formatTemperature(reading.temperature)})` : ''}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-
-                        {/* Sensor Groups Header and Options */}
-                        {(() => {
-                          const visibleSensors =
-                            system.current_temperatures?.filter(
-                              (sensor: SensorReading) =>
-                                !isSensorOrGroupHidden(sensor)
-                            ) || [];
-
-                          const sensorGroups =
-                            groupSensorsByChip(visibleSensors);
-                          const sortedGroupIds = orderGroupIds(Object.keys(sensorGroups));
-
-                          const groupsWithMultipleSensors =
-                            sortedGroupIds.filter(
-                              (groupId) => sensorGroups[groupId].length > 1
-                            );
-
-                          if (groupsWithMultipleSensors.length === 0)
-                            return null;
-
-                          return (
-                            <optgroup label="Groups">
-                              {groupsWithMultipleSensors.map((groupId) => {
-                                const groupSensors = sensorGroups[groupId];
-                                const highestTemp = Math.max(
-                                  ...groupSensors.map((s) => s.temperature)
-                                );
-                                return (
-                                  <option
-                                    key={`group-${groupId}`}
-                                    value={`__group__${groupId}`}
-                                    title="Selecting a group uses the Highest Temperature of that group"
-                                  >
-                                    {getChipDisplayName(groupId, groupSensors)}{" "}
-                                    ({formatTemperature(highestTemp)})
-                                  </option>
-                                );
-                              })}
-                            </optgroup>
-                          );
-                        })()}
-
-                        {/* Individual Sensors (sorted by group, then by ID) */}
-                        <optgroup label="Sensors">
-                          {system.current_temperatures
-                            ?.filter(
-                              (sensor: SensorReading) =>
-                                !isSensorOrGroupHidden(sensor)
-                            )
-                            .sort(compareSensorsForDropdown)
-                            .map((sensor: SensorReading) => (
-                              <option key={sensor.id} value={sensor.id}>
-                                {getSensorDisplayName(
-                                  sensor.id,
-                                  sensor.name,
-                                  sensor.label
-                                )}{" "}
-                                ({formatTemperature(sensor.temperature)})
-                              </option>
-                            ))}
-                        </optgroup>
-                      </select>
-                      </div>
+                        ariaLabel="Control Sensor"
+                        className="sensor-select"
+                      />
                     </div>
 
-                    {/* Profile Selection Dropdown
-                     *
-                     * Mirror of the zone-level dropdown above - see the
-                     * comment block there for the design rationale. Same
-                     * sort, same colour cues, same label format.
-                     */}
+                    {/* Profile Selection Dropdown (Design1 <Select>) -
+                     * mirror of the zone-level dropdown above; see that
+                     * comment block for the design rationale. */}
                     <div className="fan-control-row">
                       <label className="control-label">Fan Profile:</label>
-                      <div className="stealth-select-wrapper fan-profile-select">
-                        {/* Mirror of the zone-level dropdown above; same
-                         * sensor-pattern grouping and same closed-state
-                         * rendering. See that block for design notes. */}
-                        <div className="select-display">
-                          {(() => {
-                            const selected = fanProfiles.find(p => p.id === selectedProfiles[fan.id]);
-                            if (!selected) return 'No Profile';
-                            const dotColor = typeColorMap[selected.profile_type] || null;
-                            return (
-                              <>
-                                {dotColor && (
-                                  <span
-                                    className="profile-color-dot"
-                                    style={{ background: dotColor }}
-                                  />
-                                )}
-                                <span className="profile-name-label">{selected.profile_name}</span>
-                                <span className="profile-type-label">({selected.profile_type})</span>
-                              </>
-                            );
-                          })()}
-                        </div>
-                        <select
-                          className="select-engine"
-                          value={selectedProfiles[fan.id] || ""}
-                          onChange={(e) => {
-                            const profileId = e.target.value;
-                            if (profileId) {
-                              setSelectedProfiles((prev) => ({
-                                ...prev,
-                                [fan.id]: parseInt(profileId),
-                              }));
-                              handleFanProfileAssignment(
-                                fan,
-                                parseInt(profileId)
-                              );
-                            } else {
-                              setSelectedProfiles((prev) => {
-                                const updated = { ...prev };
-                                delete updated[fan.id];
-                                return updated;
-                              });
-                            }
-                          }}
-                          disabled={
-                            loading === `fan-profile-${fan.id}` ||
-                            system.status !== "online" ||
-                            isReadOnly
+                      <Select
+                        value={selectedProfiles[fan.id] ?? NO_PROFILE}
+                        onChange={(profileId) => {
+                          if (profileId !== NO_PROFILE) {
+                            setSelectedProfiles((prev) => ({
+                              ...prev,
+                              [fan.id]: profileId,
+                            }));
+                            handleFanProfileAssignment(fan, profileId);
+                          } else {
+                            setSelectedProfiles((prev) => {
+                              const updated = { ...prev };
+                              delete updated[fan.id];
+                              return updated;
+                            });
                           }
-                        >
-                          <option value="">No Profile (Manual)</option>
-                          {systemProfiles.length > 0 && (
-                            <>
-                              <option disabled>────────────────────</option>
-                              <option disabled>(System)</option>
-                              {systemProfiles.map((profile: FanProfile) => (
-                                <option
-                                  key={profile.id}
-                                  value={profile.id}
-                                  title={profile.description || profile.profile_name}
-                                >
-                                  {profile.profile_name} ({profile.profile_type})
-                                </option>
-                              ))}
-                            </>
-                          )}
-                          {userProfiles.length > 0 && (
-                            <>
-                              <option disabled>────────────────────</option>
-                              <option disabled>(User)</option>
-                              {userProfiles.map((profile: FanProfile) => (
-                                <option
-                                  key={profile.id}
-                                  value={profile.id}
-                                  title={profile.description || profile.profile_name}
-                                >
-                                  {profile.profile_name} ({profile.profile_type})
-                                </option>
-                              ))}
-                            </>
-                          )}
-                        </select>
-                      </div>
+                        }}
+                        options={profileSelectGroups}
+                        renderTrigger={profileRenderers.renderTrigger}
+                        renderOption={profileRenderers.renderOption}
+                        searchable
+                        disabled={
+                          loading === `fan-profile-${fan.id}` ||
+                          system.status !== "online" ||
+                          isReadOnly
+                        }
+                        ariaLabel="Fan Profile"
+                        className="fan-profile-select"
+                      />
                       {loading === `fan-profile-${fan.id}` && (
                         <Loader2 className="animate-spin" size={14} />
                       )}
@@ -2531,14 +2206,11 @@ const SystemCard: React.FC<SystemCardProps> = ({
       {/* Bulk Edit Panel */}
       <BulkEditPanel
         fans={system.current_fan_speeds || []}
-        sensors={system.current_temperatures || []}
-        profiles={fanProfiles}
         onApply={handleBulkApply}
-        getSensorDisplayName={getSensorDisplayName}
         getFanDisplayName={getFanDisplayName}
-        getChipDisplayName={getChipDisplayName}
-        groupSensorsByChip={groupSensorsByChip}
-        highestTemperature={highestTemperature}
+        sensorOptions={bulkSensorGroups}
+        profileOptions={bulkProfileGroups}
+        profileRenderers={bulkProfileRenderers}
         isOpen={isBulkEditOpen}
         anchorRect={anchorRect}
         onClose={() => setIsBulkEditOpen(false)}

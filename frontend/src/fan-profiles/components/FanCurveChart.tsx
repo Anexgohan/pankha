@@ -64,8 +64,8 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
   const pointsWithIndex = curvePoints.map((point, originalIndex) => ({ ...point, originalIndex }));
 
   let sortedPoints;
-  if (dragState.isDragging && dragState.dragStartOrder.length > 0) {
-    // Maintain the visual order from when drag started
+  // Length must match: a stale order after add/remove would index past the array
+  if (dragState.isDragging && dragState.dragStartOrder.length === pointsWithIndex.length) {
     sortedPoints = dragState.dragStartOrder.map(idx => pointsWithIndex[idx]);
   } else {
     // Normal sorting when not dragging
@@ -111,6 +111,8 @@ const FanCurveChart: React.FC<FanCurveChartProps> = ({
   // Drag event handlers
   const handleMouseDown = useCallback((event: React.MouseEvent, pointIndex: number) => {
     if (!interactive || !onPointChange) return;
+    // Left button only - a right-click (remove) must not enter drag state
+    if (event.button !== 0) return;
 
     event.preventDefault();
     const { x, y } = getSVGCoords(event.clientX, event.clientY);

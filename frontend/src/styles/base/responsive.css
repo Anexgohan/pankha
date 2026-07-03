@@ -223,16 +223,6 @@
     flex-shrink: 0;
   }
 
-  .fan-dropdown {
-    flex: 1;
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 12px;
-    box-sizing: border-box;
-  }
-
   /* Fan Profiles */
   .fan-profiles-section {
     padding: 0 !important; /* Remove section padding, container handles it */

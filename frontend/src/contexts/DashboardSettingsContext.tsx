@@ -148,6 +148,17 @@ const SECONDARY_FONT_MAP = new Map(
 const DEFAULT_PRIMARY_FONT: UIPrimaryFontChoice = 'outfit';
 const DEFAULT_SECONDARY_FONT: UISecondaryFontChoice = 'jetbrains-mono';
 
+// UI font scale (multiplies the --font-size-* tokens)
+export const FONT_SCALE_MIN = 0.8;
+export const FONT_SCALE_MAX = 1.3;
+export const FONT_SCALE_STEP = 0.05;
+
+function normalizeFontScale(raw: number): number {
+  if (!Number.isFinite(raw)) return 1;
+  const snapped = Math.round(raw * 20) / 20; // 0.05 steps, no float drift
+  return Math.min(FONT_SCALE_MAX, Math.max(FONT_SCALE_MIN, snapped));
+}
+
 function normalizeFontChoice<T extends string>(
   raw: unknown,
   fallback: T,
@@ -195,7 +206,7 @@ function ensureGoogleStylesheet(stylesheetId: string, googleQuery: string): void
   document.head.appendChild(link);
 }
 
-function ensureGoogleFontForOption(option: UIFontOption): void {
+export function ensureGoogleFontForOption(option: UIFontOption): void {
   if (option.source !== 'google') return;
   if (!option.stylesheetId || !option.googleQuery) return;
   ensureGoogleStylesheet(option.stylesheetId, option.googleQuery);
@@ -225,6 +236,8 @@ interface DashboardSettingsContextType {
   updatePrimaryFont: (font: UIPrimaryFontChoice) => Promise<void>;
   secondaryFont: UISecondaryFontChoice;
   updateSecondaryFont: (font: UISecondaryFontChoice) => Promise<void>;
+  fontScale: number;
+  updateFontScale: (scale: number) => Promise<void>;
   isLoading: boolean;
   timezone: string;
   // Temperature thresholds
@@ -294,6 +307,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   const [hoverTintColor, setHoverTintColor] = useState<string>('#0FEEEE');
   const [primaryFont, setPrimaryFont] = useState<UIPrimaryFontChoice>(DEFAULT_PRIMARY_FONT);
   const [secondaryFont, setSecondaryFont] = useState<UISecondaryFontChoice>(DEFAULT_SECONDARY_FONT);
+  const [fontScale, setFontScale] = useState<number>(1);
   const [timezone, setTimezone] = useState<string>('UTC');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -325,6 +339,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
         getSetting('ui_font_primary'),
         getSetting('ui_font_secondary'),
         getSetting('hub_log_level'),
+        getSetting('ui_font_scale'),
       ]);
 
       // Process graph scale
@@ -381,6 +396,11 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       if (results[12].status === 'fulfilled' && results[12].value?.setting_value) {
         setHubLogLevel(results[12].value.setting_value);
       }
+
+      // Process font scale
+      if (results[13].status === 'fulfilled' && results[13].value?.setting_value) {
+        setFontScale(normalizeFontScale(parseFloat(results[13].value.setting_value)));
+      }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
     } finally {
@@ -416,6 +436,11 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       ensureGoogleFontForOption(secondaryOpt);
     }
   }, [primaryFont, secondaryFont]);
+
+  // Apply UI font scale to document root
+  useEffect(() => {
+    document.documentElement.style.setProperty('--font-scale', String(fontScale));
+  }, [fontScale]);
 
   // Apply temperature colors to document root
   useEffect(() => {
@@ -480,6 +505,17 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       await updateSetting('ui_font_secondary', font);
     } catch (err) {
       console.error('Failed to update secondary font:', err);
+      fetchSettings();
+    }
+  };
+
+  const updateFontScale = async (scale: number) => {
+    const next = normalizeFontScale(scale);
+    setFontScale(next);
+    try {
+      await updateSetting('ui_font_scale', next);
+    } catch (err) {
+      console.error('Failed to update font scale:', err);
       fetchSettings();
     }
   };
@@ -598,7 +634,9 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       updatePrimaryFont,
       secondaryFont,
       updateSecondaryFont,
-      isLoading, 
+      fontScale,
+      updateFontScale,
+      isLoading,
       timezone,
       tempThresholds,
       updateTempThresholds,

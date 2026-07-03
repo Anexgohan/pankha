@@ -4,7 +4,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLicense, type LicenseInfo } from '../../license';
-import { PRIMARY_FONT_OPTIONS, SECONDARY_FONT_OPTIONS, type UIPrimaryFontChoice, type UISecondaryFontChoice, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
+import { PRIMARY_FONT_OPTIONS, SECONDARY_FONT_OPTIONS, FONT_SCALE_MIN, FONT_SCALE_MAX, FONT_SCALE_STEP, type UIPrimaryFontChoice, type UISecondaryFontChoice, ensureGoogleFontForOption, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
+import { Select, type SelectOption } from '../../components/ui/Select';
 import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
 import { formatDate, formatFriendlyDate, USER_TIMEZONE } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
@@ -33,9 +34,44 @@ import {
   Eye,
   EyeOff,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import '../styles/settings.css';
+
+// Font dropdown rows: name in the UI font + a dimmed specimen in the option's
+// own typeface (slot-appropriate: pangram for primary, numeric for mono)
+interface FontOptionData {
+  stack: string;
+  specimen: string;
+}
+
+const PRIMARY_FONT_SPECIMEN = 'The quick brown fox jumps over the lazy dog';
+const SECONDARY_FONT_SPECIMEN = '42.7°C · 1800 RPM';
+
+const PRIMARY_FONT_SELECT_OPTIONS = PRIMARY_FONT_OPTIONS.map((o) => ({
+  value: o.value,
+  label: o.label,
+  data: { stack: o.stack, specimen: PRIMARY_FONT_SPECIMEN } as FontOptionData,
+}));
+const SECONDARY_FONT_SELECT_OPTIONS = SECONDARY_FONT_OPTIONS.map((o) => ({
+  value: o.value,
+  label: o.label,
+  data: { stack: o.stack, specimen: SECONDARY_FONT_SPECIMEN } as FontOptionData,
+}));
+
+function renderFontOption<V extends string>(opt: SelectOption<V>) {
+  const data = opt.data as FontOptionData;
+  return (
+    <>
+      <span className="font-option-name">{opt.label}</span>
+      <span className="font-option-preview" style={{ fontFamily: data.stack }}>
+        {data.specimen}
+      </span>
+    </>
+  );
+}
 
 // Graph scale configuration constants
 const GRAPH_SCALE_MIN_HOURS = 1;
@@ -869,6 +905,7 @@ const Settings: React.FC = () => {
     hoverTintColor, updateHoverTintColor,
     primaryFont, updatePrimaryFont,
     secondaryFont, updateSecondaryFont,
+    fontScale, updateFontScale,
     tempThresholds, updateTempThresholds,
     tempColors, updateTempColors,
     perTypeEnabled, setPerTypeEnabled,
@@ -930,6 +967,11 @@ const Settings: React.FC = () => {
       setActiveTab('general');
     }
   }, [isDemoMode, activeTab]);
+
+  // Load every font's stylesheet so the dropdown previews render honestly
+  useEffect(() => {
+    [...PRIMARY_FONT_OPTIONS, ...SECONDARY_FONT_OPTIONS].forEach(ensureGoogleFontForOption);
+  }, []);
 
   // Tick once a minute so the "Grace - <countdown>" badge stays current on an
   // otherwise idle screen. Settings is React.memo'd (no longer re-renders on
@@ -1720,19 +1762,18 @@ const Settings: React.FC = () => {
                         className="appearance-font-sample"
                         style={{ fontFamily: PRIMARY_FONT_OPTIONS.find((o) => o.value === primaryFont)?.stack }}
                       >
-                        The quick brown fox jumps over the lazy dog
+                        <span>THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</span>
+                        <span>the quick brown fox jumps over the lazy dog</span>
                       </span>
-                      <select
+                      <Select<UIPrimaryFontChoice>
                         className="font-select"
+                        menuClassName="font-select-menu"
                         value={primaryFont}
-                        onChange={(e) => updatePrimaryFont(e.target.value as UIPrimaryFontChoice)}
-                      >
-                        {PRIMARY_FONT_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={updatePrimaryFont}
+                        options={PRIMARY_FONT_SELECT_OPTIONS}
+                        renderOption={renderFontOption}
+                        ariaLabel="Primary font"
+                      />
                     </div>
                   </div>
 
@@ -1749,19 +1790,55 @@ const Settings: React.FC = () => {
                         className="appearance-font-sample"
                         style={{ fontFamily: SECONDARY_FONT_OPTIONS.find((o) => o.value === secondaryFont)?.stack }}
                       >
-                        42.7°C · 1800 RPM · 0xDEADBEEF
+                        <span>42.7°C · 1800 RPM · 0xDEADBEEF</span>
                       </span>
-                      <select
+                      <Select<UISecondaryFontChoice>
                         className="font-select"
+                        menuClassName="font-select-menu"
                         value={secondaryFont}
-                        onChange={(e) => updateSecondaryFont(e.target.value as UISecondaryFontChoice)}
+                        onChange={updateSecondaryFont}
+                        options={SECONDARY_FONT_SELECT_OPTIONS}
+                        renderOption={renderFontOption}
+                        ariaLabel="Secondary font"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Font Size */}
+                  <div className="setting-item">
+                    <div className="setting-info-wrapper">
+                      <span className="setting-label">Font Size</span>
+                      <span className="setting-description">
+                        Scales all interface text. Click the value to reset.
+                      </span>
+                    </div>
+                    <div className="font-scale-control">
+                      <button
+                        type="button"
+                        className="font-scale-btn"
+                        onClick={() => updateFontScale(fontScale - FONT_SCALE_STEP)}
+                        disabled={fontScale <= FONT_SCALE_MIN}
+                        aria-label="Decrease font size"
                       >
-                        {SECONDARY_FONT_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        <ChevronDown size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="font-scale-value"
+                        onClick={() => updateFontScale(1)}
+                        title="Reset to 100%"
+                      >
+                        {Math.round(fontScale * 100)}%
+                      </button>
+                      <button
+                        type="button"
+                        className="font-scale-btn"
+                        onClick={() => updateFontScale(fontScale + FONT_SCALE_STEP)}
+                        disabled={fontScale >= FONT_SCALE_MAX}
+                        aria-label="Increase font size"
+                      >
+                        <ChevronUp size={14} />
+                      </button>
                     </div>
                   </div>
 

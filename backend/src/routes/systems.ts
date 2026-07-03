@@ -1834,6 +1834,7 @@ const ALLOWED_SETTINGS = [
   'hardware_prune_days',
   'ui_font_primary',
   'ui_font_secondary',
+  'ui_font_scale',
   'hub_log_level',
 ] as const;
 

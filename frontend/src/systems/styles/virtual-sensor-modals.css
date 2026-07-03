@@ -1,10 +1,9 @@
 /* Virtual Sensor modals (Sensor Builder / Manage Sensors).
  *
- * The modal frame, buttons (.btn/.btn-primary/.btn-secondary), header/footer and
- * the .bulk-edit-select dropdown are REUSED from bulk-edit-panel.css. The Name
- * field reuses .form-group from styles/components/forms.css. Only the pieces
- * unique to these modals live here, using shared theme tokens (dark/light both
- * work) and the same hover/accent vocabulary as the sensor cards. */
+ * The modal frame, buttons (.btn/.btn-primary/.btn-secondary), header/footer
+ * and the Select trigger footprint are REUSED from bulk-edit-panel.css. The
+ * Name field reuses .form-group from styles/components/forms.css. Only the
+ * pieces unique to these modals live here. */
 
 /* Stable width so the panel does not resize while browsing / changing the
  * operation (bulk-edit-panel uses fit-content, which jumps with content). */

@@ -15,6 +15,7 @@ import { getSensorDisplayName } from '../../utils/displayNames';
 import { formatTemperature } from '../../utils/formatters';
 import { createVirtualSensor, updateVirtualSensor, deleteVirtualSensor, getVirtualSensorUsage } from '../../services/virtualSensorsApi';
 import { toast } from '../../utils/toast';
+import { Select } from '../../components/ui/Select';
 import '../styles/bulk-edit-panel.css';
 import '../styles/virtual-sensor-modals.css';
 
@@ -192,17 +193,12 @@ const SensorBuilderModal: React.FC<SensorBuilderModalProps> = ({
               </div>
               <div className="form-group">
                 <label htmlFor="vs-op">Operation</label>
-                <select
+                <Select<SensorAggregateOp>
                   id="vs-op"
                   value={operation}
-                  onChange={(e) => setOperation(e.target.value as SensorAggregateOp)}
-                >
-                  {operationOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setOperation}
+                  options={operationOptions.map((o) => ({ value: o.value, label: o.label }))}
+                />
                 {selectedOption?.description && <p className="vs-op-desc">{selectedOption.description}</p>}
               </div>
               <div className="vs-summary-divider" />

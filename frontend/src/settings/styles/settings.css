@@ -884,6 +884,30 @@
   color: var(--text-tertiary);
 }
 
+/* Phone: stack the row and let presets wrap instead of overflowing the screen */
+@media (max-width: 600px) {
+  .setting-item:has(.scale-control-wrapper) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  .scale-control-wrapper {
+    justify-content: flex-start;
+  }
+
+  .scale-presets {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .scale-preset-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+
 /* Tier limit note in description */
 .tier-limit-note {
   color: var(--color-warning);
@@ -929,29 +953,90 @@
   color: var(--color-error);
 }
 
-.font-select {
+/* Design0 footprint parity (task_12); hover/focus come from the pk baseline */
+.pk-select-trigger.font-select {
   width: 100%;
   padding: 6px 10px;
-  border: 1px solid var(--border-color);
+  padding-right: 24px;
   border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   font-family: var(--font-primary);
+}
+
+/* Font menu rows: name in UI font, dimmed specimen in the option's typeface.
+ * Desktop menu capped; the mobile sheet keeps its full width. */
+.pk-select-menu.font-select-menu {
+  max-width: min(420px, calc(100vw - 16px));
+}
+
+.font-option-name {
+  flex-shrink: 0;
+}
+
+.font-option-preview {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+
+/* The specimen takes the check's auto margin (same pattern as sensor temps) */
+.pk-select-option:has(.font-option-preview) .pk-select-check {
+  margin-left: 0;
+}
+
+/* Font size stepper */
+.font-scale-control {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.font-scale-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
-.font-select:hover {
-  border-color: var(--color-accent-dynamic);
-  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 4%, var(--bg-secondary));
+/* Explicit size: Firefox collapses attribute-sized svg flex items in buttons to 0 width */
+.font-scale-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
 }
 
-.font-select:focus {
-  outline: none;
+.font-scale-btn:hover:not(:disabled) {
   border-color: var(--color-accent-dynamic);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-dynamic), transparent 80%);
+  color: var(--text-primary);
+}
+
+.font-scale-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.font-scale-value {
+  min-width: 48px;
+  text-align: center;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.font-scale-value:hover {
+  color: var(--color-accent-dynamic);
 }
 
 .accent-swatches {
@@ -2799,19 +2884,29 @@
   justify-content: flex-end;
 }
 
+/* Two-line specimen (caps + lowercase); shrinks with ellipsis when space runs out */
 .appearance-font-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
   font-size: var(--font-size-base);
   color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 320px;
   padding-right: var(--spacing-md);
   border-right: 1px solid var(--border-color-dimmed);
 }
 
-.appearance-font-control .font-select {
-  min-width: 200px;
+.appearance-font-sample > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+/* Fixed trigger footprint - width:100% would squeeze the specimen out of the row */
+.appearance-font-control .pk-select-trigger.font-select {
+  width: 240px;
+  flex: none;
   margin: 0;
 }
 
@@ -3110,7 +3205,6 @@
   }
 
   .appearance-font-sample {
-    white-space: normal;
     max-width: 100%;
     padding: var(--spacing-xs) var(--spacing-sm);
     border-right: none;
@@ -3119,12 +3213,17 @@
     background: color-mix(in srgb, var(--color-accent-dynamic) 4%, transparent);
   }
 
+  .appearance-font-sample > span {
+    white-space: normal;
+    text-align: left; /* right-align reads wrong against the accent bar */
+  }
+
   .appearance-font-control {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .appearance-font-control .font-select {
+  .appearance-font-control .pk-select-trigger.font-select {
     width: 100%;
     min-height: 44px;
   }

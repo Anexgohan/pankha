@@ -10,18 +10,21 @@
   --font-secondary: var(--font-secondary-default);
   --font-mono: var(--font-secondary);
 
+  /* UI font scale (Settings > Appearance); 1 = designed size */
+  --font-scale: 1;
+
   /* Font Sizes */
-  --font-size-xs: 11px;
-  --font-size-sm: 12px;
-  --font-size-sm2: 13px;
-  --font-size-base: 14px;
-  --font-size-md: 15px;
-  --font-size-lg: 18px;
-  --font-size-lg2: 20px;
-  --font-size-xlg: 22px;
-  --font-size-xl: 26px;
-  --font-size-2xl: 32px;
-  --font-size-3xl: 48px;
+  --font-size-xs: calc(11px * var(--font-scale));
+  --font-size-sm: calc(12px * var(--font-scale));
+  --font-size-sm2: calc(13px * var(--font-scale));
+  --font-size-base: calc(14px * var(--font-scale));
+  --font-size-md: calc(15px * var(--font-scale));
+  --font-size-lg: calc(18px * var(--font-scale));
+  --font-size-lg2: calc(20px * var(--font-scale));
+  --font-size-xlg: calc(22px * var(--font-scale));
+  --font-size-xl: calc(26px * var(--font-scale));
+  --font-size-2xl: calc(32px * var(--font-scale));
+  --font-size-3xl: calc(48px * var(--font-scale));
 
   /* Font Weights */
   --font-weight-normal: 400;

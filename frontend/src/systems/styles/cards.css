@@ -489,65 +489,8 @@
   color: var(--color-accent-dynamic);
 } */
 
-.stealth-select-wrapper {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 4px 8px;
-  transition: all 0.2s ease;
-  width: 100px;
-  height: 25px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-}
-
-.stealth-select-wrapper:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--border-light);
-}
-
-.select-engine {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.select-display {
-  font-size: var(--font-size-sm2);
-  font-weight: var(--font-weight-medium);
-  color: var(--text-primary);
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  text-align: left;
-  pointer-events: none;
-  /* text-transform: uppercase; */
-}
-
-/* Fan-profile dropdown collapsed state - small gap between the colour
- * dot and the profile name. Scoped to .fan-profile-select so we don't
- * accidentally add spacing to other .select-display usages (log level,
- * update interval, etc.) where there is only a single text child. */
-.fan-profile-select .select-display {
-  gap: var(--spacing-sm);
-}
-
-/* Inline colour swatch used in the fan-profile dropdown's collapsed state
- * (.select-display). Shape and size mirror `.status-badge .status-dot`,
- * but the colour comes from an inline `background` style set by the
- * renderer (the profile_type hex resolved through typeColorMap). Kept as
- * its own class so we don't have to nest under `.status-badge` just to
- * pick up styles. */
+/* Inline colour swatch in the fan-profile dropdown (trigger + menu rows).
+ * Size mirrors .status-badge .status-dot; colour set inline per-render. */
 .profile-color-dot {
   display: inline-block;
   width: 8px;
@@ -557,6 +500,19 @@
   /* `background` is set inline per-render. A neutral fallback keeps the
      element visible if a profile somehow has no resolved colour. */
   background: var(--text-tertiary);
+}
+
+/* Dot-to-name gap in the fan-profile trigger; footprint lives in sensors-fans.css */
+.pk-select-trigger.fan-profile-select .pk-select-value {
+  gap: var(--spacing-sm);
+}
+
+/* Design1 trigger in the settings grid - Design0's fixed 100x25 footprint */
+.command-item .pk-select-trigger {
+  width: 100px;
+  height: 25px;
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-medium);
 }
 
 /* 3.7 Footer Stats */

@@ -208,26 +208,22 @@
   color: var(--text-primary);
 }
 
-.bulk-edit-select {
+/* Design1 trigger in a control group - old .bulk-edit-select footprint. */
+.control-group .pk-select-trigger {
   width: 100%;
   padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color);
+  padding-right: 24px; /* chevron room */
   font-size: 14px;
   background-color: var(--bg-primary);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: border-color 0.2s;
 }
 
-.bulk-edit-select:hover {
-  border-color: var(--color-accent-dynamic);
-}
-
-.bulk-edit-select:focus {
-  outline: none;
-  border-color: var(--color-info);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+/* Design1 trigger in a form group (Sensor Builder) - old .form-group select footprint */
+.bulk-edit-panel .form-group .pk-select-trigger {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  padding-right: 24px;
+  font-size: var(--font-size-base);
+  background: var(--bg-tertiary);
 }
 
 /* Select All Button */
