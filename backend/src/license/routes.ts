@@ -6,6 +6,8 @@
  * - GET /api/license/pricing - Get all tier pricing info
  * - POST /api/license - Set/update license key
  * - POST /api/license/sync - Force sync with license server (for renewals)
+ * - POST /api/license/renew - Force-refresh token via worker /renew
+ * - POST /api/license/cancel - Schedule cancel-at-period-end (proxies to Worker)
  * - GET /api/license/promo - List advertised discounts (proxies to Worker)
  * - POST /api/license/checkout - Create Dodo checkout session (proxies to Worker)
  * - DELETE /api/license - Remove license (revert to free tier)
@@ -85,26 +87,40 @@ router.get('/pricing', async (req: Request, res: Response) => {
 /**
  * POST /api/license
  * Set or update license key
- * Body: { licenseKey: string }
+ * Body: { licenseKey: string, forceSeat?: boolean }
+ * forceSeat moves the seat here when the license is bound to another system
+ * (worker-enforced limits: 2 per 7 days, cumulative cap). A 409 response
+ * carries seatConflict + canForce so the UI can offer the move.
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { licenseKey } = req.body;
-    
+    const { licenseKey, forceSeat } = req.body;
+
     if (!licenseKey || typeof licenseKey !== 'string') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'License key is required' 
+      return res.status(400).json({
+        success: false,
+        error: 'License key is required'
       });
     }
 
-    const result = await licenseManager.setLicenseKey(licenseKey.trim());
-    
+    const result = await licenseManager.setLicenseKey(licenseKey.trim(), {
+      forceSeat: forceSeat === true,
+    });
+
     if (result.success) {
       res.json({
         success: true,
         tier: result.tier,
         message: `License activated: ${result.tier}`,
+      });
+    } else if (result.seatConflict) {
+      res.status(409).json({
+        success: false,
+        tier: 'free',
+        error: result.error,
+        seatConflict: true,
+        boundAt: result.boundAt ?? null,
+        canForce: result.canForce === true,
       });
     } else {
       res.status(400).json({
@@ -176,6 +192,31 @@ router.post('/renew', async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Renew failed',
+    });
+  }
+});
+
+/**
+ * POST /api/license/cancel
+ * Self-serve cancellation. Proxies to worker /cancel which schedules a
+ * cancel-at-period-end with the payment provider. Access continues until the
+ * paid-through date; the provider webhook finalizes the ledger status.
+ */
+router.post('/cancel', async (req: Request, res: Response) => {
+  try {
+    const result = await licenseManager.cancelSubscription();
+
+    if (result.success) {
+      res.json(result);
+    } else {
+      // 400 for "nothing to cancel" (lifetime/free), 502 for upstream failure
+      res.status(result.notCancellable ? 400 : 502).json(result);
+    }
+  } catch (error) {
+    log.error('Cancel error', 'License API', error);
+    res.status(500).json({
+      success: false,
+      error: 'Cancel failed',
     });
   }
 });

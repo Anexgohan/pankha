@@ -36,7 +36,10 @@ import {
   Trash2,
   RefreshCw,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Monitor,
+  Ban,
+  TriangleAlert
 } from 'lucide-react';
 import '../styles/settings.css';
 
@@ -875,6 +878,10 @@ const Settings: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRenewing, setIsRenewing] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  // Seat conflict (activation 409): holds the pending key + worker's verdict
+  // so the modal can retry with forceSeat. null = modal closed.
+  const [seatConflict, setSeatConflict] = useState<{ key: string; boundAt: string | null; canForce: boolean } | null>(null);
 
   // Billing period toggles for pricing cards
   const [proBilling, setProBilling] = useState<'monthly' | 'yearly'>('monthly');
@@ -1233,26 +1240,75 @@ const Settings: React.FC = () => {
     }
   };
 
-  const handleLicenseSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!licenseKey.trim()) return;
-
+  /**
+   * Activate a key. On 409 seat_taken the worker says the license is bound to
+   * another system - open the conflict dialog instead of failing; the dialog
+   * retries with forceSeat (worker-enforced: 2 moves/7 days, owner emailed).
+   */
+  const activateKey = async (key: string, forceSeat = false) => {
     setIsSubmitting(true);
     setLicenseStatus(null);
 
     try {
-      const result = await setLicense(licenseKey.trim());
+      const result = await setLicense(key, forceSeat);
       if (result.success) {
         setLicenseStatus({ success: true, message: `License activated: ${result.tier}` });
         setLicenseKey('');
+        setSeatConflict(null);
         await refreshLicense();
+      } else if (result.seatConflict) {
+        setSeatConflict({ key, boundAt: result.boundAt ?? null, canForce: result.canForce === true });
       } else {
         setLicenseStatus({ success: false, message: result.error || 'Invalid license key' });
       }
-    } catch (error) {
+    } catch {
       setLicenseStatus({ success: false, message: 'Failed to validate license' });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleLicenseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!licenseKey.trim()) return;
+    await activateKey(licenseKey.trim());
+  };
+
+  /** Force-move retry from the conflict dialog (or seat-lost banner via stored token). */
+  const handleForceMove = async () => {
+    if (!seatConflict) return;
+    await activateKey(seatConflict.key, true);
+  };
+
+  /**
+   * Schedule cancel-at-period-end via backend /cancel proxy. Access continues
+   * until the paid-through date; UI flips to "Cancellation scheduled".
+   */
+  const handleCancelSubscription = async () => {
+    const until = license?.expiresAt ? formatFriendlyDate(license.expiresAt, USER_TIMEZONE) : 'the end of the current billing period';
+    if (!confirm(`Cancel your subscription?\n\nYour ${license?.tier} features stay active until ${until}. No further charges after that.`)) {
+      return;
+    }
+
+    setIsCancelling(true);
+    try {
+      const response = await fetch('/api/license/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        const accessUntil = result.accessUntil ? formatFriendlyDate(result.accessUntil, USER_TIMEZONE) : until;
+        setLicenseStatus({ success: true, message: `Cancellation scheduled. Access continues until ${accessUntil}.` });
+        await refreshLicense();
+      } else {
+        setLicenseStatus({ success: false, message: result.error || 'Cancellation failed. Please try again or contact support.' });
+      }
+    } catch {
+      setLicenseStatus({ success: false, message: 'Could not reach license server. Check your internet connection.' });
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -1266,7 +1322,7 @@ const Settings: React.FC = () => {
       await deleteLicense();
       await refreshLicense();
       setLicenseStatus({ success: true, message: 'License removed. Reverted to Free tier.' });
-    } catch (error) {
+    } catch {
       setLicenseStatus({ success: false, message: 'Failed to remove license' });
     } finally {
       setIsSubmitting(false);
@@ -2507,6 +2563,33 @@ const Settings: React.FC = () => {
                       </span>
                     </div>
                   )}
+                  {/* Cancellation scheduled - access continues to the paid-through date */}
+                  {license.cancelScheduledAt && license.tier !== 'Free' && (
+                    <div className="cancel-banner">
+                      <TriangleAlert size={14} className="cancel-banner-icon" />
+                      <span>
+                        <strong>Cancellation scheduled</strong> · access continues until {license.expiresAt ? formatFriendlyDate(license.expiresAt, USER_TIMEZONE) : 'the end of the billing period'} · no further charges
+                      </span>
+                    </div>
+                  )}
+                  {/* Seat lost - license was activated on another system (soft demote) */}
+                  {license.seatState === 'lost' && (
+                    <div className="seat-lost-banner">
+                      <TriangleAlert size={14} className="seat-lost-icon" />
+                      <span>
+                        Your license was activated on <strong>another system</strong>. This system reverted to Free.
+                      </span>
+                      {license.token && (
+                        <button
+                          type="button"
+                          className="license-action-btn"
+                          onClick={() => setSeatConflict({ key: license.token!, boundAt: null, canForce: true })}
+                        >
+                          <span>Move license here</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className="license-limits">
                     <div className="limit-item">
                       <span className="limit-label">Agents</span>
@@ -2555,10 +2638,10 @@ const Settings: React.FC = () => {
                           <span className="limit-label">Remaining</span>
                           <div className="limit-value-group">
                             <span className="limit-value">{remaining.text}</span>
-                            {/* Show "Renews {date}" for subscriptions, or nothing for lifetime */}
+                            {/* "Renews {date}" for subscriptions; flips to "Ends" once a cancellation is scheduled */}
                             {license.billing !== 'lifetime' && license.nextBillingDate && (
                               <span className="limit-subtext-date">
-                                Renews {formatFriendlyDate(license.nextBillingDate, USER_TIMEZONE)}
+                                {license.cancelScheduledAt ? 'Ends' : 'Renews'} {formatFriendlyDate(license.nextBillingDate, USER_TIMEZONE)}
                               </span>
                             )}
                           </div>
@@ -2566,6 +2649,76 @@ const Settings: React.FC = () => {
                       );
                     })()}
                   </div>
+                  {/* Manage strip - server-scoped status + actions, styled in the
+                      limit-tiles language (bg surface + left accent) so it reads
+                      as part of the card, not floating buttons. */}
+                  {license.licenseId && (
+                    <div className="manage-strip">
+                      <span className="license-manage-status">
+                        {license.seatState === 'bound' && (
+                          <span className="seat-chip">
+                            <Monitor size={13} />
+                            This system holds the license
+                          </span>
+                        )}
+                        {license.lastSyncAt && (
+                          <span title={formatDateTooltip(license.lastSyncAt)}>
+                            Last synced {formatRelativeTime(license.lastSyncAt)}
+                          </span>
+                        )}
+                      </span>
+                      <span className="license-manage-actions">
+                        <span className="btn-group">
+                          <button
+                            type="button"
+                            className="license-action-btn"
+                            onClick={handleSyncLicense}
+                            disabled={isSyncing}
+                            title="Check the license server for renewals or updates"
+                          >
+                            <RefreshCw
+                              size={16}
+                              style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }}
+                            />
+                            <span>Sync</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="license-action-btn"
+                            onClick={handleRenewLicense}
+                            disabled={!canRenew || isRenewing}
+                            title={canRenew
+                              ? 'Force-refresh your license token from the server. 15 min cooldown, 3/day.'
+                              : 'Available when Sync cannot recover your license (e.g., token expired or webhook lost). Try Sync first.'}
+                          >
+                            <KeyRound
+                              size={16}
+                              style={{ animation: isRenewing ? 'spin 1s linear infinite' : 'none' }}
+                            />
+                            <span>Renew</span>
+                          </button>
+                        </span>
+                        {license.tier !== 'Free' && license.billing !== 'lifetime' && (
+                          license.cancelScheduledAt ? (
+                            <button type="button" className="license-action-btn" disabled title="Cancellation is scheduled; access continues until the paid-through date">
+                              <span>Cancellation scheduled</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="license-action-btn license-action-btn--danger"
+                              onClick={handleCancelSubscription}
+                              disabled={isCancelling}
+                              title="Cancel your subscription at the end of the current billing period"
+                            >
+                              <Ban size={16} />
+                              <span>{isCancelling ? 'Cancelling...' : 'Cancel Subscription'}</span>
+                            </button>
+                          )
+                        )}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <form onSubmit={handleLicenseSubmit} className="license-form">
@@ -2593,43 +2746,11 @@ const Settings: React.FC = () => {
                         className="license-action-btn license-action-btn--danger"
                         onClick={handleRemoveLicense}
                         disabled={isSubmitting}
-                        title="Remove license and revert to free tier"
+                        title="Remove license from this system and free its seat"
                       >
                         <Trash2 size={16} />
                         <span>Remove</span>
                       </button>
-                    )}
-                    {license.licenseId && (
-                      <>
-                        <button
-                          type="button"
-                          className="license-action-btn"
-                          onClick={handleSyncLicense}
-                          disabled={isSyncing}
-                          title="Check the license server for renewals or updates"
-                        >
-                          <RefreshCw
-                            size={16}
-                            style={{ animation: isSyncing ? 'spin 1s linear infinite' : 'none' }}
-                          />
-                          <span>Sync</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="license-action-btn"
-                          onClick={handleRenewLicense}
-                          disabled={!canRenew || isRenewing}
-                          title={canRenew
-                            ? 'Force-refresh your license token from the server. 15 min cooldown, 3/day.'
-                            : 'Available when Sync cannot recover your license (e.g., token expired or webhook lost). Try Sync first.'}
-                        >
-                          <KeyRound
-                            size={16}
-                            style={{ animation: isRenewing ? 'spin 1s linear infinite' : 'none' }}
-                          />
-                          <span>Renew</span>
-                        </button>
-                      </>
                     )}
                   </div>
                   {licenseStatus && (
@@ -2638,6 +2759,53 @@ const Settings: React.FC = () => {
                     </p>
                   )}
                 </form>
+
+                {/* Seat-conflict dialog: activation hit 409 (license bound to another
+                    system). Move is consequential, not destructive - the other
+                    system reverts to Free with data intact. */}
+                {seatConflict && (
+                  <div
+                    className="seat-modal-backdrop"
+                    onClick={(e) => { if (e.target === e.currentTarget) setSeatConflict(null); }}
+                  >
+                    <div className="seat-modal" role="dialog" aria-modal="true" aria-labelledby="seat-modal-title">
+                      <div className="seat-modal-head">
+                        <TriangleAlert size={20} />
+                        <h4 id="seat-modal-title">License in use on another system</h4>
+                      </div>
+                      <p>
+                        This license is active on another system{seatConflict.boundAt ? ` (since ${formatFriendlyDate(seatConflict.boundAt, USER_TIMEZONE)})` : ''}.
+                        A license can only be active on one system at a time.
+                      </p>
+                      <p>
+                        Moving it here deactivates it there - that system reverts to Free,
+                        its settings and data stay intact.
+                      </p>
+                      <p className="seat-modal-fine">
+                        Limit: 2 moves per 7 days. The license owner is notified by email on every move.
+                      </p>
+                      <div className="seat-modal-actions">
+                        <button type="button" className="license-action-btn" onClick={() => setSeatConflict(null)}>
+                          Keep it there
+                        </button>
+                        {seatConflict.canForce ? (
+                          <button
+                            type="button"
+                            className="seat-modal-move"
+                            onClick={handleForceMove}
+                            disabled={isSubmitting}
+                          >
+                            {isSubmitting ? 'Moving...' : 'Move license here'}
+                          </button>
+                        ) : (
+                          <span className="seat-modal-fine">
+                            Move limit reached - try again later or contact support@pankha.app
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {license.tier !== 'Free' && (license.customerName || license.customerEmail) && (
                   <div className="license-details">
