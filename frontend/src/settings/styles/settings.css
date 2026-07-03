@@ -884,6 +884,30 @@
   color: var(--text-tertiary);
 }
 
+/* Phone: stack the row and let presets wrap instead of overflowing the screen */
+@media (max-width: 600px) {
+  .setting-item:has(.scale-control-wrapper) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-md);
+  }
+
+  .scale-control-wrapper {
+    justify-content: flex-start;
+  }
+
+  .scale-presets {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .scale-preset-btn {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}
+
 /* Tier limit note in description */
 .tier-limit-note {
   color: var(--color-warning);
