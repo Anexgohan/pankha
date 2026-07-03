@@ -188,8 +188,3 @@
   cursor: not-allowed;
 }
 
-/* For stealth-select dropdowns, only dim the display layer, not the hidden select-engine */
-.system-card.read-only .stealth-select-wrapper {
-  opacity: 0.5;
-  cursor: not-allowed;
-}

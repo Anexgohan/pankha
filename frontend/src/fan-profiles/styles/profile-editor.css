@@ -209,6 +209,9 @@
 
 .sidebar-group h3 {
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -257,7 +260,7 @@
   gap: var(--spacing-xs);
 }
 
-.profile-type-row select,
+.profile-type-row .pk-select-trigger,
 .profile-type-row input {
   flex: 1;
   min-width: 0;
@@ -285,7 +288,7 @@
 }
 
 .error-icon {
-  font-size: var(--font-size-lg);
+  flex-shrink: 0;
 }
 
 .editor-footer {
@@ -553,12 +556,21 @@
   border-top: 1px solid var(--border-color);
 }
 
+.chart-controls .control-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
 .curve-info {
   display: flex;
   gap: var(--spacing-xl);
 }
 
 .curve-info span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
   font-size: 11px;
   font-family: var(--font-mono);
   color: var(--text-tertiary);
@@ -576,25 +588,13 @@
   gap: var(--spacing-md);
 }
 
-.template-dropdown {
+/* Design0 footprint parity (task_12): full-width, spacing-md, radius-md */
+.pk-select-trigger.template-dropdown {
   width: 100%;
   padding: var(--spacing-md);
-  border: 1px solid var(--border-color);
+  padding-right: 24px;
   border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
   font-size: var(--font-size-base);
-  cursor: pointer;
-}
-
-.template-dropdown:hover {
-  border-color: var(--color-primary);
-}
-
-.template-dropdown:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
 }
 
 .template-info {

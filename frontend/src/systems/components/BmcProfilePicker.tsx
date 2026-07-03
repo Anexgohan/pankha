@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Check, AlertCircle } from 'lucide-react';
 import { getProfileCatalog, type ProfileCatalog, type ProfileCatalogEntry } from '../../services/api';
 import { formatModelFamily } from '../../utils/formatters';
+import { Select } from '../../components/ui/Select';
 
 interface BmcProfilePickerProps {
   selectedProfileId: string | null;
@@ -11,9 +12,8 @@ interface BmcProfilePickerProps {
 
 /**
  * Per-system BMC profile picker used inside SystemCard.
- * Reuses system-card design language (fan-control-row + control-label +
- * stealth-select-wrapper). Data/cascade logic mirrors the deployment-page
- * IpmiProfileSelector but renders inline-per-row instead of two-up.
+ * Data/cascade logic mirrors the deployment-page IpmiProfileSelector but
+ * renders inline-per-row (fan-control-row) instead of two-up.
  */
 const BmcProfilePicker: React.FC<BmcProfilePickerProps> = ({
   selectedProfileId,
@@ -81,44 +81,30 @@ const BmcProfilePicker: React.FC<BmcProfilePickerProps> = ({
       <div className="fan-controls">
         <div className="fan-control-row">
           <label className="control-label">Vendor:</label>
-          <div className="stealth-select-wrapper">
-            <div className="select-display">
-              {selectedVendor || 'Select vendor...'}
-            </div>
-            <select
-              className="select-engine"
-              value={selectedVendor}
-              onChange={(e) => handleVendorChange(e.target.value)}
-              disabled={disabled}
-            >
-              <option value="">Select vendor...</option>
-              {vendors.map(v => (
-                <option key={v.name} value={v.name}>{v.name}</option>
-              ))}
-            </select>
-          </div>
+          <Select
+            value={selectedVendor}
+            onChange={handleVendorChange}
+            options={[
+              { value: '', label: 'Select vendor...' },
+              ...vendors.map(v => ({ value: v.name, label: v.name })),
+            ]}
+            disabled={disabled}
+            ariaLabel="BMC vendor"
+          />
         </div>
 
         <div className="fan-control-row">
           <label className="control-label">Model:</label>
-          <div className="stealth-select-wrapper">
-            <div className="select-display">
-              {selectedModel ? renderModelLabel(selectedModel) : 'Select model...'}
-            </div>
-            <select
-              className="select-engine"
-              value={selectedProfileId || ''}
-              onChange={(e) => handleModelChange(e.target.value)}
-              disabled={disabled || !selectedVendor}
-            >
-              <option value="">Select model...</option>
-              {models.map(m => (
-                <option key={m.profile_id} value={m.profile_id}>
-                  {renderModelLabel(m)}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            value={selectedProfileId || ''}
+            onChange={handleModelChange}
+            options={[
+              { value: '', label: 'Select model...' },
+              ...models.map(m => ({ value: m.profile_id, label: renderModelLabel(m) })),
+            ]}
+            disabled={disabled || !selectedVendor}
+            ariaLabel="BMC model"
+          />
         </div>
       </div>
 

@@ -1,6 +1,5 @@
 /* Select (Design1) - in-house dropdown. Tokens only; light/dark via existing
- * semantic vars. Class namespace pk-select-* (distinct from Design0's
- * .select-engine / .select-display so both coexist during migration). */
+ * semantic vars. Class namespace pk-select-*. */
 
 /* ---- Trigger (closed state) ---- */
 
@@ -10,7 +9,7 @@
   align-items: center;
   gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  padding-right: 24px; /* room for the chevron (matches Design0 .select-display) */
+  padding-right: 24px; /* room for the chevron */
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--bg-secondary);
@@ -22,7 +21,7 @@
   transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Chevron - same masked svg as Design0 (forms.css .stealth-select-wrapper::after) */
+/* Chevron - Design0's masked svg, preserved verbatim */
 .pk-select-trigger::after {
   content: "";
   position: absolute;
@@ -52,7 +51,7 @@
   background-color: var(--color-accent-dynamic);
 }
 
-/* Focus ring - same tokens as Design0 (.select-engine:focus) */
+/* Focus ring - Design0's tokens */
 .pk-select-trigger:focus-visible {
   outline: none;
   border-color: var(--color-accent-dynamic);

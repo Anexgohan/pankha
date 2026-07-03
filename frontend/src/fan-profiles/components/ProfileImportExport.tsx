@@ -22,6 +22,9 @@ import {
 } from 'lucide-react';
 import { getImportStatusColor } from '../../utils/statusColors';
 import { toast } from '../../utils/toast';
+import { Select } from '../../components/ui/Select';
+
+type ConflictStrategy = 'skip' | 'rename' | 'overwrite';
 
 interface ProfileImportExportProps {
   profiles: any[];
@@ -34,8 +37,8 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showDefaultsDialog, setShowDefaultsDialog] = useState(false);
-  const [resolveConflicts, setResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('rename');
-  const [defaultResolveConflicts, setDefaultResolveConflicts] = useState<'skip' | 'rename' | 'overwrite'>('skip');
+  const [resolveConflicts, setResolveConflicts] = useState<ConflictStrategy>('rename');
+  const [defaultResolveConflicts, setDefaultResolveConflicts] = useState<ConflictStrategy>('skip');
   const [defaultProfiles, setDefaultProfiles] = useState<DefaultProfileInfo[]>([]);
   const [selectedDefaults, setSelectedDefaults] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -315,11 +318,17 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
               </div>
               <div className="dialog-options">
                 <label>Conflict Resolution Strategy:</label>
-                <select value={defaultResolveConflicts} onChange={(e) => setDefaultResolveConflicts(e.target.value as any)}>
-                  <option value="skip">Keep Existing (Skip)</option>
-                  <option value="rename">Keep Both (Rename)</option>
-                  <option value="overwrite">Replace Existing (Overwrite)</option>
-                </select>
+                <Select<ConflictStrategy>
+                  value={defaultResolveConflicts}
+                  onChange={setDefaultResolveConflicts}
+                  options={[
+                    { value: 'skip', label: 'Keep Existing (Skip)' },
+                    { value: 'rename', label: 'Keep Both (Rename)' },
+                    { value: 'overwrite', label: 'Replace Existing (Overwrite)' },
+                  ]}
+                  width={240}
+                  ariaLabel="Conflict resolution strategy"
+                />
               </div>
             </div>
             <div className="dialog-footer">
@@ -353,11 +362,17 @@ const ProfileImportExport: React.FC<ProfileImportExportProps> = ({ onImportCompl
               <div className="dialog-options">
                 <div className="option-row">
                   <label>Duplication Strategy:</label>
-                  <select value={resolveConflicts} onChange={(e) => setResolveConflicts(e.target.value as any)}>
-                    <option value="skip">Skip Internal Conflicts</option>
-                    <option value="rename">Automatic Renaming</option>
-                    <option value="overwrite">System Overwrite</option>
-                  </select>
+                  <Select<ConflictStrategy>
+                    value={resolveConflicts}
+                    onChange={setResolveConflicts}
+                    options={[
+                      { value: 'skip', label: 'Skip Internal Conflicts' },
+                      { value: 'rename', label: 'Automatic Renaming' },
+                      { value: 'overwrite', label: 'System Overwrite' },
+                    ]}
+                    width={240}
+                    ariaLabel="Duplication strategy"
+                  />
                 </div>
               </div>
             </div>

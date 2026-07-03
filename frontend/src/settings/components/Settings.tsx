@@ -4,7 +4,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useLicense, type LicenseInfo } from '../../license';
-import { PRIMARY_FONT_OPTIONS, SECONDARY_FONT_OPTIONS, type UIPrimaryFontChoice, type UISecondaryFontChoice, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
+import { PRIMARY_FONT_OPTIONS, SECONDARY_FONT_OPTIONS, type UIPrimaryFontChoice, type UISecondaryFontChoice, ensureGoogleFontForOption, useDashboardSettings } from '../../contexts/DashboardSettingsContext';
+import { Select, type SelectOption } from '../../components/ui/Select';
 import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } from '../../services/api';
 import { formatDate, formatFriendlyDate, USER_TIMEZONE } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
@@ -36,6 +37,22 @@ import {
   RefreshCw
 } from 'lucide-react';
 import '../styles/settings.css';
+
+// Font dropdowns: each option row previews its own typeface
+const PRIMARY_FONT_SELECT_OPTIONS = PRIMARY_FONT_OPTIONS.map((o) => ({
+  value: o.value,
+  label: o.label,
+  data: o.stack,
+}));
+const SECONDARY_FONT_SELECT_OPTIONS = SECONDARY_FONT_OPTIONS.map((o) => ({
+  value: o.value,
+  label: o.label,
+  data: o.stack,
+}));
+
+function renderFontOption<V extends string>(opt: SelectOption<V>) {
+  return <span style={{ fontFamily: opt.data as string }}>{opt.label}</span>;
+}
 
 // Graph scale configuration constants
 const GRAPH_SCALE_MIN_HOURS = 1;
@@ -931,6 +948,11 @@ const Settings: React.FC = () => {
     }
   }, [isDemoMode, activeTab]);
 
+  // Load every font's stylesheet so the dropdown previews render honestly
+  useEffect(() => {
+    [...PRIMARY_FONT_OPTIONS, ...SECONDARY_FONT_OPTIONS].forEach(ensureGoogleFontForOption);
+  }, []);
+
   // Tick once a minute so the "Grace - <countdown>" badge stays current on an
   // otherwise idle screen. Settings is React.memo'd (no longer re-renders on
   // sensor deltas), so without this the countdown would only recompute on a
@@ -1722,17 +1744,14 @@ const Settings: React.FC = () => {
                       >
                         The quick brown fox jumps over the lazy dog
                       </span>
-                      <select
+                      <Select<UIPrimaryFontChoice>
                         className="font-select"
                         value={primaryFont}
-                        onChange={(e) => updatePrimaryFont(e.target.value as UIPrimaryFontChoice)}
-                      >
-                        {PRIMARY_FONT_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={updatePrimaryFont}
+                        options={PRIMARY_FONT_SELECT_OPTIONS}
+                        renderOption={renderFontOption}
+                        ariaLabel="Primary font"
+                      />
                     </div>
                   </div>
 
@@ -1751,17 +1770,14 @@ const Settings: React.FC = () => {
                       >
                         42.7°C · 1800 RPM · 0xDEADBEEF
                       </span>
-                      <select
+                      <Select<UISecondaryFontChoice>
                         className="font-select"
                         value={secondaryFont}
-                        onChange={(e) => updateSecondaryFont(e.target.value as UISecondaryFontChoice)}
-                      >
-                        {SECONDARY_FONT_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={updateSecondaryFont}
+                        options={SECONDARY_FONT_SELECT_OPTIONS}
+                        renderOption={renderFontOption}
+                        ariaLabel="Secondary font"
+                      />
                     </div>
                   </div>
 

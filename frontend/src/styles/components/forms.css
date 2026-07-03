@@ -25,8 +25,7 @@
 }
 
 .form-group input,
-.form-group textarea,
-.form-group select {
+.form-group textarea {
   width: 100%;
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--border-color);
@@ -38,8 +37,7 @@
 }
 
 .form-group input:focus,
-.form-group textarea:focus,
-.form-group select:focus {
+.form-group textarea:focus {
   outline: none;
   border-color: var(--color-info);
   box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
@@ -59,45 +57,6 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--spacing-lg);
-}
-
-/* Dropdowns */
-.refresh-rate-dropdown,
-.agent-interval-select {
-  background: var(--bg-secondary);
-  border: 2px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
-  color: var(--text-primary);
-  font-size: var(--font-size-base);
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.refresh-rate-dropdown:hover,
-.agent-interval-select:hover {
-  border-color: var(--color-info);
-}
-
-.refresh-rate-dropdown:focus,
-.agent-interval-select:focus {
-  outline: none;
-  border-color: var(--color-info);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
-}
-
-.agent-interval-select {
-  border-width: 1px;
-  padding: 2px var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  width: 60px;
-  min-width: 60px;
-  max-width: 80px;
-}
-
-.agent-interval-select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 /* Sliders */
@@ -147,97 +106,6 @@
   width: 100%;
   padding: var(--spacing-sm) var(--spacing-sm);
   font-size: var(--font-size-sm);
-}
-
-/* ===================================
-   Stealth-Overlay Dropdown Pattern
-   - Structural only. Visuals are inherited from original classes.
-   =================================== */
-
-.stealth-select-wrapper {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-  border-radius: var(--radius-sm);
-  padding: 2px;
-}
-
-/* The native select - Invisible but handles interaction and OS picker */
-.select-engine {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  z-index: 2;
-  cursor: pointer;
-  width: 100%;
-  height: 100%;
-  appearance: none;
-}
-
-/* The visible display layer - Adds the arrow and cleans up alignment */
-.select-display {
-  z-index: 1;
-  pointer-events: none;
-  white-space: nowrap;
-  display: flex !important;
-  align-items: center;
-  /* Reusing original padding logic + room for arrow */
-  padding-right: 24px !important; 
-  text-align: left;
-  border-radius: inherit;
-  transition: inherit;
-}
-
-/* Restoring the Chevron Arrow */
-.stealth-select-wrapper::after {
-  content: "";
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 10px;
-  height: 6px;
-  background-color: var(--text-primary);
-  opacity: 0.6;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1L5 5L9 1' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
-  mask-size: contain;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1L5 5L9 1' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center;
-  -webkit-mask-size: contain;
-  pointer-events: none;
-  z-index: 1;
-  transition: all 0.2s ease;
-}
-
-.stealth-select-wrapper:hover::after {
-  opacity: 1;
-  background-color: var(--color-accent-dynamic);
-}
-
-/* Option E: Soft Focus (Minimalist) */
-.stealth-select-wrapper:hover:not(:has(.select-engine:disabled)) {
-  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 8%, var(--bg-secondary));
-  border-color: var(--color-accent-dynamic);
-}
-
-.stealth-select-wrapper::before {
-  display: none; /* Removed the extra bracket */
-}
-
-/* Ensure the display layer matches the wrapper's border */
-.select-engine:hover ~ .select-display {
-  border-color: var(--color-info) !important;
-}
-
-.select-engine:focus ~ .select-display {
-  border-color: var(--color-accent-dynamic) !important;
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2) !important;
-}
-
-.select-engine:disabled ~ .select-display {
-  opacity: 0.6 !important;
-  background: var(--bg-secondary) !important;
-  transform: none !important;
 }
 
 /* ===================================

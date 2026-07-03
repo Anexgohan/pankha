@@ -929,29 +929,14 @@
   color: var(--color-error);
 }
 
-.font-select {
+/* Design0 footprint parity (task_12); hover/focus come from the pk baseline */
+.pk-select-trigger.font-select {
   width: 100%;
   padding: 6px 10px;
-  border: 1px solid var(--border-color);
+  padding-right: 24px;
   border-radius: var(--radius-md);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   font-family: var(--font-primary);
-  cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-}
-
-.font-select:hover {
-  border-color: var(--color-accent-dynamic);
-  background: color-mix(in srgb, var(--color-hover-tint-dynamic) 4%, var(--bg-secondary));
-}
-
-.font-select:focus {
-  outline: none;
-  border-color: var(--color-accent-dynamic);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent-dynamic), transparent 80%);
 }
 
 .accent-swatches {

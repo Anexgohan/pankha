@@ -114,8 +114,7 @@ export function buildSensorOptions(params: {
 }
 
 /**
- * Renderers: name + temp. Reuses .sensor-select-name/-temp (keep in Phase 5;
- * only .sensor-select-display dies).
+ * Renderers: name + temp, styled by .sensor-select-name/-temp (sensors-fans.css).
  */
 export function renderSensorTrigger(selected: SelectOption<string> | null): ReactNode {
   const data = selected?.data as SensorOptionData | undefined;

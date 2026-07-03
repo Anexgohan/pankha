@@ -195,7 +195,7 @@ function ensureGoogleStylesheet(stylesheetId: string, googleQuery: string): void
   document.head.appendChild(link);
 }
 
-function ensureGoogleFontForOption(option: UIFontOption): void {
+export function ensureGoogleFontForOption(option: UIFontOption): void {
   if (option.source !== 'google') return;
   if (!option.stylesheetId || !option.googleQuery) return;
   ensureGoogleStylesheet(option.stylesheetId, option.googleQuery);

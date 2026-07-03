@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bookmark, Zap, Trash2, Download, Check } from 'lucide-react';
 import type { HubStatus } from '../../services/api';
+import { Select } from '../../components/ui/Select';
 
 export type Channel = 'stable' | 'unstable';
 
@@ -100,64 +101,48 @@ const ReleaseHubCache: React.FC<ReleaseHubCacheProps> = React.memo(({
       <div className="hub-cache-picker-grid">
         <div className="hub-cache-picker-cell">
           <span className="builder-label">Stable version</span>
-          <div className="stealth-select-wrapper version-picker-wrapper">
-            <div className="select-display">
-              {selectedStableVersion || (latestStable ? latestStable.tag_name : 'No stable releases')}
-            </div>
-            <select
-              className="select-engine"
-              value={selectedStableVersion || ''}
-              onChange={(e) => {
-                const ver = e.target.value;
-                if (!ver) return;
-                onSelectStableVersion(ver);
-                sessionStorage.setItem('pankha-picker-stable', ver);
-                if (channel !== 'stable') onChannelChange('stable');
-              }}
-              disabled={isStaging || stableReleases.length === 0}
-            >
-              {stableReleases.length === 0 ? (
-                <option value="" disabled>No stable releases</option>
-              ) : (
-                stableReleases.map(r => (
-                  <option key={r.tag_name} value={r.tag_name}>
-                    {r.tag_name}{hubVersion === r.tag_name ? ' (Ready)' : ''}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
+          <Select
+            value={selectedStableVersion || ''}
+            onChange={(ver) => {
+              if (!ver) return;
+              onSelectStableVersion(ver);
+              sessionStorage.setItem('pankha-picker-stable', ver);
+              if (channel !== 'stable') onChannelChange('stable');
+            }}
+            options={stableReleases.map(r => ({
+              value: r.tag_name,
+              label: `${r.tag_name}${hubVersion === r.tag_name ? ' (Ready)' : ''}`,
+            }))}
+            renderTrigger={() =>
+              selectedStableVersion || (latestStable ? latestStable.tag_name : 'No stable releases')
+            }
+            disabled={isStaging || stableReleases.length === 0}
+            className="version-picker"
+            ariaLabel="Stable version"
+          />
         </div>
 
         <div className="hub-cache-picker-cell">
           <span className="builder-label">Pre-release version</span>
-          <div className="stealth-select-wrapper version-picker-wrapper">
-            <div className="select-display">
-              {selectedUnstableVersion || (latestUnstable ? latestUnstable.tag_name : 'No pre-releases')}
-            </div>
-            <select
-              className="select-engine"
-              value={selectedUnstableVersion || ''}
-              onChange={(e) => {
-                const ver = e.target.value;
-                if (!ver) return;
-                onSelectUnstableVersion(ver);
-                sessionStorage.setItem('pankha-picker-unstable', ver);
-                if (channel !== 'unstable') onChannelChange('unstable');
-              }}
-              disabled={isStaging || unstableReleases.length === 0}
-            >
-              {unstableReleases.length === 0 ? (
-                <option value="" disabled>No pre-releases</option>
-              ) : (
-                unstableReleases.map(r => (
-                  <option key={r.tag_name} value={r.tag_name}>
-                    {r.tag_name}{hubVersion === r.tag_name ? ' (Ready)' : ''}
-                  </option>
-                ))
-              )}
-            </select>
-          </div>
+          <Select
+            value={selectedUnstableVersion || ''}
+            onChange={(ver) => {
+              if (!ver) return;
+              onSelectUnstableVersion(ver);
+              sessionStorage.setItem('pankha-picker-unstable', ver);
+              if (channel !== 'unstable') onChannelChange('unstable');
+            }}
+            options={unstableReleases.map(r => ({
+              value: r.tag_name,
+              label: `${r.tag_name}${hubVersion === r.tag_name ? ' (Ready)' : ''}`,
+            }))}
+            renderTrigger={() =>
+              selectedUnstableVersion || (latestUnstable ? latestUnstable.tag_name : 'No pre-releases')
+            }
+            disabled={isStaging || unstableReleases.length === 0}
+            className="version-picker"
+            ariaLabel="Pre-release version"
+          />
         </div>
       </div>
 

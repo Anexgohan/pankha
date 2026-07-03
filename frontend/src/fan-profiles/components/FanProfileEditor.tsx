@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Check, X } from 'lucide-react';
+import { Plus, Check, X, Rocket, SlidersHorizontal, ChartLine, Thermometer, AlertTriangle } from 'lucide-react';
 import {
   createFanProfile,
   updateFanProfile,
@@ -20,6 +20,7 @@ import type { FanProfileType } from '../../services/fanProfileTypesApi';
 import FanCurveChart from './FanCurveChart';
 import FanProfileColorPicker from './FanProfileColorPicker';
 import { toast } from '../../utils/toast';
+import { Select } from '../../components/ui/Select';
 
 interface FanProfileEditorProps {
   profile?: FanProfile | null;
@@ -410,11 +411,11 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
                 className="control-button add-point"
                 disabled={loading}
               >
-                ➕ Add Point
+                <Plus size={14} /> Add Point
               </button>
               <div className="curve-info">
-                <span>📊 {curvePoints.length} points</span>
-                <span>🌡️ {Math.min(...curvePoints.map(p => p.temperature))}°C - {Math.max(...curvePoints.map(p => p.temperature))}°C</span>
+                <span><ChartLine size={12} /> {curvePoints.length} points</span>
+                <span><Thermometer size={12} /> {Math.min(...curvePoints.map(p => p.temperature))}°C - {Math.max(...curvePoints.map(p => p.temperature))}°C</span>
               </div>
             </div>
           </div>
@@ -422,28 +423,28 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
           <aside className="editor-sidebar">
             {/* Quick Start Segment */}
             <div className="sidebar-group">
-              <h3>🚀 Quick Start</h3>
+              <h3><Rocket size={12} /> Quick Start</h3>
               <div className="form-group">
                 <label htmlFor="templateSelect">Template</label>
-                <select
+                <Select
                   id="templateSelect"
                   className="template-dropdown"
                   value={selectedTemplateId}
-                  onChange={(e) => handleTemplateSelection(e.target.value)}
-                >
-                  <option value="">Starter Curve</option>
-                  {availableProfiles.map((template) => (
-                    <option key={template.id} value={template.id}>
-                      {template.profile_name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={handleTemplateSelection}
+                  options={[
+                    { value: '', label: 'Starter Curve' },
+                    ...availableProfiles.map((template) => ({
+                      value: String(template.id),
+                      label: template.profile_name,
+                    })),
+                  ]}
+                />
               </div>
             </div>
 
             {/* Profile Details Segment */}
             <div className="sidebar-group fill">
-              <h3>📝 Configuration</h3>
+              <h3><SlidersHorizontal size={12} /> Configuration</h3>
               <div className="form-group">
                 <label htmlFor="profileName">Profile Name</label>
                 <input
@@ -500,23 +501,19 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
                     </>
                   ) : (
                     <>
-                      <select
+                      <Select
                         id="profileType"
                         value={profileType}
-                        onChange={(e) => setProfileType(e.target.value)}
+                        onChange={setProfileType}
                         disabled={loading}
-                      >
-                        {profileTypes.map(t => (
-                          <option key={t.name} value={t.name}>
-                            {t.name}
-                          </option>
-                        ))}
-                        {/* If the loaded profile uses a type that's been deleted
-                            since, still render it so the select doesn't blank. */}
-                        {profileType && !profileTypes.some(t => t.name === profileType) && (
-                          <option value={profileType}>{profileType}</option>
-                        )}
-                      </select>
+                        options={[
+                          ...profileTypes.map(t => ({ value: t.name, label: t.name })),
+                          // Deleted-since type: keep a row so the trigger doesn't blank
+                          ...(profileType && !profileTypes.some(t => t.name === profileType)
+                            ? [{ value: profileType, label: profileType }]
+                            : []),
+                        ]}
+                      />
                       {/* Always-visible swatch for the selected type. Opens the
                           picker; PATCHes on Done, reverts on Cancel. Works for
                           both system and user types - recoloring is cosmetic. */}
@@ -573,7 +570,7 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
 
         {error && (
           <div className="editor-error">
-            <span className="error-icon">⚠️</span>
+            <AlertTriangle size={18} className="error-icon" />
             {error}
           </div>
         )}

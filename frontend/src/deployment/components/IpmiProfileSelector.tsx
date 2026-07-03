@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Check, AlertCircle } from 'lucide-react';
 import { getProfileCatalog, type ProfileCatalog, type ProfileCatalogEntry } from '../../services/api';
 import { formatModelFamily } from '../../utils/formatters';
+import { Select } from '../../components/ui/Select';
 
 interface IpmiProfileSelectorProps {
   selectedProfileId: string | null;
@@ -11,7 +12,6 @@ interface IpmiProfileSelectorProps {
 /**
  * BMC Profile selector for IPMI deployment.
  * Fetches catalog from backend, shows vendor/model dropdowns + match preview.
- * Reuses .builder-group, .builder-label, .stealth-select-wrapper from existing CSS.
  */
 const IpmiProfileSelector: React.FC<IpmiProfileSelectorProps> = ({ selectedProfileId, onProfileSelect }) => {
   const [catalog, setCatalog] = useState<ProfileCatalog | null>(null);
@@ -59,46 +59,34 @@ const IpmiProfileSelector: React.FC<IpmiProfileSelectorProps> = ({ selectedProfi
       <div className="profile-selector-row">
         <div className="builder-group">
           <span className="builder-label">Vendor</span>
-          <div className="stealth-select-wrapper profile-select-wrapper">
-            <select
-              className="select-engine"
-              value={selectedVendor}
-              onChange={(e) => handleVendorChange(e.target.value)}
-            >
-              <option value="">Select vendor...</option>
-              {vendors.map(v => (
-                <option key={v.name} value={v.name}>{v.name}</option>
-              ))}
-            </select>
-            <div className="select-display">
-              {selectedVendor || 'Select vendor...'}
-            </div>
-          </div>
+          <Select
+            value={selectedVendor}
+            onChange={handleVendorChange}
+            options={[
+              { value: '', label: 'Select vendor...' },
+              ...vendors.map(v => ({ value: v.name, label: v.name })),
+            ]}
+            className="profile-select"
+            ariaLabel="Vendor"
+          />
         </div>
 
         <div className="builder-group">
           <span className="builder-label">Model</span>
-          <div className="stealth-select-wrapper profile-select-wrapper">
-            <select
-              className="select-engine"
-              value={selectedProfileId || ''}
-              onChange={(e) => handleModelChange(e.target.value)}
-              disabled={!selectedVendor}
-            >
-              <option value="">Select model...</option>
-              {models.map(m => (
-                <option key={m.profile_id} value={m.profile_id}>
-                  {(formatModelFamily(m.model_family) || m.profile_id.split('/')[1])}
-                  {` [${getTierLabel(m)}${m.is_monitor_only ? ', Monitor-only' : ''}]`}
-                </option>
-              ))}
-            </select>
-            <div className="select-display">
-              {selectedModel
-                ? `${formatModelFamily(selectedModel.model_family) || selectedModel.profile_id.split('/')[1]} [${getTierLabel(selectedModel)}${selectedModel.is_monitor_only ? ', Monitor-only' : ''}]`
-                : 'Select model...'}
-            </div>
-          </div>
+          <Select
+            value={selectedProfileId || ''}
+            onChange={handleModelChange}
+            options={[
+              { value: '', label: 'Select model...' },
+              ...models.map(m => ({
+                value: m.profile_id,
+                label: `${formatModelFamily(m.model_family) || m.profile_id.split('/')[1]} [${getTierLabel(m)}${m.is_monitor_only ? ', Monitor-only' : ''}]`,
+              })),
+            ]}
+            disabled={!selectedVendor}
+            className="profile-select"
+            ariaLabel="Model"
+          />
         </div>
       </div>
 
