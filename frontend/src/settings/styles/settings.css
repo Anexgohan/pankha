@@ -676,6 +676,224 @@
   color: var(--color-error);
 }
 
+/* Manage strip — server-scoped status + actions inside .license-info. Speaks
+   the limit-tiles language (bg-secondary + 3px left accent) so it reads as a
+   sibling of the tile grid, not floating buttons. Wraps to status-then-actions
+   rows on narrow viewports. */
+.manage-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-info);
+}
+
+.manage-strip .license-action-btn {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm2);
+  background: var(--bg-tertiary);
+}
+
+.license-manage-status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm2);
+  flex-wrap: wrap;
+}
+
+.license-manage-actions {
+  display: inline-flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+/* Segmented button group — joined buttons read as one designed control. */
+.btn-group {
+  display: inline-flex;
+}
+
+.btn-group .license-action-btn {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.btn-group .license-action-btn:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+  margin-left: 0;
+}
+
+.btn-group .license-action-btn:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.btn-group .license-action-btn:hover:not(:disabled) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Seat chip — quiet when healthy; amber/red variants carry exception states. */
+.seat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+}
+
+.manage-strip .seat-chip {
+  background: var(--bg-tertiary);
+}
+
+.seat-chip svg {
+  flex-shrink: 0;
+}
+
+/* Cancellation-scheduled banner — amber sibling of .discount-banner. */
+.cancel-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--temp-caution-bg);
+  border: 1px solid var(--temp-caution-border);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.cancel-banner .cancel-banner-icon {
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.cancel-banner strong {
+  color: var(--color-warning);
+}
+
+/* Seat-lost banner — red sibling, carries the recovery action inline. */
+.seat-lost-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.seat-lost-banner .seat-lost-icon {
+  color: var(--color-error);
+  flex-shrink: 0;
+}
+
+.seat-lost-banner strong {
+  color: var(--color-error);
+}
+
+.seat-lost-banner .license-action-btn {
+  margin-left: auto;
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-sm2);
+}
+
+/* Seat-conflict dialog — activation returned 409 seat_taken. */
+.seat-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+}
+
+.seat-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  max-width: 460px;
+  width: 100%;
+  padding: var(--spacing-xl);
+}
+
+.seat-modal-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.seat-modal-head svg {
+  color: var(--color-warning);
+  flex-shrink: 0;
+}
+
+.seat-modal-head h4 {
+  font-size: var(--font-size-md);
+  margin: 0;
+}
+
+.seat-modal p {
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm2);
+  line-height: 1.55;
+  margin: 0 0 var(--spacing-md);
+}
+
+.seat-modal-fine {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+}
+
+.seat-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+}
+
+/* Move is consequential (warning), not destructive (error): the other system
+   reverts to Free with data intact. */
+.seat-modal-move {
+  background: var(--color-warning);
+  color: black;
+  border: none;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-family: var(--font-primary);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+}
+
+.seat-modal-move:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.seat-modal-move:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* General Settings UI */
 .settings-groups {
   display: flex;

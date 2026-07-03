@@ -509,3 +509,28 @@ DO $$ BEGIN
     RAISE NOTICE 'Migration: Added sort_order column to sensor_group_visibility';
   END IF;
 END $$;
+
+-- Migration: Add instance_id to license_config (task_07 seat binding - stable per-install identity).
+-- Generated once by LicenseManager on first use; survives container rebuilds (lives in the DB volume).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'license_config' AND column_name = 'instance_id'
+  ) THEN
+    ALTER TABLE license_config ADD COLUMN instance_id TEXT;
+    RAISE NOTICE 'Migration: Added instance_id column to license_config';
+  END IF;
+END $$;
+
+-- Migration: Add seat_state to license_config (task_07 seat binding).
+-- NULL = never bound (bind attempted on next activation/boot), 'bound' = seat held here,
+-- 'lost' = seat bound to another system (tier soft-demoted to Free until re-bound).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'license_config' AND column_name = 'seat_state'
+  ) THEN
+    ALTER TABLE license_config ADD COLUMN seat_state TEXT;
+    RAISE NOTICE 'Migration: Added seat_state column to license_config';
+  END IF;
+END $$;

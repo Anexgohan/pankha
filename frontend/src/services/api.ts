@@ -271,8 +271,14 @@ export const getLicense = async () => {
   return response.data;
 };
 
-export const setLicense = async (licenseKey: string) => {
-  const response = await api.post("/api/license", { licenseKey });
+export const setLicense = async (licenseKey: string, forceSeat = false) => {
+  // 409 = seat conflict (license bound to another system); pass the body
+  // through so the UI can offer a force-move instead of throwing.
+  const response = await api.post(
+    "/api/license",
+    { licenseKey, forceSeat },
+    { validateStatus: (s) => (s >= 200 && s < 300) || s === 400 || s === 409 }
+  );
   return response.data;
 };
 

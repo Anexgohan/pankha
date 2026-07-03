@@ -29,6 +29,8 @@ export interface LicenseInfo {
   discountCyclesRemaining: number | null;
   periodInterval: string | null;  // From JWT period_interval claim - "Day"|"Week"|"Month"|"Year"; null falls back to billing enum for badge display
   periodCount: number | null;     // From JWT period_count claim - e.g. 1, 7
+  seatState: 'bound' | 'lost' | null;  // Seat binding: 'lost' = license active on another system (soft-demoted); null = unbound/bind-exempt
+  cancelScheduledAt: string | null;    // When cancel-at-period-end was requested; drives the "Cancellation scheduled" state
   lastSyncAt: string | null;
 }
 
@@ -85,6 +87,8 @@ export const LicenseProvider: React.FC<LicenseProviderProps> = ({ children }) =>
         discountCyclesRemaining: null,
         periodInterval: null,
         periodCount: null,
+        seatState: null,
+        cancelScheduledAt: null,
         lastSyncAt: null,
       });
     } finally {
