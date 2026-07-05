@@ -15,6 +15,7 @@ import { DataAggregator } from './services/DataAggregator';
 import { CommandDispatcher } from './services/CommandDispatcher';
 import { WebSocketHub } from './services/WebSocketHub';
 import { FanProfileController } from './services/FanProfileController';
+import { CalibrationService } from './services/CalibrationService';
 import { DownsamplingService } from './services/DownsamplingService';
 import { ProfileService } from './services/ProfileService';
 
@@ -101,6 +102,7 @@ let services: {
   commandDispatcher: CommandDispatcher;
   webSocketHub: WebSocketHub;
   fanProfileController: FanProfileController;
+  calibrationService: CalibrationService;
   downsamplingService: DownsamplingService;
 } | null = null;
 
@@ -119,6 +121,7 @@ async function initializeServices() {
     const commandDispatcher = CommandDispatcher.getInstance();
     const webSocketHub = WebSocketHub.getInstance();
     const fanProfileController = FanProfileController.getInstance();
+    const calibrationService = CalibrationService.getInstance();
 
     // Load persisted hub log level (overrides LOG_LEVEL env var if set)
     const hubLogSetting = await db.get(
@@ -156,7 +159,10 @@ async function initializeServices() {
 
     // Start Fan Profile Controller (loads interval from database)
     await fanProfileController.start();
-    
+
+    // Start Calibration Service (auto-calibrates new/uncalibrated fans, task 21)
+    calibrationService.start();
+
     // Start Downsampling Service (Tier 2/3 data compression, runs daily at 03:00 UTC)
     const downsamplingService = new DownsamplingService(
       db.getPool(),
@@ -175,6 +181,7 @@ async function initializeServices() {
       commandDispatcher,
       webSocketHub,
       fanProfileController,
+      calibrationService,
       downsamplingService
     };
 
@@ -310,8 +317,10 @@ app.post('/api/emergency-stop', async (req, res) => {
   }
 
   try {
+    // Emergency stop owns the fans - kill any in-flight calibration first
+    services.calibrationService.abortAll('emergency stop');
     await services.commandDispatcher.emergencyStopAll();
-    res.json({ 
+    res.json({
       message: 'Emergency stop triggered for all systems',
       timestamp: new Date().toISOString()
     });

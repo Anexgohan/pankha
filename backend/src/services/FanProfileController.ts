@@ -88,6 +88,10 @@ export class FanProfileController extends EventEmitter {
   private stalledFans: Set<string> = new Set();          // currently flagged as stalled
   private tachSeen: Set<string> = new Set();             // fanKey has reported rpm > 0 at least once
 
+  // Fans locked by an active calibration run - skipped by the control loop.
+  // Managed by CalibrationService via setFanCalibrating().
+  private calibratingFans: Set<string> = new Set();
+
   // Virtual sensor defs for the current control tick (id -> {operation, member dbIds}).
   // Rebuilt fresh each tick from the DB, like the curve-points batch - no cache to invalidate.
   private virtualDefs: Map<number, { operation: 'max' | 'avg' | 'median'; memberDbIds: number[] }> = new Map();
@@ -460,6 +464,10 @@ export class FanProfileController extends EventEmitter {
     } else if (targetSpeed < currentSpeed) {
       // Need to decrease speed
       nextSpeed = Math.max(currentSpeed - fanStep, targetSpeed);
+      // Calibrated fans: below min_stop the fan stalls anyway - jump to 0
+      if (targetSpeed === 0 && calStatus === 'done' && calMinStop !== null && nextSpeed < calMinStop) {
+        nextSpeed = 0;
+      }
     } else {
       // STALL WATCHDOG (calibrated fans with a seen tach): at target, commanded
       // above min_stop, but the tach reads 0 - fan is physically stopped where
@@ -610,6 +618,13 @@ export class FanProfileController extends EventEmitter {
 
           // For zone-based fans, use zone_id as the command target; otherwise use fan_name
           const commandTarget = assignment.zone_id || assignment.fan_name;
+
+          // Skip fans locked by an active calibration run (task 21)
+          if (this.calibratingFans.has(`${assignment.agent_id}:${commandTarget}`) ||
+              this.calibratingFans.has(`${assignment.agent_id}:${assignment.fan_name}`)) {
+            log.trace(`Fan ${commandTarget} on ${assignment.agent_id} is calibrating, skipping`, 'FanProfileController');
+            continue;
+          }
 
           // Check if fan is currently reported by the agent (immediate availability check)
           const systemData = this.dataAggregator.getSystemData(assignment.agent_id);
@@ -941,5 +956,26 @@ export class FanProfileController extends EventEmitter {
    */
   public getStalledFans(): string[] {
     return [...this.stalledFans];
+  }
+
+  /**
+   * Lock/unlock a fan for calibration (task 21). Locked fans are skipped by
+   * the control loop; CalibrationService owns them for the duration.
+   */
+  public setFanCalibrating(agentId: string, fanName: string, calibrating: boolean): void {
+    const fanKey = `${agentId}:${fanName}`;
+    if (calibrating) this.calibratingFans.add(fanKey);
+    else this.calibratingFans.delete(fanKey);
+  }
+
+  /**
+   * Full per-fan reset (including current-speed record) for the handoff after
+   * calibration: the next tick reseeds from the agent's reported speed.
+   */
+  public resetFanControlState(agentId: string, fanName: string): void {
+    const fanKey = `${agentId}:${fanName}`;
+    this.lastAppliedSpeeds.delete(fanKey);
+    this.lastSpeedChangeTime.delete(fanKey);
+    this.clearFanState(agentId, fanName);
   }
 }

@@ -6,6 +6,7 @@ import { AgentManager } from "./AgentManager";
 import { CommandDispatcher } from "./CommandDispatcher";
 import { AgentCommunication } from "./AgentCommunication";
 import { FanProfileController } from "./FanProfileController";
+import { CalibrationService } from "./CalibrationService";
 import { DeltaComputer } from "./DeltaComputer";
 import Database from "../database/database";
 import type { AggregatedSystemData } from "../types/aggregatedData";
@@ -233,6 +234,15 @@ export class WebSocketHub extends EventEmitter {
     });
     fanProfileController.on("fanStallCleared", (event) => {
       this.broadcast("fanStallCleared", event, [
+        `system:${event.agentId}`,
+        "systems:all",
+      ]);
+    });
+
+    // Calibration lifecycle events (task 21): pending/running/done/failed/no_tach
+    const calibrationService = CalibrationService.getInstance();
+    calibrationService.on("fanCalibrationStatus", (event) => {
+      this.broadcast("fanCalibrationStatus", event, [
         `system:${event.agentId}`,
         "systems:all",
       ]);

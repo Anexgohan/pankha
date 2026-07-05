@@ -5,6 +5,7 @@ import { AgentManager } from "../services/AgentManager";
 import { CommandDispatcher } from "../services/CommandDispatcher";
 import { DataAggregator } from "../services/DataAggregator";
 import { FanProfileController } from "../services/FanProfileController";
+import { CalibrationService } from "../services/CalibrationService";
 import { WebSocketHub } from "../services/WebSocketHub";
 import { licenseManager } from "../license/LicenseManager";
 import UpdateDownloadService from "../services/UpdateDownloadService";
@@ -26,6 +27,7 @@ const agentManager = AgentManager.getInstance();
 const commandDispatcher = CommandDispatcher.getInstance();
 const dataAggregator = DataAggregator.getInstance();
 const fanProfileController = FanProfileController.getInstance();
+const calibrationService = CalibrationService.getInstance();
 const webSocketHub = WebSocketHub.getInstance();
 
 interface HistoryResponsePayload {
@@ -716,6 +718,13 @@ router.put("/:id/fans/:fanId", async (req: Request, res: Response) => {
       });
     }
 
+    // Calibration owns the fan for the duration (task 21)
+    if (calibrationService.isCalibrating(system.agent_id, fanId)) {
+      return res.status(409).json({
+        error: "Fan is calibrating, manual control is disabled until complete",
+      });
+    }
+
     const result = await commandDispatcher.setFanSpeed(
       system.agent_id,
       fanId,
@@ -736,6 +745,116 @@ router.put("/:id/fans/:fanId", async (req: Request, res: Response) => {
     res.status(500).json({
       error: error instanceof Error ? error.message : "Failed to set fan speed",
     });
+  }
+});
+
+// GET /api/systems/:id/fans/:fanId/calibration - Current calibration values (task 21)
+router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    const row = await db.get(
+      `SELECT f.id AS fan_db_id, f.fan_name, f.zone_id, cal.status, cal.min_start,
+              cal.min_stop, cal.min_rpm, cal.max_rpm, cal.spin_up_ms, cal.spin_down_ms,
+              cal.step_resolution, cal.response_curve, cal.calibrated_at
+       FROM fans f
+       LEFT JOIN fan_calibrations cal ON cal.fan_id = f.id
+       WHERE f.system_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2)
+       LIMIT 1`,
+      [systemId, fanId]
+    );
+    if (!row) {
+      return res.status(404).json({ error: "Fan not found" });
+    }
+
+    const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
+    res.json({
+      ...row,
+      calibrating: system
+        ? calibrationService.isCalibrating(system.agent_id, fanId)
+        : false,
+    });
+  } catch (error) {
+    log.error("Error fetching fan calibration:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch fan calibration" });
+  }
+});
+
+// GET /api/systems/:id/fans/:fanId/calibration/history - Past runs (trends, task 21)
+router.get("/:id/fans/:fanId/calibration/history", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    const rows = await db.all(
+      `SELECT h.result, h.calibrated_at
+       FROM fan_calibration_history h
+       JOIN fans f ON h.fan_id = f.id
+       WHERE f.system_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2)
+       ORDER BY h.calibrated_at DESC
+       LIMIT 50`,
+      [systemId, fanId]
+    );
+    res.json({ history: rows });
+  } catch (error) {
+    log.error("Error fetching fan calibration history:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch calibration history" });
+  }
+});
+
+// POST /api/systems/:id/fans/:fanId/calibrate - Manual (re)calibration trigger (task 21)
+router.post("/:id/fans/:fanId/calibrate", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    if (isDemoMode()) {
+      return res.json(createDemoLockResponse("Calibration is locked in demo"));
+    }
+
+    const system = await db.get(
+      "SELECT agent_id, status FROM systems WHERE id = $1",
+      [systemId]
+    );
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+    if (system.status !== "online") {
+      return res.status(409).json({ error: "System is not online" });
+    }
+    if (!(await canControlSystem(system.agent_id))) {
+      return res.status(403).json({
+        error:
+          "System exceeds agent limit. Upgrade your plan to control this system.",
+        upgrade_required: true,
+      });
+    }
+    if (calibrationService.isCalibrating(system.agent_id, fanId)) {
+      return res.status(409).json({ error: "Fan is already calibrating" });
+    }
+
+    // Zone target queues every member fan (the zone is the atomic control unit)
+    const fans = await db.all(
+      `SELECT id FROM fans
+       WHERE system_id = $1 AND (fan_name = $2 OR zone_id = $2)
+         AND is_controllable = TRUE AND enabled = TRUE AND is_stale = FALSE`,
+      [systemId, fanId]
+    );
+    if (fans.length === 0) {
+      return res.status(404).json({ error: "No controllable fan found" });
+    }
+
+    calibrationService.enqueueFans(system.agent_id, fans.map((f: any) => f.id));
+    res.json({
+      message: "Calibration queued",
+      agent_id: system.agent_id,
+      fan_id: fanId,
+      fans_queued: fans.length,
+    });
+  } catch (error) {
+    log.error("Error triggering fan calibration:", "systems", error);
+    res.status(500).json({ error: "Failed to trigger calibration" });
   }
 });
 
