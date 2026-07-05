@@ -40,6 +40,7 @@ const BATCH_COLLECT_MS = 2000;
 // One calibration unit = one command target (zone_id for IPMI, fan_name for OS).
 interface CalUnit {
   target: string;
+  label: string;               // user-facing name (fan_label, or zone id for zones)
   fanDbIds: number[];          // member fan rows (zone: several; OS fan: one)
   memberNames: string[];       // fan_name of every member (FPC lockout keys)
   curve: Array<{ duty: number; rpm: number }>;
@@ -241,13 +242,14 @@ export class CalibrationService extends EventEmitter {
     }
 
     const fans = await this.db.all(
-      `SELECT f.id, f.fan_name, f.zone_id, f.system_id
+      `SELECT f.id, f.fan_name, f.fan_label, f.zone_id, f.system_id, s.name AS system_name
        FROM fans f JOIN systems s ON f.system_id = s.id
        WHERE s.agent_id = $1 AND f.id = ANY($2) AND f.is_controllable = TRUE`,
       [agentId, fanDbIds]
     );
     if (fans.length === 0) return;
     const systemId: number = fans[0].system_id;
+    const systemName: string = fans[0].system_name;
 
     // Group into units by command target (the zone is the atomic control unit)
     const units = new Map<string, CalUnit>();
@@ -256,7 +258,8 @@ export class CalibrationService extends EventEmitter {
       let unit = units.get(target);
       if (!unit) {
         unit = {
-          target, fanDbIds: [], memberNames: [], curve: [],
+          target, label: f.zone_id || f.fan_label || f.fan_name,
+          fanDbIds: [], memberNames: [], curve: [],
           maxRpm: null, minStart: null, minStop: null, minRpm: null,
           spinUpMs: null, spinDownMs: null, stepResolution: null,
         };
@@ -276,7 +279,7 @@ export class CalibrationService extends EventEmitter {
     let active = [...units.values()];
     const finished = new Set<CalUnit>();
     log.info(
-      `Calibrating ${active.length} fan unit(s) on agent ${agentId} (${fans.length} fans)`,
+      `Calibrating ${active.map((u) => `"${u.label}"`).join(", ")} on ${systemName} (${agentId})`,
       "CalibrationService"
     );
 
@@ -302,7 +305,7 @@ export class CalibrationService extends EventEmitter {
           for (const u of [...active]) {
             const rpm = rpms.get(u.target) ?? 0;
             if (rpm <= 0) {
-              log.warn(`Fan ${u.target} on ${agentId} has no usable tach - marking no_tach`, "CalibrationService");
+              log.warn(`Fan "${u.label}" on ${systemName} has no usable tach - marking no_tach`, "CalibrationService");
               await this.setStatus(u.fanDbIds, "no_tach", true);
               this.emitStatus(agentId, systemId, u, "no_tach", "complete");
               finished.add(u);
@@ -338,11 +341,11 @@ export class CalibrationService extends EventEmitter {
         await this.setDutyAll(agentId, active.filter((o) => o !== u && !finished.has(o)), SAFE_HOLD_DUTY);
         try {
           await this.stallSearch(agentId, u);
-          await this.persistDone(u);
+          await this.persistDone(u, systemName);
           this.emitStatus(agentId, systemId, u, "done", "complete");
         } catch (e) {
           if (!(e instanceof UnitFailed)) throw e; // safety aborts bubble up
-          log.warn(`Calibration failed for fan ${u.target} on ${agentId}: ${e.message}`, "CalibrationService");
+          log.warn(`Calibration failed for fan "${u.label}" on ${systemName}: ${e.message}`, "CalibrationService");
           await this.setStatus(u.fanDbIds, "failed", true); // stamp: one auto attempt per protocol
           this.emitStatus(agentId, systemId, u, "failed", "complete");
         }
@@ -350,7 +353,7 @@ export class CalibrationService extends EventEmitter {
         await this.setDuty(agentId, u.target, SAFE_HOLD_DUTY); // park before next unit
       }
 
-      log.info(`Calibration complete for agent ${agentId}`, "CalibrationService");
+      log.info(`Calibration complete for ${systemName} (${agentId})`, "CalibrationService");
     } catch (e) {
       // Infra aborts (agent gone, commands failing, user abort) -> 'pending':
       // auto-retries when conditions normalize. Safety aborts -> 'failed'
@@ -359,7 +362,7 @@ export class CalibrationService extends EventEmitter {
       const reason = e instanceof Error ? e.message : String(e);
       const retriable = e instanceof CalibrationAbort ? e.retriable : true;
       const status = retriable ? "pending" : "failed";
-      log.error(`Calibration aborted for agent ${agentId} (${status}): ${reason}`, "CalibrationService");
+      log.error(`Calibration aborted for ${systemName} (${agentId}) (${status}): ${reason}`, "CalibrationService");
       this.snoozedUntil.set(agentId, Date.now() + AGENT_SNOOZE_MS);
       for (const u of active) {
         if (finished.has(u)) continue;
@@ -400,7 +403,7 @@ export class CalibrationService extends EventEmitter {
       if (!assigned) {
         try {
           await this.commandDispatcher.restoreFanToAuto(agentId, u.target);
-          log.info(`Fan ${u.target} on ${agentId} handed back to driver auto (no assignment)`, "CalibrationService");
+          log.info(`Fan "${u.label}" handed back to driver auto (no profile assigned)`, "CalibrationService");
           return;
         } catch (e) {
           // Older agents don't know the command - fall through to prior duty
@@ -625,7 +628,7 @@ export class CalibrationService extends EventEmitter {
   }
 
   /** Write measured values (current row per member fan) + one history snapshot each. */
-  private async persistDone(u: CalUnit): Promise<void> {
+  private async persistDone(u: CalUnit, systemName: string): Promise<void> {
     const result = {
       calibration_version: CALIBRATION_VERSION,
       min_start: u.minStart, min_stop: u.minStop, min_rpm: u.minRpm,
@@ -661,7 +664,8 @@ export class CalibrationService extends EventEmitter {
       );
     }
     log.info(
-      `Fan ${u.target} calibrated: min_start=${u.minStart}% min_stop=${u.minStop}% ` +
+      `Fan "${u.label}" (${u.target}) on ${systemName} calibrated: ` +
+      `min_start=${u.minStart}% min_stop=${u.minStop}% ` +
       `rpm=${u.minRpm}-${u.maxRpm} spin_up=${u.spinUpMs}ms resolution=${u.stepResolution}%`,
       "CalibrationService"
     );

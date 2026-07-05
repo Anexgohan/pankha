@@ -43,7 +43,9 @@ const SystemsPage: React.FC = () => {
     connectionState,
     error,
     reconnect,
-    removeSystem
+    removeSystem,
+    fanCalibration,
+    stalledFans
   } = useWebSocketData();
   const { isDemoMode } = useDemoMode();
 
@@ -303,6 +305,8 @@ const SystemsPage: React.FC = () => {
                   onToggleSensors={(expanded) => setExpandedSensors(prev => ({...prev, [system.id]: expanded}))}
                   onToggleFans={(expanded) => setExpandedFans(prev => ({...prev, [system.id]: expanded}))}
                   onToggleBmc={(expanded) => setExpandedBmc(prev => ({...prev, [system.id]: expanded}))}
+                  fanCalibration={fanCalibration}
+                  stalledFans={stalledFans}
                 />
               ))
             )}

@@ -101,6 +101,9 @@ interface SystemCardProps {
   onToggleSensors: (expanded: boolean) => void;
   onToggleFans: (expanded: boolean) => void;
   onToggleBmc: (expanded: boolean) => void;
+  // Fan calibration + stall state pushed via WS (task 21), keyed "agentId:fanName"
+  fanCalibration: Record<string, string>;
+  stalledFans: Record<string, boolean>;
 }
 
 const SystemCard: React.FC<SystemCardProps> = ({
@@ -114,9 +117,18 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onToggleSensors,
   onToggleFans,
   onToggleBmc,
+  fanCalibration,
+  stalledFans,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const { tempThresholds } = useDashboardSettings();
+
+  // Fan calibration/stall lookups (task 21). During calibration the backend
+  // owns the fan - controls are disabled and a Calibrating badge is shown.
+  const isFanCalibrating = (fanId: string) =>
+    fanCalibration[`${system.agent_id}:${fanId}`] === "running";
+  const isFanStalled = (fanId: string) =>
+    !!stalledFans[`${system.agent_id}:${fanId}`];
   const [agentInterval, setAgentInterval] = useState<number>(
     system.current_update_interval ?? getDefault<number>('updateInterval')
   );
@@ -1787,6 +1799,22 @@ const SystemCard: React.FC<SystemCardProps> = ({
                                   <span className={`status-indicator ${fan.status}`}>
                                     {fan.status}
                                   </span>
+                                  {isFanCalibrating(fan.id) && (
+                                    <span
+                                      className="status-indicator calibrating"
+                                      title="Fan is calibrating, manual control is disabled until complete"
+                                    >
+                                      Calibrating
+                                    </span>
+                                  )}
+                                  {isFanStalled(fan.id) && (
+                                    <span
+                                      className="status-indicator stalled"
+                                      title="Commanded to spin but reporting 0 RPM - fan may be stuck, disconnected, or in need of recalibration"
+                                    >
+                                      Stalled
+                                    </span>
+                                  )}
                                 </div>
                               </div>
 
@@ -1862,7 +1890,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             renderOption={renderSensorOption}
                             searchable
                             menuMaxHeight={320}
-                            disabled={system.status !== "online" || isReadOnly}
+                            disabled={system.status !== "online" || isReadOnly || zoneFans.some(f => isFanCalibrating(f.id))}
                             ariaLabel="Control Sensor"
                             className="sensor-select"
                           />
@@ -1903,7 +1931,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             disabled={
                               loading === zoneLoadingKey ||
                               system.status !== "online" ||
-                              isReadOnly
+                              isReadOnly ||
+                              zoneFans.some(f => isFanCalibrating(f.id))
                             }
                             ariaLabel="Fan Profile"
                             className="fan-profile-select"
@@ -1960,6 +1989,22 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         <span className={`status-indicator ${fan.status}`}>
                           {fan.status}
                         </span>
+                        {isFanCalibrating(fan.id) && (
+                          <span
+                            className="status-indicator calibrating"
+                            title="Fan is calibrating, manual control is disabled until complete"
+                          >
+                            Calibrating
+                          </span>
+                        )}
+                        {isFanStalled(fan.id) && (
+                          <span
+                            className="status-indicator stalled"
+                            title="Commanded to spin but reporting 0 RPM - fan may be stuck, disconnected, or in need of recalibration"
+                          >
+                            Stalled
+                          </span>
+                        )}
                       </div>
                     </div>
 
@@ -2088,7 +2133,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         renderOption={renderSensorOption}
                         searchable
                         menuMaxHeight={320}
-                        disabled={system.status !== "online" || isReadOnly}
+                        disabled={system.status !== "online" || isReadOnly || isFanCalibrating(fan.id)}
                         ariaLabel="Control Sensor"
                         className="sensor-select"
                       />
@@ -2123,7 +2168,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         disabled={
                           loading === `fan-profile-${fan.id}` ||
                           system.status !== "online" ||
-                          isReadOnly
+                          isReadOnly ||
+                          isFanCalibrating(fan.id)
                         }
                         ariaLabel="Fan Profile"
                         className="fan-profile-select"
@@ -2288,6 +2334,9 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.expandedSensors === nextProps.expandedSensors &&
     prevProps.expandedFans === nextProps.expandedFans &&
     prevProps.expandedBmc === nextProps.expandedBmc &&
-    prevProps.isDemoMode === nextProps.isDemoMode
+    prevProps.isDemoMode === nextProps.isDemoMode &&
+    // Calibration/stall maps (task 21) - new object reference on every event
+    prevProps.fanCalibration === nextProps.fanCalibration &&
+    prevProps.stalledFans === nextProps.stalledFans
   );
 });

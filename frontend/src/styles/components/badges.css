@@ -115,6 +115,20 @@
   border: 1px solid rgba(158, 158, 158, 0.2);
 }
 
+/* Fan calibration in progress (task 21) - control is locked meanwhile */
+.status-indicator.calibrating {
+  background-color: var(--temp-caution-bg);
+  color: var(--temp-caution-text);
+  border: 1px solid var(--temp-caution-border);
+}
+
+/* Stall watchdog flag (task 21) - commanded to spin but tach reads 0 */
+.status-indicator.stalled {
+  background-color: var(--temp-critical-bg);
+  color: var(--temp-critical-text);
+  border: 1px solid var(--temp-critical-border);
+}
+
 /* Profile Badges */
 .profile-badges {
   display: flex;

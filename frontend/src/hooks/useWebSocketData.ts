@@ -51,6 +51,13 @@ export function subscribeToLicenseUpdated(
   };
 }
 
+// Fan calibration lifecycle pushed by the backend (task 21).
+// Keyed "agentId:fanName" -> status ('pending'|'running'|'done'|'failed'|'no_tach')
+export type FanCalibrationMap = Record<string, string>;
+// Stalled fans (calibrated fan commanded above min_stop but tach reads 0),
+// keyed "agentId:fanName" -> true while stalled.
+export type StalledFanMap = Record<string, boolean>;
+
 interface UseWebSocketDataReturn {
   systems: SystemData[];
   isConnected: boolean;
@@ -60,6 +67,8 @@ interface UseWebSocketDataReturn {
   reconnect: () => void;
   removeSystem: (systemId: number) => void;
   overview: any | null;
+  fanCalibration: FanCalibrationMap;
+  stalledFans: StalledFanMap;
 }
 
 /**
@@ -80,6 +89,8 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [overview, setOverview] = useState<any | null>(null);
+  const [fanCalibration, setFanCalibration] = useState<FanCalibrationMap>({});
+  const [stalledFans, setStalledFans] = useState<StalledFanMap>({});
 
   const wsRef = useRef<WebSocketService | null>(null);
   const mountedRef = useRef(true);
@@ -487,6 +498,41 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       for (const listener of licenseUpdatedListeners) listener();
     });
 
+    // Fan calibration lifecycle (task 21): one event per unit per state change.
+    // A zone unit carries every member fan in fanNames.
+    wsRef.current.on("fanCalibrationStatus", (data: unknown) => {
+      const event = data as {
+        agentId: string;
+        target: string;
+        fanNames: string[];
+        status: string;
+      };
+      if (!mountedRef.current) return;
+      setFanCalibration((prev) => {
+        const next = { ...prev };
+        for (const name of [event.target, ...(event.fanNames ?? [])]) {
+          next[`${event.agentId}:${name}`] = event.status;
+        }
+        return next;
+      });
+    });
+
+    // Stall watchdog (task 21): detection-only flags from the backend
+    wsRef.current.on("fanStalled", (data: unknown) => {
+      const event = data as { agentId: string; fanId: string };
+      if (!mountedRef.current) return;
+      setStalledFans((prev) => ({ ...prev, [`${event.agentId}:${event.fanId}`]: true }));
+    });
+    wsRef.current.on("fanStallCleared", (data: unknown) => {
+      const event = data as { agentId: string; fanId: string };
+      if (!mountedRef.current) return;
+      setStalledFans((prev) => {
+        const next = { ...prev };
+        delete next[`${event.agentId}:${event.fanId}`];
+        return next;
+      });
+    });
+
     // Connect
     wsRef.current
       .connect()
@@ -559,5 +605,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     reconnect: connect,
     removeSystem,
     overview,
+    fanCalibration,
+    stalledFans,
   };
 }
