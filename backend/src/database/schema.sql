@@ -186,6 +186,36 @@ CREATE TABLE IF NOT EXISTS fan_configurations (
   FOREIGN KEY (sensor_id) REFERENCES sensors(id) ON DELETE SET NULL
 );
 
+-- Per-fan calibration results (current values; 1:1 with fans)
+-- Measured by backend-orchestrated calibration (CalibrationService), never by agents.
+-- Hardware facts only - user-intent clamps stay in fans.min_speed/max_speed.
+CREATE TABLE IF NOT EXISTS fan_calibrations (
+  id SERIAL PRIMARY KEY,
+  fan_id INTEGER NOT NULL UNIQUE,
+  status VARCHAR(20) CHECK(status IN ('pending','running','done','failed','no_tach')) DEFAULT 'pending',
+  min_start INTEGER,            -- lowest duty % that starts the fan from 0
+  min_stop INTEGER,             -- lowest duty % that keeps it spinning
+  min_rpm INTEGER,              -- RPM at min_stop
+  max_rpm INTEGER,              -- RPM at 100%
+  spin_up_ms INTEGER,           -- 0 -> stable RPM at min_start
+  spin_down_ms INTEGER,         -- 100% -> settled low duty
+  step_resolution INTEGER,      -- smallest duty step producing an RPM change
+  response_curve JSONB,         -- [{"duty":100,"rpm":1900}, ...]
+  calibrated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE CASCADE
+);
+
+-- Append-only calibration run history (auto re-calibration + degradation trends)
+CREATE TABLE IF NOT EXISTS fan_calibration_history (
+  id SERIAL PRIMARY KEY,
+  fan_id INTEGER NOT NULL,
+  result JSONB NOT NULL,        -- full snapshot: scalars + response_curve
+  calibrated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE CASCADE
+);
+
 -- Virtual Sensors (user-built aggregate sensors: max/avg of N real sensors)
 -- Resolved by FanProfileController via the "__virtual__<id>" sensor_identifier,
 -- exactly like "__highest__"/"__group__<name>". HUB-side only; agents are unaware.
@@ -242,6 +272,7 @@ CREATE INDEX IF NOT EXISTS idx_fan_curve_points_temperature ON fan_curve_points(
 CREATE INDEX IF NOT EXISTS idx_fan_profile_assignments_fan_id ON fan_profile_assignments(fan_id);
 CREATE INDEX IF NOT EXISTS idx_fan_profile_assignments_profile_id ON fan_profile_assignments(profile_id);
 CREATE INDEX IF NOT EXISTS idx_fan_configurations_fan_id ON fan_configurations(fan_id);
+CREATE INDEX IF NOT EXISTS idx_fan_calibration_history_fan_id ON fan_calibration_history(fan_id);
 CREATE INDEX IF NOT EXISTS idx_virtual_sensors_system_id ON virtual_sensors(system_id);
 CREATE INDEX IF NOT EXISTS idx_virtual_sensor_members_vsid ON virtual_sensor_members(virtual_sensor_id);
 
@@ -276,6 +307,12 @@ CREATE TRIGGER update_fans_timestamp
 DROP TRIGGER IF EXISTS update_fan_profiles_timestamp ON fan_profiles;
 CREATE TRIGGER update_fan_profiles_timestamp
     BEFORE UPDATE ON fan_profiles
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_fan_calibrations_timestamp ON fan_calibrations;
+CREATE TRIGGER update_fan_calibrations_timestamp
+    BEFORE UPDATE ON fan_calibrations
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
