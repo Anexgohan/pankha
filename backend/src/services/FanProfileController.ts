@@ -5,6 +5,7 @@ import { CommandDispatcher } from './CommandDispatcher';
 import { AgentManager } from './AgentManager';
 import { log } from '../utils/logger';
 import { deriveChipName } from '../utils/sensorUtils';
+import { CALIBRATION_VERSION } from '../config/calibration';
 
 interface FanAssignment {
   assignment_id: number;
@@ -24,6 +25,7 @@ interface FanAssignment {
   cal_status: string | null;
   cal_min_start: number | null;
   cal_min_stop: number | null;
+  cal_version: number | null;
 }
 
 interface CurvePoint {
@@ -254,7 +256,8 @@ export class FanProfileController extends EventEmitter {
           sens.sensor_name,
           cal.status AS cal_status,
           cal.min_start AS cal_min_start,
-          cal.min_stop AS cal_min_stop
+          cal.min_stop AS cal_min_stop,
+          cal.calibration_version AS cal_version
         FROM fan_profile_assignments fpa
         JOIN fans f ON fpa.fan_id = f.id
         JOIN fan_profiles fp ON fpa.profile_id = fp.id
@@ -634,6 +637,27 @@ export class FanProfileController extends EventEmitter {
             continue;
           }
 
+          // Consent-gated calibration trigger (task 21): an active assignment IS
+          // the user's consent to control this fan. Emitted only for fans in
+          // LIVE telemetry (guard above) - DB 'online' status is stale at boot
+          // and triggering into a not-yet-connected agent poisons statuses.
+          // Enqueue when calibration is missing, pending, or from an older
+          // protocol version; 'failed' rows get ONE automatic retry per
+          // protocol bump (version stamp), then manual-only.
+          // Control continues below (pass-through) until the run locks the fan.
+          const needsCalibration =
+            assignment.cal_status === null ||
+            assignment.cal_status === 'pending' ||
+            (assignment.cal_status !== 'running' &&
+              (assignment.cal_version ?? 0) < CALIBRATION_VERSION);
+          if (needsCalibration) {
+            this.emit('calibrationNeeded', {
+              agentId: assignment.agent_id,
+              fanDbId: assignment.fan_id,
+              fanName: assignment.fan_name,
+            });
+          }
+
           // Get current sensor temperature
           const temperature = this.getSensorTemperature(
             assignment.agent_id,
@@ -894,18 +918,23 @@ export class FanProfileController extends EventEmitter {
    * Note: We preserve lastAppliedSpeeds so stepping continues smoothly from current position
    */
   public clearFanState(agentId: string, fanName: string): void {
-    const fanKey = `${agentId}:${fanName}`;
     // Only clear target calculation state - NOT the current speed state
     // This ensures stepping continues from current position toward new target
+    // Intentionally NOT clearing:
+    // - lastAppliedSpeeds (current fan speed - needed for smooth stepping)
+    // - lastSpeedChangeTime (timing info - harmless to keep)
+    this.clearTargetState(agentId, fanName);
+    log.info(`Cleared target state for fan ${fanName} on agent ${agentId} (current speed preserved)`, 'FanProfileController');
+  }
+
+  /** Shared target-state clearing (no logging - callers log their own intent). */
+  private clearTargetState(agentId: string, fanName: string): void {
+    const fanKey = `${agentId}:${fanName}`;
     this.lastSignificantTemp.delete(fanKey);
     this.lastTargetSpeeds.delete(fanKey);
     this.sensorAvailabilityState.delete(fanKey);
     this.emergencyState.delete(fanKey);
     this.clearSnapAndStallState(fanKey, agentId, fanName);
-    // Intentionally NOT clearing:
-    // - lastAppliedSpeeds (current fan speed - needed for smooth stepping)
-    // - lastSpeedChangeTime (timing info - harmless to keep)
-    log.info(`Cleared target state for fan ${fanName} on agent ${agentId} (current speed preserved)`, 'FanProfileController');
   }
 
   /**
@@ -971,11 +1000,13 @@ export class FanProfileController extends EventEmitter {
   /**
    * Full per-fan reset (including current-speed record) for the handoff after
    * calibration: the next tick reseeds from the agent's reported speed.
+   * Debug-level on purpose - fleet-wide calibration waves call this per fan.
    */
   public resetFanControlState(agentId: string, fanName: string): void {
     const fanKey = `${agentId}:${fanName}`;
     this.lastAppliedSpeeds.delete(fanKey);
     this.lastSpeedChangeTime.delete(fanKey);
-    this.clearFanState(agentId, fanName);
+    this.clearTargetState(agentId, fanName);
+    log.debug(`Reset control state for fan ${fanName} on agent ${agentId} (reseeds from reported speed)`, 'FanProfileController');
   }
 }

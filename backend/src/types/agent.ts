@@ -101,7 +101,8 @@ export interface FanControlCommand {
     | "getDiagnostics"
     | "executeRawIpmi"
     | "reloadProfile"
-    | "setExcludedSensors";
+    | "setExcludedSensors"
+    | "restoreFanToAuto";
   payload: {
     fanId?: string;
     speed?: number;

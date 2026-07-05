@@ -691,6 +691,20 @@ public class LibreHardwareAdapter : IHardwareMonitor
     }
 
     /// <summary>
+    /// Hand one fan back to its driver's automatic curve (matches Rust agent's
+    /// restore_fan_to_auto). True only for NVIDIA GPU fans - generic fans have
+    /// no reliable driver-auto mode (SetDefault is chipset-dependent).
+    /// </summary>
+    public async Task<bool> RestoreFanToAutoAsync(string fanId)
+    {
+        if (_nvidiaController != null && _nvidiaController.CanControlFan(fanId))
+        {
+            return await _nvidiaController.ResetToAutoAsync(fanId);
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Enter failsafe mode: GPU fans → auto, other fans → configured failsafe speed
     /// </summary>
     public async Task EnterFailsafeModeAsync()

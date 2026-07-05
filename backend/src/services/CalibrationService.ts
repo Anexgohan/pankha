@@ -5,10 +5,15 @@ import { CommandDispatcher } from "./CommandDispatcher";
 import { AgentManager } from "./AgentManager";
 import { FanProfileController } from "./FanProfileController";
 import { log } from "../utils/logger";
+import { CALIBRATION_VERSION } from "../config/calibration";
 
 // Calibration tuning (task 21 W2). Telemetry runs at 0.5s during a calibration.
 const CALIBRATION_INTERVAL_S = 0.5;
-const SAFETY_MARGIN_C = 10;              // abort at emergency_temp - margin
+// Phase-dependent safety: phase 1 keeps every fan spinning at 50-100% (adds
+// airflow), so it only aborts at emergency_temp itself. The stall search
+// (phase 2) stops fans, so it keeps the full margin below emergency_temp.
+const STALL_SEARCH_MARGIN_C = 10;
+const MAX_CONCURRENT_SYSTEMS = 3;        // cap parallel runs (telemetry/DB contention)
 const SAMPLE_PERIOD_MS = 700;            // RPM poll cadence
 const SETTLE_TIMEOUT_MS = 15000;         // max wait for RPM to stabilize per step
 const SPINUP_TIMEOUT_MS = 8000;          // max wait for a fan to start spinning
@@ -16,8 +21,21 @@ const TELEMETRY_STALE_MS = 10000;        // abort when agent data stops flowing
 const SAFE_HOLD_DUTY = 70;               // parked duty for fans awaiting their turn
 const SWEEP_DUTIES = [100, 90, 80, 70, 60, 50];
 const STALL_SEARCH_STEP = 5;
+// Calibration hygiene: coasting rotors read tach-0 intermittently while still
+// turning, which fakes low min_start values. Confirm stops with consecutive
+// zero samples, then rest so the start search truly begins from standstill.
+const STOP_CONFIRM_SAMPLES = 3;
+const START_CONFIRM_SAMPLES = 2;
+const MIN_REST_AFTER_STOP_MS = 3000;
 const QUANT_PROBES: Array<[duty: number, step: number]> = [[51, 1], [52, 2], [55, 5]];
-const REGISTRATION_ENQUEUE_DELAY_MS = 5000; // wait for first telemetry after register
+// Quiet period after an abort or a deferred run (read-only, control disabled,
+// no telemetry) before auto-triggers may touch that agent again. Keeps an
+// emergency stop from re-launching runs and keeps skip reasons to ONE log
+// line per window instead of one per control tick.
+const AGENT_SNOOZE_MS = 5 * 60_000;
+// Collect sibling fans enqueued in the same control-loop pass so an agent
+// calibrates as one batch (one run, one log line) instead of 1 + N-1.
+const BATCH_COLLECT_MS = 2000;
 
 // One calibration unit = one command target (zone_id for IPMI, fan_name for OS).
 interface CalUnit {
@@ -34,8 +52,16 @@ interface CalUnit {
   stepResolution: number | null;
 }
 
-// Aborts the whole system run (safety); UnitFailed only fails one fan.
-class CalibrationAbort extends Error {}
+// Aborts the whole system run; UnitFailed only fails one fan.
+// retriable=true (infrastructure: agent gone, commands failing, user abort)
+// -> units revert to 'pending' and auto-retry when conditions normalize.
+// retriable=false (safety: temperature margin) -> 'failed', stamped with the
+// attempt's protocol version: one automatic attempt per protocol, then manual.
+class CalibrationAbort extends Error {
+  constructor(message: string, public readonly retriable: boolean = true) {
+    super(message);
+  }
+}
 class UnitFailed extends Error {}
 
 /**
@@ -61,8 +87,11 @@ export class CalibrationService extends EventEmitter {
 
   private queues: Map<string, Set<number>> = new Map();  // agentId -> fan db ids
   private activeRuns: Set<string> = new Set();           // agentIds mid-run
+  private pendingAgents: string[] = [];                  // FIFO awaiting a run slot
   private calibratingKeys: Set<string> = new Set();      // "agentId:target|fanName"
   private abortRequested: Set<string> = new Set();       // agentIds asked to abort
+  private phaseMargins: Map<string, number> = new Map(); // agentId -> current safety margin C
+  private snoozedUntil: Map<string, number> = new Map(); // agentId -> auto-trigger quiet period
   private started = false;
 
   private constructor() {
@@ -82,27 +111,46 @@ export class CalibrationService extends EventEmitter {
   }
 
   /**
-   * Subscribe to the triggers: new fans (DataAggregator) and agent
-   * registration (backfill for pre-existing uncalibrated fans, design D2).
+   * Start the service: crash recovery + the consent-gated trigger.
+   *
+   * The only automatic trigger is FanProfileController's 'calibrationNeeded'
+   * event, emitted from the control loop for ASSIGNED fans whose calibration
+   * is missing or from an older protocol version. An active assignment is the
+   * user's consent to control that fan - unassigned fans are never touched
+   * automatically (manual rack-icon calibration remains available).
    */
   public start(): void {
     if (this.started) return;
     this.started = true;
 
-    this.dataAggregator.on("newFansDetected", (event: { agentId: string }) => {
-      this.enqueueUncalibrated(event.agentId).catch((e) =>
-        log.error("Failed to enqueue new fans for calibration", "CalibrationService", e));
-    });
+    // Crash recovery: a backend restart mid-run orphans 'running' rows, which
+    // no trigger would ever pick up again. A crashed run is an infrastructure
+    // abort by definition -> 'pending', so it auto-retries when the agent is
+    // live again.
+    this.db.run(
+      `UPDATE fan_calibrations SET status = 'pending' WHERE status = 'running'`
+    ).then((r: any) => {
+      if (r?.rowCount > 0) {
+        log.warn(`Crash recovery: reset ${r.rowCount} orphaned 'running' calibration(s) to 'pending'`, "CalibrationService");
+      }
+    }).catch((e) => log.error("Calibration crash recovery failed", "CalibrationService", e));
 
-    this.agentManager.on("agentRegistered", (agent: { agentId: string }) => {
-      // Delay so the first telemetry (fans + sensors) is in before we start
-      setTimeout(() => {
-        this.enqueueUncalibrated(agent.agentId).catch((e) =>
-          log.error("Failed to enqueue fans on registration", "CalibrationService", e));
-      }, REGISTRATION_ENQUEUE_DELAY_MS);
-    });
+    this.fanProfileController.on(
+      "calibrationNeeded",
+      (event: { agentId: string; fanDbId: number }) => {
+        // Emitted every control tick until the run locks the fan - the queue
+        // Set and activeRuns guard make re-entry free. Snooze keeps aborted or
+        // deferred agents quiet for a while (manual enqueueFans bypasses it).
+        const until = this.snoozedUntil.get(event.agentId);
+        if (until && Date.now() < until) return;
+        this.enqueue(event.agentId, [event.fanDbId]);
+      }
+    );
 
-    log.info("Calibration service started (auto-calibration active)", "CalibrationService");
+    log.info(
+      `Calibration service started (protocol v${CALIBRATION_VERSION}, consent-gated triggers)`,
+      "CalibrationService"
+    );
   }
 
   /** True while `target` (fan_name or zone_id) is locked by a calibration run. */
@@ -115,21 +163,6 @@ export class CalibrationService extends EventEmitter {
     if (this.activeRuns.size === 0) return;
     log.warn(`Aborting ${this.activeRuns.size} calibration run(s): ${reason}`, "CalibrationService");
     for (const agentId of this.activeRuns) this.abortRequested.add(agentId);
-  }
-
-  /** Queue every controllable fan of the agent that has no completed calibration. */
-  public async enqueueUncalibrated(agentId: string): Promise<void> {
-    const rows = await this.db.all(
-      `SELECT f.id FROM fans f
-       JOIN systems s ON f.system_id = s.id
-       LEFT JOIN fan_calibrations cal ON cal.fan_id = f.id
-       WHERE s.agent_id = $1 AND s.status = 'online'
-         AND f.is_controllable = TRUE AND f.enabled = TRUE AND f.is_stale = FALSE
-         AND (cal.id IS NULL OR cal.status IN ('pending', 'failed'))`,
-      [agentId]
-    );
-    if (rows.length === 0) return;
-    this.enqueue(agentId, rows.map((r) => r.id));
   }
 
   /** Manual (re)calibration trigger - queues regardless of current status. */
@@ -147,19 +180,29 @@ export class CalibrationService extends EventEmitter {
     this.kick(agentId);
   }
 
-  // One run loop per agent; concurrent across agents.
+  // One run loop per agent; concurrent across agents up to the cap, the rest
+  // wait in FIFO order (uncapped bursts starve the event loop and telemetry).
   private kick(agentId: string): void {
     if (this.activeRuns.has(agentId)) return;
+    if (this.activeRuns.size >= MAX_CONCURRENT_SYSTEMS) {
+      if (!this.pendingAgents.includes(agentId)) this.pendingAgents.push(agentId);
+      return;
+    }
     this.activeRuns.add(agentId);
     this.runAgentQueue(agentId)
       .catch((e) => log.error(`Calibration run failed for ${agentId}`, "CalibrationService", e))
       .finally(() => {
         this.activeRuns.delete(agentId);
         this.abortRequested.delete(agentId);
+        const next = this.pendingAgents.shift();
+        if (next) this.kick(next);
       });
   }
 
   private async runAgentQueue(agentId: string): Promise<void> {
+    // Let the in-flight control tick finish enqueueing sibling fans first,
+    // so the agent calibrates as one batch instead of 1 + the rest.
+    await this.sleep(BATCH_COLLECT_MS);
     let queue = this.queues.get(agentId);
     while (queue && queue.size > 0) {
       const fanIds = [...queue];
@@ -175,14 +218,25 @@ export class CalibrationService extends EventEmitter {
    * restores prior speeds + interval and marks unfinished fans 'failed'.
    */
   private async runSystem(agentId: string, fanDbIds: number[]): Promise<void> {
+    // Deferral guards. Each snoozes the agent so the reason is logged ONCE per
+    // window, not once per control tick (the loop re-emits until calibrated).
     // Over-limit (read-only) agents must not be controlled - license honesty.
     if (await this.agentManager.isAgentReadOnly(agentId)) {
-      log.warn(`Skipping calibration for ${agentId}: agent is read-only (over agent limit)`, "CalibrationService");
+      this.snooze(agentId, "agent is read-only (over agent limit)");
       return;
     }
     // Fan control disabled agent-side means our commands are ignored - defer.
     if (!this.agentManager.getAgentEnableFanControl(agentId)) {
-      log.warn(`Skipping calibration for ${agentId}: fan control disabled`, "CalibrationService");
+      this.snooze(agentId, "fan control disabled");
+      return;
+    }
+    // Pre-flight: never touch statuses unless the agent is LIVE. DB 'online'
+    // status is stale at boot; launching into a not-yet-connected agent would
+    // poison every row with a bogus failure.
+    const preflight = this.dataAggregator.getSystemData(agentId);
+    if (!preflight ||
+        Date.now() - new Date(preflight.lastUpdate).getTime() > TELEMETRY_STALE_MS) {
+      this.snooze(agentId, "no live telemetry");
       return;
     }
 
@@ -235,7 +289,9 @@ export class CalibrationService extends EventEmitter {
       }
       await this.commandDispatcher.setUpdateInterval(agentId, CALIBRATION_INTERVAL_S);
 
-      // PHASE 1: parallel sweep (all units spinning - thermally safe)
+      // PHASE 1: parallel sweep (all units spinning - thermally safe, so the
+      // watchdog only aborts at emergency_temp itself)
+      this.phaseMargins.set(agentId, 0);
       for (const duty of SWEEP_DUTIES) {
         await this.setDutyAll(agentId, active, duty);
         const rpms = await this.settle(agentId, active.map((u) => u.target));
@@ -247,7 +303,7 @@ export class CalibrationService extends EventEmitter {
             const rpm = rpms.get(u.target) ?? 0;
             if (rpm <= 0) {
               log.warn(`Fan ${u.target} on ${agentId} has no usable tach - marking no_tach`, "CalibrationService");
-              await this.setStatus(u.fanDbIds, "no_tach");
+              await this.setStatus(u.fanDbIds, "no_tach", true);
               this.emitStatus(agentId, systemId, u, "no_tach", "complete");
               finished.add(u);
               active = active.filter((o) => o !== u);
@@ -275,7 +331,9 @@ export class CalibrationService extends EventEmitter {
       }
       for (const u of active) u.stepResolution = u.stepResolution ?? 10;
 
-      // PHASE 2: serial stall search - only one unit ever stopped (design D3)
+      // PHASE 2: serial stall search - only one unit ever stopped (design D3).
+      // Fans stop here, so the full safety margin below emergency_temp applies.
+      this.phaseMargins.set(agentId, STALL_SEARCH_MARGIN_C);
       for (const u of active) {
         await this.setDutyAll(agentId, active.filter((o) => o !== u && !finished.has(o)), SAFE_HOLD_DUTY);
         try {
@@ -285,7 +343,7 @@ export class CalibrationService extends EventEmitter {
         } catch (e) {
           if (!(e instanceof UnitFailed)) throw e; // safety aborts bubble up
           log.warn(`Calibration failed for fan ${u.target} on ${agentId}: ${e.message}`, "CalibrationService");
-          await this.setStatus(u.fanDbIds, "failed");
+          await this.setStatus(u.fanDbIds, "failed", true); // stamp: one auto attempt per protocol
           this.emitStatus(agentId, systemId, u, "failed", "complete");
         }
         finished.add(u);
@@ -294,21 +352,28 @@ export class CalibrationService extends EventEmitter {
 
       log.info(`Calibration complete for agent ${agentId}`, "CalibrationService");
     } catch (e) {
-      // Safety abort: everything unfinished is failed (retried on next trigger)
+      // Infra aborts (agent gone, commands failing, user abort) -> 'pending':
+      // auto-retries when conditions normalize. Safety aborts -> 'failed'
+      // stamped with this protocol version: one automatic attempt per
+      // protocol, then manual-only.
       const reason = e instanceof Error ? e.message : String(e);
-      log.error(`Calibration aborted for agent ${agentId}: ${reason}`, "CalibrationService");
+      const retriable = e instanceof CalibrationAbort ? e.retriable : true;
+      const status = retriable ? "pending" : "failed";
+      log.error(`Calibration aborted for agent ${agentId} (${status}): ${reason}`, "CalibrationService");
+      this.snoozedUntil.set(agentId, Date.now() + AGENT_SNOOZE_MS);
       for (const u of active) {
         if (finished.has(u)) continue;
         try {
-          await this.setStatus(u.fanDbIds, "failed");
-          this.emitStatus(agentId, systemId, u, "failed", "aborted");
+          await this.setStatus(u.fanDbIds, status, !retriable);
+          this.emitStatus(agentId, systemId, u, status, "aborted");
         } catch { /* keep restoring */ }
       }
     } finally {
+      this.phaseMargins.delete(agentId);
       // Restore: prior speeds, prior interval, FPC control (fail-closed, best effort)
       for (const u of units.values()) {
         try {
-          await this.setDuty(agentId, u.target, priorSpeeds.get(u.target) ?? SAFE_HOLD_DUTY);
+          await this.restoreUnit(agentId, u, priorSpeeds.get(u.target) ?? SAFE_HOLD_DUTY);
         } catch { /* agent may be gone */ }
         this.lockUnit(agentId, u, false);
       }
@@ -316,6 +381,34 @@ export class CalibrationService extends EventEmitter {
         await this.commandDispatcher.setUpdateInterval(agentId, priorInterval);
       } catch { /* re-synced from stored config on next agent registration */ }
     }
+  }
+
+  /**
+   * Hand a unit back after calibration. Driver-auto-capable fans (NVIDIA GPU)
+   * with no active assignment go back to the driver's own curve - restoring a
+   * fixed manual duty would strand them (nothing ever commands them again).
+   * Assigned fans get their prior duty; FPC re-commands within one tick.
+   */
+  private async restoreUnit(agentId: string, u: CalUnit, priorSpeed: number): Promise<void> {
+    // Linux NVML ids: nvidia_gpu<idx>_fan; Windows LHM ids: nvidiagpu_<idx>_...
+    const driverAutoCapable = /^nvidia_?gpu/.test(u.target);
+    if (driverAutoCapable) {
+      const assigned = await this.db.get(
+        `SELECT 1 FROM fan_profile_assignments WHERE fan_id = ANY($1) AND is_active = TRUE LIMIT 1`,
+        [u.fanDbIds]
+      );
+      if (!assigned) {
+        try {
+          await this.commandDispatcher.restoreFanToAuto(agentId, u.target);
+          log.info(`Fan ${u.target} on ${agentId} handed back to driver auto (no assignment)`, "CalibrationService");
+          return;
+        } catch (e) {
+          // Older agents don't know the command - fall through to prior duty
+          log.warn(`restoreFanToAuto not supported by ${agentId}, restoring prior duty`, "CalibrationService");
+        }
+      }
+    }
+    await this.setDuty(agentId, u.target, priorSpeed);
   }
 
   /**
@@ -354,16 +447,19 @@ export class CalibrationService extends EventEmitter {
       return;
     }
 
-    // Confirm fully stopped at 0 before the start search
+    // Confirm a TRUE stop at 0 (consecutive zero samples), then let the rotor
+    // rest - a coasting rotor restarts at duties a resting one never would.
     await this.setDuty(agentId, u.target, 0);
     await this.waitForRpm(agentId, u.target, (rpm) => rpm <= 0, SETTLE_TIMEOUT_MS,
-      `fan ${u.target} still reports RPM after duty 0`);
+      `fan ${u.target} still reports RPM after duty 0`, STOP_CONFIRM_SAMPLES);
+    await this.rest(agentId, Math.max(2 * (u.spinDownMs ?? 0), MIN_REST_AFTER_STOP_MS));
 
     // Upward: first duty that spins the fan from standstill is min_start
     for (let duty = STALL_SEARCH_STEP; duty <= 100; duty += STALL_SEARCH_STEP) {
       const t0 = Date.now();
       await this.setDuty(agentId, u.target, duty);
-      const spun = await this.tryWaitForRpm(agentId, u.target, (rpm) => rpm > 0, SPINUP_TIMEOUT_MS);
+      const spun = await this.tryWaitForRpm(
+        agentId, u.target, (rpm) => rpm > 0, SPINUP_TIMEOUT_MS, START_CONFIRM_SAMPLES);
       if (spun) {
         u.minStart = duty;
         u.spinUpMs = Date.now() - t0;
@@ -410,25 +506,43 @@ export class CalibrationService extends EventEmitter {
   /** Poll until predicate matches; throws UnitFailed on timeout. */
   private async waitForRpm(
     agentId: string, target: string,
-    predicate: (rpm: number) => boolean, timeoutMs: number, failMessage: string
+    predicate: (rpm: number) => boolean, timeoutMs: number, failMessage: string,
+    consecutive: number = 1
   ): Promise<void> {
-    if (!(await this.tryWaitForRpm(agentId, target, predicate, timeoutMs))) {
+    if (!(await this.tryWaitForRpm(agentId, target, predicate, timeoutMs, consecutive))) {
       throw new UnitFailed(failMessage);
     }
   }
 
+  /** Poll until predicate matches on `consecutive` samples in a row (noise guard). */
   private async tryWaitForRpm(
     agentId: string, target: string,
-    predicate: (rpm: number) => boolean, timeoutMs: number
+    predicate: (rpm: number) => boolean, timeoutMs: number,
+    consecutive: number = 1
   ): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
+    let hits = 0;
     while (Date.now() < deadline) {
       await this.sleep(SAMPLE_PERIOD_MS);
       this.safetyCheck(agentId);
       const rpm = this.telemetry(agentId, target)?.rpm ?? 0;
-      if (predicate(rpm)) return true;
+      if (predicate(rpm)) {
+        hits++;
+        if (hits >= consecutive) return true;
+      } else {
+        hits = 0;
+      }
     }
     return false;
+  }
+
+  /** Safety-checked pause (rotor rest between tests). */
+  private async rest(agentId: string, ms: number): Promise<void> {
+    const deadline = Date.now() + ms;
+    while (Date.now() < deadline) {
+      await this.sleep(Math.min(SAMPLE_PERIOD_MS, deadline - Date.now()));
+      this.safetyCheck(agentId);
+    }
   }
 
   /** Fail-closed guard, run at every poll. Throws CalibrationAbort. */
@@ -443,12 +557,17 @@ export class CalibrationService extends EventEmitter {
       throw new CalibrationAbort(`telemetry stale (${Math.round(age / 1000)}s - agent offline?)`);
     }
     const emergencyTemp = this.agentManager.getAgentEmergencyTemp(agentId);
+    // Phase-dependent margin: 0 while everything spins (phase 1), full margin
+    // during the stall search. Conservative default if unset.
+    const margin = this.phaseMargins.get(agentId) ?? STALL_SEARCH_MARGIN_C;
     const temps = (data.sensors ?? []).filter((s) => !s.isHidden).map((s) => s.temperature);
     if (temps.length > 0) {
       const maxTemp = Math.max(...temps);
-      if (maxTemp >= emergencyTemp - SAFETY_MARGIN_C) {
+      if (maxTemp >= emergencyTemp - margin) {
+        // Safety abort: not retriable (a hot system would churn fans forever)
         throw new CalibrationAbort(
-          `max temp ${maxTemp.toFixed(1)}C within ${SAFETY_MARGIN_C}C of emergency ${emergencyTemp}C`
+          `max temp ${maxTemp.toFixed(1)}C within ${margin}C of emergency ${emergencyTemp}C`,
+          false
         );
       }
     }
@@ -481,19 +600,34 @@ export class CalibrationService extends EventEmitter {
     }
   }
 
-  private async setStatus(fanDbIds: number[], status: string): Promise<void> {
+  /**
+   * Upsert lifecycle status. Terminal measurement statuses (no_tach) stamp the
+   * protocol version; transient ones (running/failed) keep the old stamp so a
+   * stale-version fan still recalibrates after a failed attempt is retried.
+   */
+  private async setStatus(fanDbIds: number[], status: string, stampVersion = false): Promise<void> {
     for (const fanId of fanDbIds) {
-      await this.db.run(
-        `INSERT INTO fan_calibrations (fan_id, status) VALUES ($1, $2)
-         ON CONFLICT (fan_id) DO UPDATE SET status = $2`,
-        [fanId, status]
-      );
+      if (stampVersion) {
+        await this.db.run(
+          `INSERT INTO fan_calibrations (fan_id, status, calibration_version)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (fan_id) DO UPDATE SET status = $2, calibration_version = $3`,
+          [fanId, status, CALIBRATION_VERSION]
+        );
+      } else {
+        await this.db.run(
+          `INSERT INTO fan_calibrations (fan_id, status) VALUES ($1, $2)
+           ON CONFLICT (fan_id) DO UPDATE SET status = $2`,
+          [fanId, status]
+        );
+      }
     }
   }
 
   /** Write measured values (current row per member fan) + one history snapshot each. */
   private async persistDone(u: CalUnit): Promise<void> {
     const result = {
+      calibration_version: CALIBRATION_VERSION,
       min_start: u.minStart, min_stop: u.minStop, min_rpm: u.minRpm,
       max_rpm: u.maxRpm, spin_up_ms: u.spinUpMs, spin_down_ms: u.spinDownMs,
       step_resolution: u.stepResolution,
@@ -503,20 +637,27 @@ export class CalibrationService extends EventEmitter {
       await this.db.run(
         `INSERT INTO fan_calibrations
            (fan_id, status, min_start, min_stop, min_rpm, max_rpm, spin_up_ms,
-            spin_down_ms, step_resolution, response_curve, calibrated_at)
-         VALUES ($1, 'done', $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
+            spin_down_ms, step_resolution, response_curve, calibration_version, calibrated_at)
+         VALUES ($1, 'done', $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
          ON CONFLICT (fan_id) DO UPDATE SET
            status = 'done', min_start = EXCLUDED.min_start, min_stop = EXCLUDED.min_stop,
            min_rpm = EXCLUDED.min_rpm, max_rpm = EXCLUDED.max_rpm,
            spin_up_ms = EXCLUDED.spin_up_ms, spin_down_ms = EXCLUDED.spin_down_ms,
            step_resolution = EXCLUDED.step_resolution, response_curve = EXCLUDED.response_curve,
-           calibrated_at = CURRENT_TIMESTAMP`,
+           calibration_version = EXCLUDED.calibration_version, calibrated_at = CURRENT_TIMESTAMP`,
         [fanId, u.minStart, u.minStop, u.minRpm, u.maxRpm, u.spinUpMs,
-         u.spinDownMs, u.stepResolution, JSON.stringify(result.response_curve)]
+         u.spinDownMs, u.stepResolution, JSON.stringify(result.response_curve),
+         CALIBRATION_VERSION]
+      );
+      // History from older protocol versions is not comparable - purge it so
+      // trends only ever span one measurement methodology.
+      await this.db.run(
+        `DELETE FROM fan_calibration_history WHERE fan_id = $1 AND calibration_version < $2`,
+        [fanId, CALIBRATION_VERSION]
       );
       await this.db.run(
-        `INSERT INTO fan_calibration_history (fan_id, result) VALUES ($1, $2)`,
-        [fanId, JSON.stringify(result)]
+        `INSERT INTO fan_calibration_history (fan_id, result, calibration_version) VALUES ($1, $2, $3)`,
+        [fanId, JSON.stringify(result), CALIBRATION_VERSION]
       );
     }
     log.info(
@@ -532,6 +673,15 @@ export class CalibrationService extends EventEmitter {
     this.emit("fanCalibrationStatus", {
       agentId, systemId, target: u.target, fanNames: u.memberNames, status, phase,
     });
+  }
+
+  /** Defer auto-calibration for an agent, logging the reason once per window. */
+  private snooze(agentId: string, reason: string): void {
+    this.snoozedUntil.set(agentId, Date.now() + AGENT_SNOOZE_MS);
+    log.info(
+      `Calibration deferred for ${agentId}: ${reason} (next automatic check in ${AGENT_SNOOZE_MS / 60000} min)`,
+      "CalibrationService"
+    );
   }
 
   private sleep(ms: number): Promise<void> {

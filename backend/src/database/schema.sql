@@ -201,6 +201,7 @@ CREATE TABLE IF NOT EXISTS fan_calibrations (
   spin_down_ms INTEGER,         -- 100% -> settled low duty
   step_resolution INTEGER,      -- smallest duty step producing an RPM change
   response_curve JSONB,         -- [{"duty":100,"rpm":1900}, ...]
+  calibration_version INTEGER DEFAULT 0, -- protocol version that produced these values
   calibrated_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -212,6 +213,7 @@ CREATE TABLE IF NOT EXISTS fan_calibration_history (
   id SERIAL PRIMARY KEY,
   fan_id INTEGER NOT NULL,
   result JSONB NOT NULL,        -- full snapshot: scalars + response_curve
+  calibration_version INTEGER DEFAULT 0, -- protocol version of this run
   calibrated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE CASCADE
 );
@@ -569,5 +571,28 @@ DO $$ BEGIN
   ) THEN
     ALTER TABLE license_config ADD COLUMN seat_state TEXT;
     RAISE NOTICE 'Migration: Added seat_state column to license_config';
+  END IF;
+END $$;
+
+-- Migration task 21: Add calibration_version to fan_calibrations + history.
+-- Rows from before versioning existed default to 0 (below any real version),
+-- so assigned fans recalibrate automatically on the next protocol bump.
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'fan_calibrations' AND column_name = 'calibration_version'
+  ) THEN
+    ALTER TABLE fan_calibrations ADD COLUMN calibration_version INTEGER DEFAULT 0;
+    RAISE NOTICE 'Migration task 21: Added calibration_version to fan_calibrations';
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'fan_calibration_history' AND column_name = 'calibration_version'
+  ) THEN
+    ALTER TABLE fan_calibration_history ADD COLUMN calibration_version INTEGER DEFAULT 0;
+    RAISE NOTICE 'Migration task 21: Added calibration_version to fan_calibration_history';
   END IF;
 END $$;

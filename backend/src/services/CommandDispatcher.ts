@@ -159,6 +159,24 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
+   * Hand a fan back to its driver's automatic curve (task 21). Only
+   * driver-auto-capable fans (NVIDIA GPU via NVML/NvAPI) act on this; agents
+   * respond with handled=false for plain sysfs/EC fans. Older agents reject
+   * it as an unknown command - callers must handle that.
+   */
+  public async restoreFanToAuto(
+    agentId: string,
+    fanId: string,
+    priority: "low" | "normal" | "high" | "emergency" = "normal"
+  ): Promise<any> {
+    log.info(
+      ` Restoring fan ${fanId} to driver auto for agent ${agentId}`,
+      "CommandDispatcher"
+    );
+    return this.sendCommand(agentId, "restoreFanToAuto", { fanId }, priority);
+  }
+
+  /**
    * Set update interval for an agent
    */
   public async setUpdateInterval(

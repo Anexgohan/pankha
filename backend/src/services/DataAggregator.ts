@@ -339,29 +339,19 @@ export class DataAggregator extends EventEmitter {
    */
   private async ensureFansExist(
     systemId: number,
-    agentId: string,
     fans: AgentDataPacket["fans"]
   ): Promise<void> {
     if (!fans || fans.length === 0) return;
 
-    const newFans: string[] = [];
     for (const fan of fans) {
       // Use ON CONFLICT to handle race conditions
       // On conflict: update last_reported, clear is_stale, and update zone_id (reactivation if hardware returns)
-      // xmax = 0 distinguishes a fresh INSERT from a conflict-update
-      const row = await this.db.get(
+      await this.db.run(
         `INSERT INTO fans (system_id, fan_name, fan_label, is_controllable, zone_id)
          VALUES ($1, $2, $3, true, $4)
-         ON CONFLICT (system_id, fan_name) DO UPDATE SET last_reported = CURRENT_TIMESTAMP, is_stale = false, zone_id = COALESCE($4, fans.zone_id)
-         RETURNING (xmax = 0) AS is_new`,
+         ON CONFLICT (system_id, fan_name) DO UPDATE SET last_reported = CURRENT_TIMESTAMP, is_stale = false, zone_id = COALESCE($4, fans.zone_id)`,
         [systemId, fan.id, fan.id, (fan as any).zone || null]
       );
-      if (row?.is_new) newFans.push(fan.id);
-    }
-
-    if (newFans.length > 0) {
-      // Newly discovered hardware - CalibrationService queues these (task 21)
-      this.emit("newFansDetected", { systemId, agentId, fanNames: newFans });
     }
   }
 
@@ -866,7 +856,7 @@ export class DataAggregator extends EventEmitter {
       try {
         // First ensure sensors and fans exist in database
         await this.ensureSensorsExist(system.id, dataPacket.sensors);
-        await this.ensureFansExist(system.id, agentId, dataPacket.fans);
+        await this.ensureFansExist(system.id, dataPacket.fans);
 
         // Buffer data points for aggregation (raw data still sent to dashboard)
         await this.bufferDataPoints(system.id, dataPacket, sensorIdByName, fanIdByName);
