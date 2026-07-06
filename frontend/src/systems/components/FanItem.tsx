@@ -24,7 +24,7 @@ const GAUGE_INSET = 20; // breathing room vs the header block
 const STROKE = 6; // ring stroke; arrowheads and mask band follow it
 const ARROW_RATIO = 0.6; // arrowhead tangential half-width per stroke px
 const ARROW_SPIN_S = 10; // seconds per full arrow-pattern revolution
-const TEXT_SIZE = 18; // % readout font px (bypasses --font-scale while tuning)
+const TEXT_SIZE = 18; // % readout base px; multiplied by the user font-scale
 
 /* Midpoint-anchored geometry: the SVG viewBox is centered on (0,0), so every
    element positions relative to the gauge center and only the radius moves. */
@@ -54,11 +54,11 @@ const CAL_TITLES: Record<CalState, string> = {
   pending:
     "Calibration pending - runs automatically when a profile is active, or click to start now",
   running: "Fan is calibrating, manual control is disabled until complete",
-  done: "", // built dynamically with date + version
+  done: "", // built dynamically with the date
   stale:
-    "Calibrated with an older protocol version - recalibrates automatically, or click to start now",
-  failed: "Calibration failed (safety abort) - click to retry",
-  no_tach: "No RPM feedback - calibration not possible",
+    "Calibration is outdated - it will rerun automatically, or click to start now",
+  failed: "Calibration stopped early to keep temperatures safe - click to retry",
+  no_tach: "This fan does not report its speed, so it cannot be calibrated",
 };
 
 interface FanItemProps {
@@ -128,7 +128,7 @@ const FanItem: React.FC<FanItemProps> = ({
           calInfo.calibrated_at
             ? new Date(calInfo.calibrated_at).toLocaleDateString()
             : ""
-        } (v${calInfo.version}) - click to recalibrate`
+        } - click to recalibrate`
       : CAL_TITLES[calState];
 
   // Speed gauge - geometry derives once per size, elements hang off the midpoint
@@ -288,7 +288,10 @@ const FanItem: React.FC<FanItemProps> = ({
               )}
               <span
                 className="speed-value"
-                style={{ color: ringColor, fontSize: TEXT_SIZE }}
+                style={{
+                  color: ringColor,
+                  fontSize: `calc(${TEXT_SIZE}px * var(--font-scale, 1))`,
+                }}
               >
                 {fan.speed}%
               </span>
