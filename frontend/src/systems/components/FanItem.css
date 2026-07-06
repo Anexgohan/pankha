@@ -28,7 +28,8 @@
   margin-left: -6px;
 }
 
-/* Calibrate trigger + status - mirrors .rack-visibility */
+/* Info + calibrate rack buttons - mirror .rack-visibility */
+.rack-info,
 .rack-calibrate {
   width: 28px;
   height: 28px;
@@ -45,11 +46,15 @@
 }
 
 /* Explicit size: lucide svg in a flex button collapses on Firefox */
+.rack-info svg,
 .rack-calibrate svg {
   width: 16px;
   height: 16px;
 }
 
+.rack-info { color: var(--text-secondary); }
+
+.rack-info:hover,
 .rack-calibrate:hover:not(:disabled) {
   background: var(--bg-hover);
   border-color: var(--color-accent-dynamic);

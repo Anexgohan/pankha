@@ -336,6 +336,52 @@ export const calibrateFan = async (
   );
 };
 
+export interface FanCalibrationDetail {
+  fan_db_id: number;
+  fan_name: string;
+  zone_id: string | null;
+  status: FanCalibrationInfo["status"] | null;
+  min_start: number | null;
+  min_stop: number | null;
+  min_rpm: number | null;
+  max_rpm: number | null;
+  spin_up_ms: number | null;
+  spin_down_ms: number | null;
+  step_resolution: number | null;
+  response_curve: { duty: number; rpm: number }[] | null;
+  calibration_version: number | null;
+  calibrated_at: string | null;
+  speed_min_24h: number | null;
+  speed_max_24h: number | null;
+  protocol_version: number;
+  calibrating: boolean;
+}
+
+export interface FanCalibrationHistoryRun {
+  result: Record<string, unknown>;
+  calibrated_at: string;
+}
+
+export const getFanCalibration = async (
+  systemId: number,
+  fanId: string
+): Promise<FanCalibrationDetail> => {
+  const response = await api.get(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/calibration`
+  );
+  return response.data;
+};
+
+export const getFanCalibrationHistory = async (
+  systemId: number,
+  fanId: string
+): Promise<FanCalibrationHistoryRun[]> => {
+  const response = await api.get(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/calibration/history`
+  );
+  return response.data.history;
+};
+
 // Fan Visibility
 export const updateFanVisibility = async (
   systemId: number,

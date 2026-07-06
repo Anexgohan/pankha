@@ -789,7 +789,8 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
     const row = await db.get(
       `SELECT f.id AS fan_db_id, f.fan_name, f.zone_id, cal.status, cal.min_start,
               cal.min_stop, cal.min_rpm, cal.max_rpm, cal.spin_up_ms, cal.spin_down_ms,
-              cal.step_resolution, cal.response_curve, cal.calibrated_at
+              cal.step_resolution, cal.response_curve, cal.calibration_version,
+              cal.calibrated_at
        FROM fans f
        LEFT JOIN fan_calibrations cal ON cal.fan_id = f.id
        WHERE f.system_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2)
@@ -800,9 +801,20 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
       return res.status(404).json({ error: "Fan not found" });
     }
 
+    // Speed range actually commanded over the last 24h (info card row)
+    const range = await db.get(
+      `SELECT MIN(fan_speed) AS speed_min, MAX(fan_speed) AS speed_max
+       FROM monitoring_data
+       WHERE fan_id = $1 AND timestamp > NOW() - INTERVAL '24 hours'`,
+      [row.fan_db_id]
+    );
+
     const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
     res.json({
       ...row,
+      speed_min_24h: range?.speed_min ?? null,
+      speed_max_24h: range?.speed_max ?? null,
+      protocol_version: CALIBRATION_VERSION,
       calibrating: system
         ? calibrationService.isCalibrating(system.agent_id, fanId)
         : false,

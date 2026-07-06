@@ -66,6 +66,7 @@ import {
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
 import FanItem from "./FanItem";
+import FanInfoCard from "./FanInfoCard";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorBuilderModal from "./SensorBuilderModal";
 import ManageSensorsModal from "./ManageSensorsModal";
@@ -187,6 +188,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
   >({});
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  // Fan whose info card is open (null = closed; the card unmounts entirely)
+  const [infoFanId, setInfoFanId] = useState<string | null>(null);
   const [isCardInView, setIsCardInView] = useState(true);
   const [stagedBmcProfileId, setStagedBmcProfileId] = useState<string | null>(
     system.profile_id ?? null
@@ -250,6 +253,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setAnchorRect(cardRef.current.getBoundingClientRect());
     }
     setIsBulkEditOpen(true);
+  };
+
+  const handleOpenFanInfo = (fanId: string) => {
+    if (cardRef.current) {
+      setAnchorRect(cardRef.current.getBoundingClientRect());
+    }
+    setInfoFanId(fanId);
   };
 
   const {
@@ -1824,6 +1834,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           }}
                           onToggleVisibility={() => handleToggleFanVisibility(fan.id, fan.dbId)}
                           onCalibrate={() => void handleCalibrateFan(fan)}
+                          onInfo={() => handleOpenFanInfo(fan.id)}
                         />
                       ))}
 
@@ -1927,6 +1938,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   }}
                   onToggleVisibility={() => handleToggleFanVisibility(fan.id, fan.dbId)}
                   onCalibrate={() => void handleCalibrateFan(fan)}
+                  onInfo={() => handleOpenFanInfo(fan.id)}
                 >
                   <div className="fan-controls">
                     {/* Sensor Selection Dropdown */}
@@ -2090,6 +2102,26 @@ const SystemCard: React.FC<SystemCardProps> = ({
             <p>System may be offline or not sending data</p>
           </div>
         )}
+
+      {/* Fan Info Card - only mounted while a fan's info is open */}
+      {(() => {
+        const infoFan = infoFanId
+          ? system.current_fan_speeds?.find((f: FanReading) => f.id === infoFanId)
+          : undefined;
+        if (!infoFan) return null;
+        return (
+          <FanInfoCard
+            fan={infoFan}
+            fanDisplayName={getFanDisplayName(infoFan.id, infoFan.name, infoFan.label)}
+            systemId={system.id}
+            systemName={system.name}
+            stalled={isFanStalled(infoFan.id)}
+            isOpen
+            anchorRect={anchorRect}
+            onClose={() => setInfoFanId(null)}
+          />
+        );
+      })()}
 
       {/* Bulk Edit Panel */}
       <BulkEditPanel

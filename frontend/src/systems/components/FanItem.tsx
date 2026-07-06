@@ -15,7 +15,7 @@ import type { FanCalibrationInfo } from "../../services/api";
 import { InlineEdit } from "../../components/InlineEdit";
 import AnimatedFanIcon from "../../components/icons/AnimatedFanIcon";
 import { getFanDisplayName } from "../../utils/displayNames";
-import { Gauge, Loader2 } from "lucide-react";
+import { Gauge, Info, Loader2 } from "lucide-react";
 import "./FanItem.css";
 
 // Gauge knobs - every dimension below derives from these numbers.
@@ -75,6 +75,7 @@ interface FanItemProps {
   onSaveLabel: (newLabel: string) => Promise<void>;
   onToggleVisibility: () => void;
   onCalibrate: () => void;
+  onInfo: () => void;
   /** fan-controls rows (regular fans); zone members render none */
   children?: React.ReactNode;
 }
@@ -92,6 +93,7 @@ const FanItem: React.FC<FanItemProps> = ({
   onSaveLabel,
   onToggleVisibility,
   onCalibrate,
+  onInfo,
   children,
 }) => {
   // Gauge diameter = fan-info block height (min 60 = pre-V7 size)
@@ -193,6 +195,14 @@ const FanItem: React.FC<FanItemProps> = ({
   return (
     <div className="fan-item-wrapper">
       <div className="fan-rack">
+        <button
+          className="rack-info"
+          onClick={onInfo}
+          title="Fan info and health"
+          aria-label="Fan info and health"
+        >
+          <Info size={16} />
+        </button>
         <button
           className={`rack-calibrate cal-${calState}`}
           onClick={canTrigger ? onCalibrate : undefined}
