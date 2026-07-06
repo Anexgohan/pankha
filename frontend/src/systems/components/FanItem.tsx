@@ -9,7 +9,7 @@
  * Gauge geometry is parameterized by the measured fan-info height: stroke,
  * arrowheads and mask band keep fixed dimensions, only the radius moves.
  */
-import React, { useLayoutEffect, useRef, useState } from "react";
+import React, { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FanReading } from "../../types/api";
 import type { FanCalibrationInfo } from "../../services/api";
 import { InlineEdit } from "../../components/InlineEdit";
@@ -17,6 +17,36 @@ import AnimatedFanIcon from "../../components/icons/AnimatedFanIcon";
 import { getFanDisplayName } from "../../utils/displayNames";
 import { Gauge, Loader2 } from "lucide-react";
 import "./FanItem.css";
+
+// Gauge knobs - every dimension below derives from these numbers.
+const GAUGE_FLOOR = 60; // minimum diameter (pre-redesign size)
+const GAUGE_INSET = 20; // breathing room vs the header block
+const STROKE = 6; // ring stroke; arrowheads and mask band follow it
+const ARROW_RATIO = 0.6; // arrowhead tangential half-width per stroke px
+const ARROW_SPIN_S = 10; // seconds per full arrow-pattern revolution
+const TEXT_SIZE = 18; // % readout font px (bypasses --font-scale while tuning)
+
+/* Midpoint-anchored geometry: the SVG viewBox is centered on (0,0), so every
+   element positions relative to the gauge center and only the radius moves. */
+const gaugeGeometry = (size: number) => {
+  const r = (size - 2 * STROKE) / 2;
+  const halfH = STROKE / 2;
+  const halfW = STROKE * ARROW_RATIO;
+  return {
+    size,
+    r,
+    circumference: 2 * Math.PI * r,
+    viewBox: `${-size / 2} ${-size / 2} ${size} ${size}`,
+    // arrowhead at 12 o'clock, tip pointing along the rotation direction
+    arrowPoints: {
+      cw: `${-halfW},${-r - halfH} ${halfW},${-r} ${-halfW},${-r + halfH}`,
+      ccw: `${halfW},${-r - halfH} ${-halfW},${-r} ${halfW},${-r + halfH}`,
+    },
+    maskImage:
+      `radial-gradient(circle at center, transparent ${r - halfH - 0.5}px, black ${r - halfH + 0.5}px, black ${r + halfH - 0.5}px, transparent ${r + halfH + 0.5}px), ` +
+      `conic-gradient(from -90deg, black 0deg, black var(--arc-deg, 0deg), transparent var(--arc-deg, 0deg))`,
+  };
+};
 
 type CalState = "pending" | "running" | "done" | "stale" | "failed" | "no_tach";
 
@@ -66,19 +96,21 @@ const FanItem: React.FC<FanItemProps> = ({
 }) => {
   // Gauge diameter = fan-info block height (min 60 = pre-V7 size)
   const infoRef = useRef<HTMLDivElement>(null);
-  const [gaugeSize, setGaugeSize] = useState(60);
+  const [gaugeSize, setGaugeSize] = useState(GAUGE_FLOOR);
   useLayoutEffect(() => {
     const el = infoRef.current;
     if (!el || typeof ResizeObserver === "undefined") return;
     const measure = () => {
-      const h = Math.round(el.offsetHeight);
-      setGaugeSize(h >= 60 ? h : 60);
+      const h = Math.round(el.offsetHeight) - GAUGE_INSET;
+      setGaugeSize(h >= GAUGE_FLOOR ? h : GAUGE_FLOOR);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+    // constants in deps: inert in prod, lets HMR re-measure on knob edits
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [GAUGE_FLOOR, GAUGE_INSET]);
 
   // Calibrate icon state; live WS flag wins over the REST snapshot
   const calState: CalState = calibrating
@@ -99,7 +131,7 @@ const FanItem: React.FC<FanItemProps> = ({
         } (v${calInfo.version}) - click to recalibrate`
       : CAL_TITLES[calState];
 
-  // Speed gauge - live 60px geometry scaled by radius only
+  // Speed gauge - geometry derives once per size, elements hang off the midpoint
   const flowDir = fan.rpm === 0 ? "" : rpmDecreasing ? "ccw" : "cw";
   let speedClass: string;
   if (fan.speed > 95) speedClass = "critical";
@@ -108,22 +140,36 @@ const FanItem: React.FC<FanItemProps> = ({
   else speedClass = "normal";
   const ringColor = `var(--temp-${speedClass}-border)`;
 
-  // 8px stroke (was 5px at the old 60px gauge) - arrowheads and mask band
-  // derive from it so everything stays in registration at any diameter.
-  const STROKE = 8;
-  const halfH = STROKE / 2; // arrowhead radial half-height
-  const halfW = STROKE * 0.6; // arrowhead tangential half-width (live ratio)
-  const r = (gaugeSize - 2 * STROKE) / 2;
-  const ctr = gaugeSize / 2;
-  const circumference = 2 * Math.PI * r;
-  const dashOffset = circumference * (1 - fan.speed / 100);
-  const arrowPoints =
-    flowDir === "cw"
-      ? `${ctr - halfW},${ctr - r - halfH} ${ctr + halfW},${ctr - r} ${ctr - halfW},${ctr - r + halfH}`
-      : `${ctr + halfW},${ctr - r - halfH} ${ctr - halfW},${ctr - r} ${ctr + halfW},${ctr - r + halfH}`;
-  const flowMaskImage =
-    `radial-gradient(circle at center, transparent ${r - halfH - 0.5}px, black ${r - halfH + 0.5}px, black ${r + halfH - 0.5}px, transparent ${r + halfH + 0.5}px), ` +
-    `conic-gradient(from -90deg, black 0deg, black var(--arc-deg, 0deg), transparent var(--arc-deg, 0deg))`;
+  const geo = useMemo(() => gaugeGeometry(gaugeSize), [gaugeSize]);
+  const dashOffset = geo.circumference * (1 - fan.speed / 100);
+
+  // One arrowhead in <defs>, 16 rotated <use> stamps; cached so React skips
+  // re-diffing the pattern unless the size or direction changes. The id must
+  // be instance-unique - <use href> resolves document-wide.
+  const arrowId = useId();
+  const arrowLayer = useMemo(() => {
+    if (!flowDir) return null;
+    return (
+      <div
+        className={`speed-flow-pattern flow-${flowDir}`}
+        style={{ animationDuration: `${ARROW_SPIN_S}s` }}
+      >
+        <svg viewBox={geo.viewBox} width={geo.size} height={geo.size}>
+          <defs>
+            <polygon
+              id={arrowId}
+              points={geo.arrowPoints[flowDir]}
+              fill="var(--speed-flow-color)"
+              opacity="0.35"
+            />
+          </defs>
+          {Array.from({ length: 16 }, (_, i) => (
+            <use key={i} href={`#${arrowId}`} transform={`rotate(${i * 22.5})`} />
+          ))}
+        </svg>
+      </div>
+    );
+  }, [geo, flowDir, arrowId]);
 
   // Exactly one badge: calibrating > stalled > agent status
   const badge = calibrating ? (
@@ -204,25 +250,26 @@ const FanItem: React.FC<FanItemProps> = ({
 
           <div className="speed-display">
             <div className="speed-circle">
-              <svg width={gaugeSize} height={gaugeSize} className="speed-gauge">
+              <svg
+                width={geo.size}
+                height={geo.size}
+                viewBox={geo.viewBox}
+                className="speed-gauge"
+              >
                 <circle
-                  cx={ctr}
-                  cy={ctr}
-                  r={r}
+                  r={geo.r}
                   fill="none"
                   className="speed-track"
                   strokeWidth={STROKE}
                 />
                 <circle
-                  cx={ctr}
-                  cy={ctr}
-                  r={r}
+                  r={geo.r}
                   fill="none"
                   stroke={ringColor}
                   strokeWidth={STROKE}
-                  strokeDasharray={`${circumference}`}
+                  strokeDasharray={`${geo.circumference}`}
                   strokeDashoffset={`${dashOffset}`}
-                  transform={`rotate(-90 ${ctr} ${ctr})`}
+                  transform="rotate(-90)"
                 />
               </svg>
               {flowDir && (
@@ -231,27 +278,18 @@ const FanItem: React.FC<FanItemProps> = ({
                   style={
                     {
                       "--arc-deg": `${fan.speed * 3.6}deg`,
-                      WebkitMaskImage: flowMaskImage,
-                      maskImage: flowMaskImage,
+                      WebkitMaskImage: geo.maskImage,
+                      maskImage: geo.maskImage,
                     } as React.CSSProperties
                   }
                 >
-                  <div className={`speed-flow-pattern flow-${flowDir}`}>
-                    <svg viewBox={`0 0 ${gaugeSize} ${gaugeSize}`} width={gaugeSize} height={gaugeSize}>
-                      {Array.from({ length: 16 }, (_, i) => (
-                        <polygon
-                          key={i}
-                          points={arrowPoints}
-                          fill="var(--speed-flow-color)"
-                          opacity="0.35"
-                          transform={`rotate(${i * 22.5}, ${ctr}, ${ctr})`}
-                        />
-                      ))}
-                    </svg>
-                  </div>
+                  {arrowLayer}
                 </div>
               )}
-              <span className="speed-value" style={{ color: ringColor }}>
+              <span
+                className="speed-value"
+                style={{ color: ringColor, fontSize: TEXT_SIZE }}
+              >
                 {fan.speed}%
               </span>
             </div>
