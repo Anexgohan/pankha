@@ -257,6 +257,9 @@ interface DashboardSettingsContextType {
   // Hub log level
   hubLogLevel: string;
   updateHubLogLevel: (level: string) => Promise<void>;
+  // Fan recalibration interval (days, 0 = manual only)
+  fanRecalDays: number;
+  updateFanRecalDays: (days: number) => Promise<void>;
 }
 
 const DashboardSettingsContext = createContext<DashboardSettingsContextType | undefined>(undefined);
@@ -323,6 +326,9 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   // Hub log level state
   const [hubLogLevel, setHubLogLevel] = useState<string>('info');
 
+  // Fan recalibration interval state (days, 0 = manual only)
+  const [fanRecalDays, setFanRecalDays] = useState<number>(7);
+
   const fetchSettings = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
@@ -340,6 +346,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
         getSetting('ui_font_secondary'),
         getSetting('hub_log_level'),
         getSetting('ui_font_scale'),
+        getSetting('fan_recalibration_days'),
       ]);
 
       // Process graph scale
@@ -400,6 +407,12 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       // Process font scale
       if (results[13].status === 'fulfilled' && results[13].value?.setting_value) {
         setFontScale(normalizeFontScale(parseFloat(results[13].value.setting_value)));
+      }
+
+      // Process fan recalibration interval
+      if (results[14].status === 'fulfilled' && results[14].value?.setting_value !== undefined) {
+        const days = parseInt(results[14].value.setting_value, 10);
+        if (Number.isFinite(days) && days >= 0) setFanRecalDays(days);
       }
     } catch (err) {
       console.error('Failed to fetch dashboard settings:', err);
@@ -580,6 +593,16 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     }
   };
 
+  const updateFanRecalDays = async (days: number) => {
+    setFanRecalDays(days);
+    try {
+      await updateSetting('fan_recalibration_days', days);
+    } catch (err) {
+      console.error('Failed to update fan recalibration interval:', err);
+      fetchSettings();
+    }
+  };
+
   const resetTempDefaults = async () => {
     setTempThresholds(DEFAULT_TEMP_THRESHOLDS);
     setTempColors(DEFAULT_TEMP_COLORS);
@@ -652,6 +675,8 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
       updateHardwarePruneDays,
       hubLogLevel,
       updateHubLogLevel,
+      fanRecalDays,
+      updateFanRecalDays,
     }}>
       {children}
     </DashboardSettingsContext.Provider>

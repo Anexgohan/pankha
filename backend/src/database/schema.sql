@@ -218,6 +218,17 @@ CREATE TABLE IF NOT EXISTS fan_calibration_history (
   FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE CASCADE
 );
 
+-- Stall events (watchdog log): fan commanded to spin but tach read 0.
+-- User-clearable ("after fixing the cause"); pruned to the newest 50 per fan.
+CREATE TABLE IF NOT EXISTS fan_stall_events (
+  id SERIAL PRIMARY KEY,
+  fan_id INTEGER NOT NULL,
+  commanded_speed INTEGER,
+  occurred_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (fan_id) REFERENCES fans(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_fan_stall_events_fan_id ON fan_stall_events(fan_id);
+
 -- Virtual Sensors (user-built aggregate sensors: max/avg of N real sensors)
 -- Resolved by FanProfileController via the "__virtual__<id>" sensor_identifier,
 -- exactly like "__highest__"/"__group__<name>". HUB-side only; agents are unaware.
@@ -351,6 +362,11 @@ ON CONFLICT (setting_key) DO NOTHING;
 -- Insert default hardware prune days setting (7 days, 0 = never)
 INSERT INTO backend_settings (setting_key, setting_value, description)
 VALUES ('hardware_prune_days', '7', 'Days before unreported hardware is marked stale (0 = never)')
+ON CONFLICT (setting_key) DO NOTHING;
+
+-- Insert default fan recalibration interval (7 days, 0 = manual only)
+INSERT INTO backend_settings (setting_key, setting_value, description)
+VALUES ('fan_recalibration_days', '7', 'Days between automatic fan recalibrations (0 = manual only)')
 ON CONFLICT (setting_key) DO NOTHING;
 
 -- Insert default UI font settings

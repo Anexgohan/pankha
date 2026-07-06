@@ -359,6 +359,8 @@ export interface FanCalibrationDetail {
   healthy_min_start: number | null;
   drift_10m: number | null;
   drift_samples: number;
+  stall_count: number;
+  last_stall_at: string | null;
   protocol_version: number;
   calibrating: boolean;
 }
@@ -386,6 +388,15 @@ export const getFanCalibrationHistory = async (
     `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/calibration/history`
   );
   return response.data.history;
+};
+
+export const clearFanStalls = async (
+  systemId: number,
+  fanId: string
+): Promise<void> => {
+  await api.post(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/stalls/clear`
+  );
 };
 
 // Fan Visibility

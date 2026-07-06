@@ -63,6 +63,22 @@
 
 .fic-sent { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; padding: 4px 0; color: var(--text-primary); }
 .fic-sent svg { flex-shrink: 0; margin-top: 2px; }
+.fic-sent-text { flex: 1; }
+
+/* Clear action on the stops line */
+.fic-clear {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+}
+.fic-clear:hover { color: var(--text-primary); border-color: var(--color-info); }
 .fic-ico-ok { color: var(--color-success); }
 .fic-ico-wait { color: var(--text-tertiary); }
 .fic-ico-warn { color: var(--temp-caution-text); }

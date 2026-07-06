@@ -12,6 +12,7 @@ import type { FanReading } from "../../types/api";
 import {
   getFanCalibration,
   getFanCalibrationHistory,
+  clearFanStalls,
 } from "../../services/api";
 import type {
   FanCalibrationDetail,
@@ -90,6 +91,7 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
   const [history, setHistory] = useState<FanCalibrationHistoryRun[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { isMobile, panelStyles, panelRef, contextual } = useContextualPanel(
     isOpen,
     anchorRect,
@@ -120,7 +122,7 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, systemId, fan.id]);
+  }, [isOpen, systemId, fan.id, refreshKey]);
 
   if (!isOpen) return null;
 
@@ -161,6 +163,16 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
     );
 
   const dash = <>-</>;
+
+  const handleClearStalls = async () => {
+    try {
+      await clearFanStalls(systemId, fan.id);
+      toast.success("Stop counter cleared");
+      setRefreshKey((k) => k + 1);
+    } catch {
+      toast.error("Failed to clear the stop counter");
+    }
+  };
 
   // Copy All mirrors exactly the displayed fields (house rule)
   const handleCopyAll = async () => {
@@ -207,7 +219,15 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
     if (cal?.speed_min_24h !== null && cal?.speed_max_24h !== null)
       L.push(`  Speed range used (24h): ${cal!.speed_min_24h} - ${cal!.speed_max_24h}%`);
     L.push(`  Dead zone: ${deadZoneEnd ? `0 - ${deadZoneEnd}%` : "-"}`);
-    L.push(`  Unexpected stops: ${stalled ? "1 (now)" : "None"}`);
+    L.push(
+      `  Unexpected stops: ${
+        stalled
+          ? `${Math.max(cal?.stall_count ?? 0, 1)} (now)`
+          : (cal?.stall_count ?? 0) > 0
+            ? cal!.stall_count
+            : "None"
+      }`
+    );
     if (await copyTextToClipboard(L.join("\n"))) {
       toast.success("Fan info copied to clipboard");
     } else {
@@ -262,11 +282,29 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
                   Health checks unlock after the first calibration.
                 </Sentence>
               ) : (
-                report.lines.map((line, i) => (
-                  <Sentence key={i} icon={stateIcon(line.state)} title={line.tooltip}>
-                    {line.text}
-                  </Sentence>
-                ))
+                report.lines.map((line, i) => {
+                  // Clear action rides the stops line (last) once there is a
+                  // log to reset and the fan is not stalled right now
+                  const isStops = i === report.lines.length - 1;
+                  const showClear =
+                    isStops && (cal?.stall_count ?? 0) > 0 && !stalled;
+                  return (
+                    <div className="fic-sent" key={i} title={line.tooltip}>
+                      {stateIcon(line.state)}
+                      <span className="fic-sent-text">{line.text}</span>
+                      {showClear && (
+                        <button
+                          className="fic-clear"
+                          type="button"
+                          onClick={() => void handleClearStalls()}
+                          title="Resets the stop counter - use after fixing the cause"
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -384,8 +422,14 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
               <Row k="Dead zone" title="Speed settings in this range cannot keep the fan spinning - the control logic automatically jumps over them">
                 {deadZoneEnd ? <>0 - {deadZoneEnd}<span className="fic-unit">%</span></> : dash}
               </Row>
-              <Row k="Unexpected stops" title="Times the fan was told to spin but reported no movement">
-                {stalled ? "1 (now)" : calibrated ? <span className="fic-ok">None</span> : dash}
+              <Row k="Unexpected stops" title="Times the fan was told to spin but reported no movement - Clear in Health resets the counter">
+                {stalled ? (
+                  `${Math.max(cal?.stall_count ?? 0, 1)} (now)`
+                ) : (cal?.stall_count ?? 0) > 0 ? (
+                  cal!.stall_count
+                ) : calibrated ? (
+                  <span className="fic-ok">None</span>
+                ) : dash}
               </Row>
             </div>
 

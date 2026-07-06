@@ -848,6 +848,13 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
       }
     }
 
+    // Stall log (user-clearable via POST .../stalls/clear)
+    const stalls = await db.get(
+      `SELECT COUNT(*)::int AS count, MAX(occurred_at) AS last
+       FROM fan_stall_events WHERE fan_id = $1`,
+      [row.fan_db_id]
+    );
+
     const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
     res.json({
       ...row,
@@ -858,6 +865,8 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
       healthy_min_start: healthy?.min_start ?? null,
       drift_10m: drift10m?.median ?? null,
       drift_samples: drift10m?.count ?? 0,
+      stall_count: stalls?.count ?? 0,
+      last_stall_at: stalls?.last ?? null,
       protocol_version: CALIBRATION_VERSION,
       calibrating: system
         ? calibrationService.isCalibrating(system.agent_id, fanId)
@@ -943,6 +952,35 @@ router.post("/:id/fans/:fanId/calibrate", async (req: Request, res: Response) =>
   } catch (error) {
     log.error("Error triggering fan calibration:", "systems", error);
     res.status(500).json({ error: "Failed to trigger calibration" });
+  }
+});
+
+// POST /api/systems/:id/fans/:fanId/stalls/clear - Reset the stall log after
+// the user fixed the cause; a still-stalled fan re-flags within the debounce.
+router.post("/:id/fans/:fanId/stalls/clear", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    if (isDemoMode()) {
+      return res.json(createDemoLockResponse("Clearing stalls is locked in demo"));
+    }
+
+    const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+
+    await db.run(
+      `DELETE FROM fan_stall_events
+       WHERE fan_id IN (SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2)`,
+      [systemId, fanId]
+    );
+    fanProfileController.clearStall(system.agent_id, fanId);
+    res.json({ message: "Stall log cleared", fan_id: fanId });
+  } catch (error) {
+    log.error("Error clearing fan stalls:", "systems", error);
+    res.status(500).json({ error: "Failed to clear stalls" });
   }
 });
 
@@ -2039,6 +2077,7 @@ const ALLOWED_SETTINGS = [
   'accent_color',
   'hover_tint_color',
   'hardware_prune_days',
+  'fan_recalibration_days',
   'ui_font_primary',
   'ui_font_secondary',
   'ui_font_scale',
@@ -2112,6 +2151,8 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
     if (key === 'hub_log_level') {
       logger.setLogLevel(value.toString());
       log.info(`Hub log level changed to: ${logger.getLogLevelString()}`, "systems");
+    } else if (key === 'fan_recalibration_days') {
+      fanProfileController.setRecalibrationDays(parseInt(value.toString(), 10));
     } else {
       log.info(`Backend setting updated: ${key}=${value}`, "systems");
     }

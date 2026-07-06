@@ -26,6 +26,7 @@ interface FanAssignment {
   cal_min_start: number | null;
   cal_min_stop: number | null;
   cal_version: number | null;
+  cal_calibrated_at: string | Date | null;
 }
 
 interface CurvePoint {
@@ -93,6 +94,10 @@ export class FanProfileController extends EventEmitter {
   // Fans locked by an active calibration run - skipped by the control loop.
   // Managed by CalibrationService via setFanCalibrating().
   private calibratingFans: Set<string> = new Set();
+
+  // Days between automatic recalibrations (0 = manual only). Loaded from
+  // backend_settings at start; updated live by the settings route.
+  private recalibrationDays = 7;
 
   // Virtual sensor defs for the current control tick (id -> {operation, member dbIds}).
   // Rebuilt fresh each tick from the DB, like the curve-points batch - no cache to invalidate.
@@ -262,7 +267,8 @@ export class FanProfileController extends EventEmitter {
           cal.status AS cal_status,
           cal.min_start AS cal_min_start,
           cal.min_stop AS cal_min_stop,
-          cal.calibration_version AS cal_version
+          cal.calibration_version AS cal_version,
+          cal.calibrated_at AS cal_calibrated_at
         FROM fan_profile_assignments fpa
         JOIN fans f ON fpa.fan_id = f.id
         JOIN fan_profiles fp ON fpa.profile_id = fp.id
@@ -499,6 +505,7 @@ export class FanProfileController extends EventEmitter {
             'FanProfileController'
           );
           this.emit('fanStalled', { agentId, fanId: fanName, commandedSpeed: targetSpeed });
+          this.persistStallEvent(agentId, fanName, targetSpeed);
         }
       }
 
@@ -653,11 +660,20 @@ export class FanProfileController extends EventEmitter {
           // protocol version; 'failed' rows get ONE automatic retry per
           // protocol bump (version stamp), then manual-only.
           // Control continues below (pass-through) until the run locks the fan.
+          // Periodic recalibration: age check on healthy ('done') curves only,
+          // so a failed run can't loop - it stays on the retry policy above.
+          const recalDue =
+            this.recalibrationDays > 0 &&
+            assignment.cal_status === 'done' &&
+            assignment.cal_calibrated_at != null &&
+            Date.now() - new Date(assignment.cal_calibrated_at).getTime() >
+              this.recalibrationDays * 86_400_000;
           const needsCalibration =
             assignment.cal_status === null ||
             assignment.cal_status === 'pending' ||
             (assignment.cal_status !== 'running' &&
-              (assignment.cal_version ?? 0) < CALIBRATION_VERSION);
+              (assignment.cal_version ?? 0) < CALIBRATION_VERSION) ||
+            recalDue;
           if (needsCalibration) {
             this.emit('calibrationNeeded', {
               agentId: assignment.agent_id,
@@ -832,6 +848,37 @@ export class FanProfileController extends EventEmitter {
   }
 
   /**
+   * Load recalibration interval (days, 0 = manual only) from database
+   */
+  private async loadRecalibrationDays(): Promise<number> {
+    try {
+      const setting = await this.db.get(
+        'SELECT setting_value FROM backend_settings WHERE setting_key = $1',
+        ['fan_recalibration_days']
+      );
+      if (setting && setting.setting_value !== undefined) {
+        const days = parseInt(setting.setting_value, 10);
+        if (Number.isFinite(days) && days >= 0) {
+          log.info(`Fan recalibration interval: ${days === 0 ? 'manual only' : `${days} day(s)`}`, 'FanProfileController');
+          return days;
+        }
+      }
+    } catch (error) {
+      log.error('Error loading recalibration interval from database:', 'FanProfileController', error);
+    }
+    return 7;
+  }
+
+  /**
+   * Update the recalibration interval at runtime (settings route side-effect).
+   */
+  public setRecalibrationDays(days: number): void {
+    if (!Number.isFinite(days) || days < 0) return;
+    this.recalibrationDays = days;
+    log.info(`Fan recalibration interval set to ${days === 0 ? 'manual only' : `${days} day(s)`}`, 'FanProfileController');
+  }
+
+  /**
    * Save controller interval to database
    */
   private async saveControllerInterval(intervalMs: number): Promise<void> {
@@ -862,6 +909,7 @@ export class FanProfileController extends EventEmitter {
     const intervalToUse = updateIntervalMs !== undefined
       ? updateIntervalMs
       : await this.loadControllerInterval();
+    this.recalibrationDays = await this.loadRecalibrationDays();
 
     this.updateInterval = intervalToUse;
     this.isRunning = true;
@@ -994,6 +1042,44 @@ export class FanProfileController extends EventEmitter {
    */
   public getStalledFans(): string[] {
     return [...this.stalledFans];
+  }
+
+  /** Log a stall to fan_stall_events, pruned to the newest 50 per fan. */
+  private persistStallEvent(agentId: string, fanName: string, commandedSpeed: number): void {
+    void (async () => {
+      const row = await this.db.get(
+        `SELECT f.id FROM fans f JOIN systems s ON s.id = f.system_id
+         WHERE s.agent_id = $1 AND f.fan_name = $2 LIMIT 1`,
+        [agentId, fanName]
+      );
+      if (!row) return;
+      await this.db.run(
+        `INSERT INTO fan_stall_events (fan_id, commanded_speed) VALUES ($1, $2)`,
+        [row.id, commandedSpeed]
+      );
+      await this.db.run(
+        `DELETE FROM fan_stall_events
+         WHERE fan_id = $1 AND id NOT IN (
+           SELECT id FROM fan_stall_events WHERE fan_id = $1
+           ORDER BY occurred_at DESC LIMIT 50)`,
+        [row.id]
+      );
+    })().catch((e) =>
+      log.error(`Failed to persist stall event for ${fanName}:`, 'FanProfileController', e)
+    );
+  }
+
+  /**
+   * User-initiated stall reset ("after fixing the cause"): drop the live flag
+   * and debounce so the watchdog re-evaluates fresh - a still-stalled fan
+   * re-flags within STALL_DEBOUNCE_TICKS, honestly.
+   */
+  public clearStall(agentId: string, fanName: string): void {
+    const fanKey = `${agentId}:${fanName}`;
+    this.stallTicks.delete(fanKey);
+    if (this.stalledFans.delete(fanKey)) {
+      this.emit('fanStallCleared', { agentId, fanId: fanName });
+    }
   }
 
   /**

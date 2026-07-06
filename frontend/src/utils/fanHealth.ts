@@ -190,13 +190,24 @@ function wearLine(cal: FanCalibrationDetail, runs: number): HealthLine {
   };
 }
 
-/** Sentence 4: unexpected stops (persisted counts arrive with stall history). */
-function stopsLine(stalled: boolean): HealthLine {
+/** Sentence 4: unexpected stops (persisted stall log + live flag). */
+function stopsLine(cal: FanCalibrationDetail, stalled: boolean): HealthLine {
+  const count = cal.stall_count ?? 0;
+  const last = cal.last_stall_at
+    ? new Date(cal.last_stall_at).toLocaleString()
+    : null;
   if (stalled) {
     return {
       state: "crit",
       text: "The fan is stopped while commanded to spin - check its cable or replace the fan.",
-      tooltip: "Reported 0 RPM while being told to run - stuck, disconnected, or failed",
+      tooltip: `Reporting 0 RPM while being told to run${count > 1 ? ` - ${count} stops on record` : ""}`,
+    };
+  }
+  if (count > 0) {
+    return {
+      state: "warn",
+      text: `The fan stopped ${count} time${plural(count)} unexpectedly - check its cable if it keeps happening.`,
+      tooltip: `Last stop: ${last ?? "unknown"}. Clear resets the counter after you have fixed the cause.`,
     };
   }
   return {
@@ -222,7 +233,7 @@ export function healthReport(
     runningLine(cal),
     topSpeedLine(cal, runs),
     wearLine(cal, runs),
-    stopsLine(stalled),
+    stopsLine(cal, stalled),
   ];
   const worst = Math.max(...lines.map((l) => STATE_RANK[l.state]));
   const verdict: HealthVerdict =
