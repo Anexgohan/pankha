@@ -129,8 +129,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
   // Fan calibration/stall lookups. During calibration the backend
   // owns the fan - controls are disabled and a Calibrating badge is shown.
-  const isFanCalibrating = (fanId: string) =>
-    fanCalibration[`${system.agent_id}:${fanId}`] === "running";
+  // WS events win when present; the REST snapshot covers pages that loaded
+  // or reconnected mid-calibration and never saw the "running" event.
+  const isFanCalibrating = (fanId: string) => {
+    const ws = fanCalibration[`${system.agent_id}:${fanId}`];
+    if (ws !== undefined) return ws === "running";
+    return calSnapshot?.calibrations[fanId]?.status === "running";
+  };
   const isFanStalled = (fanId: string) =>
     !!stalledFans[`${system.agent_id}:${fanId}`];
 

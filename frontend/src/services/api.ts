@@ -353,6 +353,12 @@ export interface FanCalibrationDetail {
   calibrated_at: string | null;
   speed_min_24h: number | null;
   speed_max_24h: number | null;
+  // Healthy reference (per-metric best across history) + sustained drift
+  healthy_max_rpm: number | null;
+  healthy_spin_up_ms: number | null;
+  healthy_min_start: number | null;
+  drift_10m: number | null;
+  drift_samples: number;
   protocol_version: number;
   calibrating: boolean;
 }

@@ -172,10 +172,10 @@ export class FanProfileController extends EventEmitter {
   /**
    * Zero-snap for calibrated fans (dead-zone compensation).
    *
-   * Fans cannot run below their measured min_start duty. Targets inside the
-   * dead zone snap to the NEAREST of {0, min_start} around midpoint
-   * (min_start / 2), with a sticky band equal to the agent's hysteresis value
-   * (as duty points) to prevent start/stop flapping at the midpoint:
+   * Fans cannot sustain rotation below max(min_start, min_stop) - the floor.
+   * Targets inside the dead zone snap to the NEAREST of {0, floor} around
+   * midpoint (floor / 2), with a sticky band equal to the agent's hysteresis
+   * value (as duty points) to prevent start/stop flapping at the midpoint:
    *   - stopped fan starts only when target >= midpoint + band
    *   - spinning fan stops only when target <= midpoint - band
    * An explicit target of 0 is always honored. Uncalibrated / no_tach fans
@@ -187,9 +187,14 @@ export class FanProfileController extends EventEmitter {
     commandTarget: string,
     target: number,
     calStatus: string | null,
-    calMinStart: number | null
+    calMinStart: number | null,
+    calMinStop: number | null
   ): number {
-    if (calStatus !== 'done' || !calMinStart || calMinStart <= 0) {
+    // Snap floor = max(min_start, min_stop): start-transient artifacts can
+    // measure min_start BELOW min_stop, and snapping up to a duty that cannot
+    // sustain rotation would stall the fan.
+    const floor = Math.max(calMinStart ?? 0, calMinStop ?? 0);
+    if (calStatus !== 'done' || floor <= 0) {
       return target; // not calibrated (or no dead zone measured)
     }
 
@@ -197,13 +202,13 @@ export class FanProfileController extends EventEmitter {
       this.snapState.set(fanKey, 'stopped'); // explicit stop is a real request
       return 0;
     }
-    if (target >= calMinStart) {
+    if (target >= floor) {
       this.snapState.set(fanKey, 'spinning'); // achievable duty, no snap needed
       return target;
     }
 
     // Dead zone: closest-match with sticky band
-    const midpoint = calMinStart / 2;
+    const midpoint = floor / 2;
     const band = this.agentManager.getAgentHysteresis(agentId); // duty points (design D5)
 
     let state = this.snapState.get(fanKey);
@@ -219,8 +224,8 @@ export class FanProfileController extends EventEmitter {
     if (state === 'stopped') {
       if (target >= midpoint + band) {
         this.snapState.set(fanKey, 'spinning');
-        log.debug(`Zero-snap: fan ${commandTarget} target ${target}% in dead zone, snapping UP to ${calMinStart}%`, 'FanProfileController');
-        return calMinStart;
+        log.debug(`Zero-snap: fan ${commandTarget} target ${target}% in dead zone, snapping UP to ${floor}%`, 'FanProfileController');
+        return floor;
       }
       return 0;
     } else {
@@ -229,7 +234,7 @@ export class FanProfileController extends EventEmitter {
         log.debug(`Zero-snap: fan ${commandTarget} target ${target}% in dead zone, snapping DOWN to 0%`, 'FanProfileController');
         return 0;
       }
-      return calMinStart; // hold spinning at the floor
+      return floor; // hold spinning at the floor
     }
   }
 
@@ -460,9 +465,12 @@ export class FanProfileController extends EventEmitter {
     } else if (targetSpeed > currentSpeed) {
       // Need to increase speed
       nextSpeed = Math.min(currentSpeed + fanStep, targetSpeed);
-      // Calibrated fans: don't crawl the dead zone - jump 0 -> min_start directly
-      if (currentSpeed === 0 && calStatus === 'done' && calMinStart && nextSpeed < calMinStart) {
-        nextSpeed = Math.min(calMinStart, targetSpeed);
+      // Calibrated fans: don't crawl the dead zone - jump 0 -> floor directly.
+      // Floor = max(min_start, min_stop): inverted pairs (start-transient
+      // artifact) must not land the fan below its sustain threshold.
+      const jumpFloor = Math.max(calMinStart ?? 0, calMinStop ?? 0);
+      if (currentSpeed === 0 && calStatus === 'done' && jumpFloor > 0 && nextSpeed < jumpFloor) {
+        nextSpeed = Math.min(jumpFloor, targetSpeed);
       }
     } else if (targetSpeed < currentSpeed) {
       // Need to decrease speed
@@ -750,7 +758,8 @@ export class FanProfileController extends EventEmitter {
             commandTarget,
             constrainedSpeed,
             assignment.cal_status,
-            assignment.cal_min_start
+            assignment.cal_min_start,
+            assignment.cal_min_stop
           );
 
           // Apply fan control with stepping (hysteresis already handled above)

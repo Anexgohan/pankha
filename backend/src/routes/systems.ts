@@ -21,6 +21,7 @@ import {
   validUpdateIntervals,
 } from "../config/uiOptions";
 import { CALIBRATION_VERSION } from "../config/calibration";
+import { medianDriftPct } from "../utils/fanCurve";
 
 const router = Router();
 const db = Database.getInstance();
@@ -809,11 +810,54 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
       [row.fan_db_id]
     );
 
+    // Healthy reference (D19): per-metric best across history at the current
+    // protocol; health compares against the fan's best self, never a degraded
+    // later run. Sustained drift (D20): median over 10 min of samples - the
+    // card never judges on a single reading.
+    let healthy: { max_rpm: number; spin_up_ms: number; min_start: number } | null = null;
+    let drift10m: { median: number; count: number } | null = null;
+    if (row.status === "done") {
+      const best = await db.get(
+        `SELECT MAX((result->>'max_rpm')::numeric) AS max_rpm,
+                MIN((result->>'spin_up_ms')::numeric) AS spin_up_ms,
+                MIN((result->>'min_start')::numeric) AS min_start
+         FROM fan_calibration_history
+         WHERE fan_id = $1 AND calibration_version = $2`,
+        [row.fan_db_id, CALIBRATION_VERSION]
+      );
+      if (best?.max_rpm != null) {
+        healthy = {
+          max_rpm: Number(best.max_rpm),
+          spin_up_ms: Number(best.spin_up_ms),
+          min_start: Number(best.min_start),
+        };
+      }
+      const samples = await db.all(
+        `SELECT fan_speed AS duty, fan_rpm AS rpm
+         FROM monitoring_data
+         WHERE fan_id = $1 AND timestamp > NOW() - INTERVAL '10 minutes'
+           AND fan_speed IS NOT NULL AND fan_rpm IS NOT NULL`,
+        [row.fan_db_id]
+      );
+      if (row.response_curve && samples.length > 0) {
+        drift10m = medianDriftPct(
+          row.response_curve,
+          samples,
+          Math.max(row.min_start ?? 1, 1)
+        );
+      }
+    }
+
     const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
     res.json({
       ...row,
       speed_min_24h: range?.speed_min ?? null,
       speed_max_24h: range?.speed_max ?? null,
+      healthy_max_rpm: healthy?.max_rpm ?? null,
+      healthy_spin_up_ms: healthy?.spin_up_ms ?? null,
+      healthy_min_start: healthy?.min_start ?? null,
+      drift_10m: drift10m?.median ?? null,
+      drift_samples: drift10m?.count ?? 0,
       protocol_version: CALIBRATION_VERSION,
       calibrating: system
         ? calibrationService.isCalibrating(system.agent_id, fanId)

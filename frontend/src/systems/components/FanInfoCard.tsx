@@ -21,18 +21,20 @@ import { useContextualPanel } from "../hooks/useContextualPanel";
 import { toast } from "../../utils/toast";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import {
-  MIN_TREND_RUNS,
   driftPercent,
-  topSpeedTrend,
+  topSpeedDrop,
   responseSeconds,
-  healthVerdict,
+  healthReport,
 } from "../../utils/fanHealth";
+import type { HealthState } from "../../utils/fanHealth";
 import {
   X,
   Check,
   Info as InfoIcon,
   ChevronDown,
   Clock,
+  TriangleAlert,
+  CircleX,
 } from "lucide-react";
 import FanResponseChart from "./FanResponseChart";
 import "../styles/bulk-edit-panel.css";
@@ -123,19 +125,40 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
   if (!isOpen) return null;
 
   const calibrated = loaded && cal?.status === "done";
-  const verdict = healthVerdict(loaded ? cal : null);
   const runs = history.length;
+  const report = healthReport(loaded ? cal : null, history, stalled);
   const curve = calibrated ? cal!.response_curve : null;
   const drift =
     calibrated && curve ? driftPercent(curve, fan.speed, fan.rpm) : null;
-  const trend = calibrated ? topSpeedTrend(history) : null;
+  const topDrop = calibrated && cal ? topSpeedDrop(cal) : null;
   const respS = calibrated && cal ? responseSeconds(cal) : null;
+  // Dead zone floor: below max(min_start, min_stop) the fan cannot KEEP
+  // running (start-transient artifacts can measure min_start below min_stop)
+  const deadZoneEnd = calibrated
+    ? Math.max(cal!.min_start ?? 0, cal!.min_stop ?? 0) || null
+    : null;
   const calibratedDate = cal?.calibrated_at
     ? new Date(cal.calibrated_at).toLocaleDateString()
     : null;
 
-  const check = <Check size={14} className="fic-ico-ok" />;
-  const clock = <Clock size={14} className="fic-ico-wait" />;
+  const CHIP: Record<string, { cls: string; label: string; title: string }> = {
+    healthy: { cls: "ok", label: "Healthy", title: "All health checks passed" },
+    attention: { cls: "warn", label: "Needs attention", title: "One check needs your attention" },
+    problem: { cls: "crit", label: "Problem detected", title: "A check found a problem" },
+    no_data: { cls: "none", label: "No data", title: "Health checks need calibration data" },
+  };
+  const chip = CHIP[report.verdict];
+
+  const stateIcon = (state: HealthState) =>
+    state === "ok" ? (
+      <Check size={14} className="fic-ico-ok" />
+    ) : state === "wait" ? (
+      <Clock size={14} className="fic-ico-wait" />
+    ) : state === "warn" ? (
+      <TriangleAlert size={14} className="fic-ico-warn" />
+    ) : (
+      <CircleX size={14} className="fic-ico-crit" />
+    );
 
   const dash = <>-</>;
 
@@ -144,22 +167,9 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
     const L: string[] = [];
     L.push(`Fan Info - ${fanDisplayName} (on ${systemName})`);
     L.push("");
-    L.push("Health: " + (verdict === "healthy" ? "Healthy" : "No data"));
+    L.push(`Health: ${chip.label}`);
     if (calibrated) {
-      if (drift)
-        L.push(
-          `  Running: ${fan.rpm} vs ~${Math.round(drift.expected)} RPM expected at ${fan.speed}% (${drift.drift.toFixed(1)}%)`
-        );
-      if (trend)
-        L.push(
-          `  Top speed over time: ${trend.first} -> ${trend.latest} RPM (${trend.changePct.toFixed(1)}%)`
-        );
-      L.push(
-        runs >= MIN_TREND_RUNS
-          ? "  No signs of dust buildup or bearing wear"
-          : `  Dust and wear check: available after ${MIN_TREND_RUNS - runs} more calibration${MIN_TREND_RUNS - runs === 1 ? "" : "s"}`
-      );
-      L.push(`  Unexpected stops: ${stalled ? "1 (now)" : "None"}`);
+      for (const line of report.lines) L.push(`  ${line.text}`);
     } else {
       L.push("  Health checks unlock after the first calibration");
     }
@@ -189,13 +199,14 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
       L.push(
         `  Running as expected: ${fan.rpm} vs ~${Math.round(drift.expected)} RPM (${drift.drift.toFixed(1)}%)`
       );
-    if (trend)
+    if (topDrop)
       L.push(
-        `  Top speed over time: ${trend.first} -> ${trend.latest} RPM (${trend.changePct.toFixed(1)}%)`
+        `  Top speed over time: best ${Math.round(topDrop.healthy)} -> now ${topDrop.current} RPM (${topDrop.dropPct > 0 ? "-" : "+"}${Math.abs(topDrop.dropPct).toFixed(1)}%)`
       );
     if (respS !== null) L.push(`  Time to respond: ~${respS} s`);
     if (cal?.speed_min_24h !== null && cal?.speed_max_24h !== null)
       L.push(`  Speed range used (24h): ${cal!.speed_min_24h} - ${cal!.speed_max_24h}%`);
+    L.push(`  Dead zone: ${deadZoneEnd ? `0 - ${deadZoneEnd}%` : "-"}`);
     L.push(`  Unexpected stops: ${stalled ? "1 (now)" : "None"}`);
     if (await copyTextToClipboard(L.join("\n"))) {
       toast.success("Fan info copied to clipboard");
@@ -239,11 +250,9 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
             <div className="bulk-edit-section">
               <div className="fic-health-head">
                 <h4 className="section-title">Health</h4>
-                {verdict === "healthy" ? (
-                  <span className="fic-verdict-chip ok" title="All health checks passed">Healthy</span>
-                ) : (
-                  <span className="fic-verdict-chip none" title="Health checks need calibration data">No data</span>
-                )}
+                <span className={`fic-verdict-chip ${chip.cls}`} title={chip.title}>
+                  {chip.label}
+                </span>
               </div>
               {!calibrated ? (
                 <Sentence
@@ -253,48 +262,11 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
                   Health checks unlock after the first calibration.
                 </Sentence>
               ) : (
-                <>
-                  {drift && (
-                    <Sentence
-                      icon={check}
-                      title={`${fan.rpm} vs ${Math.round(drift.expected)} RPM expected at the current ${fan.speed}% setting (${drift.drift.toFixed(1)}%)`}
-                    >
-                      Running {Math.abs(drift.drift).toFixed(1)}%{" "}
-                      {drift.drift < 0 ? "slower" : "faster"} than expected
-                      {" - within the normal range."}
-                    </Sentence>
-                  )}
-                  <Sentence
-                    icon={trend ? check : clock}
-                    title={
-                      trend
-                        ? `Top speed ${trend.first} to ${trend.latest} RPM across calibrations (${trend.changePct.toFixed(1)}%)`
-                        : "Needs a second calibration to compare against"
-                    }
-                  >
-                    {trend
-                      ? "Top speed is holding steady since first calibrated."
-                      : "Top speed trend: available after the next calibration."}
+                report.lines.map((line, i) => (
+                  <Sentence key={i} icon={stateIcon(line.state)} title={line.tooltip}>
+                    {line.text}
                   </Sentence>
-                  <Sentence
-                    icon={runs >= MIN_TREND_RUNS ? check : clock}
-                    title={
-                      runs >= MIN_TREND_RUNS
-                        ? "Inferred from top-speed and spin-up-time trends across calibrations - not a direct measurement"
-                        : `Needs at least ${MIN_TREND_RUNS} calibrations to judge wear trends - this fan has ${runs}`
-                    }
-                  >
-                    {runs >= MIN_TREND_RUNS
-                      ? "No signs of dust buildup or bearing wear."
-                      : `Dust and wear check: available after ${MIN_TREND_RUNS - runs} more calibration${MIN_TREND_RUNS - runs === 1 ? "" : "s"}.`}
-                  </Sentence>
-                  <Sentence
-                    icon={check}
-                    title="The fan has not reported no movement while being told to spin"
-                  >
-                    No unexpected stops.
-                  </Sentence>
-                </>
+                ))
               )}
             </div>
 
@@ -347,13 +319,13 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
               <div className="fic-chart-wrap">
                 <FanResponseChart
                   curve={curve}
-                  minStart={cal?.min_start ?? null}
+                  deadZoneEnd={deadZoneEnd}
                   live={calibrated ? { duty: fan.speed, rpm: fan.rpm } : null}
                   width={chartWidth}
                 />
                 <div className="fic-chart-caption">
                   {calibrated
-                    ? `Measured fan speed at each speed setting.${cal!.min_start ? ` Shaded area: settings below ${cal!.min_start}% cannot start this fan.` : ""} Green dot: where the fan is running right now.`
+                    ? `Measured fan speed at each speed setting.${deadZoneEnd ? ` Shaded area: settings below ${deadZoneEnd}% cannot keep this fan running.` : ""} Green dot: where the fan is running right now.`
                     : "The response curve appears here after the first calibration."}
                 </div>
               </div>
@@ -391,11 +363,13 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
                   </>
                 ) : dash}
               </Row>
-              <Row k="Top speed over time" title="A falling top speed over time can mean dust buildup or worn bearings">
-                {trend ? (
+              <Row k="Top speed over time" title="The fan's best recorded top speed vs its latest - falling behind can mean dust buildup or worn bearings">
+                {topDrop && runs >= 2 ? (
                   <>
-                    {trend.first} &rarr; {trend.latest} RPM{" "}
-                    <span className="fic-unit">({trend.changePct.toFixed(1)}%)</span>
+                    {Math.round(topDrop.healthy)} &rarr; {topDrop.current} RPM{" "}
+                    <span className="fic-unit">
+                      ({topDrop.dropPct > 0 ? "-" : "+"}{Math.abs(topDrop.dropPct).toFixed(1)}%)
+                    </span>
                   </>
                 ) : dash}
               </Row>
@@ -406,6 +380,9 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
                 {cal && cal.speed_min_24h !== null && cal.speed_max_24h !== null ? (
                   <>{cal.speed_min_24h} - {cal.speed_max_24h}<span className="fic-unit">%</span></>
                 ) : dash}
+              </Row>
+              <Row k="Dead zone" title="Speed settings in this range cannot keep the fan spinning - the control logic automatically jumps over them">
+                {deadZoneEnd ? <>0 - {deadZoneEnd}<span className="fic-unit">%</span></> : dash}
               </Row>
               <Row k="Unexpected stops" title="Times the fan was told to spin but reported no movement">
                 {stalled ? "1 (now)" : calibrated ? <span className="fic-ok">None</span> : dash}

@@ -16,6 +16,13 @@ const STALL_SEARCH_MARGIN_C = 10;
 const MAX_CONCURRENT_SYSTEMS = 3;        // cap parallel runs (telemetry/DB contention)
 const SAMPLE_PERIOD_MS = 700;            // RPM poll cadence
 const SETTLE_TIMEOUT_MS = 15000;         // max wait for RPM to stabilize per step
+// Command-aware settling (protocol v3): after a duty change the telemetry
+// cache still shows pre-command readings - two of those look "stable" and
+// v2 recorded pre-ramp speeds as the 100% value. Discard a dead window,
+// then require three consecutive stable samples.
+const SETTLE_DEAD_MS = 1200;             // ~2 telemetry intervals of stale readings
+const SETTLE_CONFIRM_SAMPLES = 3;        // consecutive stable samples to accept
+const FULL_DUTY_DWELL_MS = 4000;         // extra ramp time at the 100% step (arbitrary starting duty)
 const SPINUP_TIMEOUT_MS = 8000;          // max wait for a fan to start spinning
 const TELEMETRY_STALE_MS = 10000;        // abort when agent data stops flowing
 const SAFE_HOLD_DUTY = 70;               // parked duty for fans awaiting their turn
@@ -297,6 +304,8 @@ export class CalibrationService extends EventEmitter {
       this.phaseMargins.set(agentId, 0);
       for (const duty of SWEEP_DUTIES) {
         await this.setDutyAll(agentId, active, duty);
+        // First step ramps from an arbitrary starting duty - give it real time
+        if (duty === 100) await this.dwell(agentId, FULL_DUTY_DWELL_MS);
         const rpms = await this.settle(agentId, active.map((u) => u.target));
         for (const u of active) u.curve.push({ duty, rpm: rpms.get(u.target) ?? 0 });
 
@@ -315,6 +324,44 @@ export class CalibrationService extends EventEmitter {
             }
           }
           if (active.length === 0) return; // finally-block restores state
+        }
+      }
+
+      // Monotonicity guard (v4): above the dead zone RPM must not fall as duty
+      // rises; equal readings are fine (quantized fans). Every point in an
+      // inversion gets ONE re-measure pass (hardened settle) and is replaced,
+      // then the curve is accepted as-is - persistent non-monotonicity is
+      // honest hardware (external governors) and must never loop.
+      const tol = (rpm: number) => Math.max(rpm * 0.05, 20);
+      const suspects = new Map<(typeof active)[number], Set<number>>();
+      for (const u of active) {
+        const pts = [...u.curve].sort((a, b) => b.duty - a.duty);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const hi = pts[i];
+          const lo = pts[i + 1];
+          if (hi.rpm < lo.rpm - tol(lo.rpm)) {
+            const set = suspects.get(u) ?? new Set<number>();
+            set.add(hi.duty);
+            set.add(lo.duty);
+            suspects.set(u, set);
+          }
+        }
+      }
+      if (suspects.size > 0) {
+        for (const duty of SWEEP_DUTIES) {
+          const units = active.filter((u) => suspects.get(u)?.has(duty));
+          if (units.length === 0) continue;
+          await this.setDutyAll(agentId, units, duty);
+          if (duty === 100) await this.dwell(agentId, FULL_DUTY_DWELL_MS);
+          const rpms = await this.settle(agentId, units.map((u) => u.target));
+          for (const u of units) {
+            const p = u.curve.find((pt) => pt.duty === duty)!;
+            p.rpm = rpms.get(u.target) ?? p.rpm;
+            log.debug(`Re-measured ${duty}% for fan "${u.label}": ${p.rpm} RPM`, "CalibrationService");
+          }
+        }
+        for (const u of suspects.keys()) {
+          u.maxRpm = Math.max(...u.curve.map((p) => p.rpm), 0);
         }
       }
 
@@ -479,13 +526,25 @@ export class CalibrationService extends EventEmitter {
       ?.find((f) => f.id === target || f.zone === target);
   }
 
+  /** Hold state for ms while keeping the safety watchdog alive. */
+  private async dwell(agentId: string, ms: number): Promise<void> {
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      await this.sleep(Math.min(SAMPLE_PERIOD_MS, until - Date.now()));
+      this.safetyCheck(agentId);
+    }
+  }
+
   /**
-   * Wait until every target's RPM is stable (two consecutive samples within
-   * max(5%, 20 rpm)), or timeout (last sample wins). Safety-checked each poll.
+   * Wait until every target's RPM is stable: after a dead window (stale
+   * telemetry), SETTLE_CONFIRM_SAMPLES consecutive samples within
+   * max(5%, 20 rpm), or timeout (last sample wins). Safety-checked each poll.
    */
   private async settle(agentId: string, targets: string[]): Promise<Map<string, number>> {
+    await this.dwell(agentId, SETTLE_DEAD_MS);
     const deadline = Date.now() + SETTLE_TIMEOUT_MS;
     const last = new Map<string, number>();
+    const stablePairs = new Map<string, number>();
     const settled = new Map<string, number>();
     const pending = new Set(targets);
 
@@ -497,8 +556,16 @@ export class CalibrationService extends EventEmitter {
         const prev = last.get(target);
         last.set(target, rpm);
         if (prev !== undefined && Math.abs(rpm - prev) <= Math.max(rpm * 0.05, 20)) {
-          settled.set(target, rpm);
-          pending.delete(target);
+          const pairs = (stablePairs.get(target) ?? 0) + 1;
+          // N consecutive stable samples = N-1 consecutive stable pairs
+          if (pairs >= SETTLE_CONFIRM_SAMPLES - 1) {
+            settled.set(target, rpm);
+            pending.delete(target);
+          } else {
+            stablePairs.set(target, pairs);
+          }
+        } else {
+          stablePairs.set(target, 0);
         }
       }
     }

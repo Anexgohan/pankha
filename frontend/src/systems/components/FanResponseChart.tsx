@@ -11,7 +11,8 @@ import { expectedRpm, type CurvePoint } from "../../utils/fanHealth";
 
 interface FanResponseChartProps {
   curve: CurvePoint[] | null;
-  minStart: number | null;
+  /** shaded region end: max(min_start, min_stop) - below this the fan cannot keep running */
+  deadZoneEnd: number | null;
   /** current operating point; omit to hide the live dot */
   live?: { duty: number; rpm: number } | null;
   width: number;
@@ -23,14 +24,14 @@ const PAD_R = 16; /* room for the centered "100%" x label */
 const PAD_T = 10;
 const PAD_B = 26;
 
-/* y-axis step giving at most ~4 gridlines regardless of fan RPM ceiling */
-const Y_STEPS = [100, 200, 500, 1000, 2000, 5000, 10000];
+/* y-axis step giving at most 8 labeled gridlines above zero, any RPM ceiling */
+const Y_STEPS = [50, 100, 250, 500, 1000, 2500, 5000, 10000];
 const yStepFor = (dataMax: number) =>
-  Y_STEPS.find((s) => dataMax / s <= 4) ?? Y_STEPS[Y_STEPS.length - 1];
+  Y_STEPS.find((s) => dataMax / s <= 8) ?? Y_STEPS[Y_STEPS.length - 1];
 
 const FanResponseChart: React.FC<FanResponseChartProps> = ({
   curve,
-  minStart,
+  deadZoneEnd,
   live,
   width,
   height = 180,
@@ -92,14 +93,11 @@ const FanResponseChart: React.FC<FanResponseChartProps> = ({
 
   return (
     <svg className="fic-chart" width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
-      {/* grid + axis labels; unlabeled half-step lines double the resolution */}
+      {/* grid + axis labels */}
       {gridRpms.map((r) => (
         <React.Fragment key={r}>
           <line x1={PAD_L} y1={y(r)} x2={width - PAD_R} y2={y(r)} stroke="var(--border-color)" strokeWidth="1" />
           <text x={PAD_L - 6} y={y(r) + 3} textAnchor="end" fontSize="9.5" fill="var(--text-tertiary)">{r}</text>
-          {r + yStep / 2 < maxR && (
-            <line x1={PAD_L} y1={y(r + yStep / 2)} x2={width - PAD_R} y2={y(r + yStep / 2)} stroke="var(--border-color)" strokeWidth="1" opacity="0.45" />
-          )}
         </React.Fragment>
       ))}
       {[0, 25, 50, 75, 100].map((d) => (
@@ -115,11 +113,11 @@ const FanResponseChart: React.FC<FanResponseChartProps> = ({
         </text>
       ) : (
         <>
-          {/* dead zone: settings below min_start cannot start the fan */}
-          {minStart !== null && minStart > 0 && (
+          {/* dead zone: settings below the floor cannot keep the fan running */}
+          {deadZoneEnd !== null && deadZoneEnd > 0 && (
             <>
-              <rect x={x(0)} y={PAD_T} width={x(minStart) - x(0)} height={ih} fill="var(--temp-caution-text)" opacity="0.08" />
-              <line x1={x(minStart)} y1={PAD_T} x2={x(minStart)} y2={PAD_T + ih} stroke="var(--temp-caution-text)" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
+              <rect x={x(0)} y={PAD_T} width={x(deadZoneEnd) - x(0)} height={ih} fill="var(--temp-caution-text)" opacity="0.08" />
+              <line x1={x(deadZoneEnd)} y1={PAD_T} x2={x(deadZoneEnd)} y2={PAD_T + ih} stroke="var(--temp-caution-text)" strokeWidth="1" strokeDasharray="3 3" opacity="0.6" />
             </>
           )}
           <polyline
