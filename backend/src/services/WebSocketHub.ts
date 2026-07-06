@@ -223,7 +223,7 @@ export class WebSocketHub extends EventEmitter {
       ]);
     });
 
-    // Stall watchdog events (task 21): calibrated fan commanded above min_stop
+    // Stall watchdog events: calibrated fan commanded above min_stop
     // but tach reads 0. Detection-only - frontend surfaces a stalled state.
     const fanProfileController = FanProfileController.getInstance();
     fanProfileController.on("fanStalled", (event) => {
@@ -239,7 +239,7 @@ export class WebSocketHub extends EventEmitter {
       ]);
     });
 
-    // Calibration lifecycle events (task 21): pending/running/done/failed/no_tach
+    // Calibration lifecycle events: pending/running/done/failed/no_tach
     const calibrationService = CalibrationService.getInstance();
     calibrationService.on("fanCalibrationStatus", (event) => {
       this.broadcast("fanCalibrationStatus", event, [

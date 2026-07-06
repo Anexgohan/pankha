@@ -1,4 +1,4 @@
-// Fan calibration protocol version (task 21).
+// Fan calibration protocol version.
 //
 // Bump this on ANY change to the calibration procedure (sweep steps, settle or
 // hygiene logic, measured fields): assigned fans whose stored version is older

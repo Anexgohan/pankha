@@ -7,7 +7,7 @@ import { FanProfileController } from "./FanProfileController";
 import { log } from "../utils/logger";
 import { CALIBRATION_VERSION } from "../config/calibration";
 
-// Calibration tuning (task 21 W2). Telemetry runs at 0.5s during a calibration.
+// Calibration tuning. Telemetry runs at 0.5s during a calibration.
 const CALIBRATION_INTERVAL_S = 0.5;
 // Phase-dependent safety: phase 1 keeps every fan spinning at 50-100% (adds
 // airflow), so it only aborts at emergency_temp itself. The stall search
@@ -66,7 +66,7 @@ class CalibrationAbort extends Error {
 class UnitFailed extends Error {}
 
 /**
- * Fan Calibration Service (task 21)
+ * Fan Calibration Service
  *
  * Backend-orchestrated measurement of per-fan hardware facts: min_start,
  * min_stop, min/max RPM, spin up/down times, duty->RPM response curve, step

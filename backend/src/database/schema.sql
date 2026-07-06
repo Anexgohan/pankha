@@ -574,7 +574,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Migration task 21: Add calibration_version to fan_calibrations + history.
+-- Migration: Add calibration_version to fan_calibrations + history.
 -- Rows from before versioning existed default to 0 (below any real version),
 -- so assigned fans recalibrate automatically on the next protocol bump.
 DO $$ BEGIN
@@ -583,7 +583,7 @@ DO $$ BEGIN
     WHERE table_name = 'fan_calibrations' AND column_name = 'calibration_version'
   ) THEN
     ALTER TABLE fan_calibrations ADD COLUMN calibration_version INTEGER DEFAULT 0;
-    RAISE NOTICE 'Migration task 21: Added calibration_version to fan_calibrations';
+    RAISE NOTICE 'Migration: Added calibration_version to fan_calibrations';
   END IF;
 END $$;
 
@@ -593,6 +593,6 @@ DO $$ BEGIN
     WHERE table_name = 'fan_calibration_history' AND column_name = 'calibration_version'
   ) THEN
     ALTER TABLE fan_calibration_history ADD COLUMN calibration_version INTEGER DEFAULT 0;
-    RAISE NOTICE 'Migration task 21: Added calibration_version to fan_calibration_history';
+    RAISE NOTICE 'Migration: Added calibration_version to fan_calibration_history';
   END IF;
 END $$;

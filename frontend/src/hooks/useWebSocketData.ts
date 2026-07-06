@@ -51,7 +51,7 @@ export function subscribeToLicenseUpdated(
   };
 }
 
-// Fan calibration lifecycle pushed by the backend (task 21).
+// Fan calibration lifecycle pushed by the backend.
 // Keyed "agentId:fanName" -> status ('pending'|'running'|'done'|'failed'|'no_tach')
 export type FanCalibrationMap = Record<string, string>;
 // Stalled fans (calibrated fan commanded above min_stop but tach reads 0),
@@ -498,7 +498,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       for (const listener of licenseUpdatedListeners) listener();
     });
 
-    // Fan calibration lifecycle (task 21): one event per unit per state change.
+    // Fan calibration lifecycle: one event per unit per state change.
     // A zone unit carries every member fan in fanNames.
     wsRef.current.on("fanCalibrationStatus", (data: unknown) => {
       const event = data as {
@@ -517,7 +517,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       });
     });
 
-    // Stall watchdog (task 21): detection-only flags from the backend
+    // Stall watchdog: detection-only flags from the backend
     wsRef.current.on("fanStalled", (data: unknown) => {
       const event = data as { agentId: string; fanId: string };
       if (!mountedRef.current) return;

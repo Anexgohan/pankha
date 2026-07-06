@@ -622,7 +622,7 @@ export class FanProfileController extends EventEmitter {
           // For zone-based fans, use zone_id as the command target; otherwise use fan_name
           const commandTarget = assignment.zone_id || assignment.fan_name;
 
-          // Skip fans locked by an active calibration run (task 21)
+          // Skip fans locked by an active calibration run
           if (this.calibratingFans.has(`${assignment.agent_id}:${commandTarget}`) ||
               this.calibratingFans.has(`${assignment.agent_id}:${assignment.fan_name}`)) {
             log.trace(`Fan ${commandTarget} on ${assignment.agent_id} is calibrating, skipping`, 'FanProfileController');
@@ -637,7 +637,7 @@ export class FanProfileController extends EventEmitter {
             continue;
           }
 
-          // Consent-gated calibration trigger (task 21): an active assignment IS
+          // Consent-gated calibration trigger: an active assignment IS
           // the user's consent to control this fan. Emitted only for fans in
           // LIVE telemetry (guard above) - DB 'online' status is stale at boot
           // and triggering into a not-yet-connected agent poisons statuses.
@@ -981,14 +981,14 @@ export class FanProfileController extends EventEmitter {
 
   /**
    * Currently stalled fans (fanKey = "agentId:fanName"). For fullState
-   * enrichment when the frontend consumes stall events (task 21 P3).
+   * enrichment when the frontend consumes stall events.
    */
   public getStalledFans(): string[] {
     return [...this.stalledFans];
   }
 
   /**
-   * Lock/unlock a fan for calibration (task 21). Locked fans are skipped by
+   * Lock/unlock a fan for calibration. Locked fans are skipped by
    * the control loop; CalibrationService owns them for the duration.
    */
   public setFanCalibrating(agentId: string, fanName: string, calibrating: boolean): void {

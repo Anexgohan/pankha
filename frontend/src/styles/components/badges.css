@@ -115,14 +115,15 @@
   border: 1px solid rgba(158, 158, 158, 0.2);
 }
 
-/* Fan calibration in progress (task 21) - control is locked meanwhile */
+/* Fan calibration in progress - control is locked meanwhile.
+   Magenta so it can't be mistaken for a temperature caution. */
 .status-indicator.calibrating {
-  background-color: var(--temp-caution-bg);
-  color: var(--temp-caution-text);
-  border: 1px solid var(--temp-caution-border);
+  background-color: color-mix(in srgb, var(--color-accent-magenta) 10%, transparent);
+  color: var(--color-accent-magenta);
+  border: 1px solid color-mix(in srgb, var(--color-accent-magenta) 45%, transparent);
 }
 
-/* Stall watchdog flag (task 21) - commanded to spin but tach reads 0 */
+/* Stall watchdog flag - commanded to spin but tach reads 0 */
 .status-indicator.stalled {
   background-color: var(--temp-critical-bg);
   color: var(--temp-critical-text);

@@ -160,7 +160,7 @@ async function initializeServices() {
     // Start Fan Profile Controller (loads interval from database)
     await fanProfileController.start();
 
-    // Start Calibration Service (auto-calibrates new/uncalibrated fans, task 21)
+    // Start Calibration Service (auto-calibrates new/uncalibrated fans)
     calibrationService.start();
 
     // Start Downsampling Service (Tier 2/3 data compression, runs daily at 03:00 UTC)

@@ -159,7 +159,7 @@ export class CommandDispatcher extends EventEmitter {
   }
 
   /**
-   * Hand a fan back to its driver's automatic curve (task 21). Only
+   * Hand a fan back to its driver's automatic curve. Only
    * driver-auto-capable fans (NVIDIA GPU via NVML/NvAPI) act on this; agents
    * respond with handled=false for plain sysfs/EC fans. Older agents reject
    * it as an unknown command - callers must handle that.

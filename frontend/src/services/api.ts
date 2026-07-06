@@ -308,6 +308,34 @@ export const updateSetting = async (key: string, value: string | number) => {
   return response.data;
 };
 
+// Fan calibration
+export interface FanCalibrationInfo {
+  status: "pending" | "running" | "done" | "failed" | "no_tach";
+  version: number;
+  calibrated_at: string | null;
+}
+
+export interface SystemCalibrations {
+  protocol_version: number;
+  calibrations: Record<string, FanCalibrationInfo>; // keyed by fan hardware name
+}
+
+export const getSystemCalibrations = async (
+  systemId: number
+): Promise<SystemCalibrations> => {
+  const response = await api.get(`/api/systems/${systemId}/calibrations`);
+  return response.data;
+};
+
+export const calibrateFan = async (
+  systemId: number,
+  fanId: string // fan hardware name, or zone id to queue the whole zone
+): Promise<void> => {
+  await api.post(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/calibrate`
+  );
+};
+
 // Fan Visibility
 export const updateFanVisibility = async (
   systemId: number,

@@ -20,6 +20,7 @@ import {
   validEmergencyTemps,
   validUpdateIntervals,
 } from "../config/uiOptions";
+import { CALIBRATION_VERSION } from "../config/calibration";
 
 const router = Router();
 const db = Database.getInstance();
@@ -718,7 +719,7 @@ router.put("/:id/fans/:fanId", async (req: Request, res: Response) => {
       });
     }
 
-    // Calibration owns the fan for the duration (task 21)
+    // Calibration owns the fan for the duration
     if (calibrationService.isCalibrating(system.agent_id, fanId)) {
       return res.status(409).json({
         error: "Fan is calibrating, manual control is disabled until complete",
@@ -748,7 +749,38 @@ router.put("/:id/fans/:fanId", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/systems/:id/fans/:fanId/calibration - Current calibration values (task 21)
+// GET /api/systems/:id/calibrations - Bulk calibration status for the rack icons.
+// Keyed by fan hardware name; version + protocol_version let the UI flag stale runs.
+router.get("/:id/calibrations", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+
+    const rows = await db.all(
+      `SELECT f.fan_name, cal.status, cal.calibration_version, cal.calibrated_at
+       FROM fans f
+       JOIN fan_calibrations cal ON cal.fan_id = f.id
+       WHERE f.system_id = $1`,
+      [systemId]
+    );
+    const calibrations: Record<
+      string,
+      { status: string; version: number; calibrated_at: string | null }
+    > = {};
+    for (const r of rows) {
+      calibrations[r.fan_name] = {
+        status: r.status,
+        version: r.calibration_version ?? 0,
+        calibrated_at: r.calibrated_at,
+      };
+    }
+    res.json({ protocol_version: CALIBRATION_VERSION, calibrations });
+  } catch (error) {
+    log.error("Error fetching system calibrations:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch calibrations" });
+  }
+});
+
+// GET /api/systems/:id/fans/:fanId/calibration - Current calibration values
 router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) => {
   try {
     const systemId = parseInt(req.params.id);
@@ -781,7 +813,7 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
   }
 });
 
-// GET /api/systems/:id/fans/:fanId/calibration/history - Past runs (trends, task 21)
+// GET /api/systems/:id/fans/:fanId/calibration/history - Past runs (trends)
 router.get("/:id/fans/:fanId/calibration/history", async (req: Request, res: Response) => {
   try {
     const systemId = parseInt(req.params.id);
@@ -803,7 +835,7 @@ router.get("/:id/fans/:fanId/calibration/history", async (req: Request, res: Res
   }
 });
 
-// POST /api/systems/:id/fans/:fanId/calibrate - Manual (re)calibration trigger (task 21)
+// POST /api/systems/:id/fans/:fanId/calibrate - Manual (re)calibration trigger
 router.post("/:id/fans/:fanId/calibrate", async (req: Request, res: Response) => {
   try {
     const systemId = parseInt(req.params.id);
