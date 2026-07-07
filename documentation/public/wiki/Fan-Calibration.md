@@ -118,6 +118,8 @@ Health compares the fan against **its own best self** - the best measurements it
 
 > A fan's healthy reference never gets dragged down by recalibrating a dusty fan - degradation is a condition, not a new normal. It upgrades automatically the first time a run beats it (for example after cleaning).
 
+You do not have to open the info card to notice a problem: when a health check degrades, the fan's badge on its card changes to **Attention** (yellow) or **Check fan** (red), with the reason in its tooltip. Healthy fans keep their normal badge - no news is good news.
+
 ---
 
 ## Good to know

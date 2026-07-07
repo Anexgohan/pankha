@@ -21,8 +21,7 @@ import {
   validUpdateIntervals,
 } from "../config/uiOptions";
 import { CALIBRATION_VERSION } from "../config/calibration";
-import { medianDriftPct } from "../utils/fanCurve";
-import { getHealthyReference, HealthyReference } from "../utils/healthyReference";
+import { getHealthyReference, getHealthyReferences, HealthyReference } from "../utils/healthyReference";
 
 const router = Router();
 const db = Database.getInstance();
@@ -757,22 +756,48 @@ router.get("/:id/calibrations", async (req: Request, res: Response) => {
   try {
     const systemId = parseInt(req.params.id);
 
+    // One query per system: current facts + stall aggregates; the healthy
+    // references come from one bulk lookup and drift from the control loop's
+    // in-memory ring - enough for the card badge to compute the same health
+    // verdict as the info panel, with no per-fan queries.
     const rows = await db.all(
-      `SELECT f.fan_name, cal.status, cal.calibration_version, cal.calibrated_at
+      `SELECT f.id AS fan_db_id, f.fan_name, f.zone_id, s.agent_id,
+              cal.status, cal.calibration_version, cal.calibrated_at,
+              cal.min_start, cal.min_stop, cal.max_rpm, cal.spin_up_ms,
+              st.stall_count, st.last_stall_at
        FROM fans f
+       JOIN systems s ON s.id = f.system_id
        JOIN fan_calibrations cal ON cal.fan_id = f.id
+       LEFT JOIN (
+         SELECT fan_id, COUNT(*)::int AS stall_count, MAX(occurred_at) AS last_stall_at
+         FROM fan_stall_events GROUP BY fan_id
+       ) st ON st.fan_id = f.id
        WHERE f.system_id = $1`,
       [systemId]
     );
-    const calibrations: Record<
-      string,
-      { status: string; version: number; calibrated_at: string | null }
-    > = {};
+    const refs = await getHealthyReferences(db, rows.map((r) => r.fan_db_id));
+    const calibrations: Record<string, unknown> = {};
     for (const r of rows) {
+      const entry = refs.get(r.fan_db_id);
+      const drift =
+        fanProfileController.getFanDrift(r.agent_id, r.fan_name) ??
+        (r.zone_id ? fanProfileController.getFanDrift(r.agent_id, r.zone_id) : null);
       calibrations[r.fan_name] = {
         status: r.status,
         version: r.calibration_version ?? 0,
         calibrated_at: r.calibrated_at,
+        min_start: r.min_start,
+        min_stop: r.min_stop,
+        max_rpm: r.max_rpm,
+        spin_up_ms: r.spin_up_ms,
+        healthy_max_rpm: entry?.ref?.max_rpm ?? null,
+        healthy_spin_up_ms: entry?.ref?.spin_up_ms ?? null,
+        healthy_low_confidence: entry?.ref?.low_confidence ?? false,
+        drift_10m: drift?.median ?? null,
+        drift_samples: drift?.samples ?? 0,
+        stall_count: r.stall_count ?? 0,
+        last_stall_at: r.last_stall_at ?? null,
+        runs: entry?.runs ?? 0,
       };
     }
     res.json({ protocol_version: CALIBRATION_VERSION, calibrations });
@@ -813,25 +838,18 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
 
     // Healthy reference: per-metric best across sanity-passing history runs
     // at the current protocol; health compares against the fan's best self,
-    // never a degraded later run. Sustained drift: median over 10 min of
-    // samples - the card never judges on a single reading.
+    // never a degraded later run. Sustained drift: median over the control
+    // loop's in-memory ring (~10 min of at-target samples) - the card never
+    // judges on a single reading, and no telemetry query is needed.
+    const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
     let healthy: HealthyReference | null = null;
-    let drift10m: { median: number; count: number } | null = null;
+    let drift10m: { median: number; samples: number } | null = null;
     if (row.status === "done") {
       healthy = await getHealthyReference(db, row.fan_db_id);
-      const samples = await db.all(
-        `SELECT fan_speed AS duty, fan_rpm AS rpm
-         FROM monitoring_data
-         WHERE fan_id = $1 AND timestamp > NOW() - INTERVAL '10 minutes'
-           AND fan_speed IS NOT NULL AND fan_rpm IS NOT NULL`,
-        [row.fan_db_id]
-      );
-      if (row.response_curve && samples.length > 0) {
-        drift10m = medianDriftPct(
-          row.response_curve,
-          samples,
-          Math.max(row.min_start ?? 1, 1)
-        );
+      if (system) {
+        drift10m =
+          fanProfileController.getFanDrift(system.agent_id, row.fan_name) ??
+          (row.zone_id ? fanProfileController.getFanDrift(system.agent_id, row.zone_id) : null);
       }
     }
 
@@ -841,8 +859,6 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
        FROM fan_stall_events WHERE fan_id = $1`,
       [row.fan_db_id]
     );
-
-    const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
     res.json({
       ...row,
       speed_min_24h: range?.speed_min ?? null,
@@ -852,7 +868,7 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
       healthy_min_start: healthy?.min_start ?? null,
       healthy_low_confidence: healthy?.low_confidence ?? false,
       drift_10m: drift10m?.median ?? null,
-      drift_samples: drift10m?.count ?? 0,
+      drift_samples: drift10m?.samples ?? 0,
       stall_count: stalls?.count ?? 0,
       last_stall_at: stalls?.last ?? null,
       protocol_version: CALIBRATION_VERSION,

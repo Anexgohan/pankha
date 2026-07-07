@@ -68,6 +68,8 @@ interface FanItemProps {
   rpmDecreasing: boolean;
   calibrating: boolean;
   stalled: boolean;
+  /** exception-only health rung: null while the fan is healthy / unjudged */
+  health?: { verdict: "attention" | "problem"; text: string } | null;
   calInfo?: FanCalibrationInfo;
   protocolVersion: number;
   /** offline / read-only license: calibrate trigger is blocked */
@@ -87,6 +89,7 @@ const FanItem: React.FC<FanItemProps> = ({
   rpmDecreasing,
   calibrating,
   stalled,
+  health,
   calInfo,
   protocolVersion,
   controlsLocked,
@@ -173,7 +176,7 @@ const FanItem: React.FC<FanItemProps> = ({
     );
   }, [geo, flowDir, arrowId]);
 
-  // Exactly one badge: calibrating > stalled > agent status
+  // Exactly one badge: calibrating > stalled > health (exception-only) > status
   const badge = calibrating ? (
     <span
       className="status-indicator calibrating"
@@ -187,6 +190,13 @@ const FanItem: React.FC<FanItemProps> = ({
       title="Commanded to spin but reporting 0 RPM - fan may be stuck, disconnected, or in need of recalibration"
     >
       Stalled
+    </span>
+  ) : health ? (
+    <span
+      className={`status-indicator ${health.verdict === "problem" ? "health-crit" : "health-warn"}`}
+      title={health.text}
+    >
+      {health.verdict === "problem" ? "Check fan" : "Attention"}
     </span>
   ) : (
     <span className={`status-indicator ${fan.status}`}>{fan.status}</span>

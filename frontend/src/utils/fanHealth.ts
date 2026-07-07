@@ -6,9 +6,18 @@
  * backend, never a single sample), the HEALTHY reference (best run on record)
  * answers "degraded vs its healthy self?", and history depth gates trends.
  */
-import type { FanCalibrationDetail, FanCalibrationHistoryRun } from "../services/api";
+import type { FanCalibrationDetail } from "../services/api";
 
 export type CurvePoint = { duty: number; rpm: number };
+
+// The facts the verdict needs - satisfied by both the info-card detail payload
+// and the bulk snapshot entries, so card badge and panel share one engine.
+export type HealthFacts = Pick<
+  FanCalibrationDetail,
+  | "status" | "drift_10m" | "drift_samples" | "max_rpm" | "healthy_max_rpm"
+  | "spin_up_ms" | "healthy_spin_up_ms" | "healthy_low_confidence"
+  | "stall_count" | "last_stall_at"
+>;
 
 // Verdict knobs - crossing WARN turns a line (and the chip) yellow, crossing
 // CRIT turns it red. All values are percentages.
@@ -62,7 +71,7 @@ export function driftPercent(
 
 /** Top speed vs the healthy reference (positive = current below best). */
 export function topSpeedDrop(
-  cal: FanCalibrationDetail
+  cal: HealthFacts
 ): { healthy: number; current: number; dropPct: number } | null {
   if (cal.max_rpm == null || cal.healthy_max_rpm == null || cal.healthy_max_rpm <= 0)
     return null;
@@ -82,7 +91,7 @@ export function responseSeconds(cal: FanCalibrationDetail): number | null {
 const plural = (n: number) => (n === 1 ? "" : "s");
 
 /** Sentence 1: sustained running-vs-expected (10-min median from the backend). */
-function runningLine(cal: FanCalibrationDetail): HealthLine {
+function runningLine(cal: HealthFacts): HealthLine {
   if (cal.drift_10m === null || cal.drift_samples === 0) {
     return {
       state: "wait",
@@ -123,7 +132,7 @@ function runningLine(cal: FanCalibrationDetail): HealthLine {
 }
 
 /** Sentence 2: top speed vs the healthy reference. */
-function topSpeedLine(cal: FanCalibrationDetail, runs: number): HealthLine {
+function topSpeedLine(cal: HealthFacts, runs: number): HealthLine {
   const drop = topSpeedDrop(cal);
   if (!drop || runs < 2) {
     return {
@@ -152,7 +161,7 @@ function topSpeedLine(cal: FanCalibrationDetail, runs: number): HealthLine {
 }
 
 /** Sentence 3: dust/wear inference (needs MIN_TREND_RUNS calibrations). */
-function wearLine(cal: FanCalibrationDetail, runs: number): HealthLine {
+function wearLine(cal: HealthFacts, runs: number): HealthLine {
   if (runs < MIN_TREND_RUNS) {
     const left = MIN_TREND_RUNS - runs;
     return {
@@ -192,7 +201,7 @@ function wearLine(cal: FanCalibrationDetail, runs: number): HealthLine {
 }
 
 /** Sentence 4: unexpected stops (persisted stall log + live flag). */
-function stopsLine(cal: FanCalibrationDetail, stalled: boolean): HealthLine {
+function stopsLine(cal: HealthFacts, stalled: boolean): HealthLine {
   const count = cal.stall_count ?? 0;
   const last = cal.last_stall_at
     ? new Date(cal.last_stall_at).toLocaleString()
@@ -222,14 +231,13 @@ const STATE_RANK: Record<HealthState, number> = { ok: 0, wait: 0, warn: 1, crit:
 
 /** Full report: four sentences + the chip verdict (worst sentence wins). */
 export function healthReport(
-  cal: FanCalibrationDetail | null,
-  history: FanCalibrationHistoryRun[],
+  cal: HealthFacts | null,
+  runs: number,
   stalled: boolean
 ): HealthReport {
   if (!cal || cal.status !== "done") {
     return { verdict: "no_data", lines: [] };
   }
-  const runs = history.length;
   const lines = [
     runningLine(cal),
     topSpeedLine(cal, runs),

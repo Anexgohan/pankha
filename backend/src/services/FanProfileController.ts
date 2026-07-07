@@ -6,7 +6,8 @@ import { AgentManager } from './AgentManager';
 import { log } from '../utils/logger';
 import { deriveChipName } from '../utils/sensorUtils';
 import { CALIBRATION_VERSION } from '../config/calibration';
-import { getHealthyReference } from '../utils/healthyReference';
+import { getHealthyReference, HealthyReference } from '../utils/healthyReference';
+import { expectedRpm } from '../utils/fanCurve';
 
 interface FanAssignment {
   assignment_id: number;
@@ -48,6 +49,10 @@ const STALL_DEBOUNCE_TICKS = 3;
 const OVERPERF_FACTOR = 1.05;   // live rpm must exceed healthy max_rpm x this
 const OVERPERF_TICKS = 10;      // consecutive at-target ticks required...
 const OVERPERF_FLOOR_MS = 20000; // ...spanning at least this much wall clock
+
+// Drift ring: at-target drift samples for the health view, ~10 minutes at the
+// default tick rate. Median over the ring = "running as expected", in memory.
+const DRIFT_RING_SIZE = 200;
 
 // Failed-calibration retry ladder: waits between automatic re-attempts (the
 // consent trigger only reaches fans in live telemetry, so an offline system
@@ -111,9 +116,13 @@ export class FanProfileController extends EventEmitter {
   private stalledFans: Set<string> = new Set();          // currently flagged as stalled
   private tachSeen: Set<string> = new Set();             // fanKey has reported rpm > 0 at least once
 
+  // Health facts cache (calibrated fans only): healthy reference + response
+  // curve, loaded lazily, invalidated when a calibration run finishes.
+  private healthRefCache: Map<string, { healthy: HealthyReference | null; curve: { duty: number; rpm: number }[] | null }> = new Map();
+  private healthRefLoading: Set<string> = new Set();               // fanKeys mid-load
+  private driftRings: Map<string, number[]> = new Map();           // fanKey -> at-target drift % samples
+
   // Overperformance watchdog state (calibrated fans only)
-  private healthyMaxCache: Map<string, number | null> = new Map(); // fanKey -> healthy max_rpm
-  private healthyMaxLoading: Set<string> = new Set();              // fanKeys mid-load
   private overperfTicks: Map<string, number> = new Map();          // consecutive over-threshold ticks
   private overperfSince: Map<string, number> = new Map();          // first over-threshold timestamp
   private overperfFlagged: Set<string> = new Set();                // re-measure already requested
@@ -539,11 +548,26 @@ export class FanProfileController extends EventEmitter {
         }
       }
 
-      // OVERPERFORMANCE WATCHDOG (calibrated fans): sustained rpm above the
-      // healthy reference means the reference is stale (fan cleaned or
-      // replaced) - flag 'pending' so the consent trigger re-measures it.
+      // HEALTH SAMPLING + OVERPERFORMANCE WATCHDOG (calibrated fans)
       if (calStatus === 'done' && reportedFan?.rpm !== undefined && reportedFan.rpm > 0) {
-        const healthyMax = this.getHealthyMaxCached(fanKey, agentId, fanName);
+        const ref = this.getHealthRefCached(fanKey, agentId, fanName);
+
+        // Drift ring: live speed vs the calibration curve at a steady target,
+        // above the dead zone. The health view judges the ring median.
+        if (ref?.curve && targetSpeed > Math.max(calMinStart ?? 0, calMinStop ?? 0)) {
+          const expected = expectedRpm(ref.curve, targetSpeed);
+          if (expected !== null && expected > 0) {
+            const ring = this.driftRings.get(fanKey) ?? [];
+            ring.push(((reportedFan.rpm - expected) / expected) * 100);
+            if (ring.length > DRIFT_RING_SIZE) ring.shift();
+            this.driftRings.set(fanKey, ring);
+          }
+        }
+
+        // Overperformance: sustained rpm above the healthy reference means
+        // the reference is stale (fan cleaned or replaced) - flag 'pending'
+        // so the consent trigger re-measures it.
+        const healthyMax = ref?.healthy?.max_rpm ?? null;
         if (healthyMax !== null && healthyMax > 0 && reportedFan.rpm > healthyMax * OVERPERF_FACTOR) {
           const ticks = (this.overperfTicks.get(fanKey) ?? 0) + 1;
           this.overperfTicks.set(fanKey, ticks);
@@ -1110,28 +1134,46 @@ export class FanProfileController extends EventEmitter {
   }
 
   /**
-   * Cached healthy max_rpm for the overperformance watchdog. Loads lazily in
-   * the background (returns null until ready - the watchdog just waits a
-   * tick); invalidated when a calibration run finishes so a fresh reference
-   * is picked up automatically.
+   * Cached health facts (healthy reference + response curve) for the drift
+   * ring and overperformance watchdog. Loads lazily in the background
+   * (returns null until ready - callers just wait a tick); invalidated when a
+   * calibration run finishes so fresh measurements are picked up.
    */
-  private getHealthyMaxCached(fanKey: string, agentId: string, fanName: string): number | null {
-    if (this.healthyMaxCache.has(fanKey)) return this.healthyMaxCache.get(fanKey)!;
-    if (!this.healthyMaxLoading.has(fanKey)) {
-      this.healthyMaxLoading.add(fanKey);
+  private getHealthRefCached(
+    fanKey: string, agentId: string, fanName: string
+  ): { healthy: HealthyReference | null; curve: { duty: number; rpm: number }[] | null } | null {
+    if (this.healthRefCache.has(fanKey)) return this.healthRefCache.get(fanKey)!;
+    if (!this.healthRefLoading.has(fanKey)) {
+      this.healthRefLoading.add(fanKey);
       void (async () => {
         const row = await this.db.get(
-          `SELECT f.id FROM fans f JOIN systems s ON s.id = f.system_id
+          `SELECT f.id, cal.response_curve
+           FROM fans f JOIN systems s ON s.id = f.system_id
+           LEFT JOIN fan_calibrations cal ON cal.fan_id = f.id
            WHERE s.agent_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2) LIMIT 1`,
           [agentId, fanName]
         );
-        const ref = row ? await getHealthyReference(this.db, row.id) : null;
-        this.healthyMaxCache.set(fanKey, ref?.max_rpm ?? null);
+        const healthy = row ? await getHealthyReference(this.db, row.id) : null;
+        const rawCurve = row?.response_curve;
+        const curve = rawCurve
+          ? (typeof rawCurve === 'string' ? JSON.parse(rawCurve) : rawCurve)
+          : null;
+        this.healthRefCache.set(fanKey, { healthy, curve });
       })()
-        .catch((e) => log.error(`Failed to load healthy reference for ${fanName}:`, 'FanProfileController', e))
-        .finally(() => this.healthyMaxLoading.delete(fanKey));
+        .catch((e) => log.error(`Failed to load health facts for ${fanName}:`, 'FanProfileController', e))
+        .finally(() => this.healthRefLoading.delete(fanKey));
     }
     return null;
+  }
+
+  /**
+   * Sustained drift for the health view: median over the in-memory ring of
+   * at-target samples (~10 min). Null until the fan has run long enough.
+   */
+  public getFanDrift(agentId: string, fanName: string): { median: number; samples: number } | null {
+    const ring = this.driftRings.get(`${agentId}:${fanName}`);
+    if (!ring || ring.length === 0) return null;
+    return { median: median(ring), samples: ring.length };
   }
 
   /**
@@ -1230,9 +1272,10 @@ export class FanProfileController extends EventEmitter {
       this.calibratingFans.add(fanKey);
     } else {
       this.calibratingFans.delete(fanKey);
-      // Fresh calibration: drop the cached reference + watchdog state so the
-      // next tick judges against the new measurement.
-      this.healthyMaxCache.delete(fanKey);
+      // Fresh calibration: drop cached facts, drift ring and watchdog state
+      // so the next tick judges against the new measurement.
+      this.healthRefCache.delete(fanKey);
+      this.driftRings.delete(fanKey);
       this.overperfTicks.delete(fanKey);
       this.overperfSince.delete(fanKey);
       this.overperfFlagged.delete(fanKey);

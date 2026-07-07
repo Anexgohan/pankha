@@ -44,6 +44,7 @@ import { sortByOrder } from "../../utils/ordering";
 import { getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen, USER_TIMEZONE } from "../../utils/formatters";
+import { healthReport } from "../../utils/fanHealth";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
 import {
   Loader2,
@@ -139,23 +140,39 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const isFanStalled = (fanId: string) =>
     !!stalledFans[`${system.agent_id}:${fanId}`];
 
-  // Calibration snapshot for the rack icons (status/version/date per fan).
-  // Refetched whenever a WS calibration event lands, so terminal states pick
-  // up their stamped version and date.
+  // Calibration snapshot for the rack icons + health badge (facts per fan).
+  // Refetched whenever a WS calibration event lands, plus a slow periodic
+  // refresh so drift-based health verdicts stay current between events.
   const [calSnapshot, setCalSnapshot] = useState<SystemCalibrations | null>(null);
   useEffect(() => {
     let cancelled = false;
-    getSystemCalibrations(system.id)
-      .then((snap) => {
-        if (!cancelled) setCalSnapshot(snap);
-      })
-      .catch(() => {
-        // icons fall back to "pending"; next WS event retries
-      });
+    const fetchSnap = () =>
+      getSystemCalibrations(system.id)
+        .then((snap) => {
+          if (!cancelled) setCalSnapshot(snap);
+        })
+        .catch(() => {
+          // icons fall back to "pending"; next WS event or tick retries
+        });
+    fetchSnap();
+    const timer = setInterval(fetchSnap, 5 * 60_000);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [system.id, fanCalibration]);
+
+  // Health rung of the fan badge ladder: same engine as the info panel,
+  // exception-only (healthy fans keep their normal badge).
+  const fanHealthBadge = (fanId: string) => {
+    const info = calSnapshot?.calibrations[fanId];
+    if (!info) return null;
+    const report = healthReport(info, info.runs ?? 0, isFanStalled(fanId));
+    if (report.verdict !== "attention" && report.verdict !== "problem") return null;
+    const want = report.verdict === "problem" ? "crit" : "warn";
+    const line = report.lines.find((l) => l.state === want) ?? report.lines.find((l) => l.state === "warn");
+    return { verdict: report.verdict, text: line?.text ?? "" };
+  };
   const [agentInterval, setAgentInterval] = useState<number>(
     system.current_update_interval ?? getDefault<number>('updateInterval')
   );
@@ -1829,6 +1846,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                           rpmDecreasing={fanRpmStateRef.current[fan.id]?.decreasing ?? false}
                           calibrating={isFanCalibrating(fan.id)}
                           stalled={isFanStalled(fan.id)}
+                          health={fanHealthBadge(fan.id)}
                           calInfo={calSnapshot?.calibrations[fan.id]}
                           protocolVersion={calSnapshot?.protocol_version ?? 0}
                           controlsLocked={system.status !== "online" || isReadOnly}
@@ -1931,6 +1949,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   rpmDecreasing={fanRpmStateRef.current[fan.id]?.decreasing ?? false}
                   calibrating={isFanCalibrating(fan.id)}
                   stalled={isFanStalled(fan.id)}
+                  health={fanHealthBadge(fan.id)}
                   calInfo={calSnapshot?.calibrations[fan.id]}
                   protocolVersion={calSnapshot?.protocol_version ?? 0}
                   controlsLocked={system.status !== "online" || isReadOnly}

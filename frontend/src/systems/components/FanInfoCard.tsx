@@ -128,7 +128,7 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
 
   const calibrated = loaded && cal?.status === "done";
   const runs = history.length;
-  const report = healthReport(loaded ? cal : null, history, stalled);
+  const report = healthReport(loaded ? cal : null, history.length, stalled);
   const curve = calibrated ? cal!.response_curve : null;
   const drift =
     calibrated && curve ? driftPercent(curve, fan.speed, fan.rpm) : null;

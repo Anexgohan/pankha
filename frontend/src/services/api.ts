@@ -313,6 +313,19 @@ export interface FanCalibrationInfo {
   status: "pending" | "running" | "done" | "failed" | "no_tach";
   version: number;
   calibrated_at: string | null;
+  // Health facts: the card badge computes the same verdict as the info panel
+  min_start: number | null;
+  min_stop: number | null;
+  max_rpm: number | null;
+  spin_up_ms: number | null;
+  healthy_max_rpm: number | null;
+  healthy_spin_up_ms: number | null;
+  healthy_low_confidence: boolean;
+  drift_10m: number | null;
+  drift_samples: number;
+  stall_count: number;
+  last_stall_at: string | null;
+  runs: number;
 }
 
 export interface SystemCalibrations {

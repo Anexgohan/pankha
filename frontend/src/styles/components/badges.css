@@ -130,6 +130,20 @@
   border: 1px solid var(--temp-critical-border);
 }
 
+/* Health rungs of the fan badge ladder (exception-only: healthy fans show
+   their normal status). Crit uses the soft tint - red on red is not legible. */
+.status-indicator.health-warn {
+  background-color: var(--temp-caution-bg);
+  color: var(--temp-caution-text);
+  border: 1px solid var(--temp-caution-border);
+}
+.status-indicator.health-crit {
+  background-color: color-mix(in srgb, var(--color-error) 12%, transparent);
+  color: #FF7A70;
+  border: 1px solid color-mix(in srgb, var(--color-error) 50%, transparent);
+}
+[data-theme="light"] .status-indicator.health-crit { color: #C62828; }
+
 /* Profile Badges */
 .profile-badges {
   display: flex;
