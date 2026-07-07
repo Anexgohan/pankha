@@ -49,6 +49,18 @@ const OVERPERF_FACTOR = 1.05;   // live rpm must exceed healthy max_rpm x this
 const OVERPERF_TICKS = 10;      // consecutive at-target ticks required...
 const OVERPERF_FLOOR_MS = 20000; // ...spanning at least this much wall clock
 
+// Failed-calibration retry ladder: waits between automatic re-attempts (the
+// consent trigger only reaches fans in live telemetry, so an offline system
+// retries when next seen). After the last rung the fan waits a full
+// recalibration interval - or the next backend start, as this is in-memory.
+const FAILED_RETRY_BACKOFF_MS = [
+  5 * 60_000,      // 5 min
+  15 * 60_000,     // 15 min
+  45 * 60_000,     // 45 min
+  2 * 3_600_000,   // 2 h
+  6 * 3_600_000,   // 6 h
+];
+
 // Median of a non-empty array (even length -> mean of the two middle values).
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -105,6 +117,9 @@ export class FanProfileController extends EventEmitter {
   private overperfTicks: Map<string, number> = new Map();          // consecutive over-threshold ticks
   private overperfSince: Map<string, number> = new Map();          // first over-threshold timestamp
   private overperfFlagged: Set<string> = new Set();                // re-measure already requested
+
+  // Failed-calibration retry ladder (fanKey -> attempts + earliest next try)
+  private failedRetries: Map<string, { count: number; nextAt: number }> = new Map();
 
   // Fans locked by an active calibration run - skipped by the control loop.
   // Managed by CalibrationService via setFanCalibrating().
@@ -702,22 +717,27 @@ export class FanProfileController extends EventEmitter {
           // LIVE telemetry (guard above) - DB 'online' status is stale at boot
           // and triggering into a not-yet-connected agent poisons statuses.
           // Enqueue when calibration is missing, pending, or from an older
-          // protocol version; 'failed' rows get ONE automatic retry per
-          // protocol bump (version stamp), then manual-only.
+          // protocol version. 'failed' rows auto-retry on the backoff ladder
+          // while the agent is live (guard above); no ladder entry (fresh
+          // backend start) means retry now.
           // Control continues below (pass-through) until the run locks the fan.
-          // Periodic recalibration: age check on healthy ('done') curves only,
-          // so a failed run can't loop - it stays on the retry policy above.
+          // Periodic recalibration: age check on healthy ('done') curves only.
           const recalDue =
             this.recalibrationDays > 0 &&
             assignment.cal_status === 'done' &&
             assignment.cal_calibrated_at != null &&
             Date.now() - new Date(assignment.cal_calibrated_at).getTime() >
               this.recalibrationDays * 86_400_000;
+          const retryDue =
+            assignment.cal_status === 'failed' &&
+            Date.now() >=
+              (this.failedRetries.get(`${assignment.agent_id}:${assignment.fan_name}`)?.nextAt ?? 0);
           const needsCalibration =
             assignment.cal_status === null ||
             assignment.cal_status === 'pending' ||
-            (assignment.cal_status !== 'running' &&
+            (assignment.cal_status !== 'running' && assignment.cal_status !== 'failed' &&
               (assignment.cal_version ?? 0) < CALIBRATION_VERSION) ||
+            retryDue ||
             recalDue;
           if (needsCalibration) {
             this.emit('calibrationNeeded', {
@@ -1112,6 +1132,39 @@ export class FanProfileController extends EventEmitter {
         .finally(() => this.healthyMaxLoading.delete(fanKey));
     }
     return null;
+  }
+
+  /**
+   * CalibrationService reports a failed run: schedule the next automatic
+   * retry on the backoff ladder. Past the last rung, wait one recalibration
+   * interval (manual-only setting = until the next backend start).
+   */
+  public noteCalibrationFailed(agentId: string, fanName: string): void {
+    const key = `${agentId}:${fanName}`;
+    const count = (this.failedRetries.get(key)?.count ?? 0) + 1;
+    let nextAt: number;
+    let when: string;
+    if (count <= FAILED_RETRY_BACKOFF_MS.length) {
+      const wait = FAILED_RETRY_BACKOFF_MS[count - 1];
+      nextAt = Date.now() + wait;
+      when = wait >= 3_600_000 ? `${wait / 3_600_000}h` : `${wait / 60_000}min`;
+    } else if (this.recalibrationDays > 0) {
+      nextAt = Date.now() + this.recalibrationDays * 86_400_000;
+      when = `${this.recalibrationDays} day(s) (retry ladder exhausted)`;
+    } else {
+      nextAt = Number.POSITIVE_INFINITY;
+      when = 'next backend start (retry ladder exhausted, recalibration set to manual)';
+    }
+    this.failedRetries.set(key, { count, nextAt });
+    log.info(
+      `Calibration retry ${Math.min(count, FAILED_RETRY_BACKOFF_MS.length)}/${FAILED_RETRY_BACKOFF_MS.length} for fan ${fanName} on ${agentId} in ${when}`,
+      'FanProfileController'
+    );
+  }
+
+  /** Successful calibration clears the retry ladder. */
+  public clearCalibrationFailure(agentId: string, fanName: string): void {
+    this.failedRetries.delete(`${agentId}:${fanName}`);
   }
 
   /** Flag a fan (or a zone's members) 'pending'; the consent trigger re-queues it. */

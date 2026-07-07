@@ -86,6 +86,15 @@
 
 /* chart */
 .fic-chart-wrap { margin-top: 12px; }
+/* Mobile sheet: scale down to fit narrow phones (viewBox keeps proportions),
+ * never upscale past the drawn size; centered on wider sheets */
+.bulk-edit-panel.mobile .fic-chart {
+  width: 100%;
+  max-width: 336px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
 .fic-chart-caption { font-size: 10.5px; color: var(--text-tertiary); margin-top: 4px; }
 .fic-chart text { font-family: var(--font-primary); }
 .fic-chart .fic-live-ping { animation: fic-live-ping 2.2s ease-out infinite; }

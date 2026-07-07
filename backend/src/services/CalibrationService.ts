@@ -13,7 +13,7 @@ const CALIBRATION_INTERVAL_S = 0.5;
 // Phase-dependent safety: phase 1 keeps every fan spinning at 50-100% (adds
 // airflow), so it only aborts at emergency_temp itself. The stall search
 // (phase 2) stops fans, so it keeps the full margin below emergency_temp.
-const STALL_SEARCH_MARGIN_C = 10;
+const STALL_SEARCH_MARGIN_C = 5;
 const MAX_CONCURRENT_SYSTEMS = 3;        // cap parallel runs (telemetry/DB contention)
 const SAMPLE_PERIOD_MS = 700;            // RPM poll cadence
 const SETTLE_TIMEOUT_MS = 15000;         // max wait for RPM to stabilize per step
@@ -397,11 +397,13 @@ export class CalibrationService extends EventEmitter {
         try {
           await this.stallSearch(agentId, u);
           await this.persistDone(u, systemName);
+          for (const name of u.memberNames) this.fanProfileController.clearCalibrationFailure(agentId, name);
           this.emitStatus(agentId, systemId, u, "done", "complete");
         } catch (e) {
           if (!(e instanceof UnitFailed)) throw e; // safety aborts bubble up
           log.warn(`Calibration failed for fan "${u.label}" on ${systemName}: ${e.message}`, "CalibrationService");
-          await this.setStatus(u.fanDbIds, "failed", true); // stamp: one auto attempt per protocol
+          await this.setStatus(u.fanDbIds, "failed", true);
+          for (const name of u.memberNames) this.fanProfileController.noteCalibrationFailed(agentId, name);
           this.emitStatus(agentId, systemId, u, "failed", "complete");
         }
         finished.add(u);
@@ -418,9 +420,9 @@ export class CalibrationService extends EventEmitter {
       );
     } catch (e) {
       // Infra aborts (agent gone, commands failing, user abort) -> 'pending':
-      // auto-retries when conditions normalize. Safety aborts -> 'failed'
-      // stamped with this protocol version: one automatic attempt per
-      // protocol, then manual-only.
+      // auto-retries when conditions normalize. Safety aborts -> 'failed':
+      // auto-retries on the FPC backoff ladder (5 attempts, then one
+      // recalibration interval / next backend start).
       const reason = e instanceof Error ? e.message : String(e);
       const retriable = e instanceof CalibrationAbort ? e.retriable : true;
       const status = retriable ? "pending" : "failed";
@@ -430,6 +432,9 @@ export class CalibrationService extends EventEmitter {
         if (finished.has(u)) continue;
         try {
           await this.setStatus(u.fanDbIds, status, !retriable);
+          if (status === "failed") {
+            for (const name of u.memberNames) this.fanProfileController.noteCalibrationFailed(agentId, name);
+          }
           this.emitStatus(agentId, systemId, u, status, "aborted");
         } catch { /* keep restoring */ }
       }
