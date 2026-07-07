@@ -11,4 +11,11 @@
 //     dwell, monotonicity re-measure - v2 recorded pre-ramp speeds as max_rpm
 // v4: monotonicity guard generalized to the whole sweep (re-measure + replace
 //     every inverted point once; v3 only fixed 100% and kept the max)
-export const CALIBRATION_VERSION = 4;
+// v5: sustained-start confirmation - a start transient can blip the tach at
+//     duties that cannot sustain rotation (recorded min_start below min_stop);
+//     a genuine start must still be spinning after a hold at the same duty
+// v6: command-echo guard - samples only count while the register readback
+//     still echoes our commanded duty (FPC re-assert rule ported into
+//     measurement); external writers (e.g. RPi5 kernel cooling ladder) moved
+//     the register mid-settle and their speeds were recorded under our duty
+export const CALIBRATION_VERSION = 6;

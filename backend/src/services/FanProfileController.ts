@@ -6,6 +6,7 @@ import { AgentManager } from './AgentManager';
 import { log } from '../utils/logger';
 import { deriveChipName } from '../utils/sensorUtils';
 import { CALIBRATION_VERSION } from '../config/calibration';
+import { getHealthyReference } from '../utils/healthyReference';
 
 interface FanAssignment {
   assignment_id: number;
@@ -36,10 +37,17 @@ interface CurvePoint {
 
 // Re-assert tolerance (% points of duty). Ignore gaps this small (pwm<->percent
 // rounding + noise); real external-controller drags are far larger.
-const REASSERT_TOLERANCE_PERCENT = 5;
+// Exported: CalibrationService's echo guard uses the same divergence rule.
+export const REASSERT_TOLERANCE_PERCENT = 5;
 
 // Stall watchdog: consecutive at-target ticks with rpm 0 before declaring a stall.
 const STALL_DEBOUNCE_TICKS = 3;
+
+// Overperformance watchdog: sustained rpm above the healthy reference means
+// the reference is stale (fan cleaned or replaced) - queue a re-measure.
+const OVERPERF_FACTOR = 1.05;   // live rpm must exceed healthy max_rpm x this
+const OVERPERF_TICKS = 10;      // consecutive at-target ticks required...
+const OVERPERF_FLOOR_MS = 20000; // ...spanning at least this much wall clock
 
 // Median of a non-empty array (even length -> mean of the two middle values).
 function median(values: number[]): number {
@@ -90,6 +98,13 @@ export class FanProfileController extends EventEmitter {
   private stallTicks: Map<string, number> = new Map();   // consecutive rpm-0 ticks at target
   private stalledFans: Set<string> = new Set();          // currently flagged as stalled
   private tachSeen: Set<string> = new Set();             // fanKey has reported rpm > 0 at least once
+
+  // Overperformance watchdog state (calibrated fans only)
+  private healthyMaxCache: Map<string, number | null> = new Map(); // fanKey -> healthy max_rpm
+  private healthyMaxLoading: Set<string> = new Set();              // fanKeys mid-load
+  private overperfTicks: Map<string, number> = new Map();          // consecutive over-threshold ticks
+  private overperfSince: Map<string, number> = new Map();          // first over-threshold timestamp
+  private overperfFlagged: Set<string> = new Set();                // re-measure already requested
 
   // Fans locked by an active calibration run - skipped by the control loop.
   // Managed by CalibrationService via setFanCalibrating().
@@ -509,6 +524,32 @@ export class FanProfileController extends EventEmitter {
         }
       }
 
+      // OVERPERFORMANCE WATCHDOG (calibrated fans): sustained rpm above the
+      // healthy reference means the reference is stale (fan cleaned or
+      // replaced) - flag 'pending' so the consent trigger re-measures it.
+      if (calStatus === 'done' && reportedFan?.rpm !== undefined && reportedFan.rpm > 0) {
+        const healthyMax = this.getHealthyMaxCached(fanKey, agentId, fanName);
+        if (healthyMax !== null && healthyMax > 0 && reportedFan.rpm > healthyMax * OVERPERF_FACTOR) {
+          const ticks = (this.overperfTicks.get(fanKey) ?? 0) + 1;
+          this.overperfTicks.set(fanKey, ticks);
+          if (!this.overperfSince.has(fanKey)) this.overperfSince.set(fanKey, Date.now());
+          const elapsed = Date.now() - this.overperfSince.get(fanKey)!;
+          if (ticks >= OVERPERF_TICKS && elapsed >= OVERPERF_FLOOR_MS &&
+              !this.overperfFlagged.has(fanKey)) {
+            this.overperfFlagged.add(fanKey);
+            log.info(
+              `Fan ${fanName} on agent ${agentId} sustains ${reportedFan.rpm} RPM, above its ` +
+              `known maximum ${healthyMax} - queueing recalibration`,
+              'FanProfileController'
+            );
+            this.requestRecalibration(agentId, fanName);
+          }
+        } else {
+          this.overperfTicks.delete(fanKey);
+          this.overperfSince.delete(fanKey);
+        }
+      }
+
       // At target: re-assert only if the reported ACTUAL speed diverged past
       // tolerance - catches an external controller (e.g. RPi kernel thermal
       // governor) moving the fan out from under us. See REASSERT_TOLERANCE_PERCENT.
@@ -526,6 +567,10 @@ export class FanProfileController extends EventEmitter {
     // Update tracking state
     this.lastAppliedSpeeds.set(fanKey, nextSpeed);
     this.lastSpeedChangeTime.set(fanKey, Date.now());
+
+    // Duty changed - the overperformance window requires steady duty
+    this.overperfTicks.delete(fanKey);
+    this.overperfSince.delete(fanKey);
 
     // Log the action (debug level to avoid spam)
     const direction = nextSpeed > currentSpeed ? '↑' : nextSpeed < currentSpeed ? '↓' : '=';
@@ -1044,6 +1089,46 @@ export class FanProfileController extends EventEmitter {
     return [...this.stalledFans];
   }
 
+  /**
+   * Cached healthy max_rpm for the overperformance watchdog. Loads lazily in
+   * the background (returns null until ready - the watchdog just waits a
+   * tick); invalidated when a calibration run finishes so a fresh reference
+   * is picked up automatically.
+   */
+  private getHealthyMaxCached(fanKey: string, agentId: string, fanName: string): number | null {
+    if (this.healthyMaxCache.has(fanKey)) return this.healthyMaxCache.get(fanKey)!;
+    if (!this.healthyMaxLoading.has(fanKey)) {
+      this.healthyMaxLoading.add(fanKey);
+      void (async () => {
+        const row = await this.db.get(
+          `SELECT f.id FROM fans f JOIN systems s ON s.id = f.system_id
+           WHERE s.agent_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2) LIMIT 1`,
+          [agentId, fanName]
+        );
+        const ref = row ? await getHealthyReference(this.db, row.id) : null;
+        this.healthyMaxCache.set(fanKey, ref?.max_rpm ?? null);
+      })()
+        .catch((e) => log.error(`Failed to load healthy reference for ${fanName}:`, 'FanProfileController', e))
+        .finally(() => this.healthyMaxLoading.delete(fanKey));
+    }
+    return null;
+  }
+
+  /** Flag a fan (or a zone's members) 'pending'; the consent trigger re-queues it. */
+  private requestRecalibration(agentId: string, fanName: string): void {
+    void (async () => {
+      await this.db.run(
+        `UPDATE fan_calibrations SET status = 'pending'
+         WHERE fan_id IN (
+           SELECT f.id FROM fans f JOIN systems s ON s.id = f.system_id
+           WHERE s.agent_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2))`,
+        [agentId, fanName]
+      );
+    })().catch((e) =>
+      log.error(`Failed to flag ${fanName} for recalibration:`, 'FanProfileController', e)
+    );
+  }
+
   /** Log a stall to fan_stall_events, pruned to the newest 50 per fan. */
   private persistStallEvent(agentId: string, fanName: string, commandedSpeed: number): void {
     void (async () => {
@@ -1088,8 +1173,17 @@ export class FanProfileController extends EventEmitter {
    */
   public setFanCalibrating(agentId: string, fanName: string, calibrating: boolean): void {
     const fanKey = `${agentId}:${fanName}`;
-    if (calibrating) this.calibratingFans.add(fanKey);
-    else this.calibratingFans.delete(fanKey);
+    if (calibrating) {
+      this.calibratingFans.add(fanKey);
+    } else {
+      this.calibratingFans.delete(fanKey);
+      // Fresh calibration: drop the cached reference + watchdog state so the
+      // next tick judges against the new measurement.
+      this.healthyMaxCache.delete(fanKey);
+      this.overperfTicks.delete(fanKey);
+      this.overperfSince.delete(fanKey);
+      this.overperfFlagged.delete(fanKey);
+    }
   }
 
   /**

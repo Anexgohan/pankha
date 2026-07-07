@@ -132,7 +132,8 @@ function topSpeedLine(cal: FanCalibrationDetail, runs: number): HealthLine {
       tooltip: "Needs a second calibration to compare against",
     };
   }
-  const tooltip = `Best on record ${Math.round(drop.healthy)} RPM vs latest ${drop.current} RPM (${drop.dropPct > 0 ? "-" : "+"}${Math.abs(drop.dropPct).toFixed(1)}%)`;
+  const conf = cal.healthy_low_confidence ? " - based on limited-confidence measurements" : "";
+  const tooltip = `Best on record ${Math.round(drop.healthy)} RPM vs latest ${drop.current} RPM (${drop.dropPct > 0 ? "-" : "+"}${Math.abs(drop.dropPct).toFixed(1)}%)${conf}`;
   if (drop.dropPct <= TOP_DROP_WARN_PCT) {
     return { state: "ok", text: "Top speed is holding steady.", tooltip };
   }

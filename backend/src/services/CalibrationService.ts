@@ -3,9 +3,10 @@ import Database from "../database/database";
 import { DataAggregator } from "./DataAggregator";
 import { CommandDispatcher } from "./CommandDispatcher";
 import { AgentManager } from "./AgentManager";
-import { FanProfileController } from "./FanProfileController";
+import { FanProfileController, REASSERT_TOLERANCE_PERCENT } from "./FanProfileController";
 import { log } from "../utils/logger";
 import { CALIBRATION_VERSION } from "../config/calibration";
+import { runSanityCheck } from "../utils/calibrationSanity";
 
 // Calibration tuning. Telemetry runs at 0.5s during a calibration.
 const CALIBRATION_INTERVAL_S = 0.5;
@@ -34,6 +35,10 @@ const STALL_SEARCH_STEP = 5;
 const STOP_CONFIRM_SAMPLES = 3;
 const START_CONFIRM_SAMPLES = 2;
 const MIN_REST_AFTER_STOP_MS = 3000;
+// Sustained-start confirmation (protocol v5): a start transient can blip the
+// tach at duties that cannot sustain rotation (min_start below min_stop). A
+// genuine start must still be spinning after this hold at the same duty.
+const SUSTAIN_START_MS = 5000;
 const QUANT_PROBES: Array<[duty: number, step: number]> = [[51, 1], [52, 2], [55, 5]];
 // Quiet period after an abort or a deferred run (read-only, control disabled,
 // no telemetry) before auto-triggers may touch that agent again. Keeps an
@@ -100,6 +105,8 @@ export class CalibrationService extends EventEmitter {
   private abortRequested: Set<string> = new Set();       // agentIds asked to abort
   private phaseMargins: Map<string, number> = new Map(); // agentId -> current safety margin C
   private snoozedUntil: Map<string, number> = new Map(); // agentId -> auto-trigger quiet period
+  private gateRejections: Map<string, number> = new Map(); // sanity check -> rejections since start
+  private echoDiscards: Map<string, number> = new Map();  // agentId -> contaminated samples this run
   private started = false;
 
   private constructor() {
@@ -285,6 +292,7 @@ export class CalibrationService extends EventEmitter {
 
     let active = [...units.values()];
     const finished = new Set<CalUnit>();
+    this.echoDiscards.delete(agentId);
     log.info(
       `Calibrating ${active.map((u) => `"${u.label}"`).join(", ")} on ${systemName} (${agentId})`,
       "CalibrationService"
@@ -306,7 +314,7 @@ export class CalibrationService extends EventEmitter {
         await this.setDutyAll(agentId, active, duty);
         // First step ramps from an arbitrary starting duty - give it real time
         if (duty === 100) await this.dwell(agentId, FULL_DUTY_DWELL_MS);
-        const rpms = await this.settle(agentId, active.map((u) => u.target));
+        const rpms = await this.settle(agentId, active.map((u) => u.target), duty);
         for (const u of active) u.curve.push({ duty, rpm: rpms.get(u.target) ?? 0 });
 
         if (duty === 100) {
@@ -353,7 +361,7 @@ export class CalibrationService extends EventEmitter {
           if (units.length === 0) continue;
           await this.setDutyAll(agentId, units, duty);
           if (duty === 100) await this.dwell(agentId, FULL_DUTY_DWELL_MS);
-          const rpms = await this.settle(agentId, units.map((u) => u.target));
+          const rpms = await this.settle(agentId, units.map((u) => u.target), duty);
           for (const u of units) {
             const p = u.curve.find((pt) => pt.duty === duty)!;
             p.rpm = rpms.get(u.target) ?? p.rpm;
@@ -370,7 +378,7 @@ export class CalibrationService extends EventEmitter {
         const unresolved = active.filter((u) => u.stepResolution === null);
         if (unresolved.length === 0) break;
         await this.setDutyAll(agentId, unresolved, duty);
-        const rpms = await this.settle(agentId, unresolved.map((u) => u.target));
+        const rpms = await this.settle(agentId, unresolved.map((u) => u.target), duty);
         for (const u of unresolved) {
           const base = u.curve.find((p) => p.duty === 50)?.rpm ?? 0;
           const rpm = rpms.get(u.target) ?? 0;
@@ -400,7 +408,14 @@ export class CalibrationService extends EventEmitter {
         await this.setDuty(agentId, u.target, SAFE_HOLD_DUTY); // park before next unit
       }
 
-      log.info(`Calibration complete for ${systemName} (${agentId})`, "CalibrationService");
+      const discarded = this.echoDiscards.get(agentId) ?? 0;
+      log.info(
+        `Calibration complete for ${systemName} (${agentId})` +
+        (discarded > 0
+          ? ` - echo guard discarded ${discarded} sample(s) moved by an external writer`
+          : ""),
+        "CalibrationService"
+      );
     } catch (e) {
       // Infra aborts (agent gone, commands failing, user abort) -> 'pending':
       // auto-retries when conditions normalize. Safety aborts -> 'failed'
@@ -474,7 +489,7 @@ export class CalibrationService extends EventEmitter {
     for (let duty = 50 - STALL_SEARCH_STEP; duty >= 0; duty -= STALL_SEARCH_STEP) {
       const t0 = Date.now();
       await this.setDuty(agentId, u.target, duty);
-      const rpm = (await this.settle(agentId, [u.target])).get(u.target) ?? 0;
+      const rpm = (await this.settle(agentId, [u.target], duty)).get(u.target) ?? 0;
       if (rpm <= 0) {
         u.minStop = prevDuty;
         u.minRpm = prevRpm;
@@ -501,7 +516,7 @@ export class CalibrationService extends EventEmitter {
     // rest - a coasting rotor restarts at duties a resting one never would.
     await this.setDuty(agentId, u.target, 0);
     await this.waitForRpm(agentId, u.target, (rpm) => rpm <= 0, SETTLE_TIMEOUT_MS,
-      `fan ${u.target} still reports RPM after duty 0`, STOP_CONFIRM_SAMPLES);
+      `fan ${u.target} still reports RPM after duty 0`, STOP_CONFIRM_SAMPLES, 0);
     await this.rest(agentId, Math.max(2 * (u.spinDownMs ?? 0), MIN_REST_AFTER_STOP_MS));
 
     // Upward: first duty that spins the fan from standstill is min_start
@@ -509,11 +524,26 @@ export class CalibrationService extends EventEmitter {
       const t0 = Date.now();
       await this.setDuty(agentId, u.target, duty);
       const spun = await this.tryWaitForRpm(
-        agentId, u.target, (rpm) => rpm > 0, SPINUP_TIMEOUT_MS, START_CONFIRM_SAMPLES);
+        agentId, u.target, (rpm) => rpm > 0, SPINUP_TIMEOUT_MS, START_CONFIRM_SAMPLES, duty);
       if (spun) {
-        u.minStart = duty;
-        u.spinUpMs = Date.now() - t0;
-        return;
+        const spinUpMs = Date.now() - t0; // hold time below is not spin-up time
+        // Sustained-start confirmation: a transient twitch can blip the tach;
+        // a genuine start is still spinning after a hold at the same duty.
+        await this.dwell(agentId, SUSTAIN_START_MS);
+        const sustained = await this.tryWaitForRpm(
+          agentId, u.target, (rpm) => rpm > 0,
+          SAMPLE_PERIOD_MS * (START_CONFIRM_SAMPLES + 2), START_CONFIRM_SAMPLES, duty);
+        if (sustained) {
+          u.minStart = duty;
+          u.spinUpMs = spinUpMs;
+          return;
+        }
+        // Start transient: it died during the hold. Confirm standstill + rest
+        // so the next candidate starts from rest, not from a coasting rotor.
+        await this.setDuty(agentId, u.target, 0);
+        await this.waitForRpm(agentId, u.target, (rpm) => rpm <= 0, SETTLE_TIMEOUT_MS,
+          `fan ${u.target} still reports RPM after start transient at ${duty}%`, STOP_CONFIRM_SAMPLES, 0);
+        await this.rest(agentId, MIN_REST_AFTER_STOP_MS);
       }
     }
     throw new UnitFailed(`did not start even at 100% duty`);
@@ -536,11 +566,38 @@ export class CalibrationService extends EventEmitter {
   }
 
   /**
+   * Command-echo guard (protocol v6): telemetry carries the actual register
+   * readback (speed). A sample only counts when the register still echoes OUR
+   * commanded duty - the FPC re-assert rule, ported into measurement. Anything
+   * past the shared tolerance means an external writer (e.g. the RPi5 kernel
+   * cooling ladder) moved the fan mid-measure: discard the sample, re-assert
+   * the duty, retry. Detection is proof, so the discard count is reported.
+   */
+  private async echoOk(
+    agentId: string, target: string, duty: number, reported: number | undefined
+  ): Promise<boolean> {
+    if (reported === undefined ||
+        Math.abs(reported - duty) <= REASSERT_TOLERANCE_PERCENT) {
+      return true;
+    }
+    this.echoDiscards.set(agentId, (this.echoDiscards.get(agentId) ?? 0) + 1);
+    log.debug(
+      `Echo guard: fan ${target} register reads ${reported}% while commanded ${duty}% - sample discarded, duty re-asserted`,
+      "CalibrationService"
+    );
+    await this.setDuty(agentId, target, duty);
+    return false;
+  }
+
+  /**
    * Wait until every target's RPM is stable: after a dead window (stale
    * telemetry), SETTLE_CONFIRM_SAMPLES consecutive samples within
-   * max(5%, 20 rpm), or timeout (last sample wins). Safety-checked each poll.
+   * max(5%, 20 rpm), or timeout (last clean sample wins). Samples failing the
+   * echo guard are discarded. Safety-checked each poll.
    */
-  private async settle(agentId: string, targets: string[]): Promise<Map<string, number>> {
+  private async settle(
+    agentId: string, targets: string[], duty: number
+  ): Promise<Map<string, number>> {
     await this.dwell(agentId, SETTLE_DEAD_MS);
     const deadline = Date.now() + SETTLE_TIMEOUT_MS;
     const last = new Map<string, number>();
@@ -552,7 +609,14 @@ export class CalibrationService extends EventEmitter {
       await this.sleep(SAMPLE_PERIOD_MS);
       this.safetyCheck(agentId);
       for (const target of [...pending]) {
-        const rpm = this.telemetry(agentId, target)?.rpm ?? 0;
+        const t = this.telemetry(agentId, target);
+        if (!(await this.echoOk(agentId, target, duty, t?.speed))) {
+          // Contaminated: restart this target's stability window
+          stablePairs.set(target, 0);
+          last.delete(target);
+          continue;
+        }
+        const rpm = t?.rpm ?? 0;
         const prev = last.get(target);
         last.set(target, rpm);
         if (prev !== undefined && Math.abs(rpm - prev) <= Math.max(rpm * 0.05, 20)) {
@@ -569,6 +633,7 @@ export class CalibrationService extends EventEmitter {
         }
       }
     }
+    // Timeout fallback: last CLEAN sample only - contaminated ones never land
     for (const target of pending) settled.set(target, last.get(target) ?? 0);
     return settled;
   }
@@ -577,25 +642,33 @@ export class CalibrationService extends EventEmitter {
   private async waitForRpm(
     agentId: string, target: string,
     predicate: (rpm: number) => boolean, timeoutMs: number, failMessage: string,
-    consecutive: number = 1
+    consecutive: number = 1, duty?: number
   ): Promise<void> {
-    if (!(await this.tryWaitForRpm(agentId, target, predicate, timeoutMs, consecutive))) {
+    if (!(await this.tryWaitForRpm(agentId, target, predicate, timeoutMs, consecutive, duty))) {
       throw new UnitFailed(failMessage);
     }
   }
 
-  /** Poll until predicate matches on `consecutive` samples in a row (noise guard). */
+  /**
+   * Poll until predicate matches on `consecutive` samples in a row (noise
+   * guard). Pass `duty` to apply the echo guard to every sample.
+   */
   private async tryWaitForRpm(
     agentId: string, target: string,
     predicate: (rpm: number) => boolean, timeoutMs: number,
-    consecutive: number = 1
+    consecutive: number = 1, duty?: number
   ): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
     let hits = 0;
     while (Date.now() < deadline) {
       await this.sleep(SAMPLE_PERIOD_MS);
       this.safetyCheck(agentId);
-      const rpm = this.telemetry(agentId, target)?.rpm ?? 0;
+      const t = this.telemetry(agentId, target);
+      if (duty !== undefined && !(await this.echoOk(agentId, target, duty, t?.speed))) {
+        hits = 0;
+        continue;
+      }
+      const rpm = t?.rpm ?? 0;
       if (predicate(rpm)) {
         hits++;
         if (hits >= consecutive) return true;
@@ -696,12 +769,40 @@ export class CalibrationService extends EventEmitter {
 
   /** Write measured values (current row per member fan) + one history snapshot each. */
   private async persistDone(u: CalUnit, systemName: string): Promise<void> {
+    // Sanity gate: verdict stamped into the history row; the healthy-reference
+    // query trusts only passing runs. The run persists either way - the gate
+    // guards the reference, never fan control.
+    const prior = await this.db.get(
+      `SELECT MAX((result->>'max_rpm')::numeric) AS max_rpm
+       FROM fan_calibration_history
+       WHERE fan_id = ANY($1::int[]) AND calibration_version = $2`,
+      [u.fanDbIds, CALIBRATION_VERSION]
+    );
+    const sortedCurve = [...u.curve].sort((a, b) => a.duty - b.duty);
+    const sanity = runSanityCheck(
+      sortedCurve, u.maxRpm, prior?.max_rpm != null ? Number(prior.max_rpm) : null
+    );
+    if (!sanity.pass) {
+      const totals = sanity.failedChecks.map((c) => {
+        const n = (this.gateRejections.get(c) ?? 0) + 1;
+        this.gateRejections.set(c, n);
+        return `${c}=${n}`;
+      });
+      log.debug(
+        `Sanity gate rejected run for "${u.label}" (${u.target}) on ${systemName}: ` +
+        `${sanity.reasons.join("; ")} (rejections since start: ${totals.join(" ")}; ` +
+        `run still persisted as current curve)`,
+        "CalibrationService"
+      );
+    }
     const result = {
       calibration_version: CALIBRATION_VERSION,
       min_start: u.minStart, min_stop: u.minStop, min_rpm: u.minRpm,
       max_rpm: u.maxRpm, spin_up_ms: u.spinUpMs, spin_down_ms: u.spinDownMs,
       step_resolution: u.stepResolution,
-      response_curve: [...u.curve].sort((a, b) => a.duty - b.duty),
+      response_curve: sortedCurve,
+      sanity: sanity.pass ? "pass" : "fail",
+      ...(sanity.reasons.length > 0 ? { sanity_reasons: sanity.reasons } : {}),
     };
     for (const fanId of u.fanDbIds) {
       await this.db.run(

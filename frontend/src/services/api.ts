@@ -353,10 +353,12 @@ export interface FanCalibrationDetail {
   calibrated_at: string | null;
   speed_min_24h: number | null;
   speed_max_24h: number | null;
-  // Healthy reference (per-metric best across history) + sustained drift
+  // Healthy reference (per-metric best across sanity-passing history runs;
+  // low_confidence = anti-deadlock fallback over all runs) + sustained drift
   healthy_max_rpm: number | null;
   healthy_spin_up_ms: number | null;
   healthy_min_start: number | null;
+  healthy_low_confidence: boolean;
   drift_10m: number | null;
   drift_samples: number;
   stall_count: number;

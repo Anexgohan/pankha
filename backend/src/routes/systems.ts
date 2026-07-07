@@ -22,6 +22,7 @@ import {
 } from "../config/uiOptions";
 import { CALIBRATION_VERSION } from "../config/calibration";
 import { medianDriftPct } from "../utils/fanCurve";
+import { getHealthyReference, HealthyReference } from "../utils/healthyReference";
 
 const router = Router();
 const db = Database.getInstance();
@@ -810,28 +811,14 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
       [row.fan_db_id]
     );
 
-    // Healthy reference (D19): per-metric best across history at the current
-    // protocol; health compares against the fan's best self, never a degraded
-    // later run. Sustained drift (D20): median over 10 min of samples - the
-    // card never judges on a single reading.
-    let healthy: { max_rpm: number; spin_up_ms: number; min_start: number } | null = null;
+    // Healthy reference: per-metric best across sanity-passing history runs
+    // at the current protocol; health compares against the fan's best self,
+    // never a degraded later run. Sustained drift: median over 10 min of
+    // samples - the card never judges on a single reading.
+    let healthy: HealthyReference | null = null;
     let drift10m: { median: number; count: number } | null = null;
     if (row.status === "done") {
-      const best = await db.get(
-        `SELECT MAX((result->>'max_rpm')::numeric) AS max_rpm,
-                MIN((result->>'spin_up_ms')::numeric) AS spin_up_ms,
-                MIN((result->>'min_start')::numeric) AS min_start
-         FROM fan_calibration_history
-         WHERE fan_id = $1 AND calibration_version = $2`,
-        [row.fan_db_id, CALIBRATION_VERSION]
-      );
-      if (best?.max_rpm != null) {
-        healthy = {
-          max_rpm: Number(best.max_rpm),
-          spin_up_ms: Number(best.spin_up_ms),
-          min_start: Number(best.min_start),
-        };
-      }
+      healthy = await getHealthyReference(db, row.fan_db_id);
       const samples = await db.all(
         `SELECT fan_speed AS duty, fan_rpm AS rpm
          FROM monitoring_data
@@ -863,6 +850,7 @@ router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) =
       healthy_max_rpm: healthy?.max_rpm ?? null,
       healthy_spin_up_ms: healthy?.spin_up_ms ?? null,
       healthy_min_start: healthy?.min_start ?? null,
+      healthy_low_confidence: healthy?.low_confidence ?? false,
       drift_10m: drift10m?.median ?? null,
       drift_samples: drift10m?.count ?? 0,
       stall_count: stalls?.count ?? 0,
@@ -884,14 +872,17 @@ router.get("/:id/fans/:fanId/calibration/history", async (req: Request, res: Res
     const systemId = parseInt(req.params.id);
     const fanId = req.params.fanId;
 
+    // Current protocol only: older-version rows await the purge on this fan's
+    // next run and must not leak into run counts or trend gates.
     const rows = await db.all(
       `SELECT h.result, h.calibrated_at
        FROM fan_calibration_history h
        JOIN fans f ON h.fan_id = f.id
        WHERE f.system_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2)
+         AND h.calibration_version = $3
        ORDER BY h.calibrated_at DESC
        LIMIT 50`,
-      [systemId, fanId]
+      [systemId, fanId, CALIBRATION_VERSION]
     );
     res.json({ history: rows });
   } catch (error) {
