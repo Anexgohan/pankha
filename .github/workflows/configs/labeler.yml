@@ -1,13 +1,14 @@
 # PR Labeler Configuration
 # Maps files to labels
 # PRs can receive multiple labels (e.g. backend + database)
-# Last updated: 2026-04-23
+# Last updated: 2026-07-08
 #
 # Label colors (managed via GitHub API, catalogued here for reference):
 #   frontend        #f0ad4e  light orange
 #   backend         #0e8a16  green
 #   agent-windows   #00A4EF  Windows blue
 #   agent-linux     #D70A53  Debian red
+#   agent-ipmi      #B08800  dark gold
 #   docker          #384d54  Docker slate
 #   documentation   #006b75  teal
 #   ci              #d4c5f9  light purple
@@ -29,9 +30,14 @@ agent-windows:
   - changed-files:
     - any-glob-to-any-file: 'agents/clients/windows/**/*'
 
+# The IPMI agent is a separate workspace under linux/; each agent owns its own path.
 agent-linux:
   - changed-files:
-    - any-glob-to-any-file: 'agents/clients/linux/**/*'
+    - any-glob-to-any-file: 'agents/clients/linux/rust/**/*'
+
+agent-ipmi:
+  - changed-files:
+    - any-glob-to-any-file: 'agents/clients/linux/virtual-agents/host-ipmi-rust/**/*'
 
 docker:
   - changed-files:

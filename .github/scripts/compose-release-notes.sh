@@ -127,8 +127,24 @@ jq '
 # Render a section with capitalised heading
 render_section() {
   local cat="$1"
-  local items
-  items=$(jq -r --arg c "$cat" '.[] | select(.k==$c) | .v[] | "- " + .title + " by @" + .author.login + " in #" + (.number|tostring)' /tmp/grouped.json)
+  local items scope=0
+  # Intent headings hide the platform, so prefix those items with the agents they touch.
+  # Area headings (Agent Linux, ...) already carry the scope.
+  case "$cat" in breaking-change|feature|fix) scope=1 ;; esac
+  items=$(jq -r --arg c "$cat" --argjson scope "$scope" '
+    def agent_scope:
+      (.labels | map(.name)) as $L
+      | [ ("Linux"   | select($L | index("agent-linux"))),
+          ("Windows" | select($L | index("agent-windows"))),
+          ("IPMI"    | select($L | index("agent-ipmi"))) ]
+      | if   length == 0 then ""
+        elif length == 1 then "**" + .[0] + " agent** - "
+        else "**" + join(" + ") + " agents** - "
+        end;
+    .[] | select(.k==$c) | .v[]
+    | (if $scope == 1 then agent_scope else "" end) as $s
+    | "- " + $s + .title + " by @" + .author.login + " in #" + (.number|tostring)
+  ' /tmp/grouped.json)
   [ -z "$items" ] && return
   local title
   # Title-case each hyphen-separated word: "agent-linux" -> "Agent Linux"
@@ -137,6 +153,7 @@ render_section() {
     breaking-change) title="Breaking Changes" ;;
     feature)         title="Features" ;;
     fix)             title="Bug Fixes" ;;
+    agent-ipmi)      title="Agent IPMI" ;;
     _other)          title="Other Changes" ;;
   esac
   echo "### $title"
