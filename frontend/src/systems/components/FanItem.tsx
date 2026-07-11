@@ -194,7 +194,7 @@ const FanItem: React.FC<FanItemProps> = ({
   ) : health ? (
     <span
       className={`status-indicator ${health.verdict === "problem" ? "health-crit" : "health-warn"}`}
-      title={health.text}
+      title={`${health.text}\nClick the info icon for details`}
     >
       {health.verdict === "problem" ? "Check fan" : "Attention"}
     </span>

@@ -529,7 +529,8 @@
   font-size: var(--font-size-sm2);
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
-  min-width: 100px;
+  /* Short labels (Sensor:/Profile:) - width freed for the select's rest text */
+  min-width: 60px;
   flex-shrink: 0;
 }
 

@@ -50,6 +50,9 @@ interface FanInfoCardProps {
   isOpen: boolean;
   anchorRect: DOMRect | null;
   onClose: () => void;
+  // Lets the parent patch its calibrations snapshot (card badge source)
+  // when the stall log is cleared here - keeps card and panel in agreement
+  onStallsCleared?: (fanId: string) => void;
 }
 
 /** key/value row; every visible line carries a plain-language tooltip */
@@ -86,12 +89,12 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
   isOpen,
   anchorRect,
   onClose,
+  onStallsCleared,
 }) => {
   const [cal, setCal] = useState<FanCalibrationDetail | null>(null);
   const [history, setHistory] = useState<FanCalibrationHistoryRun[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [howOpen, setHowOpen] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
   const { isMobile, panelStyles, panelRef, contextual } = useContextualPanel(
     isOpen,
     anchorRect,
@@ -122,7 +125,7 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, systemId, fan.id, refreshKey]);
+  }, [isOpen, systemId, fan.id]);
 
   if (!isOpen) return null;
 
@@ -168,7 +171,10 @@ const FanInfoCard: React.FC<FanInfoCardProps> = ({
     try {
       await clearFanStalls(systemId, fan.id);
       toast.success("Stop counter cleared");
-      setRefreshKey((k) => k + 1);
+      // Outcome is known (backend deleted the rows) - patch in place instead
+      // of refetching, and tell the parent so the card badge updates too
+      setCal((c) => (c ? { ...c, stall_count: 0, last_stall_at: null } : c));
+      onStallsCleared?.(fan.id);
     } catch {
       toast.error("Failed to clear the stop counter");
     }

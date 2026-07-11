@@ -106,7 +106,8 @@ interface SystemCardProps {
   onToggleSensors: (expanded: boolean) => void;
   onToggleFans: (expanded: boolean) => void;
   onToggleBmc: (expanded: boolean) => void;
-  // Fan calibration + stall state pushed via WS, keyed "agentId:fanName"
+  // This agent's slice of the WS calibration/stall maps, keyed by fan name.
+  // Identity changes only when THIS agent has an event (see useWebSocketData).
   fanCalibration: Record<string, string>;
   stalledFans: Record<string, boolean>;
 }
@@ -133,12 +134,11 @@ const SystemCard: React.FC<SystemCardProps> = ({
   // WS events win when present; the REST snapshot covers pages that loaded
   // or reconnected mid-calibration and never saw the "running" event.
   const isFanCalibrating = (fanId: string) => {
-    const ws = fanCalibration[`${system.agent_id}:${fanId}`];
+    const ws = fanCalibration[fanId];
     if (ws !== undefined) return ws === "running";
     return calSnapshot?.calibrations[fanId]?.status === "running";
   };
-  const isFanStalled = (fanId: string) =>
-    !!stalledFans[`${system.agent_id}:${fanId}`];
+  const isFanStalled = (fanId: string) => !!stalledFans[fanId];
 
   // Calibration snapshot for the rack icons + health badge (facts per fan).
   // Refetched whenever a WS calibration event lands, plus a slow periodic
@@ -1865,7 +1865,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       <div className="fan-controls zone-controls">
                         {/* Sensor Selection Dropdown */}
                         <div className="fan-control-row">
-                          <label className="control-label">Control Sensor:</label>
+                          <label className="control-label" title="Select the Control Sensor whose temperature drives this fan.">Sensor:</label>
                           {/* Control Sensor (Design1 <Select>) - grouped
                             * Virtual / Groups / Sensors options with search;
                             * name + temp on the trigger and on every open
@@ -1898,7 +1898,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                          * (A-Z), via headerless + labeled option groups.
                          */}
                         <div className="fan-control-row">
-                          <label className="control-label">Fan Profile:</label>
+                          <label className="control-label" title="Select the Fan Profile that sets this fan's speed curve.">Profile:</label>
                           <Select
                             value={selectedProfiles[representativeFan.id] ?? NO_PROFILE}
                             onChange={(profileId) => {
@@ -1967,7 +1967,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <div className="fan-controls">
                     {/* Sensor Selection Dropdown */}
                     <div className="fan-control-row">
-                      <label className="control-label">Control Sensor:</label>
+                      <label className="control-label" title="Select the Control Sensor whose temperature drives this fan.">Sensor:</label>
                       {/* Control Sensor (Design1 <Select>) - mirror of the
                         * zone-level dropdown above; same shared options,
                         * search, and renderers. */}
@@ -2021,7 +2021,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                      * mirror of the zone-level dropdown above; see that
                      * comment block for the design rationale. */}
                     <div className="fan-control-row">
-                      <label className="control-label">Fan Profile:</label>
+                      <label className="control-label" title="Select the Fan Profile that sets this fan's speed curve.">Profile:</label>
                       <Select
                         value={selectedProfiles[fan.id] ?? NO_PROFILE}
                         onChange={(profileId) => {
@@ -2143,6 +2143,25 @@ const SystemCard: React.FC<SystemCardProps> = ({
             isOpen
             anchorRect={anchorRect}
             onClose={() => setInfoFanId(null)}
+            onStallsCleared={(fanId) =>
+              // Patch the badge's snapshot in place - the outcome is known
+              // (backend deleted the rows); the 5-min tick stays the backstop
+              setCalSnapshot((s) =>
+                s && s.calibrations[fanId]
+                  ? {
+                      ...s,
+                      calibrations: {
+                        ...s.calibrations,
+                        [fanId]: {
+                          ...s.calibrations[fanId],
+                          stall_count: 0,
+                          last_stall_at: null,
+                        },
+                      },
+                    }
+                  : s
+              )
+            }
           />
         );
       })()}

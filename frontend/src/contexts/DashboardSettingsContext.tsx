@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { updateSetting, getSetting, getHealth } from '../services/api';
 
 /**
@@ -643,41 +643,54 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
     return tempThresholds;
   }, [perTypeEnabled, tempThresholds, perTypeThresholds]);
 
+  // Memoized so ancestor re-renders (e.g. theme toggle) don't mint a new
+  // context identity and re-render every consumer (context bypasses
+  // React.memo). The update handlers are intentionally NOT deps: they are
+  // recreated per render, but any state they close over is itself a dep, so
+  // the memo re-captures fresh closures exactly when that state changes.
+  const value = useMemo(() => ({
+    graphScale,
+    updateGraphScale,
+    dataRetentionDays,
+    updateDataRetention,
+    accentColor,
+    updateAccentColor,
+    hoverTintColor,
+    updateHoverTintColor,
+    primaryFont,
+    updatePrimaryFont,
+    secondaryFont,
+    updateSecondaryFont,
+    fontScale,
+    updateFontScale,
+    isLoading,
+    timezone,
+    tempThresholds,
+    updateTempThresholds,
+    tempColors,
+    updateTempColors,
+    perTypeEnabled,
+    setPerTypeEnabled,
+    perTypeThresholds,
+    updatePerTypeThresholds: updatePerTypeThresholdsHandler,
+    resetTempDefaults,
+    getThresholdsForType,
+    hardwarePruneDays,
+    updateHardwarePruneDays,
+    hubLogLevel,
+    updateHubLogLevel,
+    fanRecalDays,
+    updateFanRecalDays,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [
+    graphScale, dataRetentionDays, accentColor, hoverTintColor, primaryFont,
+    secondaryFont, fontScale, isLoading, timezone, tempThresholds, tempColors,
+    perTypeEnabled, perTypeThresholds, getThresholdsForType, hardwarePruneDays,
+    hubLogLevel, fanRecalDays,
+  ]);
+
   return (
-    <DashboardSettingsContext.Provider value={{ 
-      graphScale, 
-      updateGraphScale, 
-      dataRetentionDays, 
-      updateDataRetention,
-      accentColor,
-      updateAccentColor,
-      hoverTintColor,
-      updateHoverTintColor,
-      primaryFont,
-      updatePrimaryFont,
-      secondaryFont,
-      updateSecondaryFont,
-      fontScale,
-      updateFontScale,
-      isLoading,
-      timezone,
-      tempThresholds,
-      updateTempThresholds,
-      tempColors,
-      updateTempColors,
-      perTypeEnabled,
-      setPerTypeEnabled,
-      perTypeThresholds,
-      updatePerTypeThresholds: updatePerTypeThresholdsHandler,
-      resetTempDefaults,
-      getThresholdsForType,
-      hardwarePruneDays,
-      updateHardwarePruneDays,
-      hubLogLevel,
-      updateHubLogLevel,
-      fanRecalDays,
-      updateFanRecalDays,
-    }}>
+    <DashboardSettingsContext.Provider value={value}>
       {children}
     </DashboardSettingsContext.Provider>
   );

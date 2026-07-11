@@ -52,11 +52,13 @@ export function subscribeToLicenseUpdated(
 }
 
 // Fan calibration lifecycle pushed by the backend.
-// Keyed "agentId:fanName" -> status ('pending'|'running'|'done'|'failed'|'no_tach')
-export type FanCalibrationMap = Record<string, string>;
+// Nested agentId -> fanName -> status ('pending'|'running'|'done'|'failed'|'no_tach').
+// Per-agent slices keep identity stable for unaffected systems, so one
+// calibration event re-renders one SystemCard instead of the whole fleet.
+export type FanCalibrationMap = Record<string, Record<string, string>>;
 // Stalled fans (calibrated fan commanded above min_stop but tach reads 0),
-// keyed "agentId:fanName" -> true while stalled.
-export type StalledFanMap = Record<string, boolean>;
+// nested agentId -> fanName -> true while stalled.
+export type StalledFanMap = Record<string, Record<string, boolean>>;
 
 interface UseWebSocketDataReturn {
   systems: SystemData[];
@@ -509,11 +511,12 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       };
       if (!mountedRef.current) return;
       setFanCalibration((prev) => {
-        const next = { ...prev };
+        // Rebuild only this agent's slice; other agents keep their reference
+        const slice = { ...prev[event.agentId] };
         for (const name of [event.target, ...(event.fanNames ?? [])]) {
-          next[`${event.agentId}:${name}`] = event.status;
+          slice[name] = event.status;
         }
-        return next;
+        return { ...prev, [event.agentId]: slice };
       });
     });
 
@@ -521,15 +524,18 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     wsRef.current.on("fanStalled", (data: unknown) => {
       const event = data as { agentId: string; fanId: string };
       if (!mountedRef.current) return;
-      setStalledFans((prev) => ({ ...prev, [`${event.agentId}:${event.fanId}`]: true }));
+      setStalledFans((prev) => ({
+        ...prev,
+        [event.agentId]: { ...prev[event.agentId], [event.fanId]: true },
+      }));
     });
     wsRef.current.on("fanStallCleared", (data: unknown) => {
       const event = data as { agentId: string; fanId: string };
       if (!mountedRef.current) return;
       setStalledFans((prev) => {
-        const next = { ...prev };
-        delete next[`${event.agentId}:${event.fanId}`];
-        return next;
+        const slice = { ...prev[event.agentId] };
+        delete slice[event.fanId];
+        return { ...prev, [event.agentId]: slice };
       });
     });
 
