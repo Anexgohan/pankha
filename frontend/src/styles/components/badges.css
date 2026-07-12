@@ -115,6 +115,35 @@
   border: 1px solid rgba(158, 158, 158, 0.2);
 }
 
+/* Fan calibration in progress - control is locked meanwhile.
+   Magenta so it can't be mistaken for a temperature caution. */
+.status-indicator.calibrating {
+  background-color: color-mix(in srgb, var(--color-accent-magenta) 10%, transparent);
+  color: var(--color-accent-magenta);
+  border: 1px solid color-mix(in srgb, var(--color-accent-magenta) 45%, transparent);
+}
+
+/* Stall watchdog flag - commanded to spin but tach reads 0 */
+.status-indicator.stalled {
+  background-color: var(--temp-critical-bg);
+  color: var(--temp-critical-text);
+  border: 1px solid var(--temp-critical-border);
+}
+
+/* Health rungs of the fan badge ladder (exception-only: healthy fans show
+   their normal status). Crit uses the soft tint - red on red is not legible. */
+.status-indicator.health-warn {
+  background-color: var(--temp-caution-bg);
+  color: var(--temp-caution-text);
+  border: 1px solid var(--temp-caution-border);
+}
+.status-indicator.health-crit {
+  background-color: color-mix(in srgb, var(--color-error) 12%, transparent);
+  color: #FF7A70;
+  border: 1px solid color-mix(in srgb, var(--color-error) 50%, transparent);
+}
+[data-theme="light"] .status-indicator.health-crit { color: #C62828; }
+
 /* Profile Badges */
 .profile-badges {
   display: flex;

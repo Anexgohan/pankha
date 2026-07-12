@@ -308,6 +308,112 @@ export const updateSetting = async (key: string, value: string | number) => {
   return response.data;
 };
 
+// Fan calibration
+export interface FanCalibrationInfo {
+  status: "pending" | "running" | "done" | "failed" | "no_tach";
+  version: number;
+  calibrated_at: string | null;
+  // Health facts: the card badge computes the same verdict as the info panel
+  min_start: number | null;
+  min_stop: number | null;
+  max_rpm: number | null;
+  spin_up_ms: number | null;
+  healthy_max_rpm: number | null;
+  healthy_spin_up_ms: number | null;
+  healthy_low_confidence: boolean;
+  drift_10m: number | null;
+  drift_samples: number;
+  stall_count: number;
+  last_stall_at: string | null;
+  runs: number;
+}
+
+export interface SystemCalibrations {
+  protocol_version: number;
+  calibrations: Record<string, FanCalibrationInfo>; // keyed by fan hardware name
+}
+
+export const getSystemCalibrations = async (
+  systemId: number
+): Promise<SystemCalibrations> => {
+  const response = await api.get(`/api/systems/${systemId}/calibrations`);
+  return response.data;
+};
+
+export const calibrateFan = async (
+  systemId: number,
+  fanId: string // fan hardware name, or zone id to queue the whole zone
+): Promise<void> => {
+  await api.post(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/calibrate`
+  );
+};
+
+export interface FanCalibrationDetail {
+  fan_db_id: number;
+  fan_name: string;
+  zone_id: string | null;
+  status: FanCalibrationInfo["status"] | null;
+  min_start: number | null;
+  min_stop: number | null;
+  min_rpm: number | null;
+  max_rpm: number | null;
+  spin_up_ms: number | null;
+  spin_down_ms: number | null;
+  step_resolution: number | null;
+  response_curve: { duty: number; rpm: number }[] | null;
+  calibration_version: number | null;
+  calibrated_at: string | null;
+  speed_min_24h: number | null;
+  speed_max_24h: number | null;
+  // Healthy reference (per-metric best across sanity-passing history runs;
+  // low_confidence = anti-deadlock fallback over all runs) + sustained drift
+  healthy_max_rpm: number | null;
+  healthy_spin_up_ms: number | null;
+  healthy_min_start: number | null;
+  healthy_low_confidence: boolean;
+  drift_10m: number | null;
+  drift_samples: number;
+  stall_count: number;
+  last_stall_at: string | null;
+  protocol_version: number;
+  calibrating: boolean;
+}
+
+export interface FanCalibrationHistoryRun {
+  result: Record<string, unknown>;
+  calibrated_at: string;
+}
+
+export const getFanCalibration = async (
+  systemId: number,
+  fanId: string
+): Promise<FanCalibrationDetail> => {
+  const response = await api.get(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/calibration`
+  );
+  return response.data;
+};
+
+export const getFanCalibrationHistory = async (
+  systemId: number,
+  fanId: string
+): Promise<FanCalibrationHistoryRun[]> => {
+  const response = await api.get(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/calibration/history`
+  );
+  return response.data.history;
+};
+
+export const clearFanStalls = async (
+  systemId: number,
+  fanId: string
+): Promise<void> => {
+  await api.post(
+    `/api/systems/${systemId}/fans/${encodeURIComponent(fanId)}/stalls/clear`
+  );
+};
+
 // Fan Visibility
 export const updateFanVisibility = async (
   systemId: number,

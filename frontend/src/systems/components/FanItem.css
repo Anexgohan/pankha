@@ -1,0 +1,76 @@
+/* ===================================
+   FanItem - rack + full-height gauge
+
+   Rack mirrors .sensor-rack (SensorItem.css): outside the card,
+   wraps into a second column on overflow. The visibility button
+   reuses .rack-visibility from SensorItem.css.
+   =================================== */
+
+.fan-item-wrapper {
+  display: flex;
+  align-items: stretch;
+}
+
+.fan-item-wrapper .fan-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.fan-rack {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap-reverse;
+  align-content: flex-end;
+  justify-content: flex-start;
+  gap: var(--spacing-xss);
+  min-width: 32px;
+  padding-left: 3px;
+  margin-left: -6px;
+}
+
+/* Info + calibrate rack buttons - mirror .rack-visibility */
+.rack-info,
+.rack-calibrate {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* Explicit size: lucide svg in a flex button collapses on Firefox */
+.rack-info svg,
+.rack-calibrate svg {
+  width: 16px;
+  height: 16px;
+}
+
+.rack-info { color: var(--text-secondary); }
+
+.rack-info:hover,
+.rack-calibrate:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--color-accent-dynamic);
+  transform: translateX(-4px);
+  box-shadow: 0 0 15px -2px var(--color-accent-dynamic);
+  z-index: 2;
+}
+
+.rack-calibrate:disabled {
+  cursor: default;
+}
+
+/* Lifecycle state colors */
+.rack-calibrate.cal-pending { color: var(--text-tertiary); }
+.rack-calibrate.cal-running { color: var(--color-accent-magenta); }
+.rack-calibrate.cal-done { color: var(--color-success); }
+.rack-calibrate.cal-stale { color: var(--temp-caution-text); }
+.rack-calibrate.cal-failed { color: var(--color-error); }
+.rack-calibrate.cal-no_tach { color: var(--text-tertiary); opacity: 0.45; }

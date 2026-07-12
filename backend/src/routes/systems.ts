@@ -5,6 +5,7 @@ import { AgentManager } from "../services/AgentManager";
 import { CommandDispatcher } from "../services/CommandDispatcher";
 import { DataAggregator } from "../services/DataAggregator";
 import { FanProfileController } from "../services/FanProfileController";
+import { CalibrationService } from "../services/CalibrationService";
 import { WebSocketHub } from "../services/WebSocketHub";
 import { licenseManager } from "../license/LicenseManager";
 import UpdateDownloadService from "../services/UpdateDownloadService";
@@ -19,6 +20,8 @@ import {
   validEmergencyTemps,
   validUpdateIntervals,
 } from "../config/uiOptions";
+import { CALIBRATION_VERSION } from "../config/calibration";
+import { getHealthyReference, getHealthyReferences, HealthyReference } from "../utils/healthyReference";
 
 const router = Router();
 const db = Database.getInstance();
@@ -26,6 +29,7 @@ const agentManager = AgentManager.getInstance();
 const commandDispatcher = CommandDispatcher.getInstance();
 const dataAggregator = DataAggregator.getInstance();
 const fanProfileController = FanProfileController.getInstance();
+const calibrationService = CalibrationService.getInstance();
 const webSocketHub = WebSocketHub.getInstance();
 
 interface HistoryResponsePayload {
@@ -716,6 +720,13 @@ router.put("/:id/fans/:fanId", async (req: Request, res: Response) => {
       });
     }
 
+    // Calibration owns the fan for the duration
+    if (calibrationService.isCalibrating(system.agent_id, fanId)) {
+      return res.status(409).json({
+        error: "Fan is calibrating, manual control is disabled until complete",
+      });
+    }
+
     const result = await commandDispatcher.setFanSpeed(
       system.agent_id,
       fanId,
@@ -736,6 +747,247 @@ router.put("/:id/fans/:fanId", async (req: Request, res: Response) => {
     res.status(500).json({
       error: error instanceof Error ? error.message : "Failed to set fan speed",
     });
+  }
+});
+
+// GET /api/systems/:id/calibrations - Bulk calibration status for the rack icons.
+// Keyed by fan hardware name; version + protocol_version let the UI flag stale runs.
+router.get("/:id/calibrations", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+
+    // One query per system: current facts + stall aggregates; the healthy
+    // references come from one bulk lookup and drift from the control loop's
+    // in-memory ring - enough for the card badge to compute the same health
+    // verdict as the info panel, with no per-fan queries.
+    const rows = await db.all(
+      `SELECT f.id AS fan_db_id, f.fan_name, f.zone_id, s.agent_id,
+              cal.status, cal.calibration_version, cal.calibrated_at,
+              cal.min_start, cal.min_stop, cal.max_rpm, cal.spin_up_ms,
+              st.stall_count, st.last_stall_at
+       FROM fans f
+       JOIN systems s ON s.id = f.system_id
+       JOIN fan_calibrations cal ON cal.fan_id = f.id
+       LEFT JOIN (
+         SELECT fan_id, COUNT(*)::int AS stall_count, MAX(occurred_at) AS last_stall_at
+         FROM fan_stall_events GROUP BY fan_id
+       ) st ON st.fan_id = f.id
+       WHERE f.system_id = $1`,
+      [systemId]
+    );
+    const refs = await getHealthyReferences(db, rows.map((r) => r.fan_db_id));
+    const calibrations: Record<string, unknown> = {};
+    for (const r of rows) {
+      const entry = refs.get(r.fan_db_id);
+      const drift =
+        fanProfileController.getFanDrift(r.agent_id, r.fan_name) ??
+        (r.zone_id ? fanProfileController.getFanDrift(r.agent_id, r.zone_id) : null);
+      calibrations[r.fan_name] = {
+        status: r.status,
+        version: r.calibration_version ?? 0,
+        calibrated_at: r.calibrated_at,
+        min_start: r.min_start,
+        min_stop: r.min_stop,
+        max_rpm: r.max_rpm,
+        spin_up_ms: r.spin_up_ms,
+        healthy_max_rpm: entry?.ref?.max_rpm ?? null,
+        healthy_spin_up_ms: entry?.ref?.spin_up_ms ?? null,
+        healthy_low_confidence: entry?.ref?.low_confidence ?? false,
+        drift_10m: drift?.median ?? null,
+        drift_samples: drift?.samples ?? 0,
+        stall_count: r.stall_count ?? 0,
+        last_stall_at: r.last_stall_at ?? null,
+        runs: entry?.runs ?? 0,
+      };
+    }
+    res.json({ protocol_version: CALIBRATION_VERSION, calibrations });
+  } catch (error) {
+    log.error("Error fetching system calibrations:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch calibrations" });
+  }
+});
+
+// GET /api/systems/:id/fans/:fanId/calibration - Current calibration values
+router.get("/:id/fans/:fanId/calibration", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    const row = await db.get(
+      `SELECT f.id AS fan_db_id, f.fan_name, f.zone_id, cal.status, cal.min_start,
+              cal.min_stop, cal.min_rpm, cal.max_rpm, cal.spin_up_ms, cal.spin_down_ms,
+              cal.step_resolution, cal.response_curve, cal.calibration_version,
+              cal.calibrated_at
+       FROM fans f
+       LEFT JOIN fan_calibrations cal ON cal.fan_id = f.id
+       WHERE f.system_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2)
+       LIMIT 1`,
+      [systemId, fanId]
+    );
+    if (!row) {
+      return res.status(404).json({ error: "Fan not found" });
+    }
+
+    // Speed range actually commanded over the last 24h (info card row)
+    const range = await db.get(
+      `SELECT MIN(fan_speed) AS speed_min, MAX(fan_speed) AS speed_max
+       FROM monitoring_data
+       WHERE fan_id = $1 AND timestamp > NOW() - INTERVAL '24 hours'`,
+      [row.fan_db_id]
+    );
+
+    // Healthy reference: per-metric best across sanity-passing history runs
+    // at the current protocol; health compares against the fan's best self,
+    // never a degraded later run. Sustained drift: median over the control
+    // loop's in-memory ring (~10 min of at-target samples) - the card never
+    // judges on a single reading, and no telemetry query is needed.
+    const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
+    let healthy: HealthyReference | null = null;
+    let drift10m: { median: number; samples: number } | null = null;
+    if (row.status === "done") {
+      healthy = await getHealthyReference(db, row.fan_db_id);
+      if (system) {
+        drift10m =
+          fanProfileController.getFanDrift(system.agent_id, row.fan_name) ??
+          (row.zone_id ? fanProfileController.getFanDrift(system.agent_id, row.zone_id) : null);
+      }
+    }
+
+    // Stall log (user-clearable via POST .../stalls/clear)
+    const stalls = await db.get(
+      `SELECT COUNT(*)::int AS count, MAX(occurred_at) AS last
+       FROM fan_stall_events WHERE fan_id = $1`,
+      [row.fan_db_id]
+    );
+    res.json({
+      ...row,
+      speed_min_24h: range?.speed_min ?? null,
+      speed_max_24h: range?.speed_max ?? null,
+      healthy_max_rpm: healthy?.max_rpm ?? null,
+      healthy_spin_up_ms: healthy?.spin_up_ms ?? null,
+      healthy_min_start: healthy?.min_start ?? null,
+      healthy_low_confidence: healthy?.low_confidence ?? false,
+      drift_10m: drift10m?.median ?? null,
+      drift_samples: drift10m?.samples ?? 0,
+      stall_count: stalls?.count ?? 0,
+      last_stall_at: stalls?.last ?? null,
+      protocol_version: CALIBRATION_VERSION,
+      calibrating: system
+        ? calibrationService.isCalibrating(system.agent_id, fanId)
+        : false,
+    });
+  } catch (error) {
+    log.error("Error fetching fan calibration:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch fan calibration" });
+  }
+});
+
+// GET /api/systems/:id/fans/:fanId/calibration/history - Past runs (trends)
+router.get("/:id/fans/:fanId/calibration/history", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    // Current protocol only: older-version rows await the purge on this fan's
+    // next run and must not leak into run counts or trend gates.
+    const rows = await db.all(
+      `SELECT h.result, h.calibrated_at
+       FROM fan_calibration_history h
+       JOIN fans f ON h.fan_id = f.id
+       WHERE f.system_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2)
+         AND h.calibration_version = $3
+       ORDER BY h.calibrated_at DESC
+       LIMIT 50`,
+      [systemId, fanId, CALIBRATION_VERSION]
+    );
+    res.json({ history: rows });
+  } catch (error) {
+    log.error("Error fetching fan calibration history:", "systems", error);
+    res.status(500).json({ error: "Failed to fetch calibration history" });
+  }
+});
+
+// POST /api/systems/:id/fans/:fanId/calibrate - Manual (re)calibration trigger
+router.post("/:id/fans/:fanId/calibrate", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    if (isDemoMode()) {
+      return res.json(createDemoLockResponse("Calibration is locked in demo"));
+    }
+
+    const system = await db.get(
+      "SELECT agent_id, status FROM systems WHERE id = $1",
+      [systemId]
+    );
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+    if (system.status !== "online") {
+      return res.status(409).json({ error: "System is not online" });
+    }
+    if (!(await canControlSystem(system.agent_id))) {
+      return res.status(403).json({
+        error:
+          "System exceeds agent limit. Upgrade your plan to control this system.",
+        upgrade_required: true,
+      });
+    }
+    if (calibrationService.isCalibrating(system.agent_id, fanId)) {
+      return res.status(409).json({ error: "Fan is already calibrating" });
+    }
+
+    // Zone target queues every member fan (the zone is the atomic control unit)
+    const fans = await db.all(
+      `SELECT id FROM fans
+       WHERE system_id = $1 AND (fan_name = $2 OR zone_id = $2)
+         AND is_controllable = TRUE AND enabled = TRUE AND is_stale = FALSE`,
+      [systemId, fanId]
+    );
+    if (fans.length === 0) {
+      return res.status(404).json({ error: "No controllable fan found" });
+    }
+
+    calibrationService.enqueueFans(system.agent_id, fans.map((f: any) => f.id));
+    res.json({
+      message: "Calibration queued",
+      agent_id: system.agent_id,
+      fan_id: fanId,
+      fans_queued: fans.length,
+    });
+  } catch (error) {
+    log.error("Error triggering fan calibration:", "systems", error);
+    res.status(500).json({ error: "Failed to trigger calibration" });
+  }
+});
+
+// POST /api/systems/:id/fans/:fanId/stalls/clear - Reset the stall log after
+// the user fixed the cause; a still-stalled fan re-flags within the debounce.
+router.post("/:id/fans/:fanId/stalls/clear", async (req: Request, res: Response) => {
+  try {
+    const systemId = parseInt(req.params.id);
+    const fanId = req.params.fanId;
+
+    if (isDemoMode()) {
+      return res.json(createDemoLockResponse("Clearing stalls is locked in demo"));
+    }
+
+    const system = await db.get("SELECT agent_id FROM systems WHERE id = $1", [systemId]);
+    if (!system) {
+      return res.status(404).json({ error: "System not found" });
+    }
+
+    await db.run(
+      `DELETE FROM fan_stall_events
+       WHERE fan_id IN (SELECT id FROM fans WHERE system_id = $1 AND fan_name = $2)`,
+      [systemId, fanId]
+    );
+    fanProfileController.clearStall(system.agent_id, fanId);
+    res.json({ message: "Stall log cleared", fan_id: fanId });
+  } catch (error) {
+    log.error("Error clearing fan stalls:", "systems", error);
+    res.status(500).json({ error: "Failed to clear stalls" });
   }
 });
 
@@ -1832,6 +2084,7 @@ const ALLOWED_SETTINGS = [
   'accent_color',
   'hover_tint_color',
   'hardware_prune_days',
+  'fan_recalibration_days',
   'ui_font_primary',
   'ui_font_secondary',
   'ui_font_scale',
@@ -1905,6 +2158,8 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
     if (key === 'hub_log_level') {
       logger.setLogLevel(value.toString());
       log.info(`Hub log level changed to: ${logger.getLogLevelString()}`, "systems");
+    } else if (key === 'fan_recalibration_days') {
+      fanProfileController.setRecalibrationDays(parseInt(value.toString(), 10));
     } else {
       log.info(`Backend setting updated: ${key}=${value}`, "systems");
     }

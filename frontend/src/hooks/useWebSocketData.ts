@@ -51,6 +51,15 @@ export function subscribeToLicenseUpdated(
   };
 }
 
+// Fan calibration lifecycle pushed by the backend.
+// Nested agentId -> fanName -> status ('pending'|'running'|'done'|'failed'|'no_tach').
+// Per-agent slices keep identity stable for unaffected systems, so one
+// calibration event re-renders one SystemCard instead of the whole fleet.
+export type FanCalibrationMap = Record<string, Record<string, string>>;
+// Stalled fans (calibrated fan commanded above min_stop but tach reads 0),
+// nested agentId -> fanName -> true while stalled.
+export type StalledFanMap = Record<string, Record<string, boolean>>;
+
 interface UseWebSocketDataReturn {
   systems: SystemData[];
   isConnected: boolean;
@@ -60,6 +69,8 @@ interface UseWebSocketDataReturn {
   reconnect: () => void;
   removeSystem: (systemId: number) => void;
   overview: any | null;
+  fanCalibration: FanCalibrationMap;
+  stalledFans: StalledFanMap;
 }
 
 /**
@@ -80,6 +91,8 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const [overview, setOverview] = useState<any | null>(null);
+  const [fanCalibration, setFanCalibration] = useState<FanCalibrationMap>({});
+  const [stalledFans, setStalledFans] = useState<StalledFanMap>({});
 
   const wsRef = useRef<WebSocketService | null>(null);
   const mountedRef = useRef(true);
@@ -487,6 +500,45 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       for (const listener of licenseUpdatedListeners) listener();
     });
 
+    // Fan calibration lifecycle: one event per unit per state change.
+    // A zone unit carries every member fan in fanNames.
+    wsRef.current.on("fanCalibrationStatus", (data: unknown) => {
+      const event = data as {
+        agentId: string;
+        target: string;
+        fanNames: string[];
+        status: string;
+      };
+      if (!mountedRef.current) return;
+      setFanCalibration((prev) => {
+        // Rebuild only this agent's slice; other agents keep their reference
+        const slice = { ...prev[event.agentId] };
+        for (const name of [event.target, ...(event.fanNames ?? [])]) {
+          slice[name] = event.status;
+        }
+        return { ...prev, [event.agentId]: slice };
+      });
+    });
+
+    // Stall watchdog: detection-only flags from the backend
+    wsRef.current.on("fanStalled", (data: unknown) => {
+      const event = data as { agentId: string; fanId: string };
+      if (!mountedRef.current) return;
+      setStalledFans((prev) => ({
+        ...prev,
+        [event.agentId]: { ...prev[event.agentId], [event.fanId]: true },
+      }));
+    });
+    wsRef.current.on("fanStallCleared", (data: unknown) => {
+      const event = data as { agentId: string; fanId: string };
+      if (!mountedRef.current) return;
+      setStalledFans((prev) => {
+        const slice = { ...prev[event.agentId] };
+        delete slice[event.fanId];
+        return { ...prev, [event.agentId]: slice };
+      });
+    });
+
     // Connect
     wsRef.current
       .connect()
@@ -559,5 +611,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     reconnect: connect,
     removeSystem,
     overview,
+    fanCalibration,
+    stalledFans,
   };
 }

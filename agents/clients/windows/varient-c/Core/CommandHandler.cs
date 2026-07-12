@@ -42,6 +42,9 @@ public class CommandHandler
                 case "emergencyStop":
                     return await HandleEmergencyStopAsync(commandId);
 
+                case "restoreFanToAuto":
+                    return await HandleRestoreFanToAutoAsync(commandId, payload);
+
                 case "setUpdateInterval":
                     return await HandleSetUpdateIntervalAsync(commandId, payload);
 
@@ -114,6 +117,21 @@ public class CommandHandler
         await _hardwareMonitor.EmergencyStopAsync();
 
         return CreateSuccessResponse(commandId, new { message = "Emergency stop executed" });
+    }
+
+    private async Task<CommandResponse> HandleRestoreFanToAutoAsync(string commandId, Dictionary<string, object> payload)
+    {
+        // Releases control back to the driver - allowed even with fan control disabled
+        var fanId = GetPayloadValue<string>(payload, "fanId");
+        if (string.IsNullOrWhiteSpace(fanId))
+        {
+            return CreateErrorResponse(commandId, "Missing fanId in restoreFanToAuto command");
+        }
+
+        var handled = await _hardwareMonitor.RestoreFanToAutoAsync(fanId);
+        _logger.Debug("Restore fan {FanId} to driver auto (handled: {Handled})", fanId, handled);
+
+        return CreateSuccessResponse(commandId, new { fanId, handled });
     }
 
     private Task<CommandResponse> HandleSetUpdateIntervalAsync(string commandId, Dictionary<string, object> payload)

@@ -5,6 +5,8 @@ import { DataAggregator } from "./DataAggregator";
 import { AgentManager } from "./AgentManager";
 import { CommandDispatcher } from "./CommandDispatcher";
 import { AgentCommunication } from "./AgentCommunication";
+import { FanProfileController } from "./FanProfileController";
+import { CalibrationService } from "./CalibrationService";
 import { DeltaComputer } from "./DeltaComputer";
 import Database from "../database/database";
 import type { AggregatedSystemData } from "../types/aggregatedData";
@@ -216,6 +218,31 @@ export class WebSocketHub extends EventEmitter {
     this.agentManager.on("agentConfigUpdated", (event) => {
       // Broadcast config updates so frontend reflects changes immediately
       this.broadcast("agentConfigUpdated", event, [
+        `system:${event.agentId}`,
+        "systems:all",
+      ]);
+    });
+
+    // Stall watchdog events: calibrated fan commanded above min_stop
+    // but tach reads 0. Detection-only - frontend surfaces a stalled state.
+    const fanProfileController = FanProfileController.getInstance();
+    fanProfileController.on("fanStalled", (event) => {
+      this.broadcast("fanStalled", event, [
+        `system:${event.agentId}`,
+        "systems:all",
+      ]);
+    });
+    fanProfileController.on("fanStallCleared", (event) => {
+      this.broadcast("fanStallCleared", event, [
+        `system:${event.agentId}`,
+        "systems:all",
+      ]);
+    });
+
+    // Calibration lifecycle events: pending/running/done/failed/no_tach
+    const calibrationService = CalibrationService.getInstance();
+    calibrationService.on("fanCalibrationStatus", (event) => {
+      this.broadcast("fanCalibrationStatus", event, [
         `system:${event.agentId}`,
         "systems:all",
       ]);

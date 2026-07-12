@@ -36,6 +36,8 @@
   --color-accent-yellow-hover: #F9A825;
   --color-accent-purple: #7E57C2;
   --color-accent-purple-hover: #6A4BAA;
+  --color-accent-magenta: #EC407A;
+  --color-accent-magenta-hover: #D81B60;
   --color-accent-brown: #8D6E63;
   --color-accent-brown-hover: #6D4C41;
 
@@ -80,6 +82,10 @@
 
 /* Light Theme Color Overrides */
 [data-theme="light"] {
+  /* Accent overrides - magenta needs a darker shade on light surfaces */
+  --color-accent-magenta: #C2185B;
+  --color-accent-magenta-hover: #AD1457;
+
   /* Neutral Colors - Light Theme */
   --neutral-50: #ffffff;
   --neutral-100: #f4f4f5;

@@ -898,7 +898,7 @@ const Settings: React.FC = () => {
   const [copiedTarget, setCopiedTarget] = useState<'token' | 'account' | null>(null);
 
   // General Settings from Context
-  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel } = useDashboardSettings();
+  const { graphScale, updateGraphScale, dataRetentionDays, updateDataRetention, hardwarePruneDays, updateHardwarePruneDays, hubLogLevel, updateHubLogLevel, fanRecalDays, updateFanRecalDays } = useDashboardSettings();
   const [isCustomScale, setIsCustomScale] = useState(false);
   const [customScaleInput, setCustomScaleInput] = useState(graphScale.toString());
   const [isCustomRetention, setIsCustomRetention] = useState(false);
@@ -1022,6 +1022,21 @@ const Settings: React.FC = () => {
     { label: '7d', value: 7, tooltip: 'Clean up undetected fans after 7 days' },
     { label: '30d', value: 30, tooltip: 'Clean up undetected fans after 30 days' },
     { label: 'Never', value: 0, tooltip: 'Never auto-clean. Manage fan records manually' },
+  ];
+
+  // Fan recalibration ladder (days; 0 = manual only).
+  // label = open-menu text; data = closed-trigger text ("Every ...").
+  const recalIntervalOptions: SelectOption<number>[] = [
+    { value: 0, label: 'Manual only' },
+    { value: 1, label: '1 day', data: 'Every day' },
+    { value: 3, label: '3 days', data: 'Every 3 days' },
+    { value: 7, label: '7 days (default)', data: 'Every 7 days (default)' },
+    { value: 15, label: '15 days', data: 'Every 15 days' },
+    { value: 30, label: '30 days', data: 'Every 30 days' },
+    { value: 60, label: '2 months', data: 'Every 2 months' },
+    { value: 90, label: '3 months', data: 'Every 3 months' },
+    { value: 180, label: '6 months', data: 'Every 6 months' },
+    { value: 365, label: '1 year', data: 'Every year' },
   ];
 
   // Max retention allowed by license tier (from SST via API)
@@ -1710,6 +1725,28 @@ const Settings: React.FC = () => {
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Fan Recalibration Setting
+                  How often calibrated fans are automatically re-measured. */}
+              <div className="setting-item graph-scale-section">
+                <div className="setting-info-wrapper">
+                  <span className="setting-label">Fan Recalibration</span>
+                  <span className="setting-description">
+                    How often each fan is automatically re-measured to keep its speed curve accurate.
+                  </span>
+                </div>
+
+                <div className="scale-control-wrapper">
+                  <Select<number>
+                    className="recal-select"
+                    value={fanRecalDays}
+                    onChange={updateFanRecalDays}
+                    options={recalIntervalOptions}
+                    renderTrigger={(sel) => (sel ? ((sel.data as string) ?? sel.label) : null)}
+                    ariaLabel="Fan recalibration interval"
+                  />
                 </div>
               </div>
 

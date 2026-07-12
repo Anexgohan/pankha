@@ -25,6 +25,12 @@ import DeploymentPage from '../../deployment/components/DeploymentPage';
 
 type TabType = 'systems' | 'profiles' | 'deployment' | 'settings';
 
+// Stable empty slices for agents with no calibration/stall events yet.
+// Must be module-level: an inline `?? {}` would mint a new object per render
+// and re-render every card (the churn the per-agent slices exist to prevent).
+const EMPTY_CAL: Record<string, string> = {};
+const EMPTY_STALLS: Record<string, boolean> = {};
+
 const SystemsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('systems');
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
@@ -43,7 +49,9 @@ const SystemsPage: React.FC = () => {
     connectionState,
     error,
     reconnect,
-    removeSystem
+    removeSystem,
+    fanCalibration,
+    stalledFans
   } = useWebSocketData();
   const { isDemoMode } = useDemoMode();
 
@@ -303,6 +311,8 @@ const SystemsPage: React.FC = () => {
                   onToggleSensors={(expanded) => setExpandedSensors(prev => ({...prev, [system.id]: expanded}))}
                   onToggleFans={(expanded) => setExpandedFans(prev => ({...prev, [system.id]: expanded}))}
                   onToggleBmc={(expanded) => setExpandedBmc(prev => ({...prev, [system.id]: expanded}))}
+                  fanCalibration={fanCalibration[system.agent_id] ?? EMPTY_CAL}
+                  stalledFans={stalledFans[system.agent_id] ?? EMPTY_STALLS}
                 />
               ))
             )}

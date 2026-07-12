@@ -43,6 +43,13 @@ public interface IHardwareMonitor : IDisposable
     Task ResetAllToAutoAsync();
 
     /// <summary>
+    /// Hand one fan back to its driver's automatic curve (matches Rust agent).
+    /// Returns true if handled (NVIDIA GPU fans); false for fans with no
+    /// driver-auto mode to restore (motherboard/EC fans).
+    /// </summary>
+    Task<bool> RestoreFanToAutoAsync(string fanId);
+
+    /// <summary>
     /// Enter failsafe mode: GPU fans → auto, other fans → failsafe speed (70%)
     /// </summary>
     Task EnterFailsafeModeAsync();

@@ -70,6 +70,19 @@ impl super::client::WebSocketClient {
                     Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
                 }
             }
+            "restoreFanToAuto" => {
+                // Hand the fan back to its driver's own curve (NVML GPU fans).
+                // handled=false for sysfs fans (no driver-auto to restore).
+                // Allowed even with fan control disabled - it RELEASES control.
+                if let Some(fan_id) = payload.get("fanId").and_then(|v| v.as_str()) {
+                    match self.hardware_monitor.restore_fan_to_auto(fan_id).await {
+                        Ok(handled) => (true, None, serde_json::json!({"fanId": fan_id, "handled": handled})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing fanId in restoreFanToAuto command".to_string()), serde_json::json!({}))
+                }
+            }
             "setUpdateInterval" => {
                 if let Some(interval) = payload.get("interval").and_then(|v| v.as_f64()) {
                     match self.set_update_interval(interval).await {

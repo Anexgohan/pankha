@@ -18,7 +18,10 @@ import {
   updateFanVisibility,
   updateSensorOrder,
   updateSensorGroupOrder,
+  getSystemCalibrations,
+  calibrateFan,
 } from "../../services/api";
+import type { SystemCalibrations } from "../../services/api";
 import { useVisibility } from "../../contexts/VisibilityContext";
 import {
   getFanProfiles,
@@ -41,6 +44,7 @@ import { sortByOrder } from "../../utils/ordering";
 import { getFanDisplayName } from "../../utils/displayNames";
 import { getTemperatureClass, getFanRPMClass } from "../../utils/statusColors";
 import { formatTemperature, formatLastSeen, USER_TIMEZONE } from "../../utils/formatters";
+import { healthReport } from "../../utils/fanHealth";
 import { useDashboardSettings } from "../../contexts/DashboardSettingsContext";
 import {
   Loader2,
@@ -62,7 +66,8 @@ import {
 } from 'lucide-react';
 import { toast } from "../../utils/toast";
 import { InlineEdit } from "../../components/InlineEdit";
-import AnimatedFanIcon from "../../components/icons/AnimatedFanIcon";
+import FanItem from "./FanItem";
+import FanInfoCard from "./FanInfoCard";
 import { BulkEditPanel } from "./BulkEditPanel";
 import SensorBuilderModal from "./SensorBuilderModal";
 import ManageSensorsModal from "./ManageSensorsModal";
@@ -101,6 +106,10 @@ interface SystemCardProps {
   onToggleSensors: (expanded: boolean) => void;
   onToggleFans: (expanded: boolean) => void;
   onToggleBmc: (expanded: boolean) => void;
+  // This agent's slice of the WS calibration/stall maps, keyed by fan name.
+  // Identity changes only when THIS agent has an event (see useWebSocketData).
+  fanCalibration: Record<string, string>;
+  stalledFans: Record<string, boolean>;
 }
 
 const SystemCard: React.FC<SystemCardProps> = ({
@@ -114,9 +123,56 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onToggleSensors,
   onToggleFans,
   onToggleBmc,
+  fanCalibration,
+  stalledFans,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const { tempThresholds } = useDashboardSettings();
+
+  // Fan calibration/stall lookups. During calibration the backend
+  // owns the fan - controls are disabled and a Calibrating badge is shown.
+  // WS events win when present; the REST snapshot covers pages that loaded
+  // or reconnected mid-calibration and never saw the "running" event.
+  const isFanCalibrating = (fanId: string) => {
+    const ws = fanCalibration[fanId];
+    if (ws !== undefined) return ws === "running";
+    return calSnapshot?.calibrations[fanId]?.status === "running";
+  };
+  const isFanStalled = (fanId: string) => !!stalledFans[fanId];
+
+  // Calibration snapshot for the rack icons + health badge (facts per fan).
+  // Refetched whenever a WS calibration event lands, plus a slow periodic
+  // refresh so drift-based health verdicts stay current between events.
+  const [calSnapshot, setCalSnapshot] = useState<SystemCalibrations | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchSnap = () =>
+      getSystemCalibrations(system.id)
+        .then((snap) => {
+          if (!cancelled) setCalSnapshot(snap);
+        })
+        .catch(() => {
+          // icons fall back to "pending"; next WS event or tick retries
+        });
+    fetchSnap();
+    const timer = setInterval(fetchSnap, 5 * 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [system.id, fanCalibration]);
+
+  // Health rung of the fan badge ladder: same engine as the info panel,
+  // exception-only (healthy fans keep their normal badge).
+  const fanHealthBadge = (fanId: string) => {
+    const info = calSnapshot?.calibrations[fanId];
+    if (!info) return null;
+    const report = healthReport(info, info.runs ?? 0, isFanStalled(fanId));
+    if (report.verdict !== "attention" && report.verdict !== "problem") return null;
+    const want = report.verdict === "problem" ? "crit" : "warn";
+    const line = report.lines.find((l) => l.state === want) ?? report.lines.find((l) => l.state === "warn");
+    return { verdict: report.verdict, text: line?.text ?? "" };
+  };
   const [agentInterval, setAgentInterval] = useState<number>(
     system.current_update_interval ?? getDefault<number>('updateInterval')
   );
@@ -154,6 +210,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
   >({});
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  // Fan whose info card is open (null = closed; the card unmounts entirely)
+  const [infoFanId, setInfoFanId] = useState<string | null>(null);
   const [isCardInView, setIsCardInView] = useState(true);
   const [stagedBmcProfileId, setStagedBmcProfileId] = useState<string | null>(
     system.profile_id ?? null
@@ -217,6 +275,13 @@ const SystemCard: React.FC<SystemCardProps> = ({
       setAnchorRect(cardRef.current.getBoundingClientRect());
     }
     setIsBulkEditOpen(true);
+  };
+
+  const handleOpenFanInfo = (fanId: string) => {
+    if (cardRef.current) {
+      setAnchorRect(cardRef.current.getBoundingClientRect());
+    }
+    setInfoFanId(fanId);
   };
 
   const {
@@ -1110,6 +1175,31 @@ const SystemCard: React.FC<SystemCardProps> = ({
     ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
     : "This system exceeds your license limit. Upgrade to control this agent. You can still view data.";
 
+  // Manual (re)calibration from the rack icon. A zone member
+  // targets its zone id - the backend queues every member fan (atomic unit).
+  const handleCalibrateFan = async (fan: FanReading) => {
+    const target = fan.zone ?? fan.id;
+    const label = fan.zone
+      ? formatZoneName(fan.zone)
+      : getFanDisplayName(fan.id, fan.name, fan.label);
+    const scope = fan.zone ? "every fan in the zone" : "the fan";
+    if (
+      !window.confirm(
+        `Recalibrate ${label}?\n\nDuring the run ${scope} sweeps through its full speed range (including brief stops) and manual control stays locked until it completes.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await calibrateFan(system.id, target);
+      toast.success(`Calibration queued for ${label}`);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to queue calibration"
+      );
+    }
+  };
+
   // Context for tooltip interpolation
   const tooltipContext = {
     logLevel,
@@ -1746,107 +1836,36 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         </span>
                       </div>
 
-                      {/* Zone member fans - metrics only */}
-                      {(showHidden ? zoneFans : visibleZoneFans).map(fan => {
-                        const rpmDecreasing = fanRpmStateRef.current[fan.id]?.decreasing ?? false;
-                        const flowDir = fan.rpm === 0 ? '' : rpmDecreasing ? 'ccw' : 'cw';
-
-                        let speedClass: string;
-                        if (fan.speed > 95) speedClass = 'critical';
-                        else if (fan.speed > 75) speedClass = 'warning';
-                        else if (rpmDecreasing) speedClass = 'caution';
-                        else speedClass = 'normal';
-
-                        const ringColor = `var(--temp-${speedClass}-border)`;
-                        const circumference = 2 * Math.PI * 25;
-                        const dashOffset = circumference * (1 - fan.speed / 100);
-
-                        return (
-                          <div key={fan.id} className={`fan-item zone-member ${isFanHidden(fan.id) || fan.isHidden ? 'fan-hidden' : ''}`}>
-                            <div className="fan-header">
-                              <div className="fan-info">
-                                <div className="fan-title">
-                                  <span className="fan-icon">
-                                    <AnimatedFanIcon size={28} speed={fan.speed} />
-                                  </span>
-                                  <div className="fan-name">
-                                    <InlineEdit
-                                      value={getFanDisplayName(fan.id, fan.name, fan.label)}
-                                      hardwareId={fan.id}
-                                      onSave={async (newLabel) => {
-                                        if (!fan.dbId) throw new Error("Fan not registered in database");
-                                        await updateFanLabel(system.id, fan.dbId, newLabel);
-                                        onUpdate();
-                                      }}
-                                      className="fan-name-edit"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="fan-metrics">
-                                  <span className="fan-rpm">{fan.rpm} RPM</span>
-                                  <span className={`status-indicator ${fan.status}`}>
-                                    {fan.status}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <button
-                                className="fan-visibility-toggle"
-                                onClick={() => handleToggleFanVisibility(fan.id, fan.dbId)}
-                                title={isFanHidden(fan.id) ? "Show fan" : "Hide fan"}
-                              >
-                                {isFanHidden(fan.id) ? (
-                                  <img src="/icons/toggle-off-01.png" width={18} height={18} alt="Hidden" />
-                                ) : (
-                                  <img src="/icons/toggle-on-01.png" width={18} height={18} alt="Visible" />
-                                )}
-                              </button>
-
-                              <div className="speed-display">
-                                <div className="speed-circle">
-                                  <svg width="60" height="60" className="speed-gauge">
-                                    <circle cx="30" cy="30" r="25" fill="none" className="speed-track" strokeWidth="5" />
-                                    <circle
-                                      cx="30" cy="30" r="25" fill="none"
-                                      stroke={ringColor} strokeWidth="5"
-                                      strokeDasharray={`${circumference}`}
-                                      strokeDashoffset={`${dashOffset}`}
-                                      transform="rotate(-90 30 30)"
-                                    />
-                                  </svg>
-                                  {flowDir && (
-                                    <div
-                                      className="speed-flow-mask"
-                                      style={{ '--arc-deg': `${fan.speed * 3.6}deg` } as React.CSSProperties}
-                                    >
-                                      <div className={`speed-flow-pattern flow-${flowDir}`}>
-                                        <svg viewBox="0 0 60 60" width="60" height="60">
-                                          {Array.from({ length: 16 }, (_, i) => (
-                                            <polygon
-                                              key={i}
-                                              points={flowDir === 'cw' ? '27,2.5 33,5 27,7.5' : '33,2.5 27,5 33,7.5'}
-                                              fill="var(--speed-flow-color)"
-                                              opacity="0.35"
-                                              transform={`rotate(${i * 22.5}, 30, 30)`}
-                                            />
-                                          ))}
-                                        </svg>
-                                      </div>
-                                    </div>
-                                  )}
-                                  <span className="speed-value" style={{ color: ringColor }}>{fan.speed}%</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {/* Zone member fans - metrics only; calibrate targets the whole zone */}
+                      {(showHidden ? zoneFans : visibleZoneFans).map(fan => (
+                        <FanItem
+                          key={fan.id}
+                          fan={fan}
+                          hidden={isFanHidden(fan.id) || !!fan.isHidden}
+                          zoneMember
+                          rpmDecreasing={fanRpmStateRef.current[fan.id]?.decreasing ?? false}
+                          calibrating={isFanCalibrating(fan.id)}
+                          stalled={isFanStalled(fan.id)}
+                          health={fanHealthBadge(fan.id)}
+                          calInfo={calSnapshot?.calibrations[fan.id]}
+                          protocolVersion={calSnapshot?.protocol_version ?? 0}
+                          controlsLocked={system.status !== "online" || isReadOnly}
+                          onSaveLabel={async (newLabel) => {
+                            if (!fan.dbId) throw new Error("Fan not registered in database");
+                            await updateFanLabel(system.id, fan.dbId, newLabel);
+                            onUpdate();
+                          }}
+                          onToggleVisibility={() => handleToggleFanVisibility(fan.id, fan.dbId)}
+                          onCalibrate={() => void handleCalibrateFan(fan)}
+                          onInfo={() => handleOpenFanInfo(fan.id)}
+                        />
+                      ))}
 
                       {/* Zone-level controls (shared by all fans in zone) */}
                       <div className="fan-controls zone-controls">
                         {/* Sensor Selection Dropdown */}
                         <div className="fan-control-row">
-                          <label className="control-label">Control Sensor:</label>
+                          <label className="control-label" title="Select the Control Sensor whose temperature drives this fan.">Sensor:</label>
                           {/* Control Sensor (Design1 <Select>) - grouped
                             * Virtual / Groups / Sensors options with search;
                             * name + temp on the trigger and on every open
@@ -1862,7 +1881,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             renderOption={renderSensorOption}
                             searchable
                             menuMaxHeight={320}
-                            disabled={system.status !== "online" || isReadOnly}
+                            disabled={system.status !== "online" || isReadOnly || zoneFans.some(f => isFanCalibrating(f.id))}
                             ariaLabel="Control Sensor"
                             className="sensor-select"
                           />
@@ -1879,7 +1898,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                          * (A-Z), via headerless + labeled option groups.
                          */}
                         <div className="fan-control-row">
-                          <label className="control-label">Fan Profile:</label>
+                          <label className="control-label" title="Select the Fan Profile that sets this fan's speed curve.">Profile:</label>
                           <Select
                             value={selectedProfiles[representativeFan.id] ?? NO_PROFILE}
                             onChange={(profileId) => {
@@ -1903,7 +1922,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                             disabled={
                               loading === zoneLoadingKey ||
                               system.status !== "online" ||
-                              isReadOnly
+                              isReadOnly ||
+                              zoneFans.some(f => isFanCalibrating(f.id))
                             }
                             ariaLabel="Fan Profile"
                             className="fan-profile-select"
@@ -1922,129 +1942,32 @@ const SystemCard: React.FC<SystemCardProps> = ({
               {!system.current_fan_speeds.some((f: FanReading) => f.zone) && system.current_fan_speeds
                 .filter((fan: FanReading) => showHidden || (!isFanHidden(fan.id) && !fan.isHidden))
                 .map((fan: FanReading) => (
-                <div key={fan.id} className={`fan-item ${isFanHidden(fan.id) || fan.isHidden ? 'fan-hidden' : ''}`}>
-                  <div className="fan-header">
-                    <div className="fan-info">
-                      <div className="fan-title">
-                        <span className="fan-icon">
-                          {/* Uses Web Animations API for jerk-free speed changes */}
-                          <AnimatedFanIcon size={28} speed={fan.speed} />
-                        </span>
-                        <div className="fan-name">
-                          <InlineEdit
-                            value={getFanDisplayName(
-                              fan.id,
-                              fan.name,
-                              fan.label
-                            )}
-                            hardwareId={fan.id}
-                            onSave={async (newLabel) => {
-                              if (!fan.dbId) {
-                                throw new Error(
-                                  "Fan not registered in database"
-                                );
-                              }
-                              await updateFanLabel(
-                                system.id,
-                                fan.dbId,
-                                newLabel
-                              );
-                              onUpdate();
-                            }}
-                            className="fan-name-edit"
-                          />
-                        </div>
-                      </div>
-                      <div className="fan-metrics">
-                        <span className="fan-rpm">{fan.rpm} RPM</span>
-                        <span className={`status-indicator ${fan.status}`}>
-                          {fan.status}
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      className="fan-visibility-toggle"
-                      onClick={() => handleToggleFanVisibility(fan.id, fan.dbId)}
-                      title={isFanHidden(fan.id) ? "Show fan" : "Hide fan"}
-                    >
-                      {isFanHidden(fan.id) ? (
-                        <img src="/icons/toggle-off-01.png" width={18} height={18} alt="Hidden" />
-                      ) : (
-                        <img src="/icons/toggle-on-01.png" width={18} height={18} alt="Visible" />
-                      )}
-                    </button>
-
-                    {(() => {
-                      const rpmDecreasing = fanRpmStateRef.current[fan.id]?.decreasing ?? false;
-                      const flowDir = fan.rpm === 0 ? '' : rpmDecreasing ? 'ccw' : 'cw';
-
-                      let speedClass: string;
-                      if (fan.speed > 95) speedClass = 'critical';
-                      else if (fan.speed > 75) speedClass = 'warning';
-                      else if (rpmDecreasing) speedClass = 'caution';
-                      else speedClass = 'normal';
-
-                      const ringColor = `var(--temp-${speedClass}-border)`;
-
-                      const circumference = 2 * Math.PI * 25;
-                      const dashOffset = circumference * (1 - fan.speed / 100);
-
-                      return (
-                        <div className="speed-display">
-                          <div className="speed-circle">
-                            <svg width="60" height="60" className="speed-gauge">
-                              <circle
-                                cx="30"
-                                cy="30"
-                                r="25"
-                                fill="none"
-                                className="speed-track"
-                                strokeWidth="5"
-                              />
-                              <circle
-                                cx="30"
-                                cy="30"
-                                r="25"
-                                fill="none"
-                                stroke={ringColor}
-                                strokeWidth="5"
-                                strokeDasharray={`${circumference}`}
-                                strokeDashoffset={`${dashOffset}`}
-                                transform="rotate(-90 30 30)"
-                              />
-                            </svg>
-                            {flowDir && (
-                              <div
-                                className="speed-flow-mask"
-                                style={{ '--arc-deg': `${fan.speed * 3.6}deg` } as React.CSSProperties}
-                              >
-                                <div className={`speed-flow-pattern flow-${flowDir}`}>
-                                  <svg viewBox="0 0 60 60" width="60" height="60">
-                                    {Array.from({ length: 16 }, (_, i) => (
-                                      <polygon
-                                        key={i}
-                                        points={flowDir === 'cw' ? '27,2.5 33,5 27,7.5' : '33,2.5 27,5 33,7.5'}
-                                        fill="var(--speed-flow-color)"
-                                        opacity="0.35"
-                                        transform={`rotate(${i * 22.5}, 30, 30)`}
-                                      />
-                                    ))}
-                                  </svg>
-                                </div>
-                              </div>
-                            )}
-                            <span className="speed-value" style={{ color: ringColor }}>{fan.speed}%</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
+                <FanItem
+                  key={fan.id}
+                  fan={fan}
+                  hidden={isFanHidden(fan.id) || !!fan.isHidden}
+                  rpmDecreasing={fanRpmStateRef.current[fan.id]?.decreasing ?? false}
+                  calibrating={isFanCalibrating(fan.id)}
+                  stalled={isFanStalled(fan.id)}
+                  health={fanHealthBadge(fan.id)}
+                  calInfo={calSnapshot?.calibrations[fan.id]}
+                  protocolVersion={calSnapshot?.protocol_version ?? 0}
+                  controlsLocked={system.status !== "online" || isReadOnly}
+                  onSaveLabel={async (newLabel) => {
+                    if (!fan.dbId) {
+                      throw new Error("Fan not registered in database");
+                    }
+                    await updateFanLabel(system.id, fan.dbId, newLabel);
+                    onUpdate();
+                  }}
+                  onToggleVisibility={() => handleToggleFanVisibility(fan.id, fan.dbId)}
+                  onCalibrate={() => void handleCalibrateFan(fan)}
+                  onInfo={() => handleOpenFanInfo(fan.id)}
+                >
                   <div className="fan-controls">
                     {/* Sensor Selection Dropdown */}
                     <div className="fan-control-row">
-                      <label className="control-label">Control Sensor:</label>
+                      <label className="control-label" title="Select the Control Sensor whose temperature drives this fan.">Sensor:</label>
                       {/* Control Sensor (Design1 <Select>) - mirror of the
                         * zone-level dropdown above; same shared options,
                         * search, and renderers. */}
@@ -2088,7 +2011,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         renderOption={renderSensorOption}
                         searchable
                         menuMaxHeight={320}
-                        disabled={system.status !== "online" || isReadOnly}
+                        disabled={system.status !== "online" || isReadOnly || isFanCalibrating(fan.id)}
                         ariaLabel="Control Sensor"
                         className="sensor-select"
                       />
@@ -2098,7 +2021,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                      * mirror of the zone-level dropdown above; see that
                      * comment block for the design rationale. */}
                     <div className="fan-control-row">
-                      <label className="control-label">Fan Profile:</label>
+                      <label className="control-label" title="Select the Fan Profile that sets this fan's speed curve.">Profile:</label>
                       <Select
                         value={selectedProfiles[fan.id] ?? NO_PROFILE}
                         onChange={(profileId) => {
@@ -2123,7 +2046,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
                         disabled={
                           loading === `fan-profile-${fan.id}` ||
                           system.status !== "online" ||
-                          isReadOnly
+                          isReadOnly ||
+                          isFanCalibrating(fan.id)
                         }
                         ariaLabel="Fan Profile"
                         className="fan-profile-select"
@@ -2133,7 +2057,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                       )}
                     </div>
                   </div>
-                </div>
+                </FanItem>
               ))}
             </div>
           )}
@@ -2202,6 +2126,45 @@ const SystemCard: React.FC<SystemCardProps> = ({
             <p>System may be offline or not sending data</p>
           </div>
         )}
+
+      {/* Fan Info Card - only mounted while a fan's info is open */}
+      {(() => {
+        const infoFan = infoFanId
+          ? system.current_fan_speeds?.find((f: FanReading) => f.id === infoFanId)
+          : undefined;
+        if (!infoFan) return null;
+        return (
+          <FanInfoCard
+            fan={infoFan}
+            fanDisplayName={getFanDisplayName(infoFan.id, infoFan.name, infoFan.label)}
+            systemId={system.id}
+            systemName={system.name}
+            stalled={isFanStalled(infoFan.id)}
+            isOpen
+            anchorRect={anchorRect}
+            onClose={() => setInfoFanId(null)}
+            onStallsCleared={(fanId) =>
+              // Patch the badge's snapshot in place - the outcome is known
+              // (backend deleted the rows); the 5-min tick stays the backstop
+              setCalSnapshot((s) =>
+                s && s.calibrations[fanId]
+                  ? {
+                      ...s,
+                      calibrations: {
+                        ...s.calibrations,
+                        [fanId]: {
+                          ...s.calibrations[fanId],
+                          stall_count: 0,
+                          last_stall_at: null,
+                        },
+                      },
+                    }
+                  : s
+              )
+            }
+          />
+        );
+      })()}
 
       {/* Bulk Edit Panel */}
       <BulkEditPanel
@@ -2288,6 +2251,9 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.expandedSensors === nextProps.expandedSensors &&
     prevProps.expandedFans === nextProps.expandedFans &&
     prevProps.expandedBmc === nextProps.expandedBmc &&
-    prevProps.isDemoMode === nextProps.isDemoMode
+    prevProps.isDemoMode === nextProps.isDemoMode &&
+    // Calibration/stall maps - new object reference on every event
+    prevProps.fanCalibration === nextProps.fanCalibration &&
+    prevProps.stalledFans === nextProps.stalledFans
   );
 });

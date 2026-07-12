@@ -1171,6 +1171,15 @@
   color: var(--color-error);
 }
 
+/* Backend Settings recalibration dropdown */
+.pk-select-trigger.recal-select {
+  width: 180px;
+  padding: 6px 10px;
+  padding-right: 24px;
+  border-radius: var(--radius-md);
+  font-family: var(--font-primary);
+}
+
 /* Design0 footprint parity (task_12); hover/focus come from the pk baseline */
 .pk-select-trigger.font-select {
   width: 100%;

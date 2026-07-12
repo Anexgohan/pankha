@@ -339,7 +339,8 @@
 
 .fan-name-edit .inline-edit-icon {
   position: absolute;
-  right: 68px;
+  /* clear the gauge, whose diameter tracks the header height */
+  right: calc(var(--gauge-size, 60px) + 8px);
   top: 0;
   z-index: 1;
 }
@@ -353,30 +354,7 @@
   opacity: 1;
 }
 
-/* Fan visibility toggle - positioned below edit icon, left of speed-display */
-.fan-visibility-toggle {
-  position: absolute;
-  right: 68px;
-  top: 20px;
-  z-index: 1;
-  opacity: 0;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: opacity 0.2s;
-}
-
-.fan-item:hover .fan-visibility-toggle {
-  opacity: 0.75;
-}
-
-.fan-item:hover .fan-visibility-toggle:hover {
-  opacity: 1;
-}
+/* Fan visibility toggle moved to the fan rack - see FanItem.css */
 
 /* Fan hidden state - mirrors sensor-hidden pattern */
 .fan-item.fan-hidden {
@@ -483,6 +461,9 @@
   transition: stroke 0.3s ease;
 }
 
+/* Mask stops here fit the legacy fixed 60x60 gauge. The gauge SVG (ring +
+   arrow pattern) is generated in code - FanItem.tsx, "Speed gauge" block -
+   which sizes to the header and overrides these stops with inline values. */
 .speed-flow-mask {
   position: absolute;
   inset: 0;
@@ -548,7 +529,8 @@
   font-size: var(--font-size-sm2);
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
-  min-width: 100px;
+  /* Short labels (Sensor:/Profile:) - width freed for the select's rest text */
+  min-width: 60px;
   flex-shrink: 0;
 }
 

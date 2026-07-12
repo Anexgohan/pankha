@@ -1,9 +1,13 @@
+import { EventEmitter } from 'events';
 import Database from '../database/database';
 import { DataAggregator } from './DataAggregator';
 import { CommandDispatcher } from './CommandDispatcher';
 import { AgentManager } from './AgentManager';
 import { log } from '../utils/logger';
 import { deriveChipName } from '../utils/sensorUtils';
+import { CALIBRATION_VERSION } from '../config/calibration';
+import { getHealthyReference, HealthyReference } from '../utils/healthyReference';
+import { expectedRpm } from '../utils/fanCurve';
 
 interface FanAssignment {
   assignment_id: number;
@@ -19,6 +23,12 @@ interface FanAssignment {
   fan_max_speed: number;
   profile_name: string;
   sensor_name: string | null;
+  // Calibration facts (LEFT JOIN fan_calibrations; null until calibrated)
+  cal_status: string | null;
+  cal_min_start: number | null;
+  cal_min_stop: number | null;
+  cal_version: number | null;
+  cal_calibrated_at: string | Date | null;
 }
 
 interface CurvePoint {
@@ -28,7 +38,33 @@ interface CurvePoint {
 
 // Re-assert tolerance (% points of duty). Ignore gaps this small (pwm<->percent
 // rounding + noise); real external-controller drags are far larger.
-const REASSERT_TOLERANCE_PERCENT = 5;
+// Exported: CalibrationService's echo guard uses the same divergence rule.
+export const REASSERT_TOLERANCE_PERCENT = 5;
+
+// Stall watchdog: consecutive at-target ticks with rpm 0 before declaring a stall.
+const STALL_DEBOUNCE_TICKS = 3;
+
+// Overperformance watchdog: sustained rpm above the healthy reference means
+// the reference is stale (fan cleaned or replaced) - queue a re-measure.
+const OVERPERF_FACTOR = 1.05;   // live rpm must exceed healthy max_rpm x this
+const OVERPERF_TICKS = 10;      // consecutive at-target ticks required...
+const OVERPERF_FLOOR_MS = 20000; // ...spanning at least this much wall clock
+
+// Drift ring: at-target drift samples for the health view, ~10 minutes at the
+// default tick rate. Median over the ring = "running as expected", in memory.
+const DRIFT_RING_SIZE = 200;
+
+// Failed-calibration retry ladder: waits between automatic re-attempts (the
+// consent trigger only reaches fans in live telemetry, so an offline system
+// retries when next seen). After the last rung the fan waits a full
+// recalibration interval - or the next backend start, as this is in-memory.
+const FAILED_RETRY_BACKOFF_MS = [
+  5 * 60_000,      // 5 min
+  15 * 60_000,     // 15 min
+  45 * 60_000,     // 45 min
+  2 * 3_600_000,   // 2 h
+  6 * 3_600_000,   // 6 h
+];
 
 // Median of a non-empty array (even length -> mean of the two middle values).
 function median(values: number[]): number {
@@ -45,7 +81,7 @@ function median(values: number[]): number {
  *
  * Based on the logic from /root/anex/proxmox/misc-scripts/fan-control/fan_control.py
  */
-export class FanProfileController {
+export class FanProfileController extends EventEmitter {
   private static instance: FanProfileController;
   private db: Database;
   private dataAggregator: DataAggregator;
@@ -71,11 +107,43 @@ export class FanProfileController {
   private lastSpeedChangeTime: Map<string, number> = new Map();
   private lastTargetSpeeds: Map<string, number> = new Map(); // Track target speed for hysteresis
 
+  // Zero-snap state (calibrated fans only): which side of the dead zone the
+  // fan was last snapped to. Sticky band prevents start/stop flapping.
+  private snapState: Map<string, 'stopped' | 'spinning'> = new Map();
+
+  // Stall watchdog state (calibrated fans with a working tach only)
+  private stallTicks: Map<string, number> = new Map();   // consecutive rpm-0 ticks at target
+  private stalledFans: Set<string> = new Set();          // currently flagged as stalled
+  private tachSeen: Set<string> = new Set();             // fanKey has reported rpm > 0 at least once
+
+  // Health facts cache (calibrated fans only): healthy reference + response
+  // curve, loaded lazily, invalidated when a calibration run finishes.
+  private healthRefCache: Map<string, { healthy: HealthyReference | null; curve: { duty: number; rpm: number }[] | null }> = new Map();
+  private healthRefLoading: Set<string> = new Set();               // fanKeys mid-load
+  private driftRings: Map<string, number[]> = new Map();           // fanKey -> at-target drift % samples
+
+  // Overperformance watchdog state (calibrated fans only)
+  private overperfTicks: Map<string, number> = new Map();          // consecutive over-threshold ticks
+  private overperfSince: Map<string, number> = new Map();          // first over-threshold timestamp
+  private overperfFlagged: Set<string> = new Set();                // re-measure already requested
+
+  // Failed-calibration retry ladder (fanKey -> attempts + earliest next try)
+  private failedRetries: Map<string, { count: number; nextAt: number }> = new Map();
+
+  // Fans locked by an active calibration run - skipped by the control loop.
+  // Managed by CalibrationService via setFanCalibrating().
+  private calibratingFans: Set<string> = new Set();
+
+  // Days between automatic recalibrations (0 = manual only). Loaded from
+  // backend_settings at start; updated live by the settings route.
+  private recalibrationDays = 7;
+
   // Virtual sensor defs for the current control tick (id -> {operation, member dbIds}).
   // Rebuilt fresh each tick from the DB, like the curve-points batch - no cache to invalidate.
   private virtualDefs: Map<number, { operation: 'max' | 'avg' | 'median'; memberDbIds: number[] }> = new Map();
 
   private constructor() {
+    super();
     this.db = Database.getInstance();
     this.dataAggregator = DataAggregator.getInstance();
     this.commandDispatcher = CommandDispatcher.getInstance();
@@ -146,6 +214,75 @@ export class FanProfileController {
   }
 
   /**
+   * Zero-snap for calibrated fans (dead-zone compensation).
+   *
+   * Fans cannot sustain rotation below max(min_start, min_stop) - the floor.
+   * Targets inside the dead zone snap to the NEAREST of {0, floor} around
+   * midpoint (floor / 2), with a sticky band equal to the agent's hysteresis
+   * value (as duty points) to prevent start/stop flapping at the midpoint:
+   *   - stopped fan starts only when target >= midpoint + band
+   *   - spinning fan stops only when target <= midpoint - band
+   * An explicit target of 0 is always honored. Uncalibrated / no_tach fans
+   * pass through unchanged (today's behavior).
+   */
+  private applyZeroSnap(
+    fanKey: string,
+    agentId: string,
+    commandTarget: string,
+    target: number,
+    calStatus: string | null,
+    calMinStart: number | null,
+    calMinStop: number | null
+  ): number {
+    // Snap floor = max(min_start, min_stop): start-transient artifacts can
+    // measure min_start BELOW min_stop, and snapping up to a duty that cannot
+    // sustain rotation would stall the fan.
+    const floor = Math.max(calMinStart ?? 0, calMinStop ?? 0);
+    if (calStatus !== 'done' || floor <= 0) {
+      return target; // not calibrated (or no dead zone measured)
+    }
+
+    if (target === 0) {
+      this.snapState.set(fanKey, 'stopped'); // explicit stop is a real request
+      return 0;
+    }
+    if (target >= floor) {
+      this.snapState.set(fanKey, 'spinning'); // achievable duty, no snap needed
+      return target;
+    }
+
+    // Dead zone: closest-match with sticky band
+    const midpoint = floor / 2;
+    const band = this.agentManager.getAgentHysteresis(agentId); // duty points (design D5)
+
+    let state = this.snapState.get(fanKey);
+    if (state === undefined) {
+      // Seed from reported RPM (ground truth); unknown -> 'stopped' so the
+      // first decision can only err toward spinning (cooling-safe).
+      const rpm = this.dataAggregator.getSystemData(agentId)?.fans
+        ?.find(f => f.id === commandTarget || f.zone === commandTarget)?.rpm;
+      state = rpm && rpm > 0 ? 'spinning' : 'stopped';
+      this.snapState.set(fanKey, state);
+    }
+
+    if (state === 'stopped') {
+      if (target >= midpoint + band) {
+        this.snapState.set(fanKey, 'spinning');
+        log.debug(`Zero-snap: fan ${commandTarget} target ${target}% in dead zone, snapping UP to ${floor}%`, 'FanProfileController');
+        return floor;
+      }
+      return 0;
+    } else {
+      if (target <= midpoint - band) {
+        this.snapState.set(fanKey, 'stopped');
+        log.debug(`Zero-snap: fan ${commandTarget} target ${target}% in dead zone, snapping DOWN to 0%`, 'FanProfileController');
+        return 0;
+      }
+      return floor; // hold spinning at the floor
+    }
+  }
+
+  /**
    * Get all active fan profile assignments with related data
    */
   private async getActiveFanAssignments(): Promise<FanAssignment[]> {
@@ -165,13 +302,19 @@ export class FanProfileController {
           f.min_speed as fan_min_speed,
           f.max_speed as fan_max_speed,
           fp.profile_name,
-          sens.sensor_name
+          sens.sensor_name,
+          cal.status AS cal_status,
+          cal.min_start AS cal_min_start,
+          cal.min_stop AS cal_min_stop,
+          cal.calibration_version AS cal_version,
+          cal.calibrated_at AS cal_calibrated_at
         FROM fan_profile_assignments fpa
         JOIN fans f ON fpa.fan_id = f.id
         JOIN fan_profiles fp ON fpa.profile_id = fp.id
         JOIN systems s ON f.system_id = s.id
         LEFT JOIN fan_configurations fc ON f.id = fc.fan_id
         LEFT JOIN sensors sens ON COALESCE(fc.sensor_id, fpa.sensor_id) = sens.id
+        LEFT JOIN fan_calibrations cal ON f.id = cal.fan_id
         WHERE fpa.is_active = TRUE
           AND f.enabled = TRUE
           AND f.is_stale = FALSE
@@ -285,9 +428,26 @@ export class FanProfileController {
     agentId: string,
     fanName: string,
     currentTemp: number,
-    targetSpeed: number
+    targetSpeed: number,
+    calStatus: string | null = null,
+    calMinStart: number | null = null,
+    calMinStop: number | null = null
   ): Promise<void> {
     const fanKey = `${agentId}:${fanName}`;
+
+    // One telemetry lookup reused below (state seeding, reassert, stall watchdog)
+    const reportedFan = this.dataAggregator.getSystemData(agentId)?.fans
+      ?.find(f => f.id === fanName || f.zone === fanName);
+
+    // Stall bookkeeping: any live tach reading clears stall state
+    if (reportedFan?.rpm !== undefined && reportedFan.rpm > 0) {
+      this.tachSeen.add(fanKey);
+      this.stallTicks.delete(fanKey);
+      if (this.stalledFans.delete(fanKey)) {
+        log.info(`Fan ${fanName} on agent ${agentId} recovered from stall`, 'FanProfileController');
+        this.emit('fanStallCleared', { agentId, fanId: fanName });
+      }
+    }
 
     // Get agent-specific settings
     const fanStep = this.agentManager.getAgentFanStep(agentId);
@@ -334,10 +494,6 @@ export class FanProfileController {
       // the zone_id; fans expose their parent zone via the `zone` field, and
       // every fan in a zone shares the same Tier-3 speed, so picking any one
       // gives the right value.
-      const systemData = this.dataAggregator.getSystemData(agentId);
-      const reportedFan =
-        systemData?.fans?.find(f => f.id === fanName) ??
-        systemData?.fans?.find(f => f.zone === fanName);
       currentSpeed = reportedFan?.speed ?? 0;
       this.lastAppliedSpeeds.set(fanKey, currentSpeed);
       this.lastSpeedChangeTime.set(fanKey, Date.now());
@@ -354,15 +510,89 @@ export class FanProfileController {
     } else if (targetSpeed > currentSpeed) {
       // Need to increase speed
       nextSpeed = Math.min(currentSpeed + fanStep, targetSpeed);
+      // Calibrated fans: don't crawl the dead zone - jump 0 -> floor directly.
+      // Floor = max(min_start, min_stop): inverted pairs (start-transient
+      // artifact) must not land the fan below its sustain threshold.
+      const jumpFloor = Math.max(calMinStart ?? 0, calMinStop ?? 0);
+      if (currentSpeed === 0 && calStatus === 'done' && jumpFloor > 0 && nextSpeed < jumpFloor) {
+        nextSpeed = Math.min(jumpFloor, targetSpeed);
+      }
     } else if (targetSpeed < currentSpeed) {
       // Need to decrease speed
       nextSpeed = Math.max(currentSpeed - fanStep, targetSpeed);
+      // Calibrated fans: below min_stop the fan stalls anyway - jump to 0
+      if (targetSpeed === 0 && calStatus === 'done' && calMinStop !== null && nextSpeed < calMinStop) {
+        nextSpeed = 0;
+      }
     } else {
+      // STALL WATCHDOG (calibrated fans with a seen tach): at target, commanded
+      // above min_stop, but the tach reads 0 - fan is physically stopped where
+      // it should spin. Detection only: flag + emit, never adjust speed.
+      if (
+        calStatus === 'done' &&
+        calMinStop !== null &&
+        targetSpeed > calMinStop &&
+        this.tachSeen.has(fanKey) &&
+        reportedFan?.rpm === 0
+      ) {
+        const ticks = (this.stallTicks.get(fanKey) ?? 0) + 1;
+        this.stallTicks.set(fanKey, ticks);
+        if (ticks >= STALL_DEBOUNCE_TICKS && !this.stalledFans.has(fanKey)) {
+          this.stalledFans.add(fanKey);
+          log.warn(
+            `Fan ${fanName} on agent ${agentId} STALLED: commanded ${targetSpeed}% but RPM is 0`,
+            'FanProfileController'
+          );
+          this.emit('fanStalled', { agentId, fanId: fanName, commandedSpeed: targetSpeed });
+          this.persistStallEvent(agentId, fanName, targetSpeed);
+        }
+      }
+
+      // HEALTH SAMPLING + OVERPERFORMANCE WATCHDOG (calibrated fans)
+      if (calStatus === 'done' && reportedFan?.rpm !== undefined && reportedFan.rpm > 0) {
+        const ref = this.getHealthRefCached(fanKey, agentId, fanName);
+
+        // Drift ring: live speed vs the calibration curve at a steady target,
+        // above the dead zone. The health view judges the ring median.
+        if (ref?.curve && targetSpeed > Math.max(calMinStart ?? 0, calMinStop ?? 0)) {
+          const expected = expectedRpm(ref.curve, targetSpeed);
+          if (expected !== null && expected > 0) {
+            const ring = this.driftRings.get(fanKey) ?? [];
+            ring.push(((reportedFan.rpm - expected) / expected) * 100);
+            if (ring.length > DRIFT_RING_SIZE) ring.shift();
+            this.driftRings.set(fanKey, ring);
+          }
+        }
+
+        // Overperformance: sustained rpm above the healthy reference means
+        // the reference is stale (fan cleaned or replaced) - flag 'pending'
+        // so the consent trigger re-measures it.
+        const healthyMax = ref?.healthy?.max_rpm ?? null;
+        if (healthyMax !== null && healthyMax > 0 && reportedFan.rpm > healthyMax * OVERPERF_FACTOR) {
+          const ticks = (this.overperfTicks.get(fanKey) ?? 0) + 1;
+          this.overperfTicks.set(fanKey, ticks);
+          if (!this.overperfSince.has(fanKey)) this.overperfSince.set(fanKey, Date.now());
+          const elapsed = Date.now() - this.overperfSince.get(fanKey)!;
+          if (ticks >= OVERPERF_TICKS && elapsed >= OVERPERF_FLOOR_MS &&
+              !this.overperfFlagged.has(fanKey)) {
+            this.overperfFlagged.add(fanKey);
+            log.info(
+              `Fan ${fanName} on agent ${agentId} sustains ${reportedFan.rpm} RPM, above its ` +
+              `known maximum ${healthyMax} - queueing recalibration`,
+              'FanProfileController'
+            );
+            this.requestRecalibration(agentId, fanName);
+          }
+        } else {
+          this.overperfTicks.delete(fanKey);
+          this.overperfSince.delete(fanKey);
+        }
+      }
+
       // At target: re-assert only if the reported ACTUAL speed diverged past
       // tolerance - catches an external controller (e.g. RPi kernel thermal
       // governor) moving the fan out from under us. See REASSERT_TOLERANCE_PERCENT.
-      const reported = this.dataAggregator.getSystemData(agentId)?.fans
-        ?.find(f => f.id === fanName || f.zone === fanName)?.speed;
+      const reported = reportedFan?.speed;
       if (reported === undefined ||
           Math.abs(reported - targetSpeed) <= REASSERT_TOLERANCE_PERCENT) {
         return; // in sync (or no telemetry yet) - nothing to do
@@ -376,6 +606,10 @@ export class FanProfileController {
     // Update tracking state
     this.lastAppliedSpeeds.set(fanKey, nextSpeed);
     this.lastSpeedChangeTime.set(fanKey, Date.now());
+
+    // Duty changed - the overperformance window requires steady duty
+    this.overperfTicks.delete(fanKey);
+    this.overperfSince.delete(fanKey);
 
     // Log the action (debug level to avoid spam)
     const direction = nextSpeed > currentSpeed ? '↑' : nextSpeed < currentSpeed ? '↓' : '=';
@@ -487,12 +721,54 @@ export class FanProfileController {
           // For zone-based fans, use zone_id as the command target; otherwise use fan_name
           const commandTarget = assignment.zone_id || assignment.fan_name;
 
+          // Skip fans locked by an active calibration run
+          if (this.calibratingFans.has(`${assignment.agent_id}:${commandTarget}`) ||
+              this.calibratingFans.has(`${assignment.agent_id}:${assignment.fan_name}`)) {
+            log.trace(`Fan ${commandTarget} on ${assignment.agent_id} is calibrating, skipping`, 'FanProfileController');
+            continue;
+          }
+
           // Check if fan is currently reported by the agent (immediate availability check)
           const systemData = this.dataAggregator.getSystemData(assignment.agent_id);
           const fanCurrentlyReported = systemData?.fans?.some(f => f.id === assignment.fan_name);
           if (!fanCurrentlyReported) {
             log.trace(`Fan ${assignment.fan_name} not in current data for agent ${assignment.agent_id}, skipping`, 'FanProfileController');
             continue;
+          }
+
+          // Consent-gated calibration trigger: an active assignment IS
+          // the user's consent to control this fan. Emitted only for fans in
+          // LIVE telemetry (guard above) - DB 'online' status is stale at boot
+          // and triggering into a not-yet-connected agent poisons statuses.
+          // Enqueue when calibration is missing, pending, or from an older
+          // protocol version. 'failed' rows auto-retry on the backoff ladder
+          // while the agent is live (guard above); no ladder entry (fresh
+          // backend start) means retry now.
+          // Control continues below (pass-through) until the run locks the fan.
+          // Periodic recalibration: age check on healthy ('done') curves only.
+          const recalDue =
+            this.recalibrationDays > 0 &&
+            assignment.cal_status === 'done' &&
+            assignment.cal_calibrated_at != null &&
+            Date.now() - new Date(assignment.cal_calibrated_at).getTime() >
+              this.recalibrationDays * 86_400_000;
+          const retryDue =
+            assignment.cal_status === 'failed' &&
+            Date.now() >=
+              (this.failedRetries.get(`${assignment.agent_id}:${assignment.fan_name}`)?.nextAt ?? 0);
+          const needsCalibration =
+            assignment.cal_status === null ||
+            assignment.cal_status === 'pending' ||
+            (assignment.cal_status !== 'running' && assignment.cal_status !== 'failed' &&
+              (assignment.cal_version ?? 0) < CALIBRATION_VERSION) ||
+            retryDue ||
+            recalDue;
+          if (needsCalibration) {
+            this.emit('calibrationNeeded', {
+              agentId: assignment.agent_id,
+              fanDbId: assignment.fan_id,
+              fanName: assignment.fan_name,
+            });
           }
 
           // Get current sensor temperature
@@ -580,13 +856,27 @@ export class FanProfileController {
             assignment.fan_max_speed
           );
 
+          // Zero-snap dead-zone targets for calibrated fans (no-op otherwise)
+          const snappedSpeed = this.applyZeroSnap(
+            fanKey,
+            assignment.agent_id,
+            commandTarget,
+            constrainedSpeed,
+            assignment.cal_status,
+            assignment.cal_min_start,
+            assignment.cal_min_stop
+          );
+
           // Apply fan control with stepping (hysteresis already handled above)
           // Use commandTarget (zone_id for IPMI, fan_name for OS agents)
           await this.applyFanControl(
             assignment.agent_id,
             commandTarget,
             temperature,
-            constrainedSpeed
+            snappedSpeed,
+            assignment.cal_status,
+            assignment.cal_min_start,
+            assignment.cal_min_stop
           );
 
           // Mark zone as processed so we don't send duplicate commands
@@ -647,6 +937,37 @@ export class FanProfileController {
   }
 
   /**
+   * Load recalibration interval (days, 0 = manual only) from database
+   */
+  private async loadRecalibrationDays(): Promise<number> {
+    try {
+      const setting = await this.db.get(
+        'SELECT setting_value FROM backend_settings WHERE setting_key = $1',
+        ['fan_recalibration_days']
+      );
+      if (setting && setting.setting_value !== undefined) {
+        const days = parseInt(setting.setting_value, 10);
+        if (Number.isFinite(days) && days >= 0) {
+          log.info(`Fan recalibration interval: ${days === 0 ? 'manual only' : `${days} day(s)`}`, 'FanProfileController');
+          return days;
+        }
+      }
+    } catch (error) {
+      log.error('Error loading recalibration interval from database:', 'FanProfileController', error);
+    }
+    return 7;
+  }
+
+  /**
+   * Update the recalibration interval at runtime (settings route side-effect).
+   */
+  public setRecalibrationDays(days: number): void {
+    if (!Number.isFinite(days) || days < 0) return;
+    this.recalibrationDays = days;
+    log.info(`Fan recalibration interval set to ${days === 0 ? 'manual only' : `${days} day(s)`}`, 'FanProfileController');
+  }
+
+  /**
    * Save controller interval to database
    */
   private async saveControllerInterval(intervalMs: number): Promise<void> {
@@ -677,6 +998,7 @@ export class FanProfileController {
     const intervalToUse = updateIntervalMs !== undefined
       ? updateIntervalMs
       : await this.loadControllerInterval();
+    this.recalibrationDays = await this.loadRecalibrationDays();
 
     this.updateInterval = intervalToUse;
     this.isRunning = true;
@@ -742,17 +1064,23 @@ export class FanProfileController {
    * Note: We preserve lastAppliedSpeeds so stepping continues smoothly from current position
    */
   public clearFanState(agentId: string, fanName: string): void {
-    const fanKey = `${agentId}:${fanName}`;
     // Only clear target calculation state - NOT the current speed state
     // This ensures stepping continues from current position toward new target
+    // Intentionally NOT clearing:
+    // - lastAppliedSpeeds (current fan speed - needed for smooth stepping)
+    // - lastSpeedChangeTime (timing info - harmless to keep)
+    this.clearTargetState(agentId, fanName);
+    log.info(`Cleared target state for fan ${fanName} on agent ${agentId} (current speed preserved)`, 'FanProfileController');
+  }
+
+  /** Shared target-state clearing (no logging - callers log their own intent). */
+  private clearTargetState(agentId: string, fanName: string): void {
+    const fanKey = `${agentId}:${fanName}`;
     this.lastSignificantTemp.delete(fanKey);
     this.lastTargetSpeeds.delete(fanKey);
     this.sensorAvailabilityState.delete(fanKey);
     this.emergencyState.delete(fanKey);
-    // Intentionally NOT clearing:
-    // - lastAppliedSpeeds (current fan speed - needed for smooth stepping)
-    // - lastSpeedChangeTime (timing info - harmless to keep)
-    log.info(`Cleared target state for fan ${fanName} on agent ${agentId} (current speed preserved)`, 'FanProfileController');
+    this.clearSnapAndStallState(fanKey, agentId, fanName);
   }
 
   /**
@@ -773,6 +1101,7 @@ export class FanProfileController {
         this.lastSpeedChangeTime.delete(key);
         this.emergencyState.delete(key);
         this.sensorAvailabilityState.delete(key);
+        this.clearSnapAndStallState(key, agentId, key.slice(prefix.length));
         cleared++;
       }
     }
@@ -780,5 +1109,189 @@ export class FanProfileController {
     if (cleared > 0) {
       log.info(`Cleared all fan state for reconnected agent ${agentId} (${cleared} fans reset)`, 'FanProfileController');
     }
+  }
+
+  /**
+   * Drop zero-snap + stall watchdog state for one fan. Snap state reseeds from
+   * reported RPM on the next tick; a lingering stall flag is cleared honestly
+   * (with event) so the frontend never shows a stale stall.
+   */
+  private clearSnapAndStallState(fanKey: string, agentId: string, fanName: string): void {
+    this.snapState.delete(fanKey);
+    this.stallTicks.delete(fanKey);
+    this.tachSeen.delete(fanKey);
+    if (this.stalledFans.delete(fanKey)) {
+      this.emit('fanStallCleared', { agentId, fanId: fanName });
+    }
+  }
+
+  /**
+   * Currently stalled fans (fanKey = "agentId:fanName"). For fullState
+   * enrichment when the frontend consumes stall events.
+   */
+  public getStalledFans(): string[] {
+    return [...this.stalledFans];
+  }
+
+  /**
+   * Cached health facts (healthy reference + response curve) for the drift
+   * ring and overperformance watchdog. Loads lazily in the background
+   * (returns null until ready - callers just wait a tick); invalidated when a
+   * calibration run finishes so fresh measurements are picked up.
+   */
+  private getHealthRefCached(
+    fanKey: string, agentId: string, fanName: string
+  ): { healthy: HealthyReference | null; curve: { duty: number; rpm: number }[] | null } | null {
+    if (this.healthRefCache.has(fanKey)) return this.healthRefCache.get(fanKey)!;
+    if (!this.healthRefLoading.has(fanKey)) {
+      this.healthRefLoading.add(fanKey);
+      void (async () => {
+        const row = await this.db.get(
+          `SELECT f.id, cal.response_curve
+           FROM fans f JOIN systems s ON s.id = f.system_id
+           LEFT JOIN fan_calibrations cal ON cal.fan_id = f.id
+           WHERE s.agent_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2) LIMIT 1`,
+          [agentId, fanName]
+        );
+        const healthy = row ? await getHealthyReference(this.db, row.id) : null;
+        const rawCurve = row?.response_curve;
+        const curve = rawCurve
+          ? (typeof rawCurve === 'string' ? JSON.parse(rawCurve) : rawCurve)
+          : null;
+        this.healthRefCache.set(fanKey, { healthy, curve });
+      })()
+        .catch((e) => log.error(`Failed to load health facts for ${fanName}:`, 'FanProfileController', e))
+        .finally(() => this.healthRefLoading.delete(fanKey));
+    }
+    return null;
+  }
+
+  /**
+   * Sustained drift for the health view: median over the in-memory ring of
+   * at-target samples (~10 min). Null until the fan has run long enough.
+   */
+  public getFanDrift(agentId: string, fanName: string): { median: number; samples: number } | null {
+    const ring = this.driftRings.get(`${agentId}:${fanName}`);
+    if (!ring || ring.length === 0) return null;
+    return { median: median(ring), samples: ring.length };
+  }
+
+  /**
+   * CalibrationService reports a failed run: schedule the next automatic
+   * retry on the backoff ladder. Past the last rung, wait one recalibration
+   * interval (manual-only setting = until the next backend start).
+   */
+  public noteCalibrationFailed(agentId: string, fanName: string): void {
+    const key = `${agentId}:${fanName}`;
+    const count = (this.failedRetries.get(key)?.count ?? 0) + 1;
+    let nextAt: number;
+    let when: string;
+    if (count <= FAILED_RETRY_BACKOFF_MS.length) {
+      const wait = FAILED_RETRY_BACKOFF_MS[count - 1];
+      nextAt = Date.now() + wait;
+      when = wait >= 3_600_000 ? `${wait / 3_600_000}h` : `${wait / 60_000}min`;
+    } else if (this.recalibrationDays > 0) {
+      nextAt = Date.now() + this.recalibrationDays * 86_400_000;
+      when = `${this.recalibrationDays} day(s) (retry ladder exhausted)`;
+    } else {
+      nextAt = Number.POSITIVE_INFINITY;
+      when = 'next backend start (retry ladder exhausted, recalibration set to manual)';
+    }
+    this.failedRetries.set(key, { count, nextAt });
+    log.info(
+      `Calibration retry ${Math.min(count, FAILED_RETRY_BACKOFF_MS.length)}/${FAILED_RETRY_BACKOFF_MS.length} for fan ${fanName} on ${agentId} in ${when}`,
+      'FanProfileController'
+    );
+  }
+
+  /** Successful calibration clears the retry ladder. */
+  public clearCalibrationFailure(agentId: string, fanName: string): void {
+    this.failedRetries.delete(`${agentId}:${fanName}`);
+  }
+
+  /** Flag a fan (or a zone's members) 'pending'; the consent trigger re-queues it. */
+  private requestRecalibration(agentId: string, fanName: string): void {
+    void (async () => {
+      await this.db.run(
+        `UPDATE fan_calibrations SET status = 'pending'
+         WHERE fan_id IN (
+           SELECT f.id FROM fans f JOIN systems s ON s.id = f.system_id
+           WHERE s.agent_id = $1 AND (f.fan_name = $2 OR f.zone_id = $2))`,
+        [agentId, fanName]
+      );
+    })().catch((e) =>
+      log.error(`Failed to flag ${fanName} for recalibration:`, 'FanProfileController', e)
+    );
+  }
+
+  /** Log a stall to fan_stall_events, pruned to the newest 50 per fan. */
+  private persistStallEvent(agentId: string, fanName: string, commandedSpeed: number): void {
+    void (async () => {
+      const row = await this.db.get(
+        `SELECT f.id FROM fans f JOIN systems s ON s.id = f.system_id
+         WHERE s.agent_id = $1 AND f.fan_name = $2 LIMIT 1`,
+        [agentId, fanName]
+      );
+      if (!row) return;
+      await this.db.run(
+        `INSERT INTO fan_stall_events (fan_id, commanded_speed) VALUES ($1, $2)`,
+        [row.id, commandedSpeed]
+      );
+      await this.db.run(
+        `DELETE FROM fan_stall_events
+         WHERE fan_id = $1 AND id NOT IN (
+           SELECT id FROM fan_stall_events WHERE fan_id = $1
+           ORDER BY occurred_at DESC LIMIT 50)`,
+        [row.id]
+      );
+    })().catch((e) =>
+      log.error(`Failed to persist stall event for ${fanName}:`, 'FanProfileController', e)
+    );
+  }
+
+  /**
+   * User-initiated stall reset ("after fixing the cause"): drop the live flag
+   * and debounce so the watchdog re-evaluates fresh - a still-stalled fan
+   * re-flags within STALL_DEBOUNCE_TICKS, honestly.
+   */
+  public clearStall(agentId: string, fanName: string): void {
+    const fanKey = `${agentId}:${fanName}`;
+    this.stallTicks.delete(fanKey);
+    if (this.stalledFans.delete(fanKey)) {
+      this.emit('fanStallCleared', { agentId, fanId: fanName });
+    }
+  }
+
+  /**
+   * Lock/unlock a fan for calibration. Locked fans are skipped by
+   * the control loop; CalibrationService owns them for the duration.
+   */
+  public setFanCalibrating(agentId: string, fanName: string, calibrating: boolean): void {
+    const fanKey = `${agentId}:${fanName}`;
+    if (calibrating) {
+      this.calibratingFans.add(fanKey);
+    } else {
+      this.calibratingFans.delete(fanKey);
+      // Fresh calibration: drop cached facts, drift ring and watchdog state
+      // so the next tick judges against the new measurement.
+      this.healthRefCache.delete(fanKey);
+      this.driftRings.delete(fanKey);
+      this.overperfTicks.delete(fanKey);
+      this.overperfSince.delete(fanKey);
+      this.overperfFlagged.delete(fanKey);
+    }
+  }
+
+  /**
+   * Full per-fan reset (including current-speed record) for the handoff after
+   * calibration: the next tick reseeds from the agent's reported speed.
+   * Debug-level on purpose - fleet-wide calibration waves call this per fan.
+   */
+  public resetFanControlState(agentId: string, fanName: string): void {
+    const fanKey = `${agentId}:${fanName}`;
+    this.lastAppliedSpeeds.delete(fanKey);
+    this.lastSpeedChangeTime.delete(fanKey);
+    this.clearTargetState(agentId, fanName);
+    log.debug(`Reset control state for fan ${fanName} on agent ${agentId} (reseeds from reported speed)`, 'FanProfileController');
   }
 }
