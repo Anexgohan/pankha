@@ -6,6 +6,7 @@
 * **Agents**
   * [Linux](Agents-Linux)
   * [Windows](Agents-Windows)
+  * [IPMI](Agents-IPMI)
   * [Advanced Settings](Agents-Advanced-Settings)
 * [Deployment Center](Deployment-Center)
 * **Dashboard & UI**

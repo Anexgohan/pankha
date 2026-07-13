@@ -1,6 +1,6 @@
 # Fan Profiles & Control Logic
 
-Pankha provides a sophisticated control engine designed to keep your system quiet when idle and cool when under load. This page explains how the control logic works.
+Pankha Fan Control provides a sophisticated control engine designed to keep your system quiet when idle and cool when under load. This page explains how the control logic works.
 
 ## Fan Profiles
 
@@ -59,7 +59,7 @@ Each fan can be assigned:
 
 Both are selected from dropdowns on each fan's row in the [Dashboard](Dashboard).
 
-> **IPMI agents**: fans belong to BMC-controlled **zones**, and the profile and control sensor are assigned per zone, not per fan - every fan in a zone follows the same curve.
+> **[IPMI agents](Agents-IPMI)**: fans belong to BMC-controlled **zones**, and the profile and control sensor are assigned per zone, not per fan - every fan in a zone follows the same curve.
 
 ---
 

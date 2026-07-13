@@ -1,6 +1,6 @@
 # Agent Philosophy
 
-Pankha agents are **deliberately kept dumb** - and that is a feature, not a limitation. This page explains the design so you know exactly what a Pankha agent can and cannot do on your machines.
+Pankha Fan Control's agents are **deliberately kept dumb** - and that is a feature, not a limitation. This page explains the design so you know exactly what a Pankha agent can and cannot do on your machines.
 
 ## Agents Are Relays, Not Controllers
 

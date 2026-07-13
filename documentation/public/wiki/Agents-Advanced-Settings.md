@@ -1,31 +1,21 @@
 # Advanced Configuration
 
-Each agent has specific settings to fine-tune its behavior. You can edit these in the **Configuration** section of any system card on the dashboard.
+Each Pankha Fan Control agent has specific settings to fine-tune its behavior. You can edit these in the **Configuration** section of any system card on the dashboard.
 
 ```mermaid
 ---
 title: Safety & Control Priority Logic
 ---
-graph TD
-    Sensor([Sensor Reading]) --> CheckEmerg{Emergency > 80°C?}
-    
-    CheckEmerg -->|Yes| ForceMax[FORCE 100% SPEED]
-    CheckEmerg -->|No| CheckConn{Backend Connected?}
-    
-    CheckConn -->|No| Failsafe[TARGET FAILSAFE %]
-    CheckConn -->|Yes| Profile[Apply Profile Curve]
-    
-    Profile --> Hysteresis{Hysteresis Check}
-    Hysteresis -->|Unchanged| Keep[Keep Current]
-    Hysteresis -->|New Target| Smooth[Smoothing Step Limiter]
-    
-    ForceMax --> Fan([Fan PWM])
-    Failsafe --> Fan
-    Smooth --> Fan
-    Keep --> Fan
-    
-    style ForceMax fill:#ff0000,stroke:#333,stroke-width:2px,color:#fff
-    style Failsafe fill:#ff9900,stroke:#333,stroke-width:2px,color:#000
+graph LR
+    Sensor([Sensor Reading]) --> CheckEmerg{Emergency °C<br/>reached?}
+    CheckEmerg -->|Yes| ForceMax[FORCE 100%]
+    CheckEmerg -->|No| CheckConn{Server<br/>connected?}
+    CheckConn -->|No| Failsafe[FAILSAFE %]
+    CheckConn -->|Yes| Profile["Profile curve<br/>-> Hysteresis -> Step"]
+    ForceMax & Failsafe & Profile --> Fan([Fan])
+
+    style ForceMax fill:#c62828,stroke:#333,stroke-width:2px,color:#fff
+    style Failsafe fill:#e65100,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ## Temperature Control
@@ -51,13 +41,13 @@ graph LR
     Block --> Keep[Keep Old Speed]
     Pass --> New[Set New Speed]
     
-    style Block fill:#ff9999,stroke:#333,color:#000
-    style Pass fill:#ccffcc,stroke:#333,color:#000
+    style Block fill:#546e7a,stroke:#333,color:#fff
+    style Pass fill:#2e7d32,stroke:#333,color:#fff
 ```
 
 ### Emergency Temperature
 *   **Purpose**: Failsafe protection for hardware safety.
-*   **How it works**: If any sensor reaches this threshold (default **80°C**), the agent **ignores all profiles, hysteresis, and smoothing**.
+*   **How it works**: If any sensor reaches this threshold (default **85°C**), the agent **ignores all profiles, hysteresis, and smoothing**.
 *   **Action**: All fans are immediately forced to **100% speed** to protect hardware.
 *   **Offline Failsafe**: When the agent loses connection to the backend, it continues monitoring temperatures locally. If any sensor hits the emergency threshold while disconnected, the agent autonomously triggers 100% fan speed-**no backend required**.
 
@@ -100,7 +90,7 @@ stateDiagram-v2
 
 ### Fan Step % (Smoothing)
 *   **Purpose**: Makes speed transitions smooth and pleasing to the ear, avoiding sudden "jet engine" spin-ups.
-*   **How it works**: Limits how much the fan speed can change per update cycle (approx. every 2 seconds).
+*   **How it works**: Limits how much the fan speed can change per update cycle (one cycle per Agent Rate tick, default 3 seconds).
 *   **Example**:
     *   Current Speed: 30%
     *   Target Speed: 100%
@@ -129,7 +119,7 @@ graph TD
     
     Sleep -.->|Repeat| Start
     
-    style Sleep fill:#d0e0ff,stroke:#333,stroke-width:4px,color:#000
+    style Sleep fill:#1565c0,stroke:#333,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -149,9 +139,9 @@ You can hide individual sensors or entire sensor groups from the dashboard. This
 
 ### Hiding Sensors
 
-*   Click the **visibility toggle** (eye icon) next to any sensor to hide or show it.
+*   Click the **visibility toggle** next to any sensor to hide or show it - on the sensor's row, or in the **Manage sensors** modal ([Dashboard](Dashboard)).
 *   You can also hide an **entire sensor group** (e.g., all `gigabyte_wmi` sensors) at once using the group-level toggle.
-*   Use the **"Show Hidden Sensors"** toggle to temporarily reveal hidden sensors for review.
+*   Use the card's **Show** button to temporarily reveal hidden sensors for review.
 
 ### How Visibility Affects Fan Control
 
@@ -175,3 +165,12 @@ Hidden sensors are **excluded** from the **Highest Temperature** (`__highest__`)
     *   **Info** (Default): Normal operational events.
     *   **Debug**: Detailed hardware reading info.
     *   **Trace**: Extreme detail (every raw byte/packet).
+
+---
+
+## Next Steps
+
+*   [Dashboard](Dashboard): where all of these settings live on each system card.
+*   [Fan Profiles & Logic](Fan-Profiles): the curves these settings shape.
+*   [Agent Philosophy](Agent-Philosophy): why failsafe and emergency are the agent's only autonomous behaviors.
+*   [Troubleshooting](Troubleshooting): when a setting doesn't seem to take effect.

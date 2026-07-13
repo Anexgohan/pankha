@@ -80,7 +80,7 @@ Under each fan are its two controls - together they define the fan's behavior:
 
 Both dropdowns are searchable. See [Fan Profiles & Logic](Fan-Profiles) for how the curve, hysteresis, and stepping actually work.
 
-**IPMI agents** show this section as **Fan Zones**: fans are grouped into the zones their BMC controls, the rows are informational, and the Sensor/Profile controls apply to the whole zone (the BMC cannot address zone members individually). IPMI cards also have a **BMC** section where the vendor profile is assigned.
+**[IPMI agents](Agents-IPMI)** show this section as **Fan Zones**: fans are grouped into the zones their BMC controls, the rows are informational, and the Sensor/Profile controls apply to the whole zone (the BMC cannot address zone members individually). IPMI cards also have a **BMC** section where the vendor profile is assigned.
 
 ## Managing Sensors
 

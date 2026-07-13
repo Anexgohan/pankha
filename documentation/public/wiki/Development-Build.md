@@ -1,6 +1,6 @@
 # Building from Source
 
-For developers who want to modify the code or contribute to development.
+For developers who want to modify Pankha Fan Control or contribute to development.
 
 ---
 
@@ -36,20 +36,19 @@ docker compose up -d
 
 ## Development Mode
 
-For active development with hot-reload:
+The repository is an npm workspaces monorepo - install once at the root:
 
-### Backend
 ```bash
-cd backend
 npm install
-npm run dev
-```
+npm run dev              # both: frontend (5173, hot reload) + backend (3000)
 
-### Frontend
-```bash
-cd frontend
-npm install
-npm run dev
+# or individually:
+npm run dev:frontend
+npm run dev:backend
+
+# checks
+npm run typecheck
+npm run lint
 ```
 
 ---
@@ -60,7 +59,14 @@ npm run dev
 ```bash
 cd agents/clients/linux/rust
 cargo build --release
-# Binary: target/release/pankha-agent
+# Binary: target/release/pankha-agent-linux
+```
+
+### IPMI Agent (Rust)
+```bash
+cd agents/clients/linux/virtual-agents/host-ipmi-rust
+cargo build --release
+# Binary: target/release/pankha-agent-ipmi-linux
 ```
 
 ### Windows Agent (.NET 8)

@@ -46,11 +46,11 @@ In the **Deployment** tab, work through the numbered steps: pick the platform an
 
 The command installs the agent as a service and connects it to your server - it appears on the dashboard within seconds. For **Windows**, the summary offers an MSI installer instead: run it on the Windows machine, then enter your server's address in the tray app.
 
-Full details: [Deployment Center](Deployment-Center), [Linux Agent](Agents-Linux), [Windows Agent](Agents-Windows).
+Full details: [Deployment Center](Deployment-Center), [Linux Agent](Agents-Linux), [Windows Agent](Agents-Windows), [IPMI Agent](Agents-IPMI).
 
 ## Step 4: Give a Fan a Profile
 
-Your new system appears as a card on the dashboard. Expand its **Fans** section - each fan row has two dropdowns, and together they define the fan's behavior:
+Your new system appears as a card on the [Dashboard](Dashboard). Expand its **Fans** section - each fan row has two dropdowns, and together they define the fan's behavior:
 
 *   **Fan Profile**: the temperature-to-speed curve. **Standard** or **Optimal** are good first picks.
 *   **Control Sensor**: the temperature that drives the curve. **Highest** is the safe default - the fan responds to whatever is hottest on that machine.

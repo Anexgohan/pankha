@@ -1,6 +1,6 @@
 # Deployment Center
 
-The Deployment Center is your hub for provisioning new agents and maintaining your fleet. Access it from the **Deployment** tab in the navigation bar.
+The Deployment Center is Pankha Fan Control's hub for provisioning new agents and maintaining your fleet. Access it from the **Deployment** tab in the navigation bar.
 
 > If no agents are connected yet, the dashboard shows a shortcut card directing you here.
 
@@ -32,7 +32,7 @@ One card per agent type - picking a card and a CPU architecture chip does both a
 | :---------- | :------------ | :--------------------------------------------- |
 | **Linux**   | x64, arm64    | Debian, Ubuntu, Proxmox, Raspberry Pi, any systemd distro |
 | **Windows** | x64           | Windows 10/11 (self-contained .NET 8 service + tray app) |
-| **IPMI**    | x64           | Enterprise servers with a BMC (iDRAC, Supermicro, and others) |
+| **[IPMI](Agents-IPMI)**    | x64           | Enterprise servers with a BMC (iDRAC, Supermicro, and others) |
 
 A small dot on an architecture chip means that binary is already **cached on your Hub** (see Step 2).
 
@@ -59,7 +59,7 @@ graph LR
 
 ### IPMI Only: BMC Profile (appears as step 3)
 
-If you selected the **IPMI** platform, an extra step appears here and the later steps shift down by one. IPMI agents need a vendor profile that tells them which commands their BMC understands:
+If you selected the **IPMI** platform, an extra step appears here and the later steps shift down by one. [IPMI agents](Agents-IPMI) need a vendor profile that tells them which commands their BMC understands:
 
 *   **Select from Catalog**: pick your server's vendor and model family from the built-in profiles.
 *   **Build Custom Profile**: open the Profile Builder to create one for unsupported hardware - it lets you define fan zones and test raw IPMI commands against a live agent before saving.
@@ -115,7 +115,7 @@ Click **Copy Deploy Command** and run it on the target machine, as root (or as a
 wget -qO- "http://192.168.1.100:3143/api/deploy/linux?token=abc123" | bash
 ```
 
-The script downloads the agent from your Hub, writes the configuration, installs the systemd service, and starts the agent - it self-registers and appears on your dashboard within seconds. IPMI deployments work the same way with their own script and include the selected BMC profile.
+The script downloads the agent from your Hub, writes the configuration, installs the systemd service, and starts the agent - it self-registers and appears on your dashboard within seconds. [IPMI deployments](Agents-IPMI) work the same way with their own script and register the selected BMC profile, which the agent then fetches from your server.
 
 Two properties make the command fleet-friendly:
 

@@ -1,6 +1,6 @@
 # Release Process
 
-How Pankha publishes releases. Releases are tagged manually; the body is composed automatically from PR labels.
+How Pankha Fan Control publishes releases. Releases are tagged manually; the body is composed automatically from PR labels.
 
 ---
 
@@ -16,7 +16,7 @@ How Pankha publishes releases. Releases are tagged manually; the body is compose
 Most releases need no authoring — just tag and push:
 
 ```bash
-cd /root/anex/dev/pankha
+cd pankha   # your clone
 git checkout main && git pull
 git tag v0.4.25
 git push --tags

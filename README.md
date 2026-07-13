@@ -10,7 +10,7 @@
   <a href="https://pankha.app/"><img src="https://img.shields.io/badge/Official_website-pankha.app-2563eb?style=flat&labelColor=555555" alt="Official website - pankha.app"></a>
 </p>
 
-**Pankha Fan Control** is an open-source fan and temperature management system for any PC - single desktop, server, or homelab fleet. Build smarter fan curves, lower noise, drop temperatures, and manage every machine from one web dashboard. Works on Windows and Linux. Free, self-hosted, no telemetry.
+**Pankha Fan Control** is an open-source fan and temperature management system for any PC - single desktop, server, or homelab fleet. Build smarter fan curves, lower noise, drop temperatures, and manage every machine from one web dashboard. Works on Windows, Linux, and IPMI/BMC-controlled servers. Free, self-hosted, no telemetry.
 
 ![Docker Pulls](https://img.shields.io/docker/pulls/anexgohan/pankha) ![GitHub Discussions](https://img.shields.io/github/discussions/Anexgohan/pankha) ![GitHub Repo Size](https://img.shields.io/github/repo-size/Anexgohan/pankha) ![GitHub Commit Activity](https://img.shields.io/github/commit-activity/m/Anexgohan/pankha) ![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)
 ![GitHub Latest Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/latest/total?label=Latest%20Downloads) ![GitHub Total Downloads](https://img.shields.io/github/downloads/Anexgohan/pankha/total?label=Total%20Downloads) ![GitHub Last Commit](https://img.shields.io/github/last-commit/Anexgohan/pankha) ![GitHub Release](https://img.shields.io/github/v/release/Anexgohan/pankha)
@@ -23,21 +23,23 @@
 ---
 ## What is Pankha Fan Control?
 
-**Pankha Fan Control** - is open-source software that gives you complete control over your systems cooling. 
+**Pankha Fan Control** - is open-source software that gives you complete control over your system's cooling. 
 Build custom fan curves, monitor temperatures in real time, and tune RPM and noise to your exact preference - on a single desktop, a homelab, or a fleet of servers.
 
 It runs the same way whether you're managing one machine or one hundred. The web dashboard works in any browser, on any device. Agents are lightweight, the backend is self-hosted, and nothing about your hardware ever leaves your network.
-Its built to support single Windows or Linux PC or multiple Servers, VM's, NAS boxes, PC's - it can handle any scale.
+It's built to handle any scale - a single Windows or Linux PC, or fleets of servers, VMs, and NAS boxes.
 
 ---
 ## Features
 
-- **Quieter PCs, cooler temps :**  smart fan curves with hysteresis and stepping eliminate the always full throttlenoise and thermal spikes left behind by stock BIOS fan profiles
-- **Unify Everything into 'One dashboard' :**  unified web UI for one system or 100, on Windows, Linux, or IPMI / BMC-controlled servers, manage fans and temperatures across all your machines, on Windows, Linux, Virtual Machines with passed through devices like GPU, PCIe card, HBA, etc and x64 or ARM from one dashboard
-- **Visual profile editor :**  drag-and-drop curve editor with import / export so you can build, share, and reuse fan profiles across machines
+- **Quieter PCs, cooler temps :**  smart fan curves with hysteresis and stepping eliminate the full-throttle noise and thermal spikes left behind by stock BIOS fan profiles
+- **Everything in one dashboard :**  one web UI for one system or a hundred - Windows, Linux, and IPMI/BMC-controlled servers, bare metal or VMs with passed-through hardware (GPU, HBA, PCIe), x64 or ARM - every fan and temperature managed from a single place
+- **Knows your fans personally :**  every fan's real usable range - where it starts, where it stalls, its true ceiling - is [measured automatically](https://github.com/Anexgohan/pankha/wiki/Fan-Calibration), and a fan that starts dying gets flagged before you can hear it
+- **Sensors you compose :**  combine any sensors into a [virtual sensor](https://github.com/Anexgohan/pankha/wiki/Dashboard) - let "the hottest of my NVMe drives" drive the drive-bay fan
+- **Visual profile editor :**  drag-and-drop curve editor with import / export so you can build, share, and reuse [fan profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles) across machines
 - **Real hardware control :**  direct PWM control with live RPM feedback, per-fan policies, and an always-on emergency-temperature override
 - **Real-time monitoring :**  temperature, RPM, and historical data for CPU, GPU, NVMe, motherboard, and chipset, streamed live over WebSocket
-- **Safe by design :**  if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override
+- **Safe by design :**  if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override - and [agents never connect to anything but your server](https://github.com/Anexgohan/pankha/wiki/Agent-Philosophy)
 - **Light and fast :**  the Linux agent is a single Rust binary using under 15MB RAM and under 1% CPU. The Windows agent runs as a .NET 8 service using under 25MB RAM and under 1% CPU with full LibreHardwareMonitor access. IPMI/BMC Agents use even less resources.
 - **Open source, self-hosted :**  AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment
 
@@ -50,7 +52,7 @@ Pankha is designed to manage cooling profiles across all your hardware from a si
 | Feature / System | 🪟 Windows Desktop | 🐧 Linux System | 💻 Central Dashboard |
 | :--- | :--- | :--- | :--- |
 | **Ideal For** | Gaming Rigs, Workstations, virtual or remote desktops | Daily Drivers, Servers, Hosts/Nodes, Virtual device passed through | Any modern web browser (Mobile/PC) |
-| **Tech Stack** | C# / .NET (Native Client) | Rust (Lightweight Binary) | TypeScript / React Backend |
+| **Tech Stack** | C# / .NET (Native Client) | Rust (Lightweight Binary) | React + TypeScript UI, Node.js + PostgreSQL backend |
 | **Deployment** | Quick-install `.msi` package | Pre-configured standalone binary | 1-Click Docker Compose setup |
 | **Resource Usage** | Near-zero background RAM & CPU usage | Near-zero background RAM & CPU usage | Low-overhead WebSocket hub |
 | **Hardware Link** | via LibreHardwareMonitor | Direct kernel-level device mappings | Real-time aggregated data stream |
@@ -65,7 +67,7 @@ Pankha is designed to manage cooling profiles across all your hardware from a si
 - **Windows users :**  a no-cloud, no-account fan utility that doesn't require per-machine setup
 - **Linux desktop and server users :**  PWM fan control on headless boxes (Debian, Ubuntu, RHEL, Proxmox, TrueNAS) without a GUI
 - **Homelabbers and self-hosters :**  manage Proxmox hosts, NAS boxes, and virtualisation hosts from one place
-- **Server admins :**  readable fan curves and a web UI for Dell PowerEdge, HP ProLiant, and Supermicro hardware controlled through IPMI / BMC, cure for always screaming fans even when idle.
+- **Server admins :**  readable fan curves and a web UI for Dell PowerEdge, HP ProLiant, and Supermicro hardware controlled through IPMI / BMC - the cure for fans that scream even at idle.
 - **Anyone managing more than one machine :**  configure one or multiple profiles and apply to as many machines as you like.
 
 ---
@@ -98,6 +100,7 @@ Pankha is designed to manage cooling profiles across all your hardware from a si
 ```bash
 wget -O compose.yml https://github.com/Anexgohan/pankha/releases/latest/download/compose.yml
 wget -O .env https://github.com/Anexgohan/pankha/releases/latest/download/example.env
+# edit .env first: set PANKHA_HUB_IP (this server's LAN IP) and your database credentials
 docker compose pull && docker compose up -d
 ```
 
@@ -110,7 +113,7 @@ Open the dashboard at `http://localhost:3143` (or your configured `PANKHA_PORT`)
 
 **A. Recommended - one-line install via Deployment AIO**
 
-In the dashboard, open **Deployment &rarr; Deployment AIO**, configure your options, and copy the generated command. It will look like:
+In the dashboard, open the **Deployment** tab, work through the numbered steps, and copy the generated command. It will look like:
 
 ```bash
 # This is an example
@@ -169,10 +172,17 @@ List all commands: `./pankha-agent --help`
 ---
 ### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent (.NET 8) :
 
-Download **[pankha-agent-windows_x64.msi](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi)** from the latest release. The installer sets up the background service and the tray app. Right-click the tray icon &rarr; **Settings** &rarr; set the backend URL. Done.
+Download **[pankha-agent-windows_x64.msi](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi)** from the latest release. The installer sets up the background service and the tray app. Right-click the tray icon &rarr; **Configure...** &rarr; set the backend URL. Done.
 Control your fans and monitor your temperatures from the dashboard!
 
 [![Wiki Windows Agent](https://img.shields.io/badge/Wiki-Windows_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)
+
+---
+### ![IPMI](https://img.shields.io/badge/-IPMI%20%2F%20BMC-6C3483?logo=serverfault&logoColor=white&style=flat-square) IPMI Agent (enterprise servers) :
+
+For rack servers whose fans are owned by the BMC (Dell iDRAC, Supermicro, and more). In the dashboard's **Deployment** tab, pick the **IPMI** platform and your server's BMC profile, then run the generated command on the server - vendor commands come from swappable profiles, and unsupported hardware can be profiled with the built-in Profile Builder.
+
+[![Wiki IPMI Agent](https://img.shields.io/badge/Wiki-IPMI_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-IPMI)
 
 ---
 ## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square) How Pankha Fan Control works
@@ -187,19 +197,44 @@ A central **backend** (Docker container with Node.js, PostgreSQL, and a WebSocke
 - **Frontend** - React + TypeScript + Vite, served directly as a Web GUI Dashboard on `http://<IP>:<PORT>`
 - **Linux agent** - single Rust binary using <15MB RAM and <1% CPU, `sysfs` hardware access, zero runtime dependencies
 - **Windows agent** - self installing .NET 8 service using <25MB RAM and <1% CPU, capable of full LibreHardwareMonitor access to all sensors and fans on any Windows machine
+- **IPMI agent** - Rust binary for BMC-controlled servers (Dell iDRAC, Supermicro, and more); drives fan zones through `ipmitool` using swappable vendor profiles
 
 **How it works**
 
-- Agents push sensor and fan readings to the backend over WebSocket every few configurable seconds; the backend computes deltas and broadcasts changes only when needed to minimise bandwidth.
+- Agents push sensor and fan readings to the backend over WebSocket at a configurable interval (default 3 seconds); the backend computes deltas and broadcasts changes only when needed to minimise bandwidth.
 - The backend evaluates your fan curves and sends control commands back to agents in real time
 - Frontend connects to the backend to display real-time sensor readings and fan speeds, and to send profile updates and config and user changes back to the backend
 - If the backend is unreachable, agents enter **failsafe mode** - a configurable safe fan speed with a local emergency-temperature override
 
-```
-Browser <-HTTP/WebSocket-> Backend (Docker) <-WebSocket-> Agents <-Direct-> Hardware
+```mermaid
+graph LR
+    Browser["Your browser<br/>(dashboard - desktop or phone)"]
+
+    subgraph SRV["Pankha Fan Control server - one per network (Docker)"]
+        direction TB
+        Logic["Control logic<br/>fan curves, calibration, safety"]
+        DB[("PostgreSQL<br/>history")]
+        Logic <--> DB
+    end
+
+    subgraph FLEET["Your machines - one lightweight agent each"]
+        direction TB
+        Win["Windows agent<br/>gaming PC, workstation"]
+        Lin["Linux agent<br/>NAS, homelab node, Raspberry Pi"]
+        Ipmi["IPMI agent<br/>rack server (BMC)"]
+    end
+
+    Browser <-->|live updates| Logic
+    Logic <-->|"sensor data up,<br/>fan commands down"| Win
+    Logic <--> Lin
+    Logic <--> Ipmi
+    Win --> HW1(["fans + sensors"])
+    Lin --> HW2(["fans + sensors"])
+    Ipmi --> HW3(["fans + sensors"])
+
+    style Logic fill:#1565c0,stroke:#333,color:#fff
 ```
 
-[![Wiki Architecture](https://img.shields.io/badge/Wiki-Architecture-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Architecture)
 
 ## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square) Documentation
 
@@ -213,6 +248,7 @@ Browser <-HTTP/WebSocket-> Backend (Docker) <-WebSocket-> Agents <-Direct-> Hard
 
 <div align="left">
 
+- [Quick Start](https://github.com/Anexgohan/pankha/wiki/Quick-Start)
 - [Installation](https://github.com/Anexgohan/pankha/wiki/Server-Installation)
 - [Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
 
@@ -226,6 +262,7 @@ Browser <-HTTP/WebSocket-> Backend (Docker) <-WebSocket-> Agents <-Direct-> Hard
 
 - [Linux](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)
 - [Windows](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)
+- [IPMI](https://github.com/Anexgohan/pankha/wiki/Agents-IPMI)
 - [Settings](https://github.com/Anexgohan/pankha/wiki/Agents-Advanced-Settings)
 
 </div>

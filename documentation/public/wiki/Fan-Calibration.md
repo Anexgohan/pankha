@@ -33,7 +33,7 @@ With these facts, fan control skips the dead zone instead of crawling through it
 - **After updates that change how measuring works.** Old measurements are not comparable to new ones, so affected fans are re-measured once.
 - **Periodically**, on the schedule you pick in **Settings > General > Backend Settings > Fan Recalibration** (default: every 7 days, or "Manual only" to disable).
 - **When a fan outperforms its records.** If a fan sustains speeds above its known maximum (for example after you cleaned it or replaced it), its records are clearly stale and it is queued for a fresh measurement.
-- **Manually**, any time, from the gauge icon next to a fan on its system card.
+- **Manually**, any time, from the gauge icon next to a fan on its system card ([Dashboard](Dashboard)).
 
 ![The calibrate icon on the fan rack](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/calibration/pankha_fan-calibrate-icon_01.png)
 
@@ -129,3 +129,12 @@ You do not have to open the info card to notice a problem: when a health check d
 - Calibration measures **hardware facts** - your own min/max speed limits on a fan are always respected and never overwritten.
 
 ![Fan Recalibration setting](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/calibration/pankha_settings_fan-recalibration_01.png)
+
+---
+
+## Next Steps
+
+*   [Fan Profiles & Logic](Fan-Profiles): the curves that calibration makes trustworthy.
+*   [Dashboard](Dashboard): where the badges, gauge icon, and fan info card live.
+*   [Settings](Settings-Page): the recalibration schedule.
+*   [Troubleshooting](Troubleshooting): failed or stuck calibration runs.

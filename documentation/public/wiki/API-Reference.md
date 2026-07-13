@@ -1,6 +1,6 @@
 # API Reference
 
-Pankha exposes a REST API for configuration and a WebSocket interface for real-time data. Base URL: `http://<server-ip>:3143`
+Pankha Fan Control exposes a REST API for configuration and a WebSocket interface for real-time data. Base URL: `http://<server-ip>:3143`
 
 Two kinds of identifiers appear in these routes:
 
@@ -190,7 +190,7 @@ Combine real sensors into a computed one (see [Dashboard](Dashboard) for the fea
 
 ### BMC Profiles (IPMI)
 
-Vendor profiles that teach the IPMI agent how to talk to a server's BMC.
+Vendor profiles that teach the [IPMI agent](Agents-IPMI) how to talk to a server's BMC.
 
 | Method | Endpoint                                   | Description                                        |
 | ------ | ------------------------------------------ | -------------------------------------------------- |
