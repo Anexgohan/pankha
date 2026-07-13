@@ -14,10 +14,13 @@
   * [Settings](Settings-Page)
 * **How It Works**
   * [Agent Philosophy](Agent-Philosophy)
+  * [The Server](Server-Architecture)
   * [Fan Profiles](Fan-Profiles)
   * [Calibration & Health](Fan-Calibration)
 * [API Reference](API-Reference)
 * **Development**
   * [Building from Source](Development-Build)
+  * [Backend](Development-Backend)
+  * [Frontend](Development-Frontend)
   * [Release Process](Development-Release-Process)
 * [Troubleshooting](Troubleshooting)

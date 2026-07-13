@@ -235,6 +235,8 @@ graph LR
     style Logic fill:#1565c0,stroke:#333,color:#fff
 ```
 
+[![Wiki Architecture](https://img.shields.io/badge/Wiki-How_the_Server_Works-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Server-Architecture)
+
 
 ## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square) Documentation
 

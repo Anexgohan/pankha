@@ -26,9 +26,31 @@ One server runs the brains; a small agent on each machine does only what it's to
 
 ```mermaid
 graph LR
-    Browser["Your browser<br/>(dashboard)"] <-->|live updates| Server["Pankha Fan Control server<br/>(Docker: control logic,<br/>history, web UI)"]
-    Server <-->|"sensor data up,<br/>fan commands down"| Agents["Agents - one per machine<br/>(Linux, Windows, IPMI)"]
-    Agents <-->|"read temperatures,<br/>set fan speeds"| HW["Fans and sensors"]
+    Browser["Your browser<br/>(dashboard - desktop or phone)"]
+
+    subgraph SRV["Pankha Fan Control server - one per network (Docker)"]
+        direction TB
+        Logic["Control logic<br/>fan curves, calibration, safety"]
+        DB[("PostgreSQL<br/>history")]
+        Logic <--> DB
+    end
+
+    subgraph FLEET["Your machines - one lightweight agent each"]
+        direction TB
+        Win["Windows agent<br/>gaming PC, workstation"]
+        Lin["Linux agent<br/>NAS, homelab node, Raspberry Pi"]
+        Ipmi["IPMI agent<br/>rack server (BMC)"]
+    end
+
+    Browser <-->|live updates| Logic
+    Logic <-->|"sensor data up,<br/>fan commands down"| Win
+    Logic <--> Lin
+    Logic <--> Ipmi
+    Win --> HW1(["fans + sensors"])
+    Lin --> HW2(["fans + sensors"])
+    Ipmi --> HW3(["fans + sensors"])
+
+    style Logic fill:#1565c0,stroke:#333,color:#fff
 ```
 
 All decisions - curves, thresholds, calibration - happen on the server. Agents are deliberately simple relays, which is why they are safe to put on every machine you own ([Agent Philosophy](Agent-Philosophy)).
