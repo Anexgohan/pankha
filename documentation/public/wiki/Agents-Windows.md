@@ -56,8 +56,8 @@ stateDiagram-v2
 
 ![MSI configuration options dialog](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/agent-windows/msi-03-options.png)
 
-    *   **Reset configuration (Clean Install)**: leave unchecked to preserve your existing `config.json` and logs when upgrading; check it to start fresh (deletes both).
-    *   **Install PawnIO Driver**: required for motherboard and drive sensors and fan control. If PawnIO is already on the system, the installer detects it and skips this step. The installation fails rather than leaving you with a half-working agent, so leave this checked.
+*   **Reset configuration (Clean Install)**: leave unchecked to preserve your existing `config.json` and logs when upgrading; check it to start fresh (deletes both).
+*   **Install PawnIO Driver**: required for motherboard and drive sensors and fan control. If PawnIO is already on the system, the installer detects it and skips this step. The installation fails rather than leaving you with a half-working agent, so leave this checked.
 
 6.  **Verify**: after the installer finishes, the Pankha fan icon appears in your System Tray. The `PankhaAgent` service is now running (check with `services.msc` if curious).
 
