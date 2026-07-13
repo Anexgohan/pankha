@@ -16,6 +16,7 @@ A **Fan Profile** defines the relationship between a temperature source and a fa
 | **Performance**    | Heavy workloads        | Fans are always spinning (40%+) and ramp aggressively. Keeps things cool at the cost of noise.   |
 | **Standard**       | Most systems           | A straightforward linear curve from low to high. Predictable and reliable.                       |
 | **Raspberry Pi 5** | SoC and ARM boards     | Stays silent until 55°C, then ramps quickly. Tuned for small boards with high-RPM fans.          |
+| **Server-Optimal** | Rack servers           | Conservative curve: quiet at idle, gradual ramp to half speed at 70°C, full speed at 85°C. Designed for rack chassis with deep airflow runs. |
 
 All built-in profiles can be used as-is or duplicated and adjusted to suit your hardware.
 
@@ -56,13 +57,15 @@ Each fan can be assigned:
 *   A **Fan Profile** (the curve that determines speed behavior).
 *   A **Control Sensor** (the temperature source that drives the curve).
 
-Both are selected from dropdowns on each fan's row in the dashboard.
+Both are selected from dropdowns on each fan's row in the [Dashboard](Dashboard).
+
+> **IPMI agents**: fans belong to BMC-controlled **zones**, and the profile and control sensor are assigned per zone, not per fan - every fan in a zone follows the same curve.
 
 ---
 
 ## Control Sensor Selection
 
-When assigning a control sensor to a fan, you have three options:
+When assigning a control sensor to a fan, you have four options:
 
 ### Individual Sensor
 
@@ -72,7 +75,7 @@ Select a specific sensor (e.g., "CPU Package", "GPU Core"). The fan speed is bas
 
 Select **"Highest"** to use the **maximum temperature across all visible sensors** on that system. This is ideal for exhaust or case fans that should respond to whatever is hottest.
 
-*   Only **visible** sensors are included. If you hide a sensor (see [Advanced Settings](Agents-Advanced-Settings)), it is excluded from the highest calculation.
+*   Only **visible** sensors are included. If you hide a sensor (see [Dashboard](Dashboard)), it is excluded from the highest calculation.
 *   This lets you declutter noisy or irrelevant sensors without affecting your fan behavior, or intentionally exclude sensors you don't want driving your fans.
 
 ### Sensor Group
@@ -87,6 +90,10 @@ Select a **sensor group** (e.g., "k10temp", "nvme") to use the highest temperatu
 | `it8628`      | All motherboard chip sensors | Case fans      |
 
 > Groups are based on the hardware chip name reported by your system. The available groups will vary depending on your hardware.
+
+### Virtual Sensor
+
+Select a **virtual sensor** you built yourself - a named combination of hand-picked sensors (highest, average, or middle of its members). This is the most precise option: "the hottest of my four NVMe drives" can drive the drive-bay fan regardless of what the rest of the system is doing. Virtual sensors are created on the [Dashboard](Dashboard).
 
 ---
 

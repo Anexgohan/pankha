@@ -149,7 +149,7 @@ User-defined categories for organizing profiles (built-in types like `silent` an
 
 ## Virtual Sensors
 
-Combine real sensors into a computed one. A virtual sensor is referenced by other APIs as `__virtual__<id>`.
+Combine real sensors into a computed one (see [Dashboard](Dashboard) for the feature itself). A virtual sensor is referenced by other APIs as `__virtual__<id>`.
 
 | Method | Endpoint                        | Description                                                          |
 | ------ | ------------------------------- | -------------------------------------------------------------------- |
