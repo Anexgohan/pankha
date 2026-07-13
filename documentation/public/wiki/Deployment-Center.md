@@ -1,39 +1,48 @@
 # Deployment Center
 
-The Deployment Center is your hub for provisioning new agents, managing updates, and maintaining your fleet. Access it from the **Deployment** tab in the navigation bar.
+The Deployment Center is your hub for provisioning new agents and maintaining your fleet. Access it from the **Deployment** tab in the navigation bar.
 
-> If no agents are connected yet, the dashboard will show a shortcut card directing you to this page.
+> If no agents are connected yet, the dashboard shows a shortcut card directing you here.
 
 ## Fleet Overview
 
-At the top, three metric cards give you a quick snapshot of your fleet:
+Three metric cards at the top give a quick snapshot:
 
-| Metric          | Description                                |
-| :-------------- | :----------------------------------------- |
-| **Total Agents** | Number of registered agents across all systems |
-| **Online Now**   | Currently connected agents                 |
-| **Outdated**     | Agents running an older version than what's staged on the Hub |
+![Deployment Center header with the Total Agents, Online Now, and Outdated metric cards](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/deploy-workspace.png)
 
----
-
-## Official Installers
-
-Direct download links for agent installers:
-
-*   **Windows Agent**: Download the MSI installer from the latest GitHub release. Supports Windows 10/11 (x86_64). See [Windows Agent](Agents-Windows) for setup details.
-*   **Linux Agent**: Use the script-based installation in the **Deployment AIO** section below. See [Linux Agent](Agents-Linux) for manual setup.
+| Metric           | Description                                                    |
+| :--------------- | :------------------------------------------------------------- |
+| **Total Agents** | Number of registered agents across all systems                 |
+| **Online Now**   | Currently connected agents                                     |
+| **Outdated**     | Agents running an older version than the latest release        |
 
 ---
 
-## Agent Downloads (Hub Staging)
+## Deploy a New Agent
 
-Before you can deploy or update Linux agents remotely, you need to **stage** an agent binary on your Pankha Hub (your server). This avoids agents downloading directly from GitHub, keeping everything on your local network.
+The deploy workspace is a numbered set of steps on the left with a **live summary on the right** - it updates as you configure, and holds the final install command. Work top to bottom, then copy the command when the summary looks right.
 
-### How to Stage a Version
+### Step 1: Platform & Architecture
 
-1.  Select a version from the dropdown (grouped into **Stable** and **Unstable** releases).
-2.  Click the **Stable** or **Unstable** button to download that version to your Hub.
-3.  Wait for the download to complete. The status will change to **"vX.X.X Ready"**.
+One card per agent type - picking a card and a CPU architecture chip does both at once:
+
+![Platform cards for Linux, Windows, and IPMI with architecture chips](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/deploy-workspace-step1-platform.png)
+
+| Platform    | Architectures | Runs on                                        |
+| :---------- | :------------ | :--------------------------------------------- |
+| **Linux**   | x64, arm64    | Debian, Ubuntu, Proxmox, Raspberry Pi, any systemd distro |
+| **Windows** | x64           | Windows 10/11 (self-contained .NET 8 service + tray app) |
+| **IPMI**    | x64           | Enterprise servers with a BMC (iDRAC, Supermicro, and others) |
+
+A small dot on an architecture chip means that binary is already **cached on your Hub** (see Step 2).
+
+### Step 2: Release & Hub Cache
+
+Pick a channel, fetch the release to the Hub, then deploy from there. The step shows the latest **Stable** and **Pre-release** versions side by side with their release dates:
+
+![Release selection with stable and pre-release versions, download button, and the Hub cache listing](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/deploy-workspace-step2-prepare-agent.png)
+
+Clicking **Download Stable** (or **Download Pre-release**) stages the whole release bundle on your Hub in one go - Linux x64 and arm64, IPMI, and the Windows MSI - each verified by checksum. The **Hub cache** list below shows exactly what's staged; the Windows MSI can be downloaded straight from its row, and **Clear all** empties the cache.
 
 ```mermaid
 ---
@@ -46,84 +55,90 @@ graph LR
     Hub -->|Fast LAN| Agent3([Agent 3])
 ```
 
-> **Why stage?** Instead of every agent downloading from the internet, you download once to your server. Agents then pull the binary over your fast local network. This also works in air-gapped environments with no internet access on agent machines.
+> **Why stage?** One internet download instead of one per machine - and it works for agent machines with no internet access at all.
 
-The **Clear Cache** button removes all cached binaries from the Hub.
+### IPMI Only: BMC Profile (appears as step 3)
 
----
+If you selected the **IPMI** platform, an extra step appears here and the later steps shift down by one. IPMI agents need a vendor profile that tells them which commands their BMC understands:
 
-## Deployment AIO (All-In-One)
+*   **Select from Catalog**: pick your server's vendor and model family from the built-in profiles.
+*   **Build Custom Profile**: open the Profile Builder to create one for unsupported hardware - it lets you define fan zones and test raw IPMI commands against a live agent before saving.
 
-This section generates a ready-to-run install command for deploying Linux agents. Configure your settings visually, then copy the command and run it on the target machine.
+Deploying Linux or Windows? This step doesn't appear - continue below.
 
-### Step 1: Installation Mode
+### Step 3: Install & Connection
 
-| Mode               | Install Path                           | Log Path                          |
-| :------------------ | :------------------------------------- | :-------------------------------- |
-| **Standard** (`/opt/`) | `/opt/pankha-agent/`                  | `/var/log/pankha-agent/`          |
-| **Portable** (CWD)    | Current working directory (e.g., `~/pankha/`) | Same directory as the agent binary |
+![Install mode set to Standard with an Internal LAN connection and the Hub URL field](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/deploy-workspace-step3-connection-lan.png)
 
-> Both modes are functionally identical. They install the same systemd service and support the same features. The only difference is where files are stored.
+**Install mode** - where the agent lives on the target machine:
 
-### Step 2: Connection Settings
+| Mode                   | Install path                             | Log path                            |
+| :--------------------- | :--------------------------------------- | :---------------------------------- |
+| **Standard** (`/opt/`) | `/opt/pankha-agent/`                     | `/var/log/pankha-agent/`            |
+| **Portable**           | Current working directory (e.g. `~/pankha/`) | Same directory as the agent binary  |
 
-Choose how the agent will connect to your Hub:
+> Both modes are functionally identical - same systemd service, same features. Only the file locations differ.
 
-*   **Internal**: Uses your server's LAN IP (e.g., `http://192.168.1.100:3143`). Best for agents on the same network.
-*   **External**: Uses the URL you're currently browsing from. Best for remote agents outside your LAN.
+**Connection** - how the agent reaches your Hub. **Internal** uses your server's LAN address, right for agents on the same network. **External** is for agents that reach the Hub at a public URL (e.g. behind a reverse proxy):
 
-You can also manually edit the Hub URL if needed.
+![Connection set to External with a public Hub URL](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/deploy-workspace-step3-connection-web.png)
 
-### Step 3: Agent Configuration
+The **Hub URL** field is editable either way - agents call this URL on every poll, so it must be reachable from the agent's network.
 
-Configure the agent's behavior before deployment:
+### Step 4: Runtime Defaults
 
-| Setting              | Options                       | Description                                                  |
-| :------------------- | :---------------------------- | :----------------------------------------------------------- |
-| **Log Level**        | DEBUG, INFO, WARN, ERROR      | Verbosity of agent logs                                      |
-| **Emergency Temp**   | 70-85 C                       | All fans go to 100% if any sensor reaches this temperature   |
-| **Failsafe Speed**   | 30-100%                       | Fan speed when the agent loses connection to the Hub         |
-| **Agent Rate**       | 1-10 seconds                  | How often the agent reads sensors and reports data            |
-| **Fan Step**         | 1-15%                         | Maximum fan speed change per update cycle (smooth transitions)|
-| **Hysteresis**       | 1-5 C                         | Minimum temperature change before the fan adjusts            |
+These settings are baked into the agent's configuration when the install script runs (all changeable later from the dashboard):
 
-> See [Advanced Settings](Agents-Advanced-Settings) for detailed explanations of each setting.
+![Runtime defaults with chip selectors for log level, emergency temperature, failsafe speed, agent rate, fan step, and hysteresis](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/deploy-workspace-step4-prepare-defaults.png)
 
-### Step 4: Copy and Run
+| Setting            | Options                | Default | Description                                                    |
+| :----------------- | :--------------------- | :------ | :------------------------------------------------------------- |
+| **Log Level**      | TRACE to ERROR         | INFO    | Verbosity of agent logs                                        |
+| **Emergency °C**   | 60-100°C               | 85°C    | All fans go to 100% if any sensor reaches this temperature     |
+| **Failsafe Speed** | 0-100%                 | 70%     | Fan speed when the agent loses connection to the Hub           |
+| **Agent rate**     | 0.5-30 seconds         | 3s      | How often the agent reads sensors and reports data             |
+| **Fan Step**       | 2-50%, or Disable      | 5%      | Maximum fan speed change per update cycle (smooth transitions) |
+| **Hysteresis**     | 0.5-10°C, or Disable   | 2.0°C   | Minimum temperature change before a fan adjusts                |
 
-Two terminal blocks display your install command in both **curl** and **wget** format. Click **Copy** and run it on the target Linux machine:
+> See [Advanced Settings](Agents-Advanced-Settings) for what each setting does in detail.
+
+### The Summary Panel: Copy and Run
+
+The right-hand panel recaps every choice and holds the install command, with a **wget/curl** toggle:
+
+![Deploy summary panel with the configuration recap and the copy deploy command button](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/deploy-workspace-step5-copy-command.png)
+
+Click **Copy Deploy Command** and run it on the target machine, as root (or as a user with `sudo` - the script escalates on its own):
 
 ```bash
 # Example (your command will have a unique token)
-curl -sSL "http://192.168.1.100:3143/api/deploy/linux?token=abc123" | bash
+wget -qO- "http://192.168.1.100:3143/api/deploy/linux?token=abc123" | bash
 ```
 
-The command downloads the agent binary from your Hub (not the internet), creates the configuration, installs the systemd service, and starts the agent. It will appear on your dashboard within seconds.
+The script downloads the agent from your Hub, writes the configuration, installs the systemd service, and starts the agent - it self-registers and appears on your dashboard within seconds. IPMI deployments work the same way with their own script and include the selected BMC profile.
 
-> **Token expiry**: Each generated command contains a unique token that expires after **24 hours**. Generate a new command if the token has expired.
+Two properties make the command fleet-friendly:
+
+*   **Reusable**: the same command works on as many machines as you like while its token is valid - paste it on every target node, no need to generate one per machine.
+*   **Architecture-aware**: before installing, the script detects the machine's CPU architecture and downloads the matching binary from your Hub (x86_64 or aarch64) - so one command covers a mixed fleet. On an unsupported architecture it stops with a clear error before changing anything.
+
+For **Windows**, the summary provides the MSI download link instead - run the installer on the target machine (see [Windows Agent](Agents-Windows)).
+
+> **Token expiry**: the command's token is valid for **24 hours** from generation. After that the server rejects it ("Invalid or expired token") - just generate a fresh command.
 
 ---
 
-## Fleet Maintenance
+## Existing Fleet
 
-This section shows all connected agents in a table and lets you manage updates.
+The fleet table below the deploy workspace lists every agent with its platform, type, version, and status (Online, Offline, Error, or Updating). Version badges flag agents that don't match your staged version - **NEW** for updates, **DOWNGRADE** if the staged version is older.
 
-### Agent Table
+![Fleet maintenance table with version badges and update actions](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/fleet-maintenance.png)
 
-| Column        | Description                                       |
-| :------------ | :------------------------------------------------ |
-| **Hostname**  | Agent name with platform icon (Windows or Linux)  |
-| **Agent ID**  | Unique agent identifier                           |
-| **Version**   | Current agent version (with update badge if outdated) |
-| **Status**    | Online, Offline, or Updating                      |
-| **Maintenance** | Update action (platform-specific)               |
+### Updating Linux and IPMI Agents
 
-### Updating Linux Agents
-
-1.  **Stage a version** in the Agent Downloads section (see above).
-2.  Open **Fleet Maintenance** and look for agents with the **"NEW vX.X.X"** badge.
-3.  Click **Update Now**. The agent downloads the new binary from the Hub, performs an atomic swap, and restarts automatically.
-4.  The agent reconnects within a few seconds and shows the new version.
+1.  **Stage the target version** (Step 2 above).
+2.  Click **Update Now** on an agent's row.
+3.  The agent downloads the binary from your Hub, verifies the SHA256 checksum, swaps it atomically, and restarts - it reconnects with the new version in a few seconds.
 
 ```mermaid
 ---
@@ -132,7 +147,7 @@ title: Remote Agent Update Flow
 sequenceDiagram
     participant User as Dashboard
     participant Hub as Pankha Hub
-    participant Agent as Linux Agent
+    participant Agent as Agent
 
     User->>Hub: Click "Update Now"
     Hub->>Agent: selfUpdate command (WebSocket)
@@ -144,16 +159,20 @@ sequenceDiagram
     Hub->>User: Agent shows updated version
 ```
 
-> **Downgrade**: If the staged Hub version is older than the agent's current version, the button will show **"Downgrade"** instead.
-
 ### Updating Windows Agents
 
-Windows agents cannot be updated remotely. The table provides a **Download MSI** link to the latest release. Download and install it manually on the Windows machine.
+Remote update for Windows agents is in the works. Until then, their row offers a **Download MSI** link - run it on the Windows machine; your settings are preserved automatically.
+
+---
+
+## Resources
+
+The Resources section links to the documentation hub, the per-platform service guides, advanced settings, and the issue tracker.
 
 ---
 
 ## Next Steps
 
-*   [Advanced Settings](Agents-Advanced-Settings): Fine-tune agent behavior after deployment.
-*   [Fan Profiles & Logic](Fan-Profiles): Set up fan curves for your newly deployed agents.
-*   [Troubleshooting](Troubleshooting): If an agent doesn't appear after deployment.
+*   [Advanced Settings](Agents-Advanced-Settings): fine-tune agent behavior after deployment.
+*   [Fan Profiles & Logic](Fan-Profiles): set up fan curves for your newly deployed agents.
+*   [Troubleshooting](Troubleshooting): if an agent doesn't appear after deployment.

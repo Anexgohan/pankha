@@ -2,6 +2,11 @@
 
 Pankha exposes a REST API for configuration and a WebSocket interface for real-time data. Base URL: `http://<server-ip>:3143`
 
+Two kinds of identifiers appear in these routes:
+
+*   **Database IDs** (numeric): `:id` for systems, and `:sensorId` / `:fanId` in label, visibility, and ordering routes.
+*   **Hardware IDs** (string, e.g. `it8628_fan_1`): `:fanId` in the fan speed and calibration routes. IPMI agents use the zone ID here (e.g. `cpu_zone`).
+
 ---
 
 ## Health & Status
@@ -11,7 +16,7 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 | GET    | `/health`             | Backend health check with service statistics |
 | GET    | `/api/overview`       | Aggregate stats across all systems           |
 | GET    | `/api/websocket/info` | WebSocket connection info and stats          |
-| POST   | `/api/emergency-stop` | Set all fans to 100% on all systems          |
+| POST   | `/api/emergency-stop` | Force all fans to 100% on all systems        |
 
 ---
 
@@ -36,20 +41,37 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 | PUT    | `/api/systems/controller/interval` | Set controller update interval |
 
 ### Sensors
-| Method | Endpoint                                               | Description                |
-| ------ | ------------------------------------------------------ | -------------------------- |
-| GET    | `/api/systems/:id/sensors`                             | Get all sensors for system |
-| PUT    | `/api/systems/:id/sensors/:sensorId/label`             | Set custom sensor label    |
-| PUT    | `/api/systems/:id/sensors/:sensorId/visibility`        | Show/hide sensor           |
-| GET    | `/api/systems/:id/sensor-visibility`                   | Get visibility settings    |
-| PUT    | `/api/systems/:id/sensor-groups/:groupName/visibility` | Show/hide sensor group     |
+| Method | Endpoint                                               | Description                          |
+| ------ | ------------------------------------------------------ | ------------------------------------ |
+| GET    | `/api/systems/:id/sensors`                             | Get all sensors for system           |
+| PUT    | `/api/systems/:id/sensors/:sensorId/label`             | Set custom sensor label              |
+| PUT    | `/api/systems/:id/sensors/:sensorId/visibility`        | Show/hide sensor (`{ is_hidden }`)   |
+| GET    | `/api/systems/:id/sensor-visibility`                   | Get visibility settings              |
+| PUT    | `/api/systems/:id/sensor-groups/:groupName/visibility` | Show/hide sensor group               |
+| GET    | `/api/systems/:id/sensor-order`                        | Get custom sensor display order      |
+| PUT    | `/api/systems/:id/sensors/order`                       | Reorder sensors within a group       |
+| PUT    | `/api/systems/:id/sensor-groups/order`                 | Reorder sensor groups                |
 
 ### Fans
-| Method | Endpoint                             | Description                |
-| ------ | ------------------------------------ | -------------------------- |
-| GET    | `/api/systems/:id/fans`              | Get all fans for system    |
-| PUT    | `/api/systems/:id/fans/:fanId`       | **Set fan speed** (0-100%) |
-| PUT    | `/api/systems/:id/fans/:fanId/label` | Set custom fan label       |
+| Method | Endpoint                                  | Description                                |
+| ------ | ----------------------------------------- | ------------------------------------------ |
+| GET    | `/api/systems/:id/fans`                   | Get all fans for system                    |
+| PUT    | `/api/systems/:id/fans/:fanId`            | **Set fan speed** (`{ speed: 0-100 }`)     |
+| PUT    | `/api/systems/:id/fans/:fanId/label`      | Set custom fan label                       |
+| PUT    | `/api/systems/:id/fans/:fanId/visibility` | Show/hide fan (`{ is_hidden }`)            |
+
+Manual speed commands return `409` while the fan is locked by a running calibration.
+
+### Fan Calibration
+| Method | Endpoint                                            | Description                                        |
+| ------ | --------------------------------------------------- | -------------------------------------------------- |
+| GET    | `/api/systems/:id/calibrations`                     | Calibration snapshot for all fans on a system      |
+| GET    | `/api/systems/:id/fans/:fanId/calibration`          | Current calibration facts for one fan              |
+| GET    | `/api/systems/:id/fans/:fanId/calibration/history`  | Past calibration runs (trend data)                 |
+| POST   | `/api/systems/:id/fans/:fanId/calibrate`            | Start a manual calibration run (`409` if offline)  |
+| POST   | `/api/systems/:id/fans/:fanId/stalls/clear`         | Clear the fan's unexpected-stop log                |
+
+See [Calibration & Health](Fan-Calibration) for what these measurements mean.
 
 ### Agent Settings
 | Method | Endpoint                              | Description                          |
@@ -71,15 +93,15 @@ Pankha exposes a REST API for configuration and a WebSocket interface for real-t
 | GET    | `/api/systems/settings/:key` | Get a specific setting by key           |
 | PUT    | `/api/systems/settings/:key` | Update a setting (`{ "value": "..." }`) |
 
-Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data_retention_days`, `accent_color`, `hover_tint_color`
+Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data_retention_days`, `accent_color`, `hover_tint_color`, `hardware_prune_days`, `fan_recalibration_days`, `ui_font_primary`, `ui_font_secondary`, `ui_font_scale`, `hub_log_level`
 
 ### Profiles & History
-| Method | Endpoint                    | Description                    |
-| ------ | --------------------------- | ------------------------------ |
-| PUT    | `/api/systems/:id/profile`  | Assign profile to system       |
-| POST   | `/api/systems/:id/profiles` | Create system-specific profile |
-| GET    | `/api/systems/:id/history`  | Get historical sensor/fan data |
-| GET    | `/api/systems/:id/charts`   | Get aggregated chart data      |
+| Method | Endpoint                    | Description                                                     |
+| ------ | --------------------------- | --------------------------------------------------------------- |
+| PUT    | `/api/systems/:id/profile`  | Assign profile to system                                        |
+| POST   | `/api/systems/:id/profiles` | Create system-specific profile                                  |
+| GET    | `/api/systems/:id/history`  | Historical data (`start_time`, `end_time`, `sensor_ids`, `fan_ids`, `limit`) |
+| GET    | `/api/systems/:id/charts`   | Get aggregated chart data                                       |
 
 ---
 
@@ -103,12 +125,40 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 ---
 
+## Fan Profile Types
+
+User-defined categories for organizing profiles (built-in types like `silent` and `performance` are system types and cannot be changed).
+
+| Method | Endpoint                       | Description                                         |
+| ------ | ------------------------------ | --------------------------------------------------- |
+| GET    | `/api/fan-profile-types`       | List all types with `is_system` flag and use count  |
+| POST   | `/api/fan-profile-types`       | Create a type (`{ name }`, `409` on name collision) |
+| PATCH  | `/api/fan-profile-types/:name` | Rename a user-defined type                          |
+| DELETE | `/api/fan-profile-types/:name` | Delete an unused user-defined type                  |
+
+---
+
 ## Fan Configurations
 
 | Method | Endpoint                            | Description                  |
 | ------ | ----------------------------------- | ---------------------------- |
 | GET    | `/api/fan-configurations/:systemId` | Get fan configurations       |
 | POST   | `/api/fan-configurations/sensor`    | Configure fan sensor mapping |
+
+---
+
+## Virtual Sensors
+
+Combine real sensors into a computed one. A virtual sensor is referenced by other APIs as `__virtual__<id>`.
+
+| Method | Endpoint                        | Description                                                          |
+| ------ | ------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/api/virtual-sensors/:systemId`| List virtual sensors for a system                                     |
+| GET    | `/api/virtual-sensors/:id/usage`| Where this virtual sensor is used (fan assignments)                   |
+| POST   | `/api/virtual-sensors`          | Create (`{ system_id, name, operation: max\|avg\|median, sensor_ids }`, minimum 2 sensors) |
+| PUT    | `/api/virtual-sensors/order`    | Reorder virtual sensors                                               |
+| PUT    | `/api/virtual-sensors/:id`      | Update name, operation, or members                                    |
+| DELETE | `/api/virtual-sensors/:id`      | Delete a virtual sensor                                               |
 
 ---
 
@@ -127,14 +177,35 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 ## Deploy
 
-| Method | Endpoint                     | Description                                      |
-| ------ | ---------------------------- | ------------------------------------------------ |
-| POST   | `/api/deploy/templates`      | Generate a deployment token (expires in 24h)     |
-| GET    | `/api/deploy/linux`          | Serve dynamic install script (`?token=<token>`)  |
-| GET    | `/api/deploy/hub/status`     | Status of locally cached agent binaries          |
-| POST   | `/api/deploy/hub/stage`      | Download a specific agent version to the hub     |
-| DELETE | `/api/deploy/hub/clear`      | Clear all locally cached agent binaries          |
-| GET    | `/api/deploy/binaries/:arch` | Serve cached agent binary (`x86_64` / `aarch64`) |
+| Method | Endpoint                                | Description                                            |
+| ------ | --------------------------------------- | ------------------------------------------------------ |
+| POST   | `/api/deploy/templates`                 | Generate a deployment token (expires in 24h)           |
+| GET    | `/api/deploy/linux`                     | Serve dynamic Linux install script (`?token=<token>`)  |
+| GET    | `/api/deploy/ipmi`                      | Serve dynamic IPMI install script (`?token=<token>`)   |
+| GET    | `/api/deploy/hub/status`                | Status of locally cached agent binaries                |
+| POST   | `/api/deploy/hub/stage`                 | Download a specific agent version to the hub           |
+| DELETE | `/api/deploy/hub/clear`                 | Clear all locally cached agent binaries                |
+| GET    | `/api/deploy/binaries/:agentType/:arch` | Serve cached binary (`os_linux`/`ipmi_host`, `x86_64`/`aarch64`) |
+| GET    | `/api/deploy/binaries/:arch`            | Serve cached OS agent binary (legacy form)             |
+
+### BMC Profiles (IPMI)
+
+Vendor profiles that teach the IPMI agent how to talk to a server's BMC.
+
+| Method | Endpoint                                   | Description                                        |
+| ------ | ------------------------------------------ | -------------------------------------------------- |
+| GET    | `/api/deploy/profiles`                     | Vendor/model catalog for profile selection         |
+| GET    | `/api/deploy/profiles/refresh`             | Re-scan profile files on disk                      |
+| GET    | `/api/deploy/profiles/assigned/:agentId`   | Resolved profile assigned to an agent              |
+| PUT    | `/api/deploy/profiles/assign/:agentId`     | Assign a profile to an agent                       |
+| POST   | `/api/deploy/profiles/custom`              | Save a custom profile from the Profile Builder     |
+| GET    | `/api/deploy/profiles/:vendor/:model`      | Get one profile definition                         |
+
+### Profile Builder
+
+| Method | Endpoint                            | Description                                             |
+| ------ | ----------------------------------- | ------------------------------------------------------- |
+| POST   | `/api/systems/:id/execute-raw-ipmi` | Run a raw IPMI command on an agent (profile testing)    |
 
 ---
 
@@ -162,16 +233,35 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 **Endpoint**: `ws://<server-ip>:3143/websocket`
 
+### Messages (Client → Server)
+
+| Message           | Description                                    |
+| ----------------- | ---------------------------------------------- |
+| `subscribe`       | Subscribe to topics (e.g. `systems:all`)       |
+| `unsubscribe`     | Unsubscribe from topics                        |
+| `requestFullSync` | Request a complete state snapshot              |
+| `getSystemData`   | Request one system's current data              |
+| `getOverview`     | Request aggregate stats                        |
+| `ping`            | Keep-alive check                               |
+
 ### Events (Server → Client)
 
-| Event                | Description                               |
-| -------------------- | ----------------------------------------- |
-| `fullState`          | Complete snapshot on connection           |
-| `systemDelta`        | Incremental updates (bandwidth optimized) |
-| `agentRegistered`    | Agent connected                           |
-| `agentOffline`       | Agent disconnected                        |
-| `agentError`         | Agent error occurred                      |
-| `agentConfigUpdated` | Config change (immediate broadcast)       |
+| Event                 | Description                                            |
+| --------------------- | ------------------------------------------------------ |
+| `fullState`           | Complete snapshot (on connect / full sync)             |
+| `systemDelta`         | Incremental updates (only changed values)              |
+| `systemOffline`       | Agent disconnected                                     |
+| `agentRegistered`     | Agent connected                                        |
+| `agentUnregistered`   | Agent stopped gracefully                               |
+| `agentError`          | Agent reported a hardware error                        |
+| `agentRecovered`      | Agent recovered from an error state                    |
+| `agentConfigUpdated`  | Config change (immediate broadcast)                    |
+| `fanCalibrationStatus`| Calibration run lifecycle (running/done/failed)        |
+| `fanStalled`          | Stall watchdog: fan read 0 RPM while commanded to spin |
+| `fanStallCleared`     | Stall condition cleared                                |
+| `commandCompleted`    | A dispatched agent command finished                    |
+| `commandFailed`       | A dispatched agent command failed                      |
+| `licenseUpdated`      | License changed on the backend (refetch `/api/license`)|
 
 ### Example: systemDelta
 ```json
@@ -193,23 +283,26 @@ Allowed setting keys: `controller_update_interval`, `graph_history_hours`, `data
 
 ### Set Fan Speed
 ```bash
-curl -X PUT http://localhost:3143/api/systems/1/fans/fan1 \
+curl -X PUT http://localhost:3143/api/systems/1/fans/it8628_fan_1 \
   -H "Content-Type: application/json" \
   -d '{"speed": 75}'
 ```
 
-### Create Fan Profile
+### Create a Virtual Sensor
 ```bash
-curl -X POST http://localhost:3143/api/fan-profiles \
+curl -X POST http://localhost:3143/api/virtual-sensors \
   -H "Content-Type: application/json" \
   -d '{
-    "profile_name": "Silent",
-    "curve_points": [
-      {"temperature": 30, "fan_speed": 30},
-      {"temperature": 50, "fan_speed": 50},
-      {"temperature": 70, "fan_speed": 100}
-    ]
+    "system_id": 1,
+    "name": "CPU + NVMe Max",
+    "operation": "max",
+    "sensor_ids": [12, 15, 18]
   }'
+```
+
+### Start a Manual Calibration
+```bash
+curl -X POST http://localhost:3143/api/systems/1/fans/it8628_fan_1/calibrate
 ```
 
 ### Check Health
@@ -229,20 +322,19 @@ curl http://localhost:3143/health
 }
 ```
 
-| Code | Meaning                                    |
-| ---- | ------------------------------------------ |
-| 200  | Success                                    |
-| 201  | Created                                    |
-| 400  | Bad request                                |
-| 403  | Forbidden (license limit / read-only mode) |
-| 404  | Not found                                  |
-| 500  | Server error                               |
-| 503  | Service unavailable                        |
+| Code | Meaning                                                        |
+| ---- | -------------------------------------------------------------- |
+| 200  | Success                                                        |
+| 201  | Created                                                        |
+| 400  | Bad request                                                    |
+| 403  | Forbidden (license limit / read-only mode)                     |
+| 404  | Not found                                                      |
+| 409  | Conflict (system offline, calibration lock, name collision)    |
+| 500  | Server error                                                   |
+| 503  | Service unavailable                                            |
 
 ---
 
 ## Notes
 
-- **Authentication**: Not required in current version
-- **Rate Limiting**: None enforced; use WebSocket for real-time updates
-- **URL Parameters**: Replace `:id`, `:fanId`, etc. with actual values
+- **URL Parameters**: Replace `:id`, `:fanId`, etc. with actual values (see the identifier note at the top of this page).
