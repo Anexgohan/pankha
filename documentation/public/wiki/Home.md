@@ -4,6 +4,13 @@ Pankha Fan Control is an open-source, distributed fan control system for self-ho
 
 ![Centralized Dashboard](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/pankha_title-bar_01.png)
 
+## Getting Started
+
+1.  **[Quick Start](Quick-Start)**: from nothing installed to fans under automatic control, in five steps.
+2.  **[Server Installation](Server-Installation)**: the full server setup reference (Docker Compose, `.env`, ports).
+3.  **[Deployment Center](Deployment-Center)**: roll agents out to the rest of your machines.
+4.  **[Dashboard](Dashboard)**: a tour of everything on screen.
+
 ## Key Features
 
 *   **Centralized Control**: manage fan curves and speeds for your NAS, gaming PC, and rack servers from one dashboard ([Dashboard](Dashboard)).
@@ -55,9 +62,3 @@ graph LR
 
 All decisions - curves, thresholds, calibration - happen on the server. Agents are deliberately simple relays, which is why they are safe to put on every machine you own ([Agent Philosophy](Agent-Philosophy)).
 
-## Getting Started
-
-1.  **[Quick Start](Quick-Start)**: from nothing installed to fans under automatic control, in five steps.
-2.  **[Server Installation](Server-Installation)**: the full server setup reference (Docker Compose, `.env`, ports).
-3.  **[Deployment Center](Deployment-Center)**: roll agents out to the rest of your machines.
-4.  **[Dashboard](Dashboard)**: a tour of everything on screen.
