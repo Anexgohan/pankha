@@ -44,8 +44,8 @@ const free: TierConfig = {
 free.benefits = [
   `${free.agentLimit} Agents`,
   `${free.retentionDays} Days History`,
-  'Critical Temp & Fan Fail Alerts',
-  'Dashboard & Email Notifications',
+  'Alerts',
+  'Notifications',
 ];
 
 const pro: TierConfig = {
@@ -62,9 +62,9 @@ const pro: TierConfig = {
 pro.benefits = [
   `${pro.agentLimit} Agents`,
   `${pro.retentionDays} Days History`,
-  'Unlimited Alerts',
-  'All Notification Channels',
-  'Full API Access',
+  'Alerts',
+  'Notifications',
+  'API Access',
 ];
 
 const enterprise: TierConfig = {
@@ -81,9 +81,9 @@ const enterprise: TierConfig = {
 enterprise.benefits = [
   enterprise.agentLimit === Infinity ? 'Unlimited Agents' : `${enterprise.agentLimit} Agents`,
   `${enterprise.retentionDays} Days History`,
-  'Unlimited Alerts',
-  'All Notification Channels',
-  'Full API Access',
+  'Alerts',
+  'Notifications',
+  'API Access',
   'No Branding',
 ];
 
