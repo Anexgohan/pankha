@@ -8,8 +8,8 @@
  * - Pro: $5/month, $49/year, $199 lifetime
  * - Enterprise: $25/month, $249/year, $649 lifetime
  * 
- * NOTE: Dodo Payments checkout URLs are defined in:
- *       frontend/src/settings/components/Settings.tsx → CHECKOUT_URLS constant
+ * NOTE: Dodo Payments product IDs are defined in:
+ *       frontend/src/settings/components/Settings.tsx → PRODUCT_IDS constant
  */
 
 export interface TierPricing {
