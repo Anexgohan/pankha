@@ -210,15 +210,9 @@ function formatRelativeTime(dateInput: string | null): string {
   return rtf.format(Math.round(diffSec / (365.25 * 86400)), 'year');
 }
 
-// Dodo Payments configuration - Toggle IS_LIVE to switch modes
-const IS_LIVE = true;
-
-const CHECKOUT_BASE = IS_LIVE
-  ? 'https://checkout.dodopayments.com/buy'
-  : 'https://test.checkout.dodopayments.com/buy';
-
-const PRODUCT_IDS = IS_LIVE ? {
-  // LIVE MODE IDs
+// Dodo Payments product IDs. Purchases create a Checkout Session via
+// POST /api/license/checkout.
+const PRODUCT_IDS = {
   pro: {
     monthly: 'pdt_0NXHTcRtQcWwEsK5nzGaI',
     yearly: 'pdt_0NXHU9c2ZTT2vIcTACOJ6',
@@ -229,43 +223,7 @@ const PRODUCT_IDS = IS_LIVE ? {
     yearly: 'pdt_0NXHVMr0paoF5dyuxh8Tj',
     lifetime: 'pdt_0NXHVVviTeIhMfLCSLNqS',
   },
-} : {
-  // TEST MODE IDs
-  pro: {
-    monthly: 'pdt_0NV3sqzBkKRDNGHgkyOT4',
-    yearly: 'pdt_0NV8gT4no4UJnP34pVgnl',
-    lifetime: 'pdt_0NV8jwCkXAYkXJYyFrPQb',
-  },
-  enterprise: {
-    monthly: 'pdt_0NV3tEaaHxETmRVdeJ0Ei',
-    yearly: 'pdt_0NV8l5b1st3Cwv9PBbTLL',
-    lifetime: 'pdt_0NV8gqfMxnRCmhzbWUzyR',
-  },
-};
-
-const CHECKOUT_URLS = {
-  pro: {
-    monthly: `${CHECKOUT_BASE}/${PRODUCT_IDS.pro.monthly}`,
-    yearly: `${CHECKOUT_BASE}/${PRODUCT_IDS.pro.yearly}`,
-    lifetime: `${CHECKOUT_BASE}/${PRODUCT_IDS.pro.lifetime}`,
-  },
-  enterprise: {
-    monthly: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.monthly}`,
-    yearly: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.yearly}`,
-    lifetime: `${CHECKOUT_BASE}/${PRODUCT_IDS.enterprise.lifetime}`,
-  },
 } as const;
-
-// productId → static checkout URL lookup. Used by handleCheckout to resolve
-// the fallback URL when a Sessions API call fails or no discount is present.
-const PRODUCT_TO_STATIC_URL: Record<string, string> = {
-  [PRODUCT_IDS.pro.monthly]: CHECKOUT_URLS.pro.monthly,
-  [PRODUCT_IDS.pro.yearly]: CHECKOUT_URLS.pro.yearly,
-  [PRODUCT_IDS.pro.lifetime]: CHECKOUT_URLS.pro.lifetime,
-  [PRODUCT_IDS.enterprise.monthly]: CHECKOUT_URLS.enterprise.monthly,
-  [PRODUCT_IDS.enterprise.yearly]: CHECKOUT_URLS.enterprise.yearly,
-  [PRODUCT_IDS.enterprise.lifetime]: CHECKOUT_URLS.enterprise.lifetime,
-};
 
 // Diagnostics Tab Component
 interface SystemInfo {
@@ -1084,11 +1042,10 @@ const Settings: React.FC = () => {
   const productIdForCard = (
     tier: 'pro' | 'enterprise',
     billing: 'monthly' | 'yearly' | 'lifetime'
-  ): string | undefined => {
+  ): string => {
     const offer = discountForCard(promo, tier, billing);
-    if (!offer) return undefined;
-    const match = offer.appliesTo.find((a) => a.tier === tier && a.billing === billing);
-    return match?.productId;
+    const fromOffer = offer?.appliesTo.find((a) => a.tier === tier && a.billing === billing)?.productId;
+    return fromOffer ?? PRODUCT_IDS[tier][billing];
   };
 
   // Copy a discount code to the clipboard, briefly flip the icon to a check.
@@ -1205,17 +1162,16 @@ const Settings: React.FC = () => {
     return lines.join('\n');
   };
 
-  // Click handler for "Get Pro/Enterprise" buttons. With a discount code,
-  // calls backend /checkout to get a Dodo Sessions URL with discount
-  // pre-applied. Without a discount, opens the static Dodo URL directly.
-  // Any backend/network failure on the discounted path falls back to the
-  // static URL so the customer can always complete a purchase.
+  // Busy flag while a checkout session is being created; disables all buy
+  // buttons so a click can't double-fire.
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+
+  // Click handler for all "Get/Switch to ..." buttons. Creates a Dodo Checkout
+  // Session via backend /checkout (discount pre-applied when present) and
+  // navigates to it same-tab; the session return_url leads back here.
   const handleCheckout = async (productId: string, discountCode?: string) => {
-    const fallbackUrl = PRODUCT_TO_STATIC_URL[productId];
-    if (!discountCode) {
-      if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
-      return;
-    }
+    if (checkoutBusy) return;
+    setCheckoutBusy(true);
     try {
       const r = await fetch('/api/license/checkout', {
         method: 'POST',
@@ -1228,14 +1184,15 @@ const Settings: React.FC = () => {
       });
       const data = await r.json();
       if (data.ok && data.checkoutUrl) {
-        window.open(data.checkoutUrl, '_blank', 'noopener,noreferrer');
-        return;
+        window.location.assign(data.checkoutUrl);
+        return; // stay busy while the browser navigates away
       }
-      console.warn('[checkout] backend returned error, falling back to static URL', data);
+      console.warn('[checkout] backend returned error', data);
     } catch (e) {
-      console.warn('[checkout] request failed, falling back to static URL', e);
+      console.warn('[checkout] request failed', e);
     }
-    if (fallbackUrl) window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    setCheckoutBusy(false);
+    toast.error("Couldn't reach the license server. Try again in a minute, or purchase at pankha.app/pricing");
   };
 
   // Build per-card "Save X% for Y months" caption. Uses the active billing
@@ -2360,7 +2317,6 @@ const Settings: React.FC = () => {
                         ? Math.round(proPriceRaw * (1 - proDiscount.amountPct / 100) * 100) / 100
                         : proPriceRaw;
                       const proProductId = productIdForCard('pro', proBilling);
-                      const proStaticUrl = CHECKOUT_URLS.pro[proBilling];
                       const proPeriodSuffix = proBilling === 'monthly' ? 'mo' : 'yr';
                       return (
                         <div className="pricing-card featured" data-tier="pro">
@@ -2403,32 +2359,33 @@ const Settings: React.FC = () => {
                           </ul>
                           {license.tier === 'Pro' && license.billing === proBilling ? (
                             <div className="current-plan-badge">Current Plan</div>
-                          ) : proDiscount && proProductId ? (
+                          ) : proDiscount ? (
                             <button
                               type="button"
                               className={`pricing-buy-btn ${license.tier === 'Pro' ? 'current-tier-btn' : ''}`}
                               onClick={() => handleCheckout(proProductId, proDiscount.code)}
+                              disabled={checkoutBusy}
                             >
                               {license.tier === 'Pro' ? 'Switch to' : 'Get'} Pro {proBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${proPriceShown}/{proPeriodSuffix})
                             </button>
                           ) : license.tier === 'Pro' ? (
-                            <a
-                              href={proStaticUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
                               className="pricing-buy-btn current-tier-btn"
+                              onClick={() => handleCheckout(proProductId)}
+                              disabled={checkoutBusy}
                             >
                               Switch to {proBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${proPriceRaw}/{proPeriodSuffix})
-                            </a>
+                            </button>
                           ) : (
-                            <a
-                              href={proStaticUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
                               className="pricing-buy-btn"
+                              onClick={() => handleCheckout(proProductId)}
+                              disabled={checkoutBusy}
                             >
                               Get Pro (${proPriceRaw}/{proPeriodSuffix})
-                            </a>
+                            </button>
                           )}
                         </div>
                       );
@@ -2444,7 +2401,6 @@ const Settings: React.FC = () => {
                         ? Math.round(entPriceRaw * (1 - entDiscount.amountPct / 100) * 100) / 100
                         : entPriceRaw;
                       const entProductId = productIdForCard('enterprise', enterpriseBilling);
-                      const entStaticUrl = CHECKOUT_URLS.enterprise[enterpriseBilling];
                       const entPeriodSuffix = enterpriseBilling === 'monthly' ? 'mo' : 'yr';
                       return (
                         <div className="pricing-card" data-tier="enterprise">
@@ -2487,32 +2443,33 @@ const Settings: React.FC = () => {
                           </ul>
                           {license.tier === 'Enterprise' && license.billing === enterpriseBilling ? (
                             <div className="current-plan-badge">Current Plan</div>
-                          ) : entDiscount && entProductId ? (
+                          ) : entDiscount ? (
                             <button
                               type="button"
                               className={`pricing-buy-btn ${license.tier === 'Enterprise' ? 'current-tier-btn' : ''}`}
                               onClick={() => handleCheckout(entProductId, entDiscount.code)}
+                              disabled={checkoutBusy}
                             >
                               {license.tier === 'Enterprise' ? 'Switch to' : 'Get'} Enterprise {enterpriseBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${entPriceShown}/{entPeriodSuffix})
                             </button>
                           ) : license.tier === 'Enterprise' ? (
-                            <a
-                              href={entStaticUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
                               className="pricing-buy-btn current-tier-btn"
+                              onClick={() => handleCheckout(entProductId)}
+                              disabled={checkoutBusy}
                             >
                               Switch to {enterpriseBilling === 'monthly' ? 'Monthly' : 'Yearly'} (${entPriceRaw}/{entPeriodSuffix})
-                            </a>
+                            </button>
                           ) : (
-                            <a
-                              href={entStaticUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
                               className="pricing-buy-btn"
+                              onClick={() => handleCheckout(entProductId)}
+                              disabled={checkoutBusy}
                             >
                               Get Enterprise (${entPriceRaw}/{entPeriodSuffix})
-                            </a>
+                            </button>
                           )}
                         </div>
                       );
@@ -2528,7 +2485,6 @@ const Settings: React.FC = () => {
                         ? Math.round(lifePriceRaw * (1 - lifeDiscount.amountPct / 100) * 100) / 100
                         : lifePriceRaw;
                       const lifeProductId = productIdForCard(lifetimeTier, 'lifetime');
-                      const lifeStaticUrl = CHECKOUT_URLS[lifetimeTier].lifetime;
                       const lifeTierLabel = lifetimeTier === 'pro' ? 'Pro' : 'Enterprise';
                       return (
                         <div className="pricing-card lifetime" data-tier="lifetime">
@@ -2571,23 +2527,24 @@ const Settings: React.FC = () => {
                           </ul>
                           {license.tier === lifeTierLabel && license.billing === 'lifetime' ? (
                             <div className="current-plan-badge">Current Plan</div>
-                          ) : lifeDiscount && lifeProductId ? (
+                          ) : lifeDiscount ? (
                             <button
                               type="button"
                               className="pricing-buy-btn lifetime-btn"
                               onClick={() => handleCheckout(lifeProductId, lifeDiscount.code)}
+                              disabled={checkoutBusy}
                             >
                               Get {lifeTierLabel} Lifetime (${lifePriceShown})
                             </button>
                           ) : (
-                            <a
-                              href={lifeStaticUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              type="button"
                               className="pricing-buy-btn lifetime-btn"
+                              onClick={() => handleCheckout(lifeProductId)}
+                              disabled={checkoutBusy}
                             >
                               Get {lifeTierLabel} Lifetime (${lifePriceRaw})
-                            </a>
+                            </button>
                           )}
                         </div>
                       );
