@@ -76,7 +76,7 @@ impl super::client::WebSocketClient {
         };
 
         let config = self.config.read().await;
-        let registration = serde_json::json!({
+        let mut registration = serde_json::json!({
             "type": "register",
             "data": {
                 "agentId": config.agent.id,
@@ -99,6 +99,14 @@ impl super::client::WebSocketClient {
                 }
             }
         });
+
+        // Present the permanent token if we have one; otherwise the one-time
+        // enrollment token from the install script (exchanged on first register)
+        if let Some(token) = &config.auth.auth_token {
+            registration["data"]["auth_token"] = serde_json::json!(token);
+        } else if let Some(token) = &config.auth.enrollment_token {
+            registration["data"]["enrollment_token"] = serde_json::json!(token);
+        }
 
         write.send(Message::text(registration.to_string())).await?;
         info!("✅ Agent registered: {}", config.agent.id);

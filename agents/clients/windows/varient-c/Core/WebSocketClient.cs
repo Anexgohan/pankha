@@ -227,7 +227,13 @@ public class WebSocketClient : IDisposable
                         Sensors = sensors,
                         Fans = fans,
                         FanControl = _config.Hardware.EnableFanControl
-                    }
+                    },
+                    // Permanent token if enrolled; otherwise the one-time
+                    // enrollment token (exchanged on first register)
+                    AuthToken = _config.Auth.AuthToken,
+                    EnrollmentToken = _config.Auth.AuthToken == null
+                        ? _config.Auth.EnrollmentToken
+                        : null
                 }
             };
 
@@ -440,6 +446,43 @@ public class WebSocketClient : IDisposable
             {
                 case "registered":
                     _logger.Information("Registration confirmed by backend");
+
+                    // Enrollment exchange: persist the Hub-minted auth token
+                    // (delivered in the registered response) and drop the
+                    // one-time enrollment token
+                    var registeredJson = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    var issuedToken = registeredJson["data"]?["auth_token"]?.Value<string>()
+                        ?? registeredJson["auth_token"]?.Value<string>();
+                    if (!string.IsNullOrEmpty(issuedToken))
+                    {
+                        _config.Auth.AuthToken = issuedToken;
+                        _config.Auth.EnrollmentToken = null;
+                        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
+                        // Never log the token itself
+                        _logger.Information("Hub auth token stored (saved to config)");
+                    }
+                    break;
+
+                case "registrationPending":
+                    // Hub is holding this agent for admin approval (D13). Keep
+                    // the connection; the Hub promotes us with "registered"
+                    // once approved. Telemetry sent meanwhile is ignored.
+                    var pendingJson = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    var pendingReason = pendingJson["data"]?["reason"]?.Value<string>()
+                        ?? "awaiting approval";
+                    _logger.Information(
+                        "Hub is holding this agent for approval ({Reason}). Approve it on the Pankha dashboard.",
+                        pendingReason);
+                    break;
+
+                case "registrationError":
+                    // Hub refused this agent. The Hub closes the connection
+                    // next; standard reconnect backoff takes over.
+                    var errorJson = Newtonsoft.Json.Linq.JObject.Parse(json);
+                    var errorReason = errorJson["data"]?["error"]?.Value<string>()
+                        ?? errorJson["error"]?.Value<string>()
+                        ?? "no reason given";
+                    _logger.Error("Hub rejected registration: {Reason}", errorReason);
                     break;
 
                 case "command":

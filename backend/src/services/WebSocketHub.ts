@@ -56,6 +56,24 @@ interface WebSocketMessage {
   clientId?: string;
 }
 
+// Credential-less agent held for admin approval (D13). Lives in memory only,
+// tied to its connection; no systems row, no license seat, telemetry ignored.
+interface PendingAgent {
+  clientId: string;
+  registrationData: any;
+  agentId: string;
+  name: string;
+  ip?: string;
+  agentType?: string;
+  platform?: string;
+  version?: string;
+  reason: string;
+  requestedAt: string;
+}
+
+// Bound on concurrently held pending agents (memory + card-spam cap)
+const MAX_PENDING_AGENTS = 20;
+
 export class WebSocketHub extends EventEmitter {
   private static instance: WebSocketHub;
   private wss: WebSocketServer | null = null;
@@ -65,6 +83,8 @@ export class WebSocketHub extends EventEmitter {
   // the per-client `subscriptions` Sets; keep them in sync only through
   // add/removeClientSubscription and removeClientFromIndex.
   private subscriptionIndex: Map<string, Set<string>> = new Map();
+  // agentId -> pending-approval entry (D13)
+  private pendingAgents: Map<string, PendingAgent> = new Map();
   private dataAggregator: DataAggregator;
   private agentManager: AgentManager;
   private commandDispatcher: CommandDispatcher;
@@ -440,6 +460,21 @@ export class WebSocketHub extends EventEmitter {
         log.info(` Frontend client disconnected: ${clientId}`, "WebSocketHub");
       }
 
+      // Pending-approval entries live with their connection (D13)
+      for (const [agentId, entry] of this.pendingAgents) {
+        if (entry.clientId === clientId) {
+          this.pendingAgents.delete(agentId);
+          this.broadcast("agentPendingRemoved", { agentId }, [
+            "agents:all",
+            "systems:all",
+          ]);
+          log.info(
+            `Pending agent ${agentId} disconnected before approval`,
+            "WebSocketHub"
+          );
+        }
+      }
+
       this.removeClientFromIndex(client); // before removing the client itself
       this.clients.delete(clientId);
       this.emit("clientDisconnected", { clientId, client });
@@ -654,7 +689,10 @@ export class WebSocketHub extends EventEmitter {
    */
   private async handleAgentRegistration(
     clientId: string,
-    registrationData: any
+    registrationData: any,
+    // true only from approvePendingAgent: an admin vouched for this agent, so
+    // the credential tree is skipped and the grandfather path issues a token
+    preApproved: boolean = false
   ): Promise<void> {
     try {
       log.info(
@@ -683,55 +721,57 @@ export class WebSocketHub extends EventEmitter {
         return;
       }
 
-      // Credential decision tree (task_02 section 4.1):
+      // Credential decision tree (task_02 section 4.4):
       //   auth_token + stored hash        -> verify or close
-      //   enrollment_token, unknown agent -> exchange for a minted token
+      //   enrollment_token valid          -> exchange for a minted token
       //   known agent, no stored hash     -> grandfather, issue via setAuthToken
-      //   nothing valid                   -> close
-      const db2 = Database.getInstance();
-      const existing = await db2.get(
-        "SELECT auth_token_hash FROM systems WHERE agent_id = $1",
-        [agentId]
-      );
-      const presentedToken = registrationData.auth_token;
-      const presentedEnrollment = registrationData.enrollment_token;
-
+      //   unknown, nothing valid          -> hold as pending-approval card
       let mintedToken: string | null = null; // returned in the registered response
-      let issueTokenViaCommand = false; // grandfather path (setAuthToken push)
+      let issueTokenViaCommand = preApproved; // grandfather path (setAuthToken push)
 
-      if (existing?.auth_token_hash) {
-        if (!verifyAgentToken(presentedToken, existing.auth_token_hash)) {
-          log.warn(
-            `Agent ${agentId} presented ${presentedToken ? "an invalid" : "no"} auth token - rejecting`,
-            "WebSocketHub"
-          );
-          this.sendToClient(clientId, "registrationError", {
-            error: "Agent token rejected",
-          });
-          this.clients.get(clientId)?.websocket.close(4403, "agent token rejected");
-          return;
-        }
-      } else if (existing) {
-        // Known agent, not yet secured. A valid enrollment token (reinstall
-        // over an existing system) mints inline; otherwise grandfather.
-        if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
-          mintedToken = mintAgentToken();
+      if (!preApproved) {
+        const db2 = Database.getInstance();
+        const existing = await db2.get(
+          "SELECT auth_token_hash FROM systems WHERE agent_id = $1",
+          [agentId]
+        );
+        const presentedToken = registrationData.auth_token;
+        const presentedEnrollment = registrationData.enrollment_token;
+
+        if (existing?.auth_token_hash) {
+          if (!verifyAgentToken(presentedToken, existing.auth_token_hash)) {
+            log.warn(
+              `Agent ${agentId} presented ${presentedToken ? "an invalid" : "no"} auth token - rejecting`,
+              "WebSocketHub"
+            );
+            this.sendToClient(clientId, "registrationError", {
+              error: "Agent token rejected",
+            });
+            this.clients.get(clientId)?.websocket.close(4403, "agent token rejected");
+            return;
+          }
+        } else if (existing) {
+          // Known agent, not yet secured. A valid enrollment token (reinstall
+          // over an existing system) mints inline; otherwise grandfather.
+          if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
+            mintedToken = mintAgentToken();
+          } else {
+            issueTokenViaCommand = true;
+          }
         } else {
-          issueTokenViaCommand = true;
-        }
-      } else {
-        // Unknown agent: enrollment token is the only way in. A deleted
-        // system's old token does not readmit it (delete = revoke).
-        if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
-          mintedToken = mintAgentToken();
-        } else {
-          const reason = presentedEnrollment
-            ? "Deploy token invalid or expired - generate a fresh install script from the Deployment page"
-            : "Enrollment required - deploy this agent via an install script from the Deployment page";
-          log.warn(`Unknown agent ${agentId} rejected: ${reason}`, "WebSocketHub");
-          this.sendToClient(clientId, "registrationError", { error: reason });
-          this.clients.get(clientId)?.websocket.close(4403, "enrollment required");
-          return;
+          // Unknown agent. Valid enrollment token = automatic (script flow).
+          // Anything else is held as a pending-approval card (D13): --setup
+          // installs, stale (>24h) install scripts, deleted-but-still-running
+          // agents. A human admin decides; nothing flows until then.
+          if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
+            mintedToken = mintAgentToken();
+          } else {
+            const reason = presentedEnrollment
+              ? "Install token expired - approve on the dashboard or run a fresh install script"
+              : "Registered without credentials - approve on the dashboard";
+            this.holdPendingAgent(clientId, registrationData, reason);
+            return;
+          }
         }
       }
 
@@ -1001,6 +1041,128 @@ export class WebSocketHub extends EventEmitter {
         error: "Registration processing failed",
       });
     }
+  }
+
+  /**
+   * Hold a credential-less agent for admin approval (D13). The connection
+   * stays open (so approval can promote it instantly) but the client is never
+   * marked isAgent - existing gates ignore its telemetry and responses.
+   */
+  private holdPendingAgent(
+    clientId: string,
+    registrationData: any,
+    reason: string
+  ): void {
+    const agentId = registrationData.agentId;
+    const previous = this.pendingAgents.get(agentId);
+
+    // Same agent retrying (reconnect after dismiss/restart): the new
+    // connection supersedes the old entry
+    if (previous && previous.clientId !== clientId) {
+      this.clients
+        .get(previous.clientId)
+        ?.websocket.close(4408, "superseded by newer registration");
+    }
+
+    if (!previous && this.pendingAgents.size >= MAX_PENDING_AGENTS) {
+      log.warn(
+        `Pending-approval queue full (${MAX_PENDING_AGENTS}) - turning away agent ${agentId}`,
+        "WebSocketHub"
+      );
+      this.sendToClient(clientId, "registrationError", {
+        error: "Hub pending-approval queue is full",
+      });
+      this.clients.get(clientId)?.websocket.close(4403, "pending queue full");
+      return;
+    }
+
+    const client = this.clients.get(clientId);
+    const entry: PendingAgent = {
+      clientId,
+      registrationData,
+      agentId,
+      name: registrationData.name || agentId,
+      ip: client?.metadata.ip,
+      agentType: registrationData.agent_type,
+      platform: registrationData.platform,
+      version: registrationData.agent_version,
+      reason,
+      requestedAt: new Date().toISOString(),
+    };
+    this.pendingAgents.set(agentId, entry);
+
+    log.info(`Agent ${agentId} held for approval: ${reason}`, "WebSocketHub");
+    this.sendToClient(clientId, "registrationPending", { agentId, reason });
+    this.broadcast("agentPendingApproval", this.pendingAgentView(entry), [
+      "agents:all",
+      "systems:all",
+    ]);
+  }
+
+  /** Metadata-only view of a pending agent (never the raw registration data) */
+  private pendingAgentView(entry: PendingAgent) {
+    const { clientId, registrationData, ...view } = entry;
+    return view;
+  }
+
+  public getPendingAgents() {
+    return Array.from(this.pendingAgents.values()).map((e) =>
+      this.pendingAgentView(e)
+    );
+  }
+
+  /**
+   * Admin approved a pending agent: run the normal registration for the held
+   * connection (row, config sync, registered response) with the grandfather
+   * path pushing its permanent token.
+   */
+  public async approvePendingAgent(
+    agentId: string
+  ): Promise<{ ok: boolean; error?: string }> {
+    const entry = this.pendingAgents.get(agentId);
+    if (!entry) {
+      return { ok: false, error: "No pending agent with that ID" };
+    }
+
+    this.pendingAgents.delete(agentId);
+    this.broadcast("agentPendingRemoved", { agentId }, [
+      "agents:all",
+      "systems:all",
+    ]);
+
+    const client = this.clients.get(entry.clientId);
+    if (!client || client.websocket.readyState !== WebSocket.OPEN) {
+      return {
+        ok: false,
+        error:
+          "Agent is no longer connected - it will reappear on its next reconnect",
+      };
+    }
+
+    log.info(`Pending agent ${agentId} approved by admin`, "WebSocketHub");
+    await this.handleAgentRegistration(entry.clientId, entry.registrationData, true);
+    return { ok: true };
+  }
+
+  /**
+   * Admin dismissed a pending agent: drop the entry and close the connection.
+   * Not a ban - the agent re-pends on its next reconnect; permanent silence
+   * means uninstalling the agent on that machine.
+   */
+  public dismissPendingAgent(agentId: string): { ok: boolean; error?: string } {
+    const entry = this.pendingAgents.get(agentId);
+    if (!entry) {
+      return { ok: false, error: "No pending agent with that ID" };
+    }
+
+    this.pendingAgents.delete(agentId);
+    this.broadcast("agentPendingRemoved", { agentId }, [
+      "agents:all",
+      "systems:all",
+    ]);
+    this.clients.get(entry.clientId)?.websocket.close(4403, "dismissed");
+    log.info(`Pending agent ${agentId} dismissed by admin`, "WebSocketHub");
+    return { ok: true };
   }
 
   /**

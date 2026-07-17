@@ -63,6 +63,8 @@ const ACCESS_RULES: Array<{ pattern: RegExp; access: AccessClass }> = [
   { pattern: /^POST \/deploy\/profiles\/custom$/, access: 'admin' },
   { pattern: /^POST \/systems\/\d+\/update$/, access: 'admin' },
   { pattern: /^DELETE \/systems\/\d+$/, access: 'admin' },
+  // Pending-approval queue (D13): admitting machines is admin territory
+  { pattern: /^(GET|POST|DELETE) \/systems\/pending(\/|$)/, access: 'admin' },
   { pattern: /^(POST|DELETE) \/license$/, access: 'admin' },
   { pattern: /^POST \/license\/(sync|renew|cancel|checkout)$/, access: 'admin' },
 ];

@@ -23,6 +23,11 @@ public class AgentConfig
     [JsonProperty("logging")]
     public LoggingSettings Logging { get; set; } = new();
 
+    // Hub credentials. Declared last so it serializes as the final section
+    // of config.json; default keeps pre-auth config files parsing.
+    [JsonProperty("auth")]
+    public AuthSettings Auth { get; set; } = new();
+
     /// <summary>
     /// Load configuration from file
     /// </summary>
@@ -265,7 +270,8 @@ public class AgentConfig
                 LogFile = "logs/agent.log",
                 MaxLogSizeMb = 50,
                 LogRetentionDays = 7
-            }
+            },
+            Auth = new AuthSettings()
         };
     }
 }

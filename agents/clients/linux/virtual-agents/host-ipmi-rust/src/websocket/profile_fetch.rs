@@ -14,12 +14,15 @@ use tracing::{info, warn, debug};
 pub async fn fetch_and_cache_profile(
     profile_url: &str,
     install_dir: &Path,
+    // Hub auth token: required once this agent is secured (the Hub rejects
+    // tokenless fetches for secured agents); None during first enrollment
+    auth_token: Option<&str>,
 ) -> Result<PathBuf> {
     let profile_path = install_dir.join("profile.json");
 
     // Attempt HTTP fetch
     info!("Fetching BMC profile from {}", profile_url);
-    match fetch_profile_http(profile_url).await {
+    match fetch_profile_http(profile_url, auth_token).await {
         Ok(json) => {
             std::fs::write(&profile_path, &json)
                 .with_context(|| format!("Failed to write profile to {:?}", profile_path))?;
@@ -41,9 +44,20 @@ pub async fn fetch_and_cache_profile(
 }
 
 /// Perform the HTTP GET request using curl (same pattern as self_update.rs).
-async fn fetch_profile_http(url: &str) -> Result<String> {
+async fn fetch_profile_http(url: &str, auth_token: Option<&str>) -> Result<String> {
+    let mut args: Vec<String> = vec![
+        "-sSL".to_string(),
+        "--max-time".to_string(),
+        "10".to_string(),
+    ];
+    if let Some(token) = auth_token {
+        args.push("-H".to_string());
+        args.push(format!("Authorization: Bearer {}", token));
+    }
+    args.push(url.to_string());
+
     let output = std::process::Command::new("curl")
-        .args(["-sSL", "--max-time", "10", url])
+        .args(&args)
         .output()
         .context("Failed to execute curl - ensure it is installed")?;
 

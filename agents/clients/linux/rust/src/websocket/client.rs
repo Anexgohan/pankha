@@ -525,6 +525,21 @@ impl WebSocketClient {
                         }
                     }
                 }
+                "registrationPending" => {
+                    // Hub is holding this agent for admin approval (D13).
+                    // Keep the connection; the Hub promotes us with a
+                    // "registered" message once approved. Telemetry we send
+                    // meanwhile is ignored Hub-side.
+                    let reason = message
+                        .get("data")
+                        .and_then(|d| d.get("reason"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("awaiting approval");
+                    info!(
+                        "Hub is holding this agent for approval ({}). Approve it on the Pankha dashboard.",
+                        reason
+                    );
+                }
                 "registrationError" => {
                     // Hub refused this agent. Say exactly why (expired deploy
                     // token vs rejected credential) - the Hub closes the

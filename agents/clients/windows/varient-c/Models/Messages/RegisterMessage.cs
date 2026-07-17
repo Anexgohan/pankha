@@ -65,6 +65,18 @@ public class RegisterData
 
     [JsonProperty("capabilities")]
     public Capabilities Capabilities { get; set; } = new();
+
+    /// <summary>
+    /// Hub-minted permanent credential (absent until enrolled)
+    /// </summary>
+    [JsonProperty("auth_token", NullValueHandling = NullValueHandling.Ignore)]
+    public string? AuthToken { get; set; }
+
+    /// <summary>
+    /// One-time deploy token, exchanged for auth_token on first register
+    /// </summary>
+    [JsonProperty("enrollment_token", NullValueHandling = NullValueHandling.Ignore)]
+    public string? EnrollmentToken { get; set; }
 }
 
 /// <summary>

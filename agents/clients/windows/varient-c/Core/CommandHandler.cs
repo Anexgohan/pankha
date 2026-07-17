@@ -68,6 +68,9 @@ public class CommandHandler
                 case "setEnableFanControl":
                     return await HandleSetEnableFanControlAsync(commandId, payload);
 
+                case "setAuthToken":
+                    return HandleSetAuthToken(commandId, payload);
+
                 case "setAgentName":
                     return await HandleSetAgentNameAsync(commandId, payload);
 
@@ -278,6 +281,28 @@ public class CommandHandler
         _logger.Information("Fan Control changed: {Old} → {New}", oldStatus, status);
 
         return Task.FromResult(CreateSuccessResponse(commandId, new { enabled }));
+    }
+
+    private CommandResponse HandleSetAuthToken(string commandId, Dictionary<string, object> payload)
+    {
+        // Persist happens BEFORE the response is returned - the Hub only
+        // commits the token hash once we respond success, so acking an
+        // unpersisted token would lock this agent out.
+        var token = GetPayloadValue<string>(payload, "authToken");
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return CreateErrorResponse(commandId, "Auth token cannot be empty");
+        }
+
+        _config.Auth.AuthToken = token;
+        // One-time bootstrap credential - no longer needed
+        _config.Auth.EnrollmentToken = null;
+        _config.SaveToFile(Pankha.WindowsAgent.Platform.PathResolver.ConfigPath);
+
+        // Never log the token itself
+        _logger.Information("Hub auth token stored (saved to config)");
+
+        return CreateSuccessResponse(commandId, new { message = "Auth token stored" });
     }
 
     private Task<CommandResponse> HandleSetAgentNameAsync(string commandId, Dictionary<string, object> payload)

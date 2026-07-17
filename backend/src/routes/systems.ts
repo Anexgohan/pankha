@@ -398,6 +398,45 @@ router.put("/controller/interval", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/systems/pending - Agents held for admin approval (D13)
+router.get("/pending", (_req: Request, res: Response) => {
+  res.json(WebSocketHub.getInstance().getPendingAgents());
+});
+
+// POST /api/systems/pending/:agentId/approve - Admit a pending agent
+router.post("/pending/:agentId/approve", async (req: Request, res: Response) => {
+  try {
+    if (isDemoMode()) {
+      return res.json(createDemoLockResponse("Agent approval is locked in demo"));
+    }
+    const result = await WebSocketHub.getInstance().approvePendingAgent(
+      req.params.agentId
+    );
+    if (!result.ok) {
+      return res.status(404).json({ error: result.error });
+    }
+    res.json({ message: "Agent approved", agent_id: req.params.agentId });
+  } catch (error) {
+    log.error("Error approving pending agent:", "systems", error);
+    res.status(500).json({ error: "Failed to approve agent" });
+  }
+});
+
+// DELETE /api/systems/pending/:agentId - Dismiss a pending agent (not a ban;
+// it reappears on its next reconnect unless uninstalled on the machine)
+router.delete("/pending/:agentId", (req: Request, res: Response) => {
+  if (isDemoMode()) {
+    return res.json(createDemoLockResponse("Agent dismissal is locked in demo"));
+  }
+  const result = WebSocketHub.getInstance().dismissPendingAgent(
+    req.params.agentId
+  );
+  if (!result.ok) {
+    return res.status(404).json({ error: result.error });
+  }
+  res.json({ message: "Agent dismissed", agent_id: req.params.agentId });
+});
+
 // GET /api/systems/:id - Get system details
 router.get("/:id", async (req: Request, res: Response) => {
   try {

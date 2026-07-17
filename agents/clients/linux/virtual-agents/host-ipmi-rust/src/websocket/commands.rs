@@ -165,6 +165,19 @@ impl super::client::WebSocketClient {
                     (false, Some("Missing or invalid excludedSensors".to_string()), serde_json::json!({}))
                 }
             }
+            "setAuthToken" => {
+                // Persist happens inside set_auth_token BEFORE the ack below -
+                // the Hub only commits the token hash once we respond success,
+                // so acking an unpersisted token would lock this agent out.
+                if let Some(token) = payload.get("authToken").and_then(|v| v.as_str()) {
+                    match self.set_auth_token(token).await {
+                        Ok(_) => (true, None, serde_json::json!({"message": "Auth token stored"})),
+                        Err(e) => (false, Some(e.to_string()), serde_json::json!({})),
+                    }
+                } else {
+                    (false, Some("Missing or invalid authToken".to_string()), serde_json::json!({}))
+                }
+            }
             "selfUpdate" => {
                 // Extract version from payload for comparison
                 let target_version = payload.get("version").and_then(|v| v.as_str()).map(|s| s.to_string());
@@ -183,6 +196,7 @@ impl super::client::WebSocketClient {
                 // Fetch fresh profile from backend API, save to disk, then hot-reload
                 let config = self.config.read().await;
                 let profile_url = config.profile_url();
+                let auth_token = config.auth.auth_token.clone();
                 drop(config);
 
                 let install_dir = std::env::current_exe()
@@ -190,7 +204,7 @@ impl super::client::WebSocketClient {
                     .and_then(|p| p.parent().map(|d| d.to_path_buf()))
                     .unwrap_or_else(|| std::path::PathBuf::from("."));
 
-                match super::profile_fetch::fetch_and_cache_profile(&profile_url, &install_dir).await {
+                match super::profile_fetch::fetch_and_cache_profile(&profile_url, &install_dir, auth_token.as_deref()).await {
                     Ok(path) => {
                         info!("Profile fetched from API to {:?}, hot-reloading...", path);
                         match self.hardware_monitor.reload_profile().await {
@@ -503,6 +517,32 @@ impl super::client::WebSocketClient {
         let status = if enabled { "enabled" } else { "disabled" };
         let old_status = if old_enabled { "enabled" } else { "disabled" };
         info!("Fan Control changed: {} → {}", old_status, status);
+        Ok(())
+    }
+
+    pub(crate) async fn set_auth_token(&self, token: &str) -> Result<()> {
+        if token.trim().is_empty() {
+            return Err(anyhow::anyhow!("Auth token cannot be empty"));
+        }
+
+        // Update config quickly with minimal lock time
+        {
+            let mut config = self.config.write().await;
+            config.auth.auth_token = Some(token.to_string());
+            // One-time bootstrap credential - no longer needed
+            config.auth.enrollment_token = None;
+        } // Lock released here
+
+        // Perform I/O outside of lock
+        let config_path = std::env::current_exe()?
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Cannot determine executable directory"))?
+            .join("config.json");
+
+        save_config(&*self.config.read().await, config_path.to_str().unwrap()).await?;
+
+        // Never log the token itself
+        info!("Hub auth token stored (saved to config)");
         Ok(())
     }
 

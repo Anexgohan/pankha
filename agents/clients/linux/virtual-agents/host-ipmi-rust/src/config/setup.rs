@@ -193,6 +193,9 @@ pub async fn run_setup_wizard(config_path: Option<&str>) -> Result<()> {
             max_log_size_mb: 10,
             log_retention_days: 7,
         },
+        // Wizard setups start without credentials; enrollment needs a deploy
+        // token from the Hub's Deployment page (see enrollment_token)
+        auth: AuthSettings::default(),
     };
 
     save_config(&config, config_file.to_str().unwrap()).await?;

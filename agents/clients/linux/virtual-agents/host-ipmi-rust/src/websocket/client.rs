@@ -403,6 +403,20 @@ impl WebSocketClient {
                 "registered" => {
                     info!("Agent successfully registered with backend");
 
+                    // Enrollment exchange: persist the Hub-minted auth token
+                    // (delivered in the registered response) and drop the
+                    // one-time enrollment token
+                    let issued_token = message
+                        .get("data")
+                        .and_then(|d| d.get("auth_token"))
+                        .or_else(|| message.get("auth_token"))
+                        .and_then(|v| v.as_str());
+                    if let Some(token) = issued_token {
+                        if let Err(e) = self.set_auth_token(token).await {
+                            error!("Failed to persist Hub auth token: {}", e);
+                        }
+                    }
+
                     // Cleanup after successful update (if applicable)
                     if let Ok(current_exe) = std::env::current_exe() {
                         if let Some(exe_dir) = current_exe.parent() {
@@ -474,6 +488,34 @@ impl WebSocketClient {
                             }
                         }
                     }
+                }
+                "registrationPending" => {
+                    // Hub is holding this agent for admin approval (D13).
+                    // Keep the connection; the Hub promotes us with a
+                    // "registered" message once approved. Telemetry we send
+                    // meanwhile is ignored Hub-side.
+                    let reason = message
+                        .get("data")
+                        .and_then(|d| d.get("reason"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("awaiting approval");
+                    info!(
+                        "Hub is holding this agent for approval ({}). Approve it on the Pankha dashboard.",
+                        reason
+                    );
+                }
+                "registrationError" => {
+                    // Hub refused this agent. Say exactly why (expired deploy
+                    // token vs rejected credential) - the Hub closes the
+                    // connection next, and the standard reconnect backoff
+                    // (capped at 15s) takes over; no special retry handling.
+                    let reason = message
+                        .get("data")
+                        .and_then(|d| d.get("error"))
+                        .or_else(|| message.get("error"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("no reason given");
+                    error!("Hub rejected registration: {}", reason);
                 }
                 _ => {
                     debug!("Received message type: {}", msg_type);
