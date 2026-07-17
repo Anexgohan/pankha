@@ -952,6 +952,11 @@ export class WebSocketHub extends EventEmitter {
             [hashAgentToken(mintedToken), agentId]
           );
           log.info(`Agent ${agentId} enrolled - auth token issued`, "WebSocketHub");
+          // Clear the Unsecured badge live
+          this.agentManager.emit("agentConfigUpdated", {
+            agentId,
+            config: { unsecured: false },
+          });
         }
 
         // Send registration confirmation with configuration
@@ -979,6 +984,11 @@ export class WebSocketHub extends EventEmitter {
                   [hashAgentToken(grandfatherToken), agentId]
                 );
                 log.info(`Agent ${agentId} secured via setAuthToken`, "WebSocketHub");
+                // Clear the Unsecured badge live
+                this.agentManager.emit("agentConfigUpdated", {
+                  agentId,
+                  config: { unsecured: false },
+                });
               })
               .catch((err) => {
                 log.debug(
@@ -1323,8 +1333,12 @@ export class WebSocketHub extends EventEmitter {
     const agentId = system.agent_id;
     const agentStatus = this.agentManager.getAgentStatus(agentId);
 
+    // The token hash never leaves the hub; the UI only needs the boolean
+    const { auth_token_hash, ...publicSystem } = system;
+
     return {
-      ...system,
+      ...publicSystem,
+      unsecured: !auth_token_hash,
       status: agentStatus?.status || systemData?.status || system.status,
       real_time_status: agentStatus?.status || systemData?.status || "unknown",
       last_seen: systemData?.lastUpdate?.toISOString() || system.last_seen || null,

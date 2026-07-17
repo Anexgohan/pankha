@@ -9,21 +9,41 @@ import FanProfileManager from '../../fan-profiles/components/FanProfileManager';
 import Settings from '../../settings/components/Settings';
 import { useWebSocketData } from '../../hooks/useWebSocketData';
 import { useDemoMode } from '../../hooks/useDemoMode';
+import { useAuth } from '../../contexts/AuthContext';
 import HeaderFan from '../../components/HeaderFan';
-import { 
-  Loader2, 
-  Unplug, 
-  CircleAlert, 
-  ShieldAlert, 
-  Monitor, 
-  Wind, 
+import PendingAgentCard from './PendingAgentCard';
+import { Select, type SelectOption } from '../../components/ui/Select';
+import {
+  Loader2,
+  Unplug,
+  CircleAlert,
+  ShieldAlert,
+  Monitor,
+  Wind,
   Settings2,
   ChevronRight,
-  Command
+  Command,
+  LogOut,
+  User,
+  TriangleAlert
 } from 'lucide-react';
 import DeploymentPage from '../../deployment/components/DeploymentPage';
 
 type TabType = 'systems' | 'profiles' | 'deployment' | 'settings';
+type SettingsTabName = 'general' | 'license' | 'accounts' | 'diagnostics' | 'about';
+
+// Header user menu: action list, not a value picker - value stays null
+type UserMenuAction = 'account' | 'settings' | 'logout';
+const USER_MENU_OPTIONS: SelectOption<UserMenuAction>[] = [
+  { value: 'account', label: 'Account' },
+  { value: 'settings', label: 'Settings' },
+  { value: 'logout', label: 'Log out' },
+];
+const USER_MENU_ICONS: Record<UserMenuAction, React.ReactNode> = {
+  account: <User size={15} />,
+  settings: <Settings2 size={15} />,
+  logout: <LogOut size={15} />,
+};
 
 // Stable empty slices for agents with no calibration/stall events yet.
 // Must be module-level: an inline `?? {}` would mint a new object per render
@@ -41,6 +61,9 @@ const SystemsPage: React.FC = () => {
   const [expandedSensors, setExpandedSensors] = useState<{[systemId: number]: boolean}>({});
   const [expandedFans, setExpandedFans] = useState<{[systemId: number]: boolean}>({});
   const [expandedBmc, setExpandedBmc] = useState<{[systemId: number]: boolean}>({});
+  // Deep link into Settings from the user menu (fresh object per click so
+  // Settings' effect re-fires even for the same tab)
+  const [settingsIntent, setSettingsIntent] = useState<{ tab: SettingsTabName } | null>(null);
 
   // Pure WebSocket - no HTTP polling!
   const {
@@ -51,9 +74,11 @@ const SystemsPage: React.FC = () => {
     reconnect,
     removeSystem,
     fanCalibration,
-    stalledFans
+    stalledFans,
+    pendingAgents
   } = useWebSocketData();
   const { isDemoMode } = useDemoMode();
+  const { can, username, logout, authResetActive } = useAuth();
 
   // Fetch versions from GitHub API
   React.useEffect(() => {
@@ -232,18 +257,57 @@ const SystemsPage: React.FC = () => {
             )}
           </div>
 
-          <ControllerIntervalSelector />
+          {can('admin') && <ControllerIntervalSelector />}
           <ThemeToggle />
 
-          <button
-            onClick={handleEmergencyStop}
-            className="emergency-button"
-            title="Emergency stop all fans"
-          >
-            <ShieldAlert size={18} /> <span className="btn-label">Emergency Stop</span>
-          </button>
+          {can('operator') && (
+            <button
+              onClick={handleEmergencyStop}
+              className="emergency-button"
+              title="Emergency stop all fans"
+            >
+              <ShieldAlert size={18} />
+            </button>
+          )}
+
+          <Select<UserMenuAction>
+            value={null}
+            options={USER_MENU_OPTIONS}
+            onChange={(action) => {
+              if (action === 'logout') {
+                logout();
+              } else {
+                // Non-admins have no General tab; Settings lands them on Accounts
+                setSettingsIntent({
+                  tab: action === 'account' || !can('admin') ? 'accounts' : 'general',
+                });
+                setActiveTab('settings');
+              }
+            }}
+            className="user-menu-trigger"
+            menuClassName="user-menu-list"
+            align="end"
+            ariaLabel={`Account menu (${username ?? ''})`}
+            renderTrigger={() => <User size={20} />}
+            renderOption={(opt) => (
+              <span className="user-menu-item">
+                {USER_MENU_ICONS[opt.value]} {opt.label}
+              </span>
+            )}
+          />
         </div>
       </header>
+
+      {authResetActive && can('admin') && (
+        <div className="reset-banner">
+          <TriangleAlert size={16} />
+          <span>
+            <strong>PANKHA_AUTH_RESET is active.</strong>&nbsp;User accounts are wiped on
+            every restart. Remove <code>PANKHA_AUTH_RESET</code> from your .env now that
+            access is recovered.
+          </span>
+        </div>
+      )}
 
       <nav className="dashboard-nav">
         <div className="nav-tabs">
@@ -253,18 +317,22 @@ const SystemsPage: React.FC = () => {
           >
             <Monitor size={16} /> Systems Monitor
           </button>
-          <button
-            className={`nav-tab ${activeTab === 'profiles' ? 'active' : ''}`}
-            onClick={() => setActiveTab('profiles')}
-          >
-            <Wind size={16} /> Fan Profiles
-          </button>
-          <button
-            className={`nav-tab ${activeTab === 'deployment' ? 'active' : ''}`}
-            onClick={() => setActiveTab('deployment')}
-          >
-            <Command size={16} /> Deployment
-          </button>
+          {can('operator') && (
+            <button
+              className={`nav-tab ${activeTab === 'profiles' ? 'active' : ''}`}
+              onClick={() => setActiveTab('profiles')}
+            >
+              <Wind size={16} /> Fan Profiles
+            </button>
+          )}
+          {can('admin') && (
+            <button
+              className={`nav-tab ${activeTab === 'deployment' ? 'active' : ''}`}
+              onClick={() => setActiveTab('deployment')}
+            >
+              <Command size={16} /> Deployment
+            </button>
+          )}
           <button
             className={`nav-tab ${activeTab === 'settings' ? 'active' : ''}`}
             onClick={() => setActiveTab('settings')}
@@ -281,7 +349,10 @@ const SystemsPage: React.FC = () => {
       <div className="dashboard-content">
         {activeTab === 'systems' && (
           <div className="systems-grid">
-            {systems.length === 0 ? (
+            {pendingAgents.map(agent => (
+              <PendingAgentCard key={agent.agentId} agent={agent} />
+            ))}
+            {systems.length === 0 && pendingAgents.length === 0 ? (
               <div className="no-systems-redirect-card">
                 <div className="card-header">
                   <ShieldAlert size={24} className="alert-icon" />
@@ -336,7 +407,7 @@ const SystemsPage: React.FC = () => {
         )}
 
         {activeTab === 'settings' && (
-          <Settings />
+          <Settings requestedTab={settingsIntent} />
         )}
       </div>
 

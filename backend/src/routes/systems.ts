@@ -213,8 +213,12 @@ router.get("/", async (req: Request, res: Response) => {
       const isReadOnly = readOnlyStatus.get(system.agent_id) ?? false;
       const accessStatus = isReadOnly ? "over_limit" : "active";
 
+      // The token hash never leaves the hub; the UI only needs the boolean
+      const { auth_token_hash, ...publicSystem } = system;
+
       return {
-        ...system,
+        ...publicSystem,
+        unsecured: !auth_token_hash,
         capabilities: system.capabilities || null,
         config_data: system.config_data || null,
         access_status: accessStatus,
@@ -467,8 +471,12 @@ router.get("/:id", async (req: Request, res: Response) => {
     const agentStatus = agentManager.getAgentStatus(system.agent_id);
     const systemData = dataAggregator.getSystemData(system.agent_id);
 
+    // The token hash never leaves the hub; the UI only needs the boolean
+    const { auth_token_hash, ...publicSystem } = system;
+
     res.json({
-      ...system,
+      ...publicSystem,
+      unsecured: !auth_token_hash,
       capabilities: system.capabilities || null,
       config_data: system.config_data || null,
       sensors,

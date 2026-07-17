@@ -37,14 +37,17 @@ type AccessClass = 'public' | 'deploy-token' | 'agent-token' | Role;
 // "<METHOD> <path>" where path is relative to the /api mount. First match
 // wins; defaults below the table: GET -> viewer, everything else -> operator.
 const ACCESS_RULES: Array<{ pattern: RegExp; access: AccessClass }> = [
-  // Auth bootstrap + boot-time frontend config (login page needs these)
-  { pattern: /^POST \/auth\/(login|logout|setup)$/, access: 'public' },
+  // Auth bootstrap + boot-time frontend config (login page needs these).
+  // register is public here; the route itself enforces the admin's
+  // self-registration toggle (D15)
+  { pattern: /^POST \/auth\/(login|logout|setup|register)$/, access: 'public' },
   { pattern: /^GET \/auth\/me$/, access: 'public' },
   { pattern: /^GET \/config\/deployment(\.js)?$/, access: 'public' },
   // Own-password change: any authenticated rank
   { pattern: /^PUT \/auth\/password$/, access: 'viewer' },
-  // User management: admin only
+  // User management + registration settings: admin only
   { pattern: /^(GET|POST|PUT|DELETE) \/auth\/users(\/|$)/, access: 'admin' },
+  { pattern: /^(GET|PUT) \/auth\/registration$/, access: 'admin' },
   // Install scripts fetch these headlessly with their own short-lived
   // ?token= (validated in the route; hardened in M3)
   { pattern: /^GET \/deploy\/(linux|ipmi)$/, access: 'deploy-token' },

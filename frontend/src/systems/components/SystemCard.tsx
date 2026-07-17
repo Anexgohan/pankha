@@ -23,6 +23,7 @@ import {
 } from "../../services/api";
 import type { SystemCalibrations } from "../../services/api";
 import { useVisibility } from "../../contexts/VisibilityContext";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   getFanProfiles,
   assignProfileToFan,
@@ -1168,10 +1169,18 @@ const SystemCard: React.FC<SystemCardProps> = ({
   const sensorSelectGroups = buildSensorOptions(sensorOptionInputs);
   const bulkSensorGroups = buildSensorOptions({ ...sensorOptionInputs, emptyLabel: "Don't change" });
 
-  // Helper to check if agent is read-only (over license limit OR IPMI without profile)
+  // Helper to check if agent is read-only (over license limit, IPMI without
+  // profile, or the signed-in user is a Viewer - same disabled rendering path)
+  const { can } = useAuth();
+  const isViewerLocked = !can('operator');
+  // Unsecured takes priority in the single status-badge slot (same layering
+  // as status-indicator health-warn/ok)
+  const isUnsecured = system.unsecured === true;
   const isIpmiNoProfile = (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') && !system.profile_id && system.status === 'online';
-  const isReadOnly = system.read_only === true || isIpmiNoProfile;
-  const readOnlyTooltip = isIpmiNoProfile
+  const isReadOnly = system.read_only === true || isIpmiNoProfile || isViewerLocked;
+  const readOnlyTooltip = isViewerLocked
+    ? "Viewer accounts can watch but not control. Ask an admin for operator access."
+    : isIpmiNoProfile
     ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
     : "This system exceeds your license limit. Upgrade to control this agent. You can still view data.";
 
@@ -1273,15 +1282,17 @@ const SystemCard: React.FC<SystemCardProps> = ({
           <div className="system-title-top">
             <div className="status-group">
               <span
-                className={`status-badge ${isIpmiNoProfile ? 'read-only' : system.status}`}
-                title={isIpmiNoProfile
+                className={`status-badge ${isUnsecured ? 'offline' : isIpmiNoProfile ? 'read-only' : system.status}`}
+                title={isUnsecured
+                  ? "Runs without an auth token - update the agent to secure it"
+                  : isIpmiNoProfile
                   ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
                   : system.status === 'error' && system.last_error
                     ? `Agent status is currently "ERROR"\n\nReason: ${system.last_error}`
                     : `Agent status is currently "${system.status.toUpperCase()}"`}
               >
                 <span className="status-dot" />
-                {isIpmiNoProfile ? 'read only' : system.status}
+                {isUnsecured ? 'unsecured' : isIpmiNoProfile ? 'read only' : system.status}
               </span>
               {getPlatformIcon()}
             </div>
@@ -1292,6 +1303,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <LockIcon size={14} />
                 </span>
               )}
+              {can('admin') && (
               <button
                 className="delete-button"
                 onClick={handleDeleteSystem}
@@ -1304,6 +1316,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                   <X size={14} />
                 )}
               </button>
+              )}
             </div>
           </div>
 
@@ -2242,6 +2255,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.system.enable_fan_control ===
       nextProps.system.enable_fan_control &&
     prevProps.system.read_only === nextProps.system.read_only && // License limit status
+    prevProps.system.unsecured === nextProps.system.unsecured && // Auth token status badge
     prevProps.system.profile_id === nextProps.system.profile_id && // IPMI profile assignment
     // Explicit sensor/fan array checks (reference equality works because mergeDelta creates new arrays)
     prevProps.system.current_temperatures ===

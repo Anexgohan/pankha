@@ -10,6 +10,8 @@ import { setLicense, getPricing, deleteLicense, getSystems, getDiagnostics } fro
 import { formatDate, formatFriendlyDate, USER_TIMEZONE } from '../../utils/formatters';
 import { toast } from '../../utils/toast';
 import { useDemoMode } from '../../hooks/useDemoMode';
+import { useAuth } from '../../contexts/AuthContext';
+import AccountsTab from './AccountsTab';
 import ColorPicker from './ColorPicker';
 import ThresholdStrip from './ThresholdStrip';
 import {
@@ -84,7 +86,7 @@ const GRAPH_SCALE_MAX_HOURS = 720; // 30 days
 const PANKHA_SITE = 'https://pankha.app';
 const GITHUB_REPO = 'https://github.com/Anexgohan/pankha';
 
-type SettingsTab = 'general' | 'license' | 'diagnostics' | 'about';
+type SettingsTab = 'general' | 'license' | 'accounts' | 'diagnostics' | 'about';
 
 interface TierPricing {
   name: string;
@@ -827,9 +829,24 @@ const AboutTab: React.FC = () => {
   );
 };
 
-const Settings: React.FC = () => {
+interface SettingsProps {
+  // Deep link from the header user menu; fresh object per click
+  requestedTab?: { tab: SettingsTab } | null;
+}
+
+const Settings: React.FC<SettingsProps> = ({ requestedTab = null }) => {
   const { isDemoMode } = useDemoMode();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const { can } = useAuth();
+  // General and Subscription hold hub-wide settings (admin domain);
+  // everyone else lands on their own Accounts tab
+  const [activeTab, setActiveTab] = useState<SettingsTab>(can('admin') ? 'general' : 'accounts');
+
+  useEffect(() => {
+    if (requestedTab) {
+      setActiveTab(requestedTab.tab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedTab]);
   const { license, isLoading, refreshLicense } = useLicense();
   const [licenseKey, setLicenseKey] = useState('');
   const [licenseStatus, setLicenseStatus] = useState<{ success: boolean; message: string } | null>(null);
@@ -1487,13 +1504,15 @@ const Settings: React.FC = () => {
   return (
     <div className="settings-container">
       <nav className="settings-tabs">
-        <button
-          className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`}
-          onClick={() => setActiveTab('general')}
-        >
-          General
-        </button>
-        {!isDemoMode && (
+        {can('admin') && (
+          <button
+            className={`settings-tab ${activeTab === 'general' ? 'active' : ''}`}
+            onClick={() => setActiveTab('general')}
+          >
+            General
+          </button>
+        )}
+        {!isDemoMode && can('admin') && (
           <button
             className={`settings-tab ${activeTab === 'license' ? 'active' : ''}`}
             onClick={() => setActiveTab('license')}
@@ -1501,6 +1520,12 @@ const Settings: React.FC = () => {
             Subscription
           </button>
         )}
+        <button
+          className={`settings-tab ${activeTab === 'accounts' ? 'active' : ''}`}
+          onClick={() => setActiveTab('accounts')}
+        >
+          Accounts
+        </button>
         <button
           className={`settings-tab ${activeTab === 'diagnostics' ? 'active' : ''}`}
           onClick={() => setActiveTab('diagnostics')}
@@ -1516,8 +1541,11 @@ const Settings: React.FC = () => {
       </nav>
 
       <div className="settings-content">
+        {/* Accounts Tab */}
+        {activeTab === 'accounts' && <AccountsTab />}
+
         {/* General Tab */}
-        {activeTab === 'general' && (
+        {activeTab === 'general' && can('admin') && (
           <div className="settings-section">
             <h2>General</h2>
             <p className="settings-info">
@@ -2128,7 +2156,7 @@ const Settings: React.FC = () => {
     )}
 
         {/* License/Subscription Tab */}
-        {!isDemoMode && activeTab === 'license' && (
+        {!isDemoMode && activeTab === 'license' && can('admin') && (
           <div className="settings-section">
             <h2>Subscription</h2>
             

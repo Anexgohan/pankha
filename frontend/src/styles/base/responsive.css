@@ -72,10 +72,6 @@
     min-width: 0 !important;
   }
 
-  .emergency-button .btn-label {
-    display: none; /* Hide text on mobile */
-  }
-
   .theme-toggle {
     grid-column: 3; /* Right column */
     width: 42px;

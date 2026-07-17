@@ -18,6 +18,7 @@
 @import './components/buttons.css';
 @import './components/forms.css';
 @import './components/badges.css';
+@import './components/auth.css';
 
 /* 4. Page-Specific Styles */
 /* Systems Monitor Page */

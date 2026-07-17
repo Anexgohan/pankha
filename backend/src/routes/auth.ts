@@ -22,6 +22,35 @@ const MIN_PASSWORD_LENGTH = 8;
 // Fixed delay on failed logins to slow guessing
 const FAIL_DELAY_MS = 500;
 
+// Self-registration settings (D15), stored in backend_settings.
+// Off by default: open registration on a LAN would undo the auth feature.
+const REG_ENABLED_KEY = 'auth_self_registration';
+const REG_ROLE_KEY = 'auth_default_role';
+
+async function getRegistrationSettings(): Promise<{ enabled: boolean; default_role: string }> {
+  const db = Database.getInstance();
+  const rows = await db.all(
+    'SELECT setting_key, setting_value FROM backend_settings WHERE setting_key IN ($1, $2)',
+    [REG_ENABLED_KEY, REG_ROLE_KEY]
+  );
+  const map = new Map(rows.map((r) => [r.setting_key, r.setting_value]));
+  const role = map.get(REG_ROLE_KEY);
+  return {
+    enabled: map.get(REG_ENABLED_KEY) === 'true',
+    default_role: role && VALID_ROLES.includes(role) ? role : 'viewer',
+  };
+}
+
+async function saveSetting(key: string, value: string, description: string): Promise<void> {
+  const db = Database.getInstance();
+  await db.run(
+    `INSERT INTO backend_settings (setting_key, setting_value, description)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (setting_key) DO UPDATE SET setting_value = $2, updated_at = NOW()`,
+    [key, value, description]
+  );
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function validateCredentials(username: unknown, password: unknown): string | null {
@@ -72,6 +101,96 @@ router.post('/setup', async (req: Request, res: Response) => {
   } catch (error) {
     log.error('Setup failed', 'auth', error);
     res.status(500).json({ error: 'Setup failed' });
+  }
+});
+
+/**
+ * POST /api/auth/register
+ * Self-registration from the sign-in screen. Only works while the admin has
+ * enabled it; the account gets the admin-chosen default role.
+ */
+router.post('/register', async (req: Request, res: Response) => {
+  try {
+    const settings = await getRegistrationSettings();
+    if (!settings.enabled) {
+      return res.status(403).json({ error: 'Account creation is disabled on this Hub' });
+    }
+    if (!usersExist()) {
+      // Fresh hub: the first account must be the admin (setup flow)
+      return res.status(400).json({ error: 'Set up the admin account first' });
+    }
+
+    const { username, password } = req.body ?? {};
+    const invalid = validateCredentials(username, password);
+    if (invalid) {
+      return res.status(400).json({ error: invalid });
+    }
+
+    const db = Database.getInstance();
+    const passwordHash = await hashPassword(password);
+    const row = await db.get(
+      `INSERT INTO users (username, password_hash, role)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (username) DO NOTHING
+       RETURNING id`,
+      [username, passwordHash, settings.default_role]
+    );
+    if (!row) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+    await reloadUserCache();
+
+    const user = { userId: row.id, username, role: settings.default_role };
+    setSessionCookie(res, await signSession(user));
+    log.info(`Self-registered user: ${username} (${settings.default_role})`, 'auth');
+    res.status(201).json({ username, role: settings.default_role });
+  } catch (error) {
+    log.error('Registration failed', 'auth', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+/**
+ * GET /api/auth/registration (admin)
+ * PUT /api/auth/registration (admin) - body { enabled?, default_role? }
+ */
+router.get('/registration', async (_req: Request, res: Response) => {
+  try {
+    res.json(await getRegistrationSettings());
+  } catch (error) {
+    log.error('Failed to read registration settings', 'auth', error);
+    res.status(500).json({ error: 'Failed to read registration settings' });
+  }
+});
+
+router.put('/registration', async (req: Request, res: Response) => {
+  try {
+    const { enabled, default_role } = req.body ?? {};
+    if (enabled !== undefined) {
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ error: 'enabled must be a boolean' });
+      }
+      await saveSetting(
+        REG_ENABLED_KEY,
+        enabled ? 'true' : 'false',
+        'Allow account creation from the sign-in screen'
+      );
+    }
+    if (default_role !== undefined) {
+      if (typeof default_role !== 'string' || !VALID_ROLES.includes(default_role)) {
+        return res.status(400).json({ error: `Role must be one of: ${VALID_ROLES.join(', ')}` });
+      }
+      await saveSetting(REG_ROLE_KEY, default_role, 'Role given to self-created accounts');
+    }
+    const settings = await getRegistrationSettings();
+    log.info(
+      `Registration settings updated: enabled=${settings.enabled}, default_role=${settings.default_role}`,
+      'auth'
+    );
+    res.json(settings);
+  } catch (error) {
+    log.error('Failed to update registration settings', 'auth', error);
+    res.status(500).json({ error: 'Failed to update registration settings' });
   }
 });
 
@@ -127,9 +246,10 @@ router.post('/logout', (req: Request, res: Response) => {
 
 /**
  * GET /api/auth/me
- * Public: tells the frontend whether to show the app, login, or setup.
+ * Public: tells the frontend whether to show the app, login, setup, and
+ * whether the login card offers self-registration.
  */
-router.get('/me', (req: Request, res: Response) => {
+router.get('/me', async (req: Request, res: Response) => {
   if (req.session) {
     return res.json({
       authenticated: true,
@@ -138,9 +258,11 @@ router.get('/me', (req: Request, res: Response) => {
       auth_reset_active: isAuthResetActive(),
     });
   }
+  const registration = await getRegistrationSettings().catch(() => ({ enabled: false }));
   res.json({
     authenticated: false,
     setup_required: !usersExist(),
+    registration_enabled: registration.enabled,
     auth_reset_active: isAuthResetActive(),
   });
 });
