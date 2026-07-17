@@ -73,7 +73,10 @@ const ACCESS_RULES: Array<{ pattern: RegExp; access: AccessClass }> = [
 ];
 
 function classify(method: string, path: string): AccessClass {
-  const key = `${method} ${path}`;
+  // Strip trailing slashes: Express routes "/foo/" to the "/foo" handler, so
+  // a rule must not be dodged by a slash that drops the path to the default.
+  const normalized = path.length > 1 ? path.replace(/\/+$/, '') : path;
+  const key = `${method} ${normalized}`;
   for (const rule of ACCESS_RULES) {
     if (rule.pattern.test(key)) return rule.access;
   }

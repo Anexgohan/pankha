@@ -691,7 +691,7 @@ export class WebSocketHub extends EventEmitter {
     clientId: string,
     registrationData: any,
     // true only from approvePendingAgent: an admin vouched for this agent, so
-    // the credential tree is skipped and the grandfather path issues a token
+    // the credential tree is skipped and a token is pushed via setAuthToken
     preApproved: boolean = false
   ): Promise<void> {
     try {
@@ -721,13 +721,11 @@ export class WebSocketHub extends EventEmitter {
         return;
       }
 
-      // Credential decision tree (task_02 section 4.4):
+      // Credential decision tree (task_02 section 4.4, single door):
       //   auth_token + stored hash        -> verify or close
       //   enrollment_token valid          -> exchange for a minted token
-      //   known agent, no stored hash     -> grandfather, issue via setAuthToken
-      //   unknown, nothing valid          -> hold as pending-approval card
+      //   anything else, known or unknown -> hold as pending-approval card
       let mintedToken: string | null = null; // returned in the registered response
-      let issueTokenViaCommand = preApproved; // grandfather path (setAuthToken push)
 
       if (!preApproved) {
         const db2 = Database.getInstance();
@@ -750,25 +748,21 @@ export class WebSocketHub extends EventEmitter {
             this.clients.get(clientId)?.websocket.close(4403, "agent token rejected");
             return;
           }
-        } else if (existing) {
-          // Known agent, not yet secured. A valid enrollment token (reinstall
-          // over an existing system) mints inline; otherwise grandfather.
-          if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
-            mintedToken = mintAgentToken();
-          } else {
-            issueTokenViaCommand = true;
-          }
         } else {
-          // Unknown agent. Valid enrollment token = automatic (script flow).
-          // Anything else is held as a pending-approval card (D13): --setup
-          // installs, stale (>24h) install scripts, deleted-but-still-running
-          // agents. A human admin decides; nothing flows until then.
+          // No stored token, known or unknown - the agent_id alone proves
+          // nothing. Valid enrollment token = automatic (script flow).
+          // Anything else is held as a pending-approval card (D13): fleet
+          // migration, --setup installs, stale (>24h) install scripts,
+          // deleted-but-still-running agents. A human admin decides; nothing
+          // flows until then.
           if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
             mintedToken = mintAgentToken();
           } else {
             const reason = presentedEnrollment
               ? "Install token expired - approve on the dashboard or run a fresh install script"
-              : "Registered without credentials - approve on the dashboard";
+              : existing
+                ? "Existing agent has no token yet - approve to migrate it"
+                : "Registered without credentials - approve on the dashboard";
             this.holdPendingAgent(clientId, registrationData, reason);
             return;
           }
@@ -969,19 +963,20 @@ export class WebSocketHub extends EventEmitter {
           ...(mintedToken ? { auth_token: mintedToken } : {}),
         });
 
-        // Grandfather path: push a token to a known-but-unsecured agent. The
-        // hash is committed only on the agent's ack, so old binaries that
-        // ignore setAuthToken stay connectable (shown Unsecured in the UI)
-        // until fleet self-update delivers a binary that completes this.
-        if (issueTokenViaCommand) {
-          const grandfatherToken = mintAgentToken();
+        // Approval path: push a permanent token to the agent an admin just
+        // approved. The hash is committed only on the agent's ack, so old
+        // binaries that ignore setAuthToken stay connectable (shown Unsecured
+        // in the UI) until fleet self-update delivers a binary that completes
+        // this.
+        if (preApproved) {
+          const approvalToken = mintAgentToken();
           setTimeout(() => {
             this.commandDispatcher
-              .sendCommand(agentId, "setAuthToken", { authToken: grandfatherToken })
+              .sendCommand(agentId, "setAuthToken", { authToken: approvalToken })
               .then(async () => {
                 await db.run(
                   "UPDATE systems SET auth_token_hash = $1 WHERE agent_id = $2",
-                  [hashAgentToken(grandfatherToken), agentId]
+                  [hashAgentToken(approvalToken), agentId]
                 );
                 log.info(`Agent ${agentId} secured via setAuthToken`, "WebSocketHub");
                 // Clear the Unsecured badge live
@@ -1123,8 +1118,8 @@ export class WebSocketHub extends EventEmitter {
 
   /**
    * Admin approved a pending agent: run the normal registration for the held
-   * connection (row, config sync, registered response) with the grandfather
-   * path pushing its permanent token.
+   * connection (row, config sync, registered response) with the approval
+   * path pushing its permanent token via setAuthToken.
    */
   public async approvePendingAgent(
     agentId: string
