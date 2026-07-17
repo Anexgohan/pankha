@@ -71,8 +71,12 @@ interface PendingAgent {
   requestedAt: string;
 }
 
-// Bound on concurrently held pending agents (memory + card-spam cap)
-const MAX_PENDING_AGENTS = 20;
+// Bound on concurrently held pending agents (memory + card-spam cap).
+// Raise it for a large first-time migration so the whole fleet pends at once.
+const MAX_PENDING_AGENTS = (() => {
+  const raw = parseInt(process.env.PANKHA_MAX_PENDING_AGENTS ?? '', 10);
+  return Number.isInteger(raw) && raw > 0 ? raw : 20;
+})();
 
 export class WebSocketHub extends EventEmitter {
   private static instance: WebSocketHub;
