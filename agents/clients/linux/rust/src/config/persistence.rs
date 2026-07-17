@@ -86,6 +86,12 @@ pub async fn load_config(path: Option<&str>) -> Result<AgentConfig> {
 pub async fn save_config(config: &AgentConfig, path: &str) -> Result<()> {
     let content = serde_json::to_string_pretty(config)?;
     tokio::fs::write(path, content).await?;
+    // config.json carries the Hub auth token - keep it owner-only
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        tokio::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).await?;
+    }
     info!("Configuration saved to: {}", path);
     Ok(())
 }
