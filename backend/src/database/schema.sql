@@ -612,3 +612,30 @@ DO $$ BEGIN
     RAISE NOTICE 'Migration: Added calibration_version to fan_calibration_history';
   END IF;
 END $$;
+
+-- ============================================================================
+-- Hub authentication (task_02): user accounts + per-agent token hash
+-- ============================================================================
+
+-- Dashboard user accounts. Role names are validated in the backend; no CHECK
+-- constraint so new roles need no schema migration.
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(255) UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role VARCHAR(50) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Migration: per-agent auth token hash (SHA-256 hex). NULL = agent not yet
+-- secured (pre-auth agent awaiting token issuance).
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'systems' AND column_name = 'auth_token_hash'
+  ) THEN
+    ALTER TABLE systems ADD COLUMN auth_token_hash TEXT;
+    RAISE NOTICE 'Migration: Added auth_token_hash column to systems';
+  END IF;
+END $$;

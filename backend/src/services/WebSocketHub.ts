@@ -12,6 +12,9 @@ import Database from "../database/database";
 import type { AggregatedSystemData } from "../types/aggregatedData";
 import { licenseManager } from "../license";
 import { log } from "../utils/logger";
+import { SESSION_COOKIE, parseCookieHeader, verifySession } from "../auth/session";
+import { mintAgentToken, hashAgentToken, verifyAgentToken } from "../auth/tokens";
+import { isValidDeployToken } from "../auth/enrollment";
 import { 
   defaultUpdateInterval, 
   defaultFanStep, 
@@ -38,6 +41,11 @@ interface ClientConnection {
     connectedAt: Date;
     agentId?: string;
     isAgent?: boolean;
+    // Session-verified dashboard connection. Connections start unclassified;
+    // isFrontend is granted by a valid session cookie at upgrade, isAgent by
+    // an authenticated register message. Neither = no data flows.
+    isFrontend?: boolean;
+    username?: string;
   };
 }
 
@@ -94,7 +102,10 @@ export class WebSocketHub extends EventEmitter {
     });
 
     this.wss.on("connection", (ws: WebSocket, request: IncomingMessage) => {
-      this.handleNewConnection(ws, request);
+      this.handleNewConnection(ws, request).catch((error) => {
+        log.error("Failed to handle new WebSocket connection", "WebSocketHub", error);
+        ws.close();
+      });
     });
 
     this.startPingInterval();
@@ -274,11 +285,19 @@ export class WebSocketHub extends EventEmitter {
   /**
    * Handle new WebSocket connection
    */
-  private handleNewConnection(ws: WebSocket, request: IncomingMessage): void {
+  private async handleNewConnection(ws: WebSocket, request: IncomingMessage): Promise<void> {
     const clientId = this.generateClientId();
     const userAgent = request.headers["user-agent"] || "";
-    const isAgent =
-      userAgent.includes("Python") || userAgent.includes("websockets");
+
+    // Classification is credential-based: a valid session cookie on the
+    // upgrade request marks a frontend connection; agents earn isAgent via an
+    // authenticated register message. Unclassified connections receive
+    // nothing and may only register or ping.
+    const cookies = parseCookieHeader(request.headers.cookie);
+    const session = cookies[SESSION_COOKIE]
+      ? await verifySession(cookies[SESSION_COOKIE])
+      : null;
+    const isFrontend = !!session;
 
     // Get real IP address (handles nginx proxy and IPv6-mapped IPv4)
     const realIp = this.extractRealIp(request);
@@ -292,20 +311,22 @@ export class WebSocketHub extends EventEmitter {
         userAgent: userAgent,
         ip: realIp,
         connectedAt: new Date(),
-        isAgent: isAgent,
+        isAgent: false,
+        isFrontend,
+        username: session?.user.username,
       },
     };
 
     this.clients.set(clientId, client);
 
-    if (isAgent) {
+    if (!isFrontend) {
       log.info(
-        ` New AGENT WebSocket connected: ${clientId} (${client.metadata.ip})`,
+        ` New unclassified WebSocket connected (agent register or login pending): ${clientId} (${client.metadata.ip})`,
         "WebSocketHub"
       );
     } else {
       log.info(
-        ` New FRONTEND WebSocket connected: ${clientId} (${client.metadata.ip})`,
+        ` New FRONTEND WebSocket connected: ${clientId} (${client.metadata.ip}, user: ${session!.user.username})`,
         "WebSocketHub"
       );
 
@@ -443,6 +464,24 @@ export class WebSocketHub extends EventEmitter {
       if (!client) return;
 
       client.lastActivity = new Date();
+
+      // Dashboard data flows only to session-verified connections. 4401 lets
+      // the frontend distinguish "log in again" from a network drop.
+      const FRONTEND_MESSAGES = [
+        "subscribe",
+        "unsubscribe",
+        "requestFullSync",
+        "getSystemData",
+        "getOverview",
+      ];
+      if (FRONTEND_MESSAGES.includes(message.type) && !client.metadata.isFrontend) {
+        log.warn(
+          `Unauthenticated client ${clientId} sent ${message.type} - closing`,
+          "WebSocketHub"
+        );
+        client.websocket.close(4401, "authentication required");
+        return;
+      }
 
       switch (message.type) {
         case "subscribe":
@@ -635,9 +674,68 @@ export class WebSocketHub extends EventEmitter {
       }
 
       const agentId = registrationData.agentId;
+      const client = this.clients.get(clientId);
+
+      if (client?.metadata.isFrontend) {
+        this.sendToClient(clientId, "registrationError", {
+          error: "Frontend connections cannot register as agents",
+        });
+        return;
+      }
+
+      // Credential decision tree (task_02 section 4.1):
+      //   auth_token + stored hash        -> verify or close
+      //   enrollment_token, unknown agent -> exchange for a minted token
+      //   known agent, no stored hash     -> grandfather, issue via setAuthToken
+      //   nothing valid                   -> close
+      const db2 = Database.getInstance();
+      const existing = await db2.get(
+        "SELECT auth_token_hash FROM systems WHERE agent_id = $1",
+        [agentId]
+      );
+      const presentedToken = registrationData.auth_token;
+      const presentedEnrollment = registrationData.enrollment_token;
+
+      let mintedToken: string | null = null; // returned in the registered response
+      let issueTokenViaCommand = false; // grandfather path (setAuthToken push)
+
+      if (existing?.auth_token_hash) {
+        if (!verifyAgentToken(presentedToken, existing.auth_token_hash)) {
+          log.warn(
+            `Agent ${agentId} presented ${presentedToken ? "an invalid" : "no"} auth token - rejecting`,
+            "WebSocketHub"
+          );
+          this.sendToClient(clientId, "registrationError", {
+            error: "Agent token rejected",
+          });
+          this.clients.get(clientId)?.websocket.close(4403, "agent token rejected");
+          return;
+        }
+      } else if (existing) {
+        // Known agent, not yet secured. A valid enrollment token (reinstall
+        // over an existing system) mints inline; otherwise grandfather.
+        if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
+          mintedToken = mintAgentToken();
+        } else {
+          issueTokenViaCommand = true;
+        }
+      } else {
+        // Unknown agent: enrollment token is the only way in. A deleted
+        // system's old token does not readmit it (delete = revoke).
+        if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
+          mintedToken = mintAgentToken();
+        } else {
+          const reason = presentedEnrollment
+            ? "Deploy token invalid or expired - generate a fresh install script from the Deployment page"
+            : "Enrollment required - deploy this agent via an install script from the Deployment page";
+          log.warn(`Unknown agent ${agentId} rejected: ${reason}`, "WebSocketHub");
+          this.sendToClient(clientId, "registrationError", { error: reason });
+          this.clients.get(clientId)?.websocket.close(4403, "enrollment required");
+          return;
+        }
+      }
 
       // Mark this client as an agent connection
-      const client = this.clients.get(clientId);
       if (client) {
         client.metadata.agentId = agentId;
         client.metadata.isAgent = true;
@@ -805,6 +903,17 @@ export class WebSocketHub extends EventEmitter {
           );
         }
 
+        // Enrollment: persist the token hash now that the systems row exists,
+        // and hand the plaintext to the agent inside the registered response
+        // (the agent persists it and drops its enrollment_token).
+        if (mintedToken) {
+          await db.run(
+            "UPDATE systems SET auth_token_hash = $1 WHERE agent_id = $2",
+            [hashAgentToken(mintedToken), agentId]
+          );
+          log.info(`Agent ${agentId} enrolled - auth token issued`, "WebSocketHub");
+        }
+
         // Send registration confirmation with configuration
         this.sendToClient(clientId, "registered", {
           agentId: agentId,
@@ -812,7 +921,33 @@ export class WebSocketHub extends EventEmitter {
           message: "Agent registered successfully",
           timestamp: new Date().toISOString(),
           configuration: finalConfig, // Send configuration to agent so it can apply it
+          ...(mintedToken ? { auth_token: mintedToken } : {}),
         });
+
+        // Grandfather path: push a token to a known-but-unsecured agent. The
+        // hash is committed only on the agent's ack, so old binaries that
+        // ignore setAuthToken stay connectable (shown Unsecured in the UI)
+        // until fleet self-update delivers a binary that completes this.
+        if (issueTokenViaCommand) {
+          const grandfatherToken = mintAgentToken();
+          setTimeout(() => {
+            this.commandDispatcher
+              .sendCommand(agentId, "setAuthToken", { authToken: grandfatherToken })
+              .then(async () => {
+                await db.run(
+                  "UPDATE systems SET auth_token_hash = $1 WHERE agent_id = $2",
+                  [hashAgentToken(grandfatherToken), agentId]
+                );
+                log.info(`Agent ${agentId} secured via setAuthToken`, "WebSocketHub");
+              })
+              .catch((err) => {
+                log.debug(
+                  `Agent ${agentId} did not accept setAuthToken (pre-auth binary?): ${err?.message ?? err}`,
+                  "WebSocketHub"
+                );
+              });
+          }, 2000);
+        }
 
         // DB-priority profile sync: if DB has a profile_id that differs from agent's,
         // tell the agent to reload so it fetches the authoritative profile from the API.

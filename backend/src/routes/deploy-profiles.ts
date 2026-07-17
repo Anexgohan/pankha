@@ -20,6 +20,9 @@ import { ProfileService } from '../services/ProfileService';
 import { CommandDispatcher } from '../services/CommandDispatcher';
 import { AgentManager } from '../services/AgentManager';
 import { createDemoLockResponse, isDemoMode } from '../utils/mode';
+import { verifyAgentToken } from '../auth/tokens';
+import { isValidDeployToken } from '../auth/enrollment';
+import { hasLevel } from '../middleware/auth';
 
 const router = Router();
 const db = Database.getInstance();
@@ -74,9 +77,20 @@ router.get('/assigned/:agentId', async (req, res) => {
     const { agentId } = req.params;
 
     const system = await db.get(
-      'SELECT profile_id FROM systems WHERE agent_id = $1',
+      'SELECT profile_id, auth_token_hash FROM systems WHERE agent_id = $1',
       [agentId]
     );
+
+    // Secured agents must present their token. Unsecured rows stay open so
+    // fresh installs (profile fetched before first registration) and
+    // grandfathered agents keep working; a session (dashboard preview) also
+    // passes.
+    if (system?.auth_token_hash && !req.session) {
+      const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (!verifyAgentToken(bearer, system.auth_token_hash)) {
+        return res.status(401).json({ error: 'Agent token required' });
+      }
+    }
 
     if (!system || !system.profile_id) {
       return res.status(404).json({ error: 'No profile assigned to this agent' });
@@ -121,6 +135,14 @@ router.put('/assign/:agentId', async (req, res) => {
   try {
     if (isDemoMode()) {
       return res.json(createDemoLockResponse('Profile Change not allowed, it is locked in demo'));
+    }
+
+    // Install scripts present the deploy token; dashboard users an
+    // operator+ session (profiles are operator domain per the role matrix)
+    if (!hasLevel(req.session, 'operator') && !(await isValidDeployToken(req.query.token))) {
+      return res.status(401).json({
+        error: 'Valid deploy token or operator session required',
+      });
     }
 
     const { agentId } = req.params;

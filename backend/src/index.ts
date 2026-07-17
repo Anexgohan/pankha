@@ -8,6 +8,7 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import Database from './database/database';
 import { AgentManager } from './services/AgentManager';
 import { AgentCommunication } from './services/AgentCommunication';
@@ -28,6 +29,8 @@ import fanConfigurationsRouter from './routes/fanConfigurations';
 import virtualSensorsRouter from './routes/virtualSensors';
 import deployRouter from './routes/deploy';
 import configRouter from './routes/config';
+import authRouter from './routes/auth';
+import { apiAuthGuard, initAuth } from './middleware/auth';
 import { licenseRouter, licenseManager } from './license';
 import { log, logger } from './utils/logger';
 import { createDemoLockResponse, isDemoMode } from './utils/mode';
@@ -114,6 +117,9 @@ async function initializeServices() {
     const db = Database.getInstance();
     await db.initialize();
 
+    // Auth: session secret, PANKHA_AUTH_RESET handling, user cache
+    await initAuth();
+
     // Initialize core services
     const agentManager = AgentManager.getInstance();
     const agentCommunication = AgentCommunication.getInstance();
@@ -195,8 +201,11 @@ async function initializeServices() {
 }
 
 // Middleware
-app.use(cors());
+// origin: true reflects the request origin so cookie-carrying requests work
+// from the Vite dev server (5173); same trust surface as the previous cors()
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(
   compression({
     threshold: COMPRESSION_THRESHOLD_BYTES,
@@ -232,7 +241,12 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Central auth guard: classifies every /api request (public, deploy-token,
+// agent-token, or session + minimum role) before any router runs
+app.use('/api', apiAuthGuard);
+
 // API routes
+app.use('/api/auth', authRouter);
 app.use('/api/systems', systemsRouter);
 app.use('/api/discovery', discoveryRouter);
 app.use('/api/fan-profiles', fanProfilesRouter);
