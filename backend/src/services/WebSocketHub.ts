@@ -15,6 +15,8 @@ import { log } from "../utils/logger";
 import { SESSION_COOKIE, parseCookieHeader, verifySession } from "../auth/session";
 import { mintAgentToken, hashAgentToken, verifyAgentToken } from "../auth/tokens";
 import { isValidDeployToken } from "../auth/enrollment";
+import { UpdateDownloadService } from "./UpdateDownloadService";
+import { compareSemver } from "../utils/version";
 import { 
   defaultUpdateInterval, 
   defaultFanStep, 
@@ -56,7 +58,7 @@ interface WebSocketMessage {
   clientId?: string;
 }
 
-// Credential-less agent held for admin approval (D13). Lives in memory only,
+// Credential-less agent held for admin approval. Lives in memory only,
 // tied to its connection; no systems row, no license seat, telemetry ignored.
 interface PendingAgent {
   clientId: string;
@@ -83,6 +85,14 @@ const MAX_PENDING_AGENTS = (() => {
   return n;
 })();
 
+// Oldest agent build that can store a pushed auth token. Approving an older
+// Linux/IPMI agent chains a self-update first; its token is pushed after it
+// reconnects on the new build.
+const MIN_TOKEN_CAPABLE_AGENT_VERSION = "v0.6.3-alpha1";
+
+// How long an updating agent has to reconnect before it must pend again.
+const UPDATE_RECONNECT_WINDOW_MS = 300_000;
+
 export class WebSocketHub extends EventEmitter {
   private static instance: WebSocketHub;
   private wss: WebSocketServer | null = null;
@@ -92,8 +102,11 @@ export class WebSocketHub extends EventEmitter {
   // the per-client `subscriptions` Sets; keep them in sync only through
   // add/removeClientSubscription and removeClientFromIndex.
   private subscriptionIndex: Map<string, Set<string>> = new Map();
-  // agentId -> pending-approval entry (D13)
+  // agentId -> pending-approval entry
   private pendingAgents: Map<string, PendingAgent> = new Map();
+  // Approve-and-update in flight: agentId -> reconnect window (same source IP)
+  private updateReconnectTickets: Map<string, { ip?: string; deadline: number }> =
+    new Map();
   private dataAggregator: DataAggregator;
   private agentManager: AgentManager;
   private commandDispatcher: CommandDispatcher;
@@ -469,7 +482,7 @@ export class WebSocketHub extends EventEmitter {
         log.info(` Frontend client disconnected: ${clientId}`, "WebSocketHub");
       }
 
-      // Pending-approval entries live with their connection (D13)
+      // Pending-approval entries live with their connection
       for (const [agentId, entry] of this.pendingAgents) {
         if (entry.clientId === clientId) {
           this.pendingAgents.delete(agentId);
@@ -700,7 +713,9 @@ export class WebSocketHub extends EventEmitter {
     clientId: string,
     registrationData: any,
     // Set only by approvePendingAgent: admin vouched, so skip the credential tree and push a token.
-    preApproved: boolean = false
+    preApproved: boolean = false,
+    // Old build that can't store a token yet: self-update it instead of pushing one.
+    chainSelfUpdate: boolean = false
   ): Promise<void> {
     try {
       log.info(
@@ -746,28 +761,62 @@ export class WebSocketHub extends EventEmitter {
 
         if (existing?.auth_token_hash) {
           if (!verifyAgentToken(presentedToken, existing.auth_token_hash)) {
-            log.warn(
-              `Agent ${agentId} presented ${presentedToken ? "an invalid" : "no"} auth token - rejecting`,
-              "WebSocketHub"
+            // A failed credential counts as impersonation only while the
+            // real agent is connected; otherwise hold for approval so the
+            // admin can reissue a token.
+            const liveConflict = Array.from(this.clients.entries()).some(
+              ([cid, c]) =>
+                cid !== clientId &&
+                c.metadata.isAgent &&
+                c.metadata.agentId === agentId
             );
-            this.sendToClient(clientId, "registrationError", {
-              error: "Agent token rejected",
-            });
-            this.clients.get(clientId)?.websocket.close(4403, "agent token rejected");
-            return;
+            if (liveConflict) {
+              log.warn(
+                `Agent ${agentId} presented ${presentedToken ? "an invalid" : "no"} auth token while an authenticated connection is online - rejecting (possible impersonation)`,
+                "WebSocketHub"
+              );
+              this.sendToClient(clientId, "registrationError", {
+                error: "Agent token rejected",
+              });
+              this.clients.get(clientId)?.websocket.close(4403, "agent token rejected");
+              return;
+            }
+            // An approved-with-update agent reconnects tokenless even when an
+            // old hash exists; a valid window ticket completes the approval.
+            if (this.redeemUpdateTicket(agentId, client?.metadata.ip)) {
+              preApproved = true;
+            } else {
+              const reason = presentedToken
+                ? "Secured system presented an invalid token - approve to issue a new one"
+                : presentedEnrollment
+                  ? (await isValidDeployToken(presentedEnrollment))
+                    ? "Secured system reinstalled with a valid install token - approve to issue a new one"
+                    : "Secured system presented an expired install token - approve to issue a new one"
+                  : "Secured system reconnected without its token - approve to issue a new one";
+              this.holdPendingAgent(clientId, registrationData, reason);
+              return;
+            }
           }
         } else {
-          // No stored token (known or unknown): a valid enrollment token auto-enrolls (script flow); anything else is held for admin approval (D13, single door).
+          // No stored token (known or unknown): a valid enrollment token auto-enrolls (script flow); anything else is held for admin approval.
           if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
             mintedToken = mintAgentToken();
           } else {
-            const reason = presentedEnrollment
-              ? "Install token expired - approve on the dashboard or run a fresh install script"
-              : existing
-                ? "Existing agent has no token yet - approve to migrate it"
-                : "Registered without credentials - approve on the dashboard";
-            this.holdPendingAgent(clientId, registrationData, reason);
-            return;
+            // An agent the admin just approved-with-update reconnects here
+            // tokenless; inside its window and from the same address, the
+            // approval completes without a second click.
+            if (this.redeemUpdateTicket(agentId, client?.metadata.ip)) {
+              preApproved = true;
+            }
+            if (!preApproved) {
+              const reason = presentedEnrollment
+                ? "Install token expired - approve on the dashboard or run a fresh install script"
+                : existing
+                  ? "Existing agent has no token yet - approve to migrate it"
+                  : "Registered without credentials - approve on the dashboard";
+              this.holdPendingAgent(clientId, registrationData, reason);
+              return;
+            }
           }
         }
       }
@@ -966,8 +1015,42 @@ export class WebSocketHub extends EventEmitter {
           ...(mintedToken ? { auth_token: mintedToken } : {}),
         });
 
+        if (preApproved && chainSelfUpdate) {
+          // Update the old build first; the reconnect on the new binary
+          // completes the approval and receives the token.
+          const staged = UpdateDownloadService.getInstance().getLocalStatus().version;
+          const sourceIp = this.clients.get(clientId)?.metadata.ip;
+          this.updateReconnectTickets.set(agentId, {
+            ip: sourceIp,
+            deadline: Date.now() + UPDATE_RECONNECT_WINDOW_MS,
+          });
+          setTimeout(() => {
+            this.commandDispatcher
+              .sendCommand(agentId, "selfUpdate", { version: staged }, "normal")
+              .then(() => {
+                log.info(
+                  `Agent ${agentId} accepted update to ${staged} - expecting reconnect from ${sourceIp} within ${UPDATE_RECONNECT_WINDOW_MS / 1000}s`,
+                  "WebSocketHub"
+                );
+                // Let dashboards show UPDATING instead of a bare offline
+                this.broadcast(
+                  "agentUpdating",
+                  { agentId, version: staged, windowMs: UPDATE_RECONNECT_WINDOW_MS },
+                  ["agents:all", "systems:all"]
+                );
+              })
+              .catch((err) => {
+                this.updateReconnectTickets.delete(agentId);
+                log.warn(
+                  `Agent ${agentId} did not accept selfUpdate: ${err?.message ?? err}`,
+                  "WebSocketHub"
+                );
+              });
+          }, 2000);
+        }
+
         // Approved agent: push its permanent token. Hash commits only on the agent's ack, so pre-auth binaries stay connectable (shown Unsecured) until self-update.
-        if (preApproved) {
+        if (preApproved && !chainSelfUpdate) {
           const approvalToken = mintAgentToken();
           setTimeout(() => {
             this.commandDispatcher
@@ -1048,7 +1131,7 @@ export class WebSocketHub extends EventEmitter {
   }
 
   /**
-   * Hold a credential-less agent for admin approval (D13). The connection
+   * Hold a credential-less agent for admin approval. The connection
    * stays open (so approval can promote it instantly) but the client is never
    * marked isAgent - existing gates ignore its telemetry and responses.
    */
@@ -1103,10 +1186,39 @@ export class WebSocketHub extends EventEmitter {
     ]);
   }
 
+  /**
+   * Single-use reconnect ticket for an approved-with-update agent: deleted on
+   * sight; only an in-window reconnect from the same address completes the
+   * approval without a second admin click.
+   */
+  private redeemUpdateTicket(agentId: string, sourceIp?: string): boolean {
+    const ticket = this.updateReconnectTickets.get(agentId);
+    if (!ticket) return false;
+    this.updateReconnectTickets.delete(agentId);
+    if (Date.now() <= ticket.deadline && ticket.ip && sourceIp === ticket.ip) {
+      log.info(
+        `Agent ${agentId} reconnected from ${sourceIp} within the update window - completing approval`,
+        "WebSocketHub"
+      );
+      return true;
+    }
+    log.info(
+      `Agent ${agentId} reconnected ${Date.now() > ticket.deadline ? "after the update window closed" : `from unexpected address ${sourceIp}`} - holding for approval`,
+      "WebSocketHub"
+    );
+    return false;
+  }
+
   /** Metadata-only view of a pending agent (never the raw registration data) */
   private pendingAgentView(entry: PendingAgent) {
     const { clientId, registrationData, ...view } = entry;
-    return view;
+    return {
+      ...view,
+      // Lets the UI label the approve action honestly: below this version,
+      // approving a Linux/IPMI agent also updates it.
+      belowTokenVersion:
+        compareSemver(entry.version || "0.0.0", MIN_TOKEN_CAPABLE_AGENT_VERSION) < 0,
+    };
   }
 
   public getPendingAgents() {
@@ -1128,6 +1240,38 @@ export class WebSocketHub extends EventEmitter {
       return { ok: false, error: "No pending agent with that ID" };
     }
 
+    // Credential recovery guard: if the real agent came back online while
+    // this claim sat pending, approving would hand its identity away.
+    const liveConflict = Array.from(this.clients.entries()).some(
+      ([cid, c]) =>
+        cid !== entry.clientId &&
+        c.metadata.isAgent &&
+        c.metadata.agentId === agentId
+    );
+    if (liveConflict) {
+      return {
+        ok: false,
+        error: "This system is already online and secured - dismiss this request instead",
+      };
+    }
+
+    // Old Linux/IPMI builds can't store a pushed token, so approval also
+    // updates them - which needs new-enough binaries staged on the hub.
+    // A failed check leaves the agent pending so the click can be retried.
+    const agentType = entry.agentType ?? entry.registrationData?.agent_type;
+    const chainSelfUpdate =
+      (agentType === "os_linux" || agentType === "ipmi_host") &&
+      compareSemver(entry.version || "0.0.0", MIN_TOKEN_CAPABLE_AGENT_VERSION) < 0;
+    if (chainSelfUpdate) {
+      const staged = UpdateDownloadService.getInstance().getLocalStatus().version;
+      if (!staged || compareSemver(staged, MIN_TOKEN_CAPABLE_AGENT_VERSION) < 0) {
+        return {
+          ok: false,
+          error: `Stage ${MIN_TOKEN_CAPABLE_AGENT_VERSION} binaries in Fleet Maintenance first`,
+        };
+      }
+    }
+
     this.pendingAgents.delete(agentId);
     this.broadcast("agentPendingRemoved", { agentId }, [
       "agents:all",
@@ -1143,8 +1287,16 @@ export class WebSocketHub extends EventEmitter {
       };
     }
 
-    log.info(`Pending agent ${agentId} approved by admin`, "WebSocketHub");
-    await this.handleAgentRegistration(entry.clientId, entry.registrationData, true);
+    log.info(
+      `Pending agent ${agentId} approved by admin${chainSelfUpdate ? " (old build - chaining update)" : ""}`,
+      "WebSocketHub"
+    );
+    await this.handleAgentRegistration(
+      entry.clientId,
+      entry.registrationData,
+      true,
+      chainSelfUpdate
+    );
     return { ok: true };
   }
 

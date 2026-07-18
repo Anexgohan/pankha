@@ -50,6 +50,16 @@
   animation: status-dot-pulse 1s infinite;
 }
 
+.status-badge.updating {
+  background: color-mix(in srgb, var(--color-info), transparent 90%);
+  border-color: color-mix(in srgb, var(--color-info), transparent 85%);
+  color: var(--color-info);
+}
+
+.status-badge.updating .status-dot {
+  animation: status-dot-pulse 1s infinite;
+}
+
 .status-badge.installing {
   background: color-mix(in srgb, var(--color-info), transparent 90%);
   border-color: color-mix(in srgb, var(--color-info), transparent 85%);

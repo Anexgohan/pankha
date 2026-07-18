@@ -36,6 +36,8 @@ export interface PendingAgent {
   version?: string;
   reason: string;
   requestedAt: string;
+  // Hub-computed: approving an old Linux/IPMI build also updates it
+  belowTokenVersion?: boolean;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {

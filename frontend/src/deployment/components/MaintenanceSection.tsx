@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Activity, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import type { HubStatus } from '../../services/api';
 import type { PendingAgent } from '../../services/authApi';
+import { compareSemver } from '../../utils/version';
 
 type MaintenanceSortKey = 'name' | 'agentId' | 'platform' | 'agentType' | 'version' | 'status' | 'maintenance';
 type SortDirection = 'asc' | 'desc';
@@ -15,54 +16,13 @@ interface MaintenanceSectionProps {
   unstableVersion: string | null;
   updatingAgents: Set<number>;
   onApplyUpdate: (systemId: number) => void;
+  onApprove: (agentId: string) => Promise<void>;
   hubStatus: HubStatus | null;
   githubRepo: string;
 }
 
 const isWindowsSystem = (system: any) =>
   system.platform === 'windows' || system.agent_id?.toLowerCase().startsWith('windows-');
-
-/**
- * Parse pre-release tag into a comparable number based on GitHub workflow definition.
- * Ranks: stable (Infinity) > rc > beta > alpha > dev/nightly/etc.
- */
-const parsePreRelease = (version: string): number => {
-  if (!version.includes('-')) return Infinity;
-
-  const suffix = version.split('-')[1]?.toLowerCase() || '';
-  const numMatch = suffix.match(/\d+$/);
-  const num = numMatch ? parseInt(numMatch[0], 10) : 0;
-
-  let weight = 0;
-  if (suffix.startsWith('rc')) weight = 8000;
-  else if (suffix.startsWith('beta')) weight = 7000;
-  else if (suffix.startsWith('alpha')) weight = 6000;
-  else if (suffix.startsWith('pre') || suffix.startsWith('preview')) weight = 5000;
-  else if (suffix.startsWith('insiders')) weight = 4000;
-  else if (suffix.startsWith('experimental')) weight = 3000;
-  else if (suffix.startsWith('canary')) weight = 2000;
-  else if (suffix.startsWith('dev')) weight = 1000;
-  else if (suffix.startsWith('nightly')) weight = 500;
-  else weight = 100;
-
-  return weight + num;
-};
-
-const stripPreRelease = (version: string): string =>
-  (version || '0.0.0').replace(/^v/, '').replace(/-.*$/, '');
-
-const compareSemver = (a: string, b: string): number => {
-  const cleanA = (a || '0.0.0').replace(/^v/, '');
-  const cleanB = (b || '0.0.0').replace(/^v/, '');
-  const pa = stripPreRelease(cleanA).split('.').map(Number);
-  const pb = stripPreRelease(cleanB).split('.').map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const na = pa[i] || 0;
-    const nb = pb[i] || 0;
-    if (na !== nb) return na - nb;
-  }
-  return (parsePreRelease(cleanA) - parsePreRelease(cleanB)) || 0;
-};
 
 const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
   isExpanded,
@@ -73,6 +33,7 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
   unstableVersion,
   updatingAgents,
   onApplyUpdate,
+  onApprove,
   hubStatus,
   githubRepo,
 }) => {
@@ -80,11 +41,31 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Agents connected but held for admin approval: not registered, so their
-  // systems row still reads offline - show the truthful state instead
-  const pendingIds = useMemo(
-    () => new Set(pendingAgents.map(p => p.agentId)),
+  // systems row still reads offline (and a stale version) - show the live
+  // connection's state instead
+  const pendingByAgentId = useMemo(
+    () => new Map(pendingAgents.map(p => [p.agentId, p])),
     [pendingAgents]
   );
+  const pendingIds = useMemo(
+    () => new Set(pendingByAgentId.keys()),
+    [pendingByAgentId]
+  );
+  // Approve clicks in flight, so a slow approve can't double-fire
+  const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
+
+  const handleApprove = async (agentId: string) => {
+    setApprovingIds(prev => new Set(prev).add(agentId));
+    try {
+      await onApprove(agentId);
+    } finally {
+      setApprovingIds(prev => {
+        const next = new Set(prev);
+        next.delete(agentId);
+        return next;
+      });
+    }
+  };
 
   const getStatusLabel = (system: any) =>
     updatingAgents.has(system.id)
@@ -104,8 +85,11 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
     const isUpdating = updatingAgents.has(system.id);
     const isOnline = system.status === 'online' || system.status === 'error';
 
+    const pending = pendingByAgentId.get(system.agent_id);
+    if (pending) {
+      return pending.belowTokenVersion && !isWindows ? 'APPROVE & UPDATE' : 'APPROVE';
+    }
     if (isWindows) return isOutdated ? 'DOWNLOAD MSI' : 'GET MSI';
-    if (pendingIds.has(system.agent_id)) return 'APPROVE FIRST';
     if (!hubStatus?.version) return 'UNAVAILABLE';
     if (!isOnline) return 'OFFLINE';
     if (isUpdating) return 'UPDATING';
@@ -181,7 +165,7 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
     });
 
     return sortDirection === 'asc' ? sorted : sorted.reverse();
-  }, [systems, sortKey, sortDirection, updatingAgents, pendingIds]);
+  }, [systems, sortKey, sortDirection, updatingAgents, pendingIds, pendingByAgentId]);
 
   return (
     <section className={`deployment-section maintenance-panel ${!isExpanded ? 'collapsed' : ''}`}>
@@ -253,16 +237,21 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
                 ) : (
                   sortedSystems.map(system => {
                     const isWindows = isWindowsSystem(system);
+                    const pending = pendingByAgentId.get(system.agent_id);
+                    const isPending = !!pending;
+                    // Pending rows show the live connection's version, not the stale row
+                    const agentVersion = pending?.version || system.agent_version;
                     const hubVer = hubStatus?.version?.replace('v', '') || '';
                     const stableVer = stableVersion?.replace('v', '') || '';
                     const cleanTarget = isWindows ? stableVer : (hubVer || stableVer);
                     const targetVersion = cleanTarget ? `v${cleanTarget}` : null;
-                    const isMismatch = cleanTarget && system.agent_version && compareSemver(cleanTarget, system.agent_version) !== 0;
-                    const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
+                    const isMismatch = cleanTarget && agentVersion && compareSemver(cleanTarget, agentVersion) !== 0;
+                    const isDowngrade = isMismatch && compareSemver(cleanTarget, agentVersion) < 0;
                     const isOutdated = isMismatch && !isDowngrade;
                     const isUpdating = updatingAgents.has(system.id);
-                    const isPending = pendingIds.has(system.agent_id);
                     const isOnline = system.status === 'online' || system.status === 'error';
+                    const willChainUpdate = isPending && !!pending?.belowTokenVersion && !isWindows;
+                    const isApproving = isPending && approvingIds.has(system.agent_id);
 
                     const statusLabel = getStatusLabel(system);
                     const statusClass = isUpdating ? 'updating' : (isPending ? 'pending' : (isOnline ? (system.status === 'error' ? 'error' : 'online') : 'offline'));
@@ -333,7 +322,7 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
                         </td>
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-xs)' }}>
-                            <span>v{system.agent_version || '0.0.0'}</span>
+                            <span>v{agentVersion || '0.0.0'}</span>
                             {isOutdated && !isUpdating && (
                               <span className="update-badge" title={`Update to ${targetVersion} available`}>
                                 NEW {targetVersion}
@@ -358,7 +347,20 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
                           </span>
                         </td>
                         <td>
-                          {isWindows ? (
+                          {isPending ? (
+                            <button
+                              className={`btn-table-action ${willChainUpdate ? 'update-needed' : ''}`}
+                              onClick={() => handleApprove(system.agent_id)}
+                              disabled={isApproving}
+                              title={willChainUpdate
+                                ? `Approve and update this agent to ${targetVersion ?? 'the staged version'} in one step`
+                                : isWindows
+                                  ? 'Approve this agent - old Windows builds update via the MSI installer'
+                                  : 'Approve this agent'}
+                            >
+                              {isApproving ? 'Approving...' : (willChainUpdate ? 'Approve & Update' : 'Approve')}
+                            </button>
+                          ) : isWindows ? (
                             <a
                               href={`${githubRepo}/releases/latest/download/pankha-agent-windows_x64.msi`}
                               className={`btn-table-action windows-download ${isOutdated ? 'update-needed' : ''}`}
@@ -371,29 +373,27 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
                           ) : (
                             <span
                               title={
-                                isPending
-                                  ? 'Approve this agent on the dashboard first, then update'
-                                  : !hubStatus?.version
-                                    ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first`
-                                    : (!isOnline
-                                      ? 'Agent is offline'
-                                      : (isUpdating
-                                        ? 'Update in progress...'
-                                        : (isDowngrade
-                                          ? `Downgrade agent to ${targetVersion}`
-                                          : (isOutdated
-                                            ? `Click to update agent to ${targetVersion}`
-                                            : `Reinstall agent version ${targetVersion}`))))
+                                !hubStatus?.version
+                                  ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first`
+                                  : (!isOnline
+                                    ? 'Agent is offline'
+                                    : (isUpdating
+                                      ? 'Update in progress...'
+                                      : (isDowngrade
+                                        ? `Downgrade agent to ${targetVersion}`
+                                        : (isOutdated
+                                          ? `Click to update agent to ${targetVersion}`
+                                          : `Reinstall agent version ${targetVersion}`))))
                               }
                               style={{ display: 'inline-block' }}
                             >
                               <button
                                 className={`btn-table-action ${isOutdated ? 'update-needed' : ''} ${isDowngrade ? 'downgrade' : ''}`}
                                 onClick={() => onApplyUpdate(system.id)}
-                                disabled={isPending || !isOnline || isUpdating || !hubStatus?.version}
+                                disabled={!isOnline || isUpdating || !hubStatus?.version}
                                 style={{ pointerEvents: 'auto' }}
                               >
-                                {isPending ? 'Approve First' : (isUpdating ? 'Updating...' : (isDowngrade ? 'Downgrade' : (isOutdated ? 'Update Now' : 'Reinstall')))}
+                                {isUpdating ? 'Updating...' : (isDowngrade ? 'Downgrade' : (isOutdated ? 'Update Now' : 'Reinstall'))}
                               </button>
                             </span>
                           )}

@@ -111,6 +111,8 @@ interface SystemCardProps {
   // Identity changes only when THIS agent has an event (see useWebSocketData).
   fanCalibration: Record<string, string>;
   stalledFans: Record<string, boolean>;
+  // Mid self-update: shown as UPDATING instead of offline/unsecured
+  isUpdating?: boolean;
 }
 
 const SystemCard: React.FC<SystemCardProps> = ({
@@ -126,6 +128,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
   onToggleBmc,
   fanCalibration,
   stalledFans,
+  isUpdating = false,
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
   const { tempThresholds } = useDashboardSettings();
@@ -1282,8 +1285,10 @@ const SystemCard: React.FC<SystemCardProps> = ({
           <div className="system-title-top">
             <div className="status-group">
               <span
-                className={`status-badge ${isUnsecured ? 'offline' : isIpmiNoProfile ? 'read-only' : system.status}`}
-                title={isUnsecured
+                className={`status-badge ${isUpdating ? 'updating' : isUnsecured ? 'offline' : isIpmiNoProfile ? 'read-only' : system.status}`}
+                title={isUpdating
+                  ? "Updating to a new version - reconnects automatically"
+                  : isUnsecured
                   ? "Runs without an auth token - update the agent to secure it"
                   : isIpmiNoProfile
                   ? "Monitor-only mode\nAssign a Profile to enable fan control from Deployment"
@@ -1292,7 +1297,7 @@ const SystemCard: React.FC<SystemCardProps> = ({
                     : `Agent status is currently "${system.status.toUpperCase()}"`}
               >
                 <span className="status-dot" />
-                {isUnsecured ? 'unsecured' : isIpmiNoProfile ? 'read only' : system.status}
+                {isUpdating ? 'updating' : isUnsecured ? 'unsecured' : isIpmiNoProfile ? 'read only' : system.status}
               </span>
               {getPlatformIcon()}
             </div>
@@ -2268,6 +2273,7 @@ export default React.memo(SystemCard, (prevProps, nextProps) => {
     prevProps.isDemoMode === nextProps.isDemoMode &&
     // Calibration/stall maps - new object reference on every event
     prevProps.fanCalibration === nextProps.fanCalibration &&
-    prevProps.stalledFans === nextProps.stalledFans
+    prevProps.stalledFans === nextProps.stalledFans &&
+    prevProps.isUpdating === nextProps.isUpdating // Self-update badge
   );
 });
