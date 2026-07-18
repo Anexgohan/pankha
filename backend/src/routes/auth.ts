@@ -23,7 +23,7 @@ const MIN_PASSWORD_LENGTH = 8;
 // Fixed delay on failed logins to slow guessing
 const FAIL_DELAY_MS = 500;
 
-// Self-registration settings (D15), stored in backend_settings.
+// Self-registration settings, stored in backend_settings.
 // Off by default: open registration on a LAN would undo the auth feature.
 const REG_ENABLED_KEY = 'auth_self_registration';
 const REG_ROLE_KEY = 'auth_default_role';

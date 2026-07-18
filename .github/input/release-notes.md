@@ -15,13 +15,15 @@
 
 ## Highlights
 
-<!-- Lead with 1-3 big things. Example:
-- **IPMI Support (Alpha)**: Pankha now talks to /dev/ipmi0 on enterprise BMC servers.
-  Currently supports Supermicro and Dell; HP is read-only. -->
+- **Login and user accounts**: The dashboard now sits behind a login. Three roles - Viewer (watch), Operator (control fans), Admin (everything) - with user management in Settings. First start opens a setup screen to create the admin account.
+- **Agent security**: Agents authenticate with per-machine tokens. New machines appear as approval cards on the dashboard instead of registering silently - you decide what joins your fleet.
+- **Approve & Update**: Approving an agent that runs an older build also updates it, in the same click. The agent upgrades itself from the Hub cache, reconnects, and is secured automatically.
 
 ## Breaking Changes
 
-<!-- List behaviour changes for existing users. If none, write "None" or delete this section. -->
+- **The REST API now requires login.** Anything that calls the API directly (scripts, curl, integrations) must authenticate first and send the session cookie. Cookie-based examples are in the [API Reference](https://github.com/Anexgohan/pankha/wiki/API-Reference).
+- **Existing agents need a one-time approval after this upgrade.** They will appear as pending approval cards. Stage this release's binaries in Fleet Maintenance first, then click Approve & Update on each Linux/IPMI agent - it updates and secures itself in one step. Windows agents: install the new MSI on the machine, then approve.
+- **Install scripts expire after 24 hours.** A script generated before this upgrade (or older than a day) will not enroll new agents - generate a fresh one from the Deployment page.
 
 ## Screenshots
 
@@ -29,4 +31,5 @@
 
 ## Notes
 
-<!-- Migration steps, known issues, anything else worth calling out. -->
+- New optional environment variables (reverse-proxy allowlist, session duration, admin reset) are documented on the [Docker and Env](https://github.com/Anexgohan/pankha/wiki/Docker-and-Env) wiki page. Note that `PANKHA_TRUST_PROXY` is now a comma-separated list of proxy IPs/CIDRs.
+- Deleting a system on the dashboard no longer uninstalls anything on the machine; a still-running agent simply reappears as a pending card.

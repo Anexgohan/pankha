@@ -40,7 +40,7 @@ type AccessClass = 'public' | 'deploy-token' | 'agent-token' | Role;
 const ACCESS_RULES: Array<{ pattern: RegExp; access: AccessClass }> = [
   // Auth bootstrap + boot-time frontend config (login page needs these).
   // register is public here; the route itself enforces the admin's
-  // self-registration toggle (D15)
+  // self-registration toggle
   { pattern: /^POST \/auth\/(login|logout|setup|register)$/, access: 'public' },
   { pattern: /^GET \/auth\/me$/, access: 'public' },
   { pattern: /^GET \/config\/deployment(\.js)?$/, access: 'public' },
@@ -67,7 +67,7 @@ const ACCESS_RULES: Array<{ pattern: RegExp; access: AccessClass }> = [
   { pattern: /^POST \/deploy\/profiles\/custom$/, access: 'admin' },
   { pattern: /^POST \/systems\/\d+\/update$/, access: 'admin' },
   { pattern: /^DELETE \/systems\/\d+$/, access: 'admin' },
-  // Pending-approval queue (D13): admitting machines is admin territory
+  // Pending-approval queue: admitting machines is admin territory
   { pattern: /^(GET|POST|DELETE) \/systems\/pending(\/|$)/, access: 'admin' },
   { pattern: /^(POST|DELETE) \/license$/, access: 'admin' },
   { pattern: /^POST \/license\/(sync|renew|cancel|checkout)$/, access: 'admin' },

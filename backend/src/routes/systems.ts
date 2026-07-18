@@ -402,7 +402,7 @@ router.put("/controller/interval", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/systems/pending - Agents held for admin approval (D13)
+// GET /api/systems/pending - Agents held for admin approval
 router.get("/pending", (_req: Request, res: Response) => {
   res.json(WebSocketHub.getInstance().getPendingAgents());
 });

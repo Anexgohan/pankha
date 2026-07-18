@@ -490,7 +490,7 @@ impl WebSocketClient {
                     }
                 }
                 "registrationPending" => {
-                    // Hub is holding this agent for admin approval (D13).
+                    // Hub is holding this agent for admin approval.
                     // Keep the connection; the Hub promotes us with a
                     // "registered" message once approved. Telemetry we send
                     // meanwhile is ignored Hub-side.

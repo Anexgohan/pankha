@@ -318,7 +318,7 @@ export class CalibrationService extends EventEmitter {
         for (const u of active) u.curve.push({ duty, rpm: rpms.get(u.target) ?? 0 });
 
         if (duty === 100) {
-          // Tach check: no reading at full duty -> no usable tach (design D11)
+          // Tach check: no reading at full duty -> no usable tach
           for (const u of [...active]) {
             const rpm = rpms.get(u.target) ?? 0;
             if (rpm <= 0) {

@@ -464,7 +464,7 @@ public class WebSocketClient : IDisposable
                     break;
 
                 case "registrationPending":
-                    // Hub is holding this agent for admin approval (D13). Keep
+                    // Hub is holding this agent for admin approval. Keep
                     // the connection; the Hub promotes us with "registered"
                     // once approved. Telemetry sent meanwhile is ignored.
                     var pendingJson = Newtonsoft.Json.Linq.JObject.Parse(json);
