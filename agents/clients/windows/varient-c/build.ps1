@@ -413,6 +413,10 @@ if (-not $Publish) {
     $TrayBuildParams = @("Pankha.Tray\Pankha.Tray.csproj", "-c", $Configuration)
     if ($AppIconPath) { $TrayBuildParams += "/p:AppIconPath=`"$AppIconPath`"" }
     dotnet build @TrayBuildParams
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Tray App Build failed" -ForegroundColor Red
+        exit 1
+    }
     Write-Host "✅ Tray App Build complete" -ForegroundColor Green
     Write-Host ""
 }

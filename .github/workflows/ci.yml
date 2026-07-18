@@ -58,6 +58,31 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: cargo check --release --locked
 
+  windows-agent-check:
+    name: Windows Agent Compile Check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('agents/clients/windows/varient-c/**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      # Compile-only: runs the ui-options codegen + builds agent and tray
+      # csproj like the release does, but skips publish and the WiX installer.
+      # Explicit -Version: the shallow checkout has no tags, so build.ps1's
+      # git-describe fallback would produce an invalid AssemblyVersion
+      - name: Compile agent + tray
+        working-directory: agents/clients/windows/varient-c
+        run: .\build.ps1 -Configuration Release -Version "0.0.0-ci"
+
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest

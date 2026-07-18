@@ -451,8 +451,8 @@ public class WebSocketClient : IDisposable
                     // (delivered in the registered response) and drop the
                     // one-time enrollment token
                     var registeredJson = Newtonsoft.Json.Linq.JObject.Parse(json);
-                    var issuedToken = registeredJson["data"]?["auth_token"]?.Value<string>()
-                        ?? registeredJson["auth_token"]?.Value<string>();
+                    var issuedToken = (string?)registeredJson["data"]?["auth_token"]
+                        ?? (string?)registeredJson["auth_token"];
                     if (!string.IsNullOrEmpty(issuedToken))
                     {
                         _config.Auth.AuthToken = issuedToken;
@@ -468,7 +468,7 @@ public class WebSocketClient : IDisposable
                     // the connection; the Hub promotes us with "registered"
                     // once approved. Telemetry sent meanwhile is ignored.
                     var pendingJson = Newtonsoft.Json.Linq.JObject.Parse(json);
-                    var pendingReason = pendingJson["data"]?["reason"]?.Value<string>()
+                    var pendingReason = (string?)pendingJson["data"]?["reason"]
                         ?? "awaiting approval";
                     _logger.Information(
                         "Hub is holding this agent for approval ({Reason}). Approve it on the Pankha dashboard.",
@@ -479,8 +479,8 @@ public class WebSocketClient : IDisposable
                     // Hub refused this agent. The Hub closes the connection
                     // next; standard reconnect backoff takes over.
                     var errorJson = Newtonsoft.Json.Linq.JObject.Parse(json);
-                    var errorReason = errorJson["data"]?["error"]?.Value<string>()
-                        ?? errorJson["error"]?.Value<string>()
+                    var errorReason = (string?)errorJson["data"]?["error"]
+                        ?? (string?)errorJson["error"]
                         ?? "no reason given";
                     _logger.Error("Hub rejected registration: {Reason}", errorReason);
                     break;
