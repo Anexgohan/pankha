@@ -6,6 +6,7 @@ dotenv.config({ path: path.join(__dirname, '../../.env') }); // Load from projec
 
 import express from 'express';
 import http from 'http';
+import net from 'net';
 import cors from 'cors';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
@@ -42,10 +43,30 @@ const app = express();
 // 3. 3143 (default fallback / brand port)
 const PORT = process.env.PORT || process.env.PANKHA_PORT || 3143;
 
-// Reverse-proxy hop count so the login limiter sees the real client IP, not the proxy. 0 (default) = off.
-const TRUST_PROXY_HOPS = parseInt(process.env.PANKHA_TRUST_PROXY ?? '', 10);
-if (Number.isInteger(TRUST_PROXY_HOPS) && TRUST_PROXY_HOPS > 0) {
-  app.set('trust proxy', TRUST_PROXY_HOPS);
+// Trusted reverse proxies, comma-separated IPs/CIDRs. Only forwarded-for
+// headers arriving FROM these addresses are believed, so the login limiter
+// sees the real client IP. Unset = no proxy trusted.
+const isIpOrCidr = (entry: string): boolean => {
+  const [ip, prefix, extra] = entry.split('/');
+  if (extra !== undefined) return false;
+  const family = net.isIP(ip);
+  if (family === 0) return false;
+  if (prefix === undefined) return true;
+  if (!/^\d+$/.test(prefix)) return false;
+  const bits = parseInt(prefix, 10);
+  return bits >= 0 && bits <= (family === 4 ? 32 : 128);
+};
+const TRUST_PROXY_RAW = (process.env.PANKHA_TRUST_PROXY ?? '').trim();
+if (TRUST_PROXY_RAW) {
+  const proxies = TRUST_PROXY_RAW.split(',').map((s) => s.trim()).filter(Boolean);
+  if (proxies.length > 0 && proxies.every(isIpOrCidr)) {
+    app.set('trust proxy', proxies);
+  } else {
+    log.warn(
+      `PANKHA_TRUST_PROXY ignored - expected comma-separated IPs/CIDRs (e.g. "192.168.1.5, 10.0.0.0/8"), got "${TRUST_PROXY_RAW}". No proxy is trusted.`,
+      'startup'
+    );
+  }
 }
 
 // Periodic heap-usage check. Warns only when heapUsed exceeds the threshold

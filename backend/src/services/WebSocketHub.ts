@@ -71,10 +71,16 @@ interface PendingAgent {
   requestedAt: string;
 }
 
-// Max agents held awaiting approval at once (memory + card-spam bound); raise for large migrations.
+// Max agents held awaiting approval at once (memory + card-spam bound); raise for large enrollments.
 const MAX_PENDING_AGENTS = (() => {
-  const raw = parseInt(process.env.PANKHA_MAX_PENDING_AGENTS ?? '', 10);
-  return Number.isInteger(raw) && raw > 0 ? raw : 20;
+  const raw = (process.env.PANKHA_MAX_PENDING_AGENTS ?? '').trim();
+  if (!raw) return 20;
+  const n = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+  if (!Number.isInteger(n) || n <= 0) {
+    log.warn(`PANKHA_MAX_PENDING_AGENTS ignored - expected a positive integer, got "${raw}". Using 20.`, 'websocket');
+    return 20;
+  }
+  return n;
 })();
 
 export class WebSocketHub extends EventEmitter {

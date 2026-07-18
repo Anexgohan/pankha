@@ -111,7 +111,18 @@ export function isAuthResetActive(): boolean {
 export async function initAuth(): Promise<void> {
   await initSessionSecret();
 
-  if (process.env.PANKHA_AUTH_RESET === 'true') {
+  // Destructive switch: strict values only. Garbage means unclear operator
+  // intent, so refuse to start rather than guess.
+  const authReset = (process.env.PANKHA_AUTH_RESET ?? '').trim();
+  if (authReset && authReset !== 'true' && authReset !== 'false') {
+    log.error(
+      `PANKHA_AUTH_RESET must be "true", "false", or unset - got "${authReset}". Refusing to start.`,
+      'auth'
+    );
+    process.exit(1);
+  }
+
+  if (authReset === 'true') {
     authResetActive = true;
     const db = Database.getInstance();
     const result = await db.run('DELETE FROM users');

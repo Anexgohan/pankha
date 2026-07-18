@@ -8,8 +8,14 @@ import { parseDurationSeconds } from '../utils/duration';
 // role NAME only - numeric levels exist solely in middleware/auth.ts.
 export const SESSION_COOKIE = 'pankha_session';
 // Session lifetime (sliding), e.g. "7 days", "12 hours". Via PANKHA_SESSION_DURATION; default 7 days.
-export const SESSION_TTL_SECONDS =
-  parseDurationSeconds(process.env.PANKHA_SESSION_DURATION) ?? 7 * 24 * 60 * 60;
+export const SESSION_TTL_SECONDS = (() => {
+  const raw = (process.env.PANKHA_SESSION_DURATION ?? '').trim();
+  const parsed = parseDurationSeconds(raw);
+  if (raw && parsed === null) {
+    log.warn(`PANKHA_SESSION_DURATION unrecognized ("${raw}") - using the 7 day default.`, 'auth');
+  }
+  return parsed ?? 7 * 24 * 60 * 60;
+})();
 // Reissue the cookie once a session has used ~1/7 of its life (sliding expiry).
 export const SESSION_RENEW_AFTER_SECONDS = Math.floor(SESSION_TTL_SECONDS / 7);
 
