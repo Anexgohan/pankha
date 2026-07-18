@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Bookmark, Zap, Trash2, Download, Check } from 'lucide-react';
 import type { HubStatus } from '../../services/api';
 import { Select } from '../../components/ui/Select';
+import { compareSemver } from '../../utils/version';
 
 export type Channel = 'stable' | 'unstable';
 
@@ -67,8 +68,18 @@ const ReleaseHubCache: React.FC<ReleaseHubCacheProps> = React.memo(({
   onClearCache,
   githubRepo,
 }) => {
-  const latestStable = stableReleases[0];
-  const latestUnstable = unstableReleases[0];
+  // Release feed arrives in publish-date order; rank by version instead
+  // (beta1 published before alpha4 must still list above it)
+  const sortedStable = useMemo(
+    () => [...stableReleases].sort((a, b) => compareSemver(b.tag_name, a.tag_name)),
+    [stableReleases]
+  );
+  const sortedUnstable = useMemo(
+    () => [...unstableReleases].sort((a, b) => compareSemver(b.tag_name, a.tag_name)),
+    [unstableReleases]
+  );
+  const latestStable = sortedStable[0];
+  const latestUnstable = sortedUnstable[0];
 
   const selectedVersion = channel === 'stable' ? selectedStableVersion : selectedUnstableVersion;
   const hubVersion = hubStatus?.version || null;
@@ -109,7 +120,7 @@ const ReleaseHubCache: React.FC<ReleaseHubCacheProps> = React.memo(({
               sessionStorage.setItem('pankha-picker-stable', ver);
               if (channel !== 'stable') onChannelChange('stable');
             }}
-            options={stableReleases.map(r => ({
+            options={sortedStable.map(r => ({
               value: r.tag_name,
               label: `${r.tag_name}${hubVersion === r.tag_name ? ' (Ready)' : ''}`,
             }))}
@@ -132,7 +143,7 @@ const ReleaseHubCache: React.FC<ReleaseHubCacheProps> = React.memo(({
               sessionStorage.setItem('pankha-picker-unstable', ver);
               if (channel !== 'unstable') onChannelChange('unstable');
             }}
-            options={unstableReleases.map(r => ({
+            options={sortedUnstable.map(r => ({
               value: r.tag_name,
               label: `${r.tag_name}${hubVersion === r.tag_name ? ' (Ready)' : ''}`,
             }))}

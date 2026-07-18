@@ -5,7 +5,7 @@ import { approvePendingAgent, dismissPendingAgent } from '../../services/authApi
 import { toast } from '../../utils/toast';
 import './PendingAgentCard.css';
 
-// Defanged card for an agent awaiting admin approval (D13): registration
+// Defanged card for an agent awaiting admin approval: registration
 // metadata only - no telemetry flows until approved. The card disappears via
 // the agentPendingRemoved broadcast after either action.
 
@@ -24,6 +24,11 @@ function timeAgo(iso: string): string {
 
 const PendingAgentCard: React.FC<PendingAgentCardProps> = ({ agent }) => {
   const [busy, setBusy] = useState(false);
+
+  const isWindows = agent.platform === 'windows' || agent.agentType === 'os_windows';
+  // Old Linux/IPMI builds are updated as part of the approval
+  const willChainUpdate = agent.belowTokenVersion === true && !isWindows;
+  const windowsOldBuild = agent.belowTokenVersion === true && isWindows;
 
   const handleApprove = async () => {
     setBusy(true);
@@ -98,9 +103,21 @@ const PendingAgentCard: React.FC<PendingAgentCardProps> = ({ agent }) => {
         </div>
       </div>
 
+      {windowsOldBuild && (
+        <div className="pending-reason">
+          <ShieldQuestion size={15} /> Old build: after approving, run the latest
+          Windows MSI installer on the machine, then approve it again to secure it.
+        </div>
+      )}
+
       <div className="pending-actions">
-        <button className="control-button" onClick={handleApprove} disabled={busy}>
-          <Check size={15} /> Approve
+        <button
+          className="control-button"
+          onClick={handleApprove}
+          disabled={busy}
+          title={willChainUpdate ? 'Approves this agent and updates it in one step' : undefined}
+        >
+          <Check size={15} /> {willChainUpdate ? 'Approve & Update' : 'Approve'}
         </button>
         <button className="pending-dismiss" onClick={handleDismiss} disabled={busy}>
           <X size={15} /> Dismiss

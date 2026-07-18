@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 /**
  * Sign-in screen, with an optional create-account mode when the admin has
- * enabled self-registration (D15). Shown whenever no session exists.
+ * enabled self-registration. Shown whenever no session exists.
  */
 const LoginPage: React.FC = () => {
   const { login, registerAccount, registrationEnabled } = useAuth();

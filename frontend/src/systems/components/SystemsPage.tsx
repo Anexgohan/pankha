@@ -75,7 +75,8 @@ const SystemsPage: React.FC = () => {
     removeSystem,
     fanCalibration,
     stalledFans,
-    pendingAgents
+    pendingAgents,
+    updatingAgentIds
   } = useWebSocketData();
   const { isDemoMode } = useDemoMode();
   const { can, username, logout, authResetActive } = useAuth();
@@ -384,6 +385,7 @@ const SystemsPage: React.FC = () => {
                   onToggleBmc={(expanded) => setExpandedBmc(prev => ({...prev, [system.id]: expanded}))}
                   fanCalibration={fanCalibration[system.agent_id] ?? EMPTY_CAL}
                   stalledFans={stalledFans[system.agent_id] ?? EMPTY_STALLS}
+                  isUpdating={updatingAgentIds.has(system.agent_id)}
                 />
               ))
             )}
@@ -400,6 +402,7 @@ const SystemsPage: React.FC = () => {
           <DeploymentPage
             systems={systems}
             pendingAgents={pendingAgents}
+            updatingAgentIds={updatingAgentIds}
             latestVersion={latestVersion}
             unstableVersion={unstableVersion}
             stableReleases={stableReleases}

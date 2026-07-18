@@ -29,6 +29,7 @@ import RuntimeDefaults, { type LogLevel } from './RuntimeDefaults';
 import DeploySummary from './DeploySummary';
 import MaintenanceSection from './MaintenanceSection';
 import type { PendingAgent } from '../../services/authApi';
+import { approvePendingAgent } from '../../services/authApi';
 import ResourcesSection from './ResourcesSection';
 import '../styles/deployment.css';
 
@@ -79,6 +80,7 @@ interface DeploymentPageProps {
   stableReleases?: ReleaseInfo[];
   unstableReleases?: ReleaseInfo[];
   pendingAgents?: PendingAgent[];
+  updatingAgentIds?: Set<string>;
 }
 
 export const DeploymentPage: React.FC<DeploymentPageProps> = ({
@@ -88,6 +90,7 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
   stableReleases = [],
   unstableReleases = [],
   pendingAgents = [],
+  updatingAgentIds,
 }) => {
   // Workspace state (new shape replaces aioAgentMode/arch)
   const [platform, setPlatform] = useState<Platform>('linux');
@@ -332,6 +335,28 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
     return `wget -qO- "${url}" | bash`;
   };
 
+  // Approve from Fleet Maintenance: same endpoint as the dashboard card;
+  // for old builds the hub chains the update, so no second click needed
+  const handleApprovePending = async (agentId: string) => {
+    try {
+      await approvePendingAgent(agentId);
+      toast.success('Agent approved');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Approval failed');
+    }
+  };
+
+  // Hub-driven updating state (approve-and-update chain) merged with the
+  // locally tracked Update Now clicks
+  const allUpdatingAgents = useMemo(() => {
+    if (!updatingAgentIds || updatingAgentIds.size === 0) return updatingAgents;
+    const merged = new Set(updatingAgents);
+    for (const system of systems) {
+      if (updatingAgentIds.has(system.agent_id)) merged.add(system.id);
+    }
+    return merged;
+  }, [updatingAgents, updatingAgentIds, systems]);
+
   const handleRemoteUpdate = async (systemId: number) => {
     try {
       setUpdatingAgents(prev => new Set(prev).add(systemId));
@@ -558,9 +583,10 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
         onToggle={() => setIsMaintenanceExpanded(!isMaintenanceExpanded)}
         systems={systems}
         pendingAgents={pendingAgents}
+        onApprove={handleApprovePending}
         stableVersion={latestVersion}
         unstableVersion={unstableVersion || null}
-        updatingAgents={updatingAgents}
+        updatingAgents={allUpdatingAgents}
         onApplyUpdate={handleRemoteUpdate}
         hubStatus={hubStatus}
         githubRepo={GITHUB_REPO}

@@ -74,8 +74,10 @@ interface UseWebSocketDataReturn {
   overview: any | null;
   fanCalibration: FanCalibrationMap;
   stalledFans: StalledFanMap;
-  // Agents held for admin approval (D13); always empty for non-admins
+  // Agents held for admin approval; always empty for non-admins
   pendingAgents: PendingAgent[];
+  // agent_ids mid self-update (approve-and-update chain)
+  updatingAgentIds: Set<string>;
 }
 
 /**
@@ -99,6 +101,24 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   const [fanCalibration, setFanCalibration] = useState<FanCalibrationMap>({});
   const [stalledFans, setStalledFans] = useState<StalledFanMap>({});
   const [pendingAgents, setPendingAgents] = useState<PendingAgent[]>([]);
+  // Agents mid self-update (approve-and-update chain): shown as UPDATING
+  // instead of offline until they re-register or their window lapses
+  const [updatingAgentIds, setUpdatingAgentIds] = useState<Set<string>>(new Set());
+  const updatingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const clearUpdatingAgent = useCallback((agentId: string) => {
+    const timer = updatingTimersRef.current.get(agentId);
+    if (timer) {
+      clearTimeout(timer);
+      updatingTimersRef.current.delete(agentId);
+    }
+    setUpdatingAgentIds((prev) => {
+      if (!prev.has(agentId)) return prev;
+      const next = new Set(prev);
+      next.delete(agentId);
+      return next;
+    });
+  }, []);
   const { can } = useAuth();
 
   const wsRef = useRef<WebSocketService | null>(null);
@@ -330,12 +350,15 @@ export function useWebSocketData(): UseWebSocketDataReturn {
 
     if (!mountedRef.current) return;
 
+    // Back from its self-update restart
+    if (data?.agentId) clearUpdatingAgent(data.agentId);
+
     // Request full sync to get complete data for this agent
     if (wsRef.current) {
       console.log("🔄 Requesting full sync after agent registration");
       wsRef.current.send("requestFullSync");
     }
-  }, []);
+  }, [clearUpdatingAgent]);
 
   /**
    * Handle agent unregistered (agent stopped/gracefully disconnected)
@@ -526,7 +549,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       notifyAuthRequired();
     });
 
-    // Pending-approval queue (D13, admin-only broadcasts carry metadata only)
+    // Pending-approval queue (admin-only broadcasts carry metadata only)
     wsRef.current.on("agentPendingApproval", (data: unknown) => {
       if (!mountedRef.current || !isAdminRef.current) return;
       const entry = data as PendingAgent;
@@ -539,6 +562,22 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       if (!mountedRef.current) return;
       const { agentId } = data as { agentId: string };
       setPendingAgents((prev) => prev.filter((p) => p.agentId !== agentId));
+    });
+
+    // Approve-and-update in flight: mark UPDATING until the agent
+    // re-registers or its reconnect window lapses
+    wsRef.current.on("agentUpdating", (data: unknown) => {
+      if (!mountedRef.current) return;
+      const { agentId, windowMs } = data as { agentId: string; version?: string; windowMs?: number };
+      if (!agentId) return;
+      setUpdatingAgentIds((prev) => new Set(prev).add(agentId));
+      const timer = setTimeout(
+        () => clearUpdatingAgent(agentId),
+        windowMs && windowMs > 0 ? windowMs : 300_000
+      );
+      const old = updatingTimersRef.current.get(agentId);
+      if (old) clearTimeout(old);
+      updatingTimersRef.current.set(agentId, timer);
     });
 
     // Fan calibration lifecycle: one event per unit per state change.
@@ -611,6 +650,7 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     handleAgentError,
     handleAgentRecovered,
     handleAgentConfigUpdated,
+    clearUpdatingAgent,
   ]);
 
   /**
@@ -655,5 +695,6 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     fanCalibration,
     stalledFans,
     pendingAgents,
+    updatingAgentIds,
   };
 }
