@@ -399,6 +399,7 @@ const SystemsPage: React.FC = () => {
         {activeTab === 'deployment' && (
           <DeploymentPage
             systems={systems}
+            pendingAgents={pendingAgents}
             latestVersion={latestVersion}
             unstableVersion={unstableVersion}
             stableReleases={stableReleases}

@@ -28,6 +28,7 @@ import InstallConnection, { type PathMode, type UrlMode } from './InstallConnect
 import RuntimeDefaults, { type LogLevel } from './RuntimeDefaults';
 import DeploySummary from './DeploySummary';
 import MaintenanceSection from './MaintenanceSection';
+import type { PendingAgent } from '../../services/authApi';
 import ResourcesSection from './ResourcesSection';
 import '../styles/deployment.css';
 
@@ -77,6 +78,7 @@ interface DeploymentPageProps {
   unstableVersion?: string | null;
   stableReleases?: ReleaseInfo[];
   unstableReleases?: ReleaseInfo[];
+  pendingAgents?: PendingAgent[];
 }
 
 export const DeploymentPage: React.FC<DeploymentPageProps> = ({
@@ -85,6 +87,7 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
   unstableVersion,
   stableReleases = [],
   unstableReleases = [],
+  pendingAgents = [],
 }) => {
   // Workspace state (new shape replaces aioAgentMode/arch)
   const [platform, setPlatform] = useState<Platform>('linux');
@@ -554,6 +557,7 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
         isExpanded={isMaintenanceExpanded}
         onToggle={() => setIsMaintenanceExpanded(!isMaintenanceExpanded)}
         systems={systems}
+        pendingAgents={pendingAgents}
         stableVersion={latestVersion}
         unstableVersion={unstableVersion || null}
         updatingAgents={updatingAgents}

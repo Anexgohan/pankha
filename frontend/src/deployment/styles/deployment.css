@@ -1389,6 +1389,12 @@
   color: var(--color-accent-dynamic);
 }
 
+.status-tag-v2.pending {
+  background: color-mix(in srgb, var(--color-info), transparent 92%);
+  border-color: color-mix(in srgb, var(--color-info), transparent 85%);
+  color: var(--color-info);
+}
+
 .status-tag-v2 .status-dot {
   width: 6px;
   height: 6px;
