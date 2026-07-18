@@ -3484,3 +3484,240 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ===================================
+   Accounts tab (task_02 auth, design per approved hub-auth slice)
+   =================================== */
+
+.signed-in-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-base);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+}
+
+.signed-in-row svg {
+  color: var(--text-tertiary);
+}
+
+.role-chip {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-info) 50%, transparent);
+  color: var(--color-info);
+}
+
+/* Registration setting rows reuse .setting-item (label left, control right) */
+.registration-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.user-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-panels_01);
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--font-size-base);
+}
+
+.user-row:last-child {
+  border-bottom: none;
+}
+
+.user-row .u-name {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-weight: var(--font-weight-medium);
+  min-width: 0;
+}
+
+.user-row .u-name svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.user-row .u-you {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.user-row .pk-select-trigger {
+  min-width: 96px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.row-action {
+  background: transparent;
+  border: none;
+  padding: 5px;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.row-action:hover:not(:disabled) {
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 8%, transparent);
+}
+
+.row-action.danger:hover:not(:disabled) {
+  color: var(--color-error);
+  background: color-mix(in srgb, var(--color-error) 8%, transparent);
+}
+
+.row-action:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Inline password-reset strip under a user row */
+.user-row-reset {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--bg-panels_02);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.user-row-reset input {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm2);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: inherit;
+}
+
+.user-row-reset input:focus {
+  outline: none;
+  border-color: var(--color-info);
+}
+
+.user-row-reset .control-button {
+  padding: var(--spacing-xs) var(--spacing-lg);
+}
+
+.add-user-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--spacing-md);
+  background: transparent;
+  color: var(--color-info);
+  border: 1px dashed color-mix(in srgb, var(--color-info) 45%, transparent);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-medium);
+}
+
+.add-user-btn:hover {
+  border-style: solid;
+}
+
+.add-user-form {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--bg-panels_01);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.add-user-form .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 130px;
+  gap: var(--spacing-md);
+  align-items: end;
+}
+
+.add-user-form .form-group {
+  margin-bottom: 0;
+}
+
+.add-user-form .form-group label {
+  font-size: var(--font-size-sm2);
+}
+
+.add-user-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.add-user-actions .control-button {
+  padding: var(--spacing-xs) var(--spacing-lg);
+}
+
+.add-user-cancel {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-xs) var(--spacing-lg);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+}
+
+.role-hint {
+  display: flex;
+  gap: var(--spacing-lg);
+  flex-wrap: wrap;
+  margin: 0 0 var(--spacing-md);
+}
+
+.role-hint span {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+.role-hint b {
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.pw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 var(--spacing-lg);
+  max-width: 560px;
+}
+
+.pw-grid .full {
+  grid-column: 1 / -1;
+}
+
+.pw-save {
+  padding: var(--spacing-sm) var(--spacing-xl);
+}

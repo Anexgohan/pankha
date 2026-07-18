@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { SystemData } from "../types/api";
 import WebSocketService from "../services/websocket";
+import { notifyAuthRequired } from "../services/authEvents";
+import { getPendingAgents, type PendingAgent } from "../services/authApi";
+import { useAuth } from "../contexts/AuthContext";
 
 // Delta update structure from backend
 export interface SystemDelta {
@@ -71,6 +74,8 @@ interface UseWebSocketDataReturn {
   overview: any | null;
   fanCalibration: FanCalibrationMap;
   stalledFans: StalledFanMap;
+  // Agents held for admin approval (D13); always empty for non-admins
+  pendingAgents: PendingAgent[];
 }
 
 /**
@@ -93,10 +98,15 @@ export function useWebSocketData(): UseWebSocketDataReturn {
   const [overview, setOverview] = useState<any | null>(null);
   const [fanCalibration, setFanCalibration] = useState<FanCalibrationMap>({});
   const [stalledFans, setStalledFans] = useState<StalledFanMap>({});
+  const [pendingAgents, setPendingAgents] = useState<PendingAgent[]>([]);
+  const { can } = useAuth();
 
   const wsRef = useRef<WebSocketService | null>(null);
   const mountedRef = useRef(true);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // The pending queue is admin-only; ref keeps handlers stable across renders
+  const isAdminRef = useRef(false);
+  isAdminRef.current = can("admin");
 
   /**
    * Merge delta into existing systems state
@@ -416,6 +426,15 @@ export function useWebSocketData(): UseWebSocketDataReturn {
       wsRef.current.subscribe(["systems:all"]);
       wsRef.current.send("requestFullSync");
     }
+
+    // Seed the pending-approval queue (events keep it current afterwards)
+    if (isAdminRef.current) {
+      getPendingAgents()
+        .then((pending) => {
+          if (mountedRef.current) setPendingAgents(pending);
+        })
+        .catch((err) => console.error("Failed to fetch pending agents:", err));
+    }
   }, []);
 
   // Note: handleDisconnect and handleError are handled by the WebSocket service's
@@ -498,6 +517,28 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     );
     wsRef.current.on("licenseUpdated", () => {
       for (const listener of licenseUpdatedListeners) listener();
+    });
+
+    // Session expired or revoked mid-connection: hand off to the auth layer
+    // (login screen) instead of the retry loop
+    wsRef.current.on("authRequired", () => {
+      console.warn("🔒 WebSocket closed: authentication required");
+      notifyAuthRequired();
+    });
+
+    // Pending-approval queue (D13, admin-only broadcasts carry metadata only)
+    wsRef.current.on("agentPendingApproval", (data: unknown) => {
+      if (!mountedRef.current || !isAdminRef.current) return;
+      const entry = data as PendingAgent;
+      setPendingAgents((prev) => [
+        ...prev.filter((p) => p.agentId !== entry.agentId),
+        entry,
+      ]);
+    });
+    wsRef.current.on("agentPendingRemoved", (data: unknown) => {
+      if (!mountedRef.current) return;
+      const { agentId } = data as { agentId: string };
+      setPendingAgents((prev) => prev.filter((p) => p.agentId !== agentId));
     });
 
     // Fan calibration lifecycle: one event per unit per state change.
@@ -613,5 +654,6 @@ export function useWebSocketData(): UseWebSocketDataReturn {
     overview,
     fanCalibration,
     stalledFans,
+    pendingAgents,
   };
 }

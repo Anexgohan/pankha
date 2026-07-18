@@ -12,6 +12,9 @@ import Database from "../database/database";
 import type { AggregatedSystemData } from "../types/aggregatedData";
 import { licenseManager } from "../license";
 import { log } from "../utils/logger";
+import { SESSION_COOKIE, parseCookieHeader, verifySession } from "../auth/session";
+import { mintAgentToken, hashAgentToken, verifyAgentToken } from "../auth/tokens";
+import { isValidDeployToken } from "../auth/enrollment";
 import { 
   defaultUpdateInterval, 
   defaultFanStep, 
@@ -38,6 +41,11 @@ interface ClientConnection {
     connectedAt: Date;
     agentId?: string;
     isAgent?: boolean;
+    // Session-verified dashboard connection. Connections start unclassified;
+    // isFrontend is granted by a valid session cookie at upgrade, isAgent by
+    // an authenticated register message. Neither = no data flows.
+    isFrontend?: boolean;
+    username?: string;
   };
 }
 
@@ -48,6 +56,33 @@ interface WebSocketMessage {
   clientId?: string;
 }
 
+// Credential-less agent held for admin approval (D13). Lives in memory only,
+// tied to its connection; no systems row, no license seat, telemetry ignored.
+interface PendingAgent {
+  clientId: string;
+  registrationData: any;
+  agentId: string;
+  name: string;
+  ip?: string;
+  agentType?: string;
+  platform?: string;
+  version?: string;
+  reason: string;
+  requestedAt: string;
+}
+
+// Max agents held awaiting approval at once (memory + card-spam bound); raise for large enrollments.
+const MAX_PENDING_AGENTS = (() => {
+  const raw = (process.env.PANKHA_MAX_PENDING_AGENTS ?? '').trim();
+  if (!raw) return 20;
+  const n = /^\d+$/.test(raw) ? parseInt(raw, 10) : NaN;
+  if (!Number.isInteger(n) || n <= 0) {
+    log.warn(`PANKHA_MAX_PENDING_AGENTS ignored - expected a positive integer, got "${raw}". Using 20.`, 'websocket');
+    return 20;
+  }
+  return n;
+})();
+
 export class WebSocketHub extends EventEmitter {
   private static instance: WebSocketHub;
   private wss: WebSocketServer | null = null;
@@ -57,6 +92,8 @@ export class WebSocketHub extends EventEmitter {
   // the per-client `subscriptions` Sets; keep them in sync only through
   // add/removeClientSubscription and removeClientFromIndex.
   private subscriptionIndex: Map<string, Set<string>> = new Map();
+  // agentId -> pending-approval entry (D13)
+  private pendingAgents: Map<string, PendingAgent> = new Map();
   private dataAggregator: DataAggregator;
   private agentManager: AgentManager;
   private commandDispatcher: CommandDispatcher;
@@ -94,7 +131,10 @@ export class WebSocketHub extends EventEmitter {
     });
 
     this.wss.on("connection", (ws: WebSocket, request: IncomingMessage) => {
-      this.handleNewConnection(ws, request);
+      this.handleNewConnection(ws, request).catch((error) => {
+        log.error("Failed to handle new WebSocket connection", "WebSocketHub", error);
+        ws.close();
+      });
     });
 
     this.startPingInterval();
@@ -274,11 +314,19 @@ export class WebSocketHub extends EventEmitter {
   /**
    * Handle new WebSocket connection
    */
-  private handleNewConnection(ws: WebSocket, request: IncomingMessage): void {
+  private async handleNewConnection(ws: WebSocket, request: IncomingMessage): Promise<void> {
     const clientId = this.generateClientId();
     const userAgent = request.headers["user-agent"] || "";
-    const isAgent =
-      userAgent.includes("Python") || userAgent.includes("websockets");
+
+    // Classification is credential-based: a valid session cookie on the
+    // upgrade request marks a frontend connection; agents earn isAgent via an
+    // authenticated register message. Unclassified connections receive
+    // nothing and may only register or ping.
+    const cookies = parseCookieHeader(request.headers.cookie);
+    const session = cookies[SESSION_COOKIE]
+      ? await verifySession(cookies[SESSION_COOKIE])
+      : null;
+    const isFrontend = !!session;
 
     // Get real IP address (handles nginx proxy and IPv6-mapped IPv4)
     const realIp = this.extractRealIp(request);
@@ -292,20 +340,22 @@ export class WebSocketHub extends EventEmitter {
         userAgent: userAgent,
         ip: realIp,
         connectedAt: new Date(),
-        isAgent: isAgent,
+        isAgent: false,
+        isFrontend,
+        username: session?.user.username,
       },
     };
 
     this.clients.set(clientId, client);
 
-    if (isAgent) {
+    if (!isFrontend) {
       log.info(
-        ` New AGENT WebSocket connected: ${clientId} (${client.metadata.ip})`,
+        ` New unclassified WebSocket connected (agent register or login pending): ${clientId} (${client.metadata.ip})`,
         "WebSocketHub"
       );
     } else {
       log.info(
-        ` New FRONTEND WebSocket connected: ${clientId} (${client.metadata.ip})`,
+        ` New FRONTEND WebSocket connected: ${clientId} (${client.metadata.ip}, user: ${session!.user.username})`,
         "WebSocketHub"
       );
 
@@ -419,6 +469,21 @@ export class WebSocketHub extends EventEmitter {
         log.info(` Frontend client disconnected: ${clientId}`, "WebSocketHub");
       }
 
+      // Pending-approval entries live with their connection (D13)
+      for (const [agentId, entry] of this.pendingAgents) {
+        if (entry.clientId === clientId) {
+          this.pendingAgents.delete(agentId);
+          this.broadcast("agentPendingRemoved", { agentId }, [
+            "agents:all",
+            "systems:all",
+          ]);
+          log.info(
+            `Pending agent ${agentId} disconnected before approval`,
+            "WebSocketHub"
+          );
+        }
+      }
+
       this.removeClientFromIndex(client); // before removing the client itself
       this.clients.delete(clientId);
       this.emit("clientDisconnected", { clientId, client });
@@ -443,6 +508,24 @@ export class WebSocketHub extends EventEmitter {
       if (!client) return;
 
       client.lastActivity = new Date();
+
+      // Dashboard data flows only to session-verified connections. 4401 lets
+      // the frontend distinguish "log in again" from a network drop.
+      const FRONTEND_MESSAGES = [
+        "subscribe",
+        "unsubscribe",
+        "requestFullSync",
+        "getSystemData",
+        "getOverview",
+      ];
+      if (FRONTEND_MESSAGES.includes(message.type) && !client.metadata.isFrontend) {
+        log.warn(
+          `Unauthenticated client ${clientId} sent ${message.type} - closing`,
+          "WebSocketHub"
+        );
+        client.websocket.close(4401, "authentication required");
+        return;
+      }
 
       switch (message.type) {
         case "subscribe":
@@ -615,7 +698,9 @@ export class WebSocketHub extends EventEmitter {
    */
   private async handleAgentRegistration(
     clientId: string,
-    registrationData: any
+    registrationData: any,
+    // Set only by approvePendingAgent: admin vouched, so skip the credential tree and push a token.
+    preApproved: boolean = false
   ): Promise<void> {
     try {
       log.info(
@@ -635,9 +720,59 @@ export class WebSocketHub extends EventEmitter {
       }
 
       const agentId = registrationData.agentId;
+      const client = this.clients.get(clientId);
+
+      if (client?.metadata.isFrontend) {
+        this.sendToClient(clientId, "registrationError", {
+          error: "Frontend connections cannot register as agents",
+        });
+        return;
+      }
+
+      // Credential decision tree (task_02 section 4.4, single door):
+      //   auth_token + stored hash        -> verify or close
+      //   enrollment_token valid          -> exchange for a minted token
+      //   anything else, known or unknown -> hold as pending-approval card
+      let mintedToken: string | null = null; // returned in the registered response
+
+      if (!preApproved) {
+        const db2 = Database.getInstance();
+        const existing = await db2.get(
+          "SELECT auth_token_hash FROM systems WHERE agent_id = $1",
+          [agentId]
+        );
+        const presentedToken = registrationData.auth_token;
+        const presentedEnrollment = registrationData.enrollment_token;
+
+        if (existing?.auth_token_hash) {
+          if (!verifyAgentToken(presentedToken, existing.auth_token_hash)) {
+            log.warn(
+              `Agent ${agentId} presented ${presentedToken ? "an invalid" : "no"} auth token - rejecting`,
+              "WebSocketHub"
+            );
+            this.sendToClient(clientId, "registrationError", {
+              error: "Agent token rejected",
+            });
+            this.clients.get(clientId)?.websocket.close(4403, "agent token rejected");
+            return;
+          }
+        } else {
+          // No stored token (known or unknown): a valid enrollment token auto-enrolls (script flow); anything else is held for admin approval (D13, single door).
+          if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
+            mintedToken = mintAgentToken();
+          } else {
+            const reason = presentedEnrollment
+              ? "Install token expired - approve on the dashboard or run a fresh install script"
+              : existing
+                ? "Existing agent has no token yet - approve to migrate it"
+                : "Registered without credentials - approve on the dashboard";
+            this.holdPendingAgent(clientId, registrationData, reason);
+            return;
+          }
+        }
+      }
 
       // Mark this client as an agent connection
-      const client = this.clients.get(clientId);
       if (client) {
         client.metadata.agentId = agentId;
         client.metadata.isAgent = true;
@@ -805,6 +940,22 @@ export class WebSocketHub extends EventEmitter {
           );
         }
 
+        // Enrollment: persist the token hash now that the systems row exists,
+        // and hand the plaintext to the agent inside the registered response
+        // (the agent persists it and drops its enrollment_token).
+        if (mintedToken) {
+          await db.run(
+            "UPDATE systems SET auth_token_hash = $1 WHERE agent_id = $2",
+            [hashAgentToken(mintedToken), agentId]
+          );
+          log.info(`Agent ${agentId} enrolled - auth token issued`, "WebSocketHub");
+          // Clear the Unsecured badge live
+          this.agentManager.emit("agentConfigUpdated", {
+            agentId,
+            config: { unsecured: false },
+          });
+        }
+
         // Send registration confirmation with configuration
         this.sendToClient(clientId, "registered", {
           agentId: agentId,
@@ -812,7 +963,35 @@ export class WebSocketHub extends EventEmitter {
           message: "Agent registered successfully",
           timestamp: new Date().toISOString(),
           configuration: finalConfig, // Send configuration to agent so it can apply it
+          ...(mintedToken ? { auth_token: mintedToken } : {}),
         });
+
+        // Approved agent: push its permanent token. Hash commits only on the agent's ack, so pre-auth binaries stay connectable (shown Unsecured) until self-update.
+        if (preApproved) {
+          const approvalToken = mintAgentToken();
+          setTimeout(() => {
+            this.commandDispatcher
+              .sendCommand(agentId, "setAuthToken", { authToken: approvalToken })
+              .then(async () => {
+                await db.run(
+                  "UPDATE systems SET auth_token_hash = $1 WHERE agent_id = $2",
+                  [hashAgentToken(approvalToken), agentId]
+                );
+                log.info(`Agent ${agentId} secured via setAuthToken`, "WebSocketHub");
+                // Clear the Unsecured badge live
+                this.agentManager.emit("agentConfigUpdated", {
+                  agentId,
+                  config: { unsecured: false },
+                });
+              })
+              .catch((err) => {
+                log.debug(
+                  `Agent ${agentId} did not accept setAuthToken (pre-auth binary?): ${err?.message ?? err}`,
+                  "WebSocketHub"
+                );
+              });
+          }, 2000);
+        }
 
         // DB-priority profile sync: if DB has a profile_id that differs from agent's,
         // tell the agent to reload so it fetches the authoritative profile from the API.
@@ -866,6 +1045,128 @@ export class WebSocketHub extends EventEmitter {
         error: "Registration processing failed",
       });
     }
+  }
+
+  /**
+   * Hold a credential-less agent for admin approval (D13). The connection
+   * stays open (so approval can promote it instantly) but the client is never
+   * marked isAgent - existing gates ignore its telemetry and responses.
+   */
+  private holdPendingAgent(
+    clientId: string,
+    registrationData: any,
+    reason: string
+  ): void {
+    const agentId = registrationData.agentId;
+    const previous = this.pendingAgents.get(agentId);
+
+    // Same agent retrying (reconnect after dismiss/restart): the new
+    // connection supersedes the old entry
+    if (previous && previous.clientId !== clientId) {
+      this.clients
+        .get(previous.clientId)
+        ?.websocket.close(4408, "superseded by newer registration");
+    }
+
+    if (!previous && this.pendingAgents.size >= MAX_PENDING_AGENTS) {
+      log.warn(
+        `Pending-approval queue full (${MAX_PENDING_AGENTS}) - turning away agent ${agentId}`,
+        "WebSocketHub"
+      );
+      this.sendToClient(clientId, "registrationError", {
+        error: "Hub pending-approval queue is full",
+      });
+      this.clients.get(clientId)?.websocket.close(4403, "pending queue full");
+      return;
+    }
+
+    const client = this.clients.get(clientId);
+    const entry: PendingAgent = {
+      clientId,
+      registrationData,
+      agentId,
+      name: registrationData.name || agentId,
+      ip: client?.metadata.ip,
+      agentType: registrationData.agent_type,
+      platform: registrationData.platform,
+      version: registrationData.agent_version,
+      reason,
+      requestedAt: new Date().toISOString(),
+    };
+    this.pendingAgents.set(agentId, entry);
+
+    log.info(`Agent ${agentId} held for approval: ${reason}`, "WebSocketHub");
+    this.sendToClient(clientId, "registrationPending", { agentId, reason });
+    this.broadcast("agentPendingApproval", this.pendingAgentView(entry), [
+      "agents:all",
+      "systems:all",
+    ]);
+  }
+
+  /** Metadata-only view of a pending agent (never the raw registration data) */
+  private pendingAgentView(entry: PendingAgent) {
+    const { clientId, registrationData, ...view } = entry;
+    return view;
+  }
+
+  public getPendingAgents() {
+    return Array.from(this.pendingAgents.values()).map((e) =>
+      this.pendingAgentView(e)
+    );
+  }
+
+  /**
+   * Admin approved a pending agent: run the normal registration for the held
+   * connection (row, config sync, registered response) with the approval
+   * path pushing its permanent token via setAuthToken.
+   */
+  public async approvePendingAgent(
+    agentId: string
+  ): Promise<{ ok: boolean; error?: string }> {
+    const entry = this.pendingAgents.get(agentId);
+    if (!entry) {
+      return { ok: false, error: "No pending agent with that ID" };
+    }
+
+    this.pendingAgents.delete(agentId);
+    this.broadcast("agentPendingRemoved", { agentId }, [
+      "agents:all",
+      "systems:all",
+    ]);
+
+    const client = this.clients.get(entry.clientId);
+    if (!client || client.websocket.readyState !== WebSocket.OPEN) {
+      return {
+        ok: false,
+        error:
+          "Agent is no longer connected - it will reappear on its next reconnect",
+      };
+    }
+
+    log.info(`Pending agent ${agentId} approved by admin`, "WebSocketHub");
+    await this.handleAgentRegistration(entry.clientId, entry.registrationData, true);
+    return { ok: true };
+  }
+
+  /**
+   * Admin dismissed a pending agent: drop the entry and close the connection.
+   * Not a ban - the agent re-pends on its next reconnect; permanent silence
+   * means uninstalling the agent on that machine.
+   */
+  public dismissPendingAgent(agentId: string): { ok: boolean; error?: string } {
+    const entry = this.pendingAgents.get(agentId);
+    if (!entry) {
+      return { ok: false, error: "No pending agent with that ID" };
+    }
+
+    this.pendingAgents.delete(agentId);
+    this.broadcast("agentPendingRemoved", { agentId }, [
+      "agents:all",
+      "systems:all",
+    ]);
+    this.clients.get(entry.clientId)?.websocket.close(4403, "dismissed");
+    log.info(`Pending agent ${agentId} dismissed by admin`, "WebSocketHub");
+    return { ok: true };
   }
 
   /**
@@ -1026,8 +1327,12 @@ export class WebSocketHub extends EventEmitter {
     const agentId = system.agent_id;
     const agentStatus = this.agentManager.getAgentStatus(agentId);
 
+    // The token hash never leaves the hub; the UI only needs the boolean
+    const { auth_token_hash, ...publicSystem } = system;
+
     return {
-      ...system,
+      ...publicSystem,
+      unsecured: !auth_token_hash,
       status: agentStatus?.status || systemData?.status || system.status,
       real_time_status: agentStatus?.status || systemData?.status || "unknown",
       last_seen: systemData?.lastUpdate?.toISOString() || system.last_seen || null,

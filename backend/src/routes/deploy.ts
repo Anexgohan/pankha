@@ -124,7 +124,7 @@ router.get('/linux', async (req, res) => {
     const localBinaryBase = `${backendUrl}/api/deploy/binaries`;
 
     // Generate install script
-    const script = generateInstallScript(config, backendUrl, wsUrl, localBinaryBase);
+    const script = generateInstallScript(config, backendUrl, wsUrl, localBinaryBase, String(token));
 
     res.setHeader('Content-Type', 'text/x-shellscript');
     res.send(script);
@@ -296,7 +296,7 @@ router.get('/ipmi', async (req, res) => {
     const wsUrl = `${protocol === 'https' ? 'wss' : 'ws'}://${hubHost}/websocket`;
     const localBinaryBase = `${backendUrl}/api/deploy/binaries`;
 
-    const script = generateIpmiInstallScript(config, backendUrl, wsUrl, localBinaryBase);
+    const script = generateIpmiInstallScript(config, backendUrl, wsUrl, localBinaryBase, String(token));
 
     res.setHeader('Content-Type', 'text/x-shellscript');
     res.send(script);
@@ -306,7 +306,7 @@ router.get('/ipmi', async (req, res) => {
   }
 });
 
-function generateIpmiInstallScript(config: any, backendUrl: string, wsUrl: string, localBinaryBase: string): string {
+function generateIpmiInstallScript(config: any, backendUrl: string, wsUrl: string, localBinaryBase: string, deployToken: string): string {
   const {
     path_mode,
     log_level,
@@ -443,13 +443,18 @@ CONFIG_CONTENT='{
     "log_file": "'$LOG_FILE'",
     "max_log_size_mb": 10,
     "log_retention_days": 7
+  },
+  "auth": {
+    "enrollment_token": "${deployToken}"
   }
 }'
 
 if [ "$INSTALL_DIR" = "$(pwd)" ]; then
     echo "$CONFIG_CONTENT" > "$INSTALL_DIR/config.json"
+    chmod 600 "$INSTALL_DIR/config.json"
 else
     echo "$CONFIG_CONTENT" | run_as_root tee "$INSTALL_DIR/config.json" > /dev/null
+    run_as_root chmod 600 "$INSTALL_DIR/config.json"
 fi
 
 echo "      Agent ID: $AGENT_ID"
@@ -473,7 +478,7 @@ ASSIGN_OK=false
 for i in 1 2 3 4 5; do
     sleep 2
     ASSIGN_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X PUT \\
-      "$BACKEND_URL/api/deploy/profiles/assign/$AGENT_ID" \\
+      "$BACKEND_URL/api/deploy/profiles/assign/$AGENT_ID?token=${deployToken}" \\
       -H "Content-Type: application/json" \\
       -d '{"profile_id":"'$PROFILE_ID'"}')
     if [ "$ASSIGN_CODE" = "200" ]; then
@@ -511,7 +516,7 @@ fi
 `;
 }
 
-function generateInstallScript(config: any, backendUrl: string, wsUrl: string, localBinaryBase: string): string {
+function generateInstallScript(config: any, backendUrl: string, wsUrl: string, localBinaryBase: string, deployToken: string): string {
   const {
     path_mode,
     log_level,
@@ -636,13 +641,18 @@ CONFIG_CONTENT='{
     "log_file": "'$LOG_FILE'",
     "max_log_size_mb": 10,
     "log_retention_days": 7
+  },
+  "auth": {
+    "enrollment_token": "${deployToken}"
   }
 }'
 
 if [ "$INSTALL_DIR" = "$(pwd)" ]; then
     echo "$CONFIG_CONTENT" > "$INSTALL_DIR/config.json"
+    chmod 600 "$INSTALL_DIR/config.json"
 else
     echo "$CONFIG_CONTENT" | run_as_root tee "$INSTALL_DIR/config.json" > /dev/null
+    run_as_root chmod 600 "$INSTALL_DIR/config.json"
 fi
 
 echo "      Agent ID: $AGENT_ID"

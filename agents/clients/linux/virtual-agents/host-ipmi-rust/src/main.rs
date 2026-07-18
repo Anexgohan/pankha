@@ -289,6 +289,7 @@ async fn main() -> Result<()> {
         match websocket::profile_fetch::fetch_and_cache_profile(
             &profile_url,
             &install_dir,
+            config.auth.auth_token.as_deref(),
         ).await {
             Ok(path) => info!("BMC profile ready at {:?}", path),
             Err(e) => warn!("Profile fetch failed: {}. Agent will use --profile flag or existing profile.json", e),

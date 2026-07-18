@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Activity, ChevronDown, ChevronRight, Download } from 'lucide-react';
 import type { HubStatus } from '../../services/api';
+import type { PendingAgent } from '../../services/authApi';
 
 type MaintenanceSortKey = 'name' | 'agentId' | 'platform' | 'agentType' | 'version' | 'status' | 'maintenance';
 type SortDirection = 'asc' | 'desc';
@@ -9,6 +10,7 @@ interface MaintenanceSectionProps {
   isExpanded: boolean;
   onToggle: () => void;
   systems: any[];
+  pendingAgents?: PendingAgent[];
   stableVersion: string | null;
   unstableVersion: string | null;
   updatingAgents: Set<number>;
@@ -66,6 +68,7 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
   isExpanded,
   onToggle,
   systems,
+  pendingAgents = [],
   stableVersion,
   unstableVersion,
   updatingAgents,
@@ -76,10 +79,19 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
   const [sortKey, setSortKey] = useState<MaintenanceSortKey | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
+  // Agents connected but held for admin approval: not registered, so their
+  // systems row still reads offline - show the truthful state instead
+  const pendingIds = useMemo(
+    () => new Set(pendingAgents.map(p => p.agentId)),
+    [pendingAgents]
+  );
+
   const getStatusLabel = (system: any) =>
     updatingAgents.has(system.id)
       ? 'UPDATING'
-      : (system.status === 'error' ? 'ERROR' : (system.status === 'online' ? 'ONLINE' : 'OFFLINE'));
+      : pendingIds.has(system.agent_id)
+        ? 'PENDING APPROVAL'
+        : (system.status === 'error' ? 'ERROR' : (system.status === 'online' ? 'ONLINE' : 'OFFLINE'));
 
   const getMaintenanceLabel = (system: any) => {
     const isWindows = isWindowsSystem(system);
@@ -93,6 +105,7 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
     const isOnline = system.status === 'online' || system.status === 'error';
 
     if (isWindows) return isOutdated ? 'DOWNLOAD MSI' : 'GET MSI';
+    if (pendingIds.has(system.agent_id)) return 'APPROVE FIRST';
     if (!hubStatus?.version) return 'UNAVAILABLE';
     if (!isOnline) return 'OFFLINE';
     if (isUpdating) return 'UPDATING';
@@ -157,7 +170,7 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
         case 'version':
           return compareSemver(a.agent_version, b.agent_version);
         case 'status': {
-          const rank: Record<string, number> = { OFFLINE: 0, ERROR: 1, ONLINE: 2, UPDATING: 3 };
+          const rank: Record<string, number> = { OFFLINE: 0, 'PENDING APPROVAL': 1, ERROR: 2, ONLINE: 3, UPDATING: 4 };
           return (rank[getStatusLabel(a)] ?? 0) - (rank[getStatusLabel(b)] ?? 0);
         }
         case 'maintenance':
@@ -168,7 +181,7 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
     });
 
     return sortDirection === 'asc' ? sorted : sorted.reverse();
-  }, [systems, sortKey, sortDirection, updatingAgents]);
+  }, [systems, sortKey, sortDirection, updatingAgents, pendingIds]);
 
   return (
     <section className={`deployment-section maintenance-panel ${!isExpanded ? 'collapsed' : ''}`}>
@@ -248,10 +261,11 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
                     const isDowngrade = isMismatch && compareSemver(cleanTarget, system.agent_version) < 0;
                     const isOutdated = isMismatch && !isDowngrade;
                     const isUpdating = updatingAgents.has(system.id);
+                    const isPending = pendingIds.has(system.agent_id);
                     const isOnline = system.status === 'online' || system.status === 'error';
 
                     const statusLabel = getStatusLabel(system);
-                    const statusClass = isUpdating ? 'updating' : (isOnline ? (system.status === 'error' ? 'error' : 'online') : 'offline');
+                    const statusClass = isUpdating ? 'updating' : (isPending ? 'pending' : (isOnline ? (system.status === 'error' ? 'error' : 'online') : 'offline'));
 
                     const getFleetIcon = () => {
                       if (system.agent_type === 'ipmi_host' || system.agent_type === 'ipmi_network') {
@@ -357,27 +371,29 @@ const MaintenanceSection: React.FC<MaintenanceSectionProps> = React.memo(({
                           ) : (
                             <span
                               title={
-                                !hubStatus?.version
-                                  ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first`
-                                  : (!isOnline
-                                    ? 'Agent is offline'
-                                    : (isUpdating
-                                      ? 'Update in progress...'
-                                      : (isDowngrade
-                                        ? `Downgrade agent to ${targetVersion}`
-                                        : (isOutdated
-                                          ? `Click to update agent to ${targetVersion}`
-                                          : `Reinstall agent version ${targetVersion}`))))
+                                isPending
+                                  ? 'Approve this agent on the dashboard first, then update'
+                                  : !hubStatus?.version
+                                    ? `Download Stable ${stableVersion || ''} or Unstable ${unstableVersion || ''} to server first`
+                                    : (!isOnline
+                                      ? 'Agent is offline'
+                                      : (isUpdating
+                                        ? 'Update in progress...'
+                                        : (isDowngrade
+                                          ? `Downgrade agent to ${targetVersion}`
+                                          : (isOutdated
+                                            ? `Click to update agent to ${targetVersion}`
+                                            : `Reinstall agent version ${targetVersion}`))))
                               }
                               style={{ display: 'inline-block' }}
                             >
                               <button
                                 className={`btn-table-action ${isOutdated ? 'update-needed' : ''} ${isDowngrade ? 'downgrade' : ''}`}
                                 onClick={() => onApplyUpdate(system.id)}
-                                disabled={!isOnline || isUpdating || !hubStatus?.version}
+                                disabled={isPending || !isOnline || isUpdating || !hubStatus?.version}
                                 style={{ pointerEvents: 'auto' }}
                               >
-                                {isUpdating ? 'Updating...' : (isDowngrade ? 'Downgrade' : (isOutdated ? 'Update Now' : 'Reinstall'))}
+                                {isPending ? 'Approve First' : (isUpdating ? 'Updating...' : (isDowngrade ? 'Downgrade' : (isOutdated ? 'Update Now' : 'Reinstall')))}
                               </button>
                             </span>
                           )}

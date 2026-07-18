@@ -97,6 +97,7 @@ export interface FanControlCommand {
     | "setFailsafeSpeed"
     | "setEnableFanControl"
     | "setAgentName"
+    | "setAuthToken"
     | "selfUpdate"
     | "getDiagnostics"
     | "executeRawIpmi"
@@ -124,6 +125,7 @@ export interface FanControlCommand {
     version?: string | null; // For selfUpdate command (hub version, e.g., "v0.3.2")
     bytes?: string; // For executeRawIpmi command (hex bytes like "0x30 0x70 0x66")
     excludedSensors?: string[]; // For setExcludedSensors command - sensor IDs to skip in failsafe
+    authToken?: string; // For setAuthToken command - Hub-minted agent credential
   };
   timestamp: number;
   priority: "low" | "normal" | "high" | "emergency";

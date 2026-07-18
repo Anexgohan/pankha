@@ -6,8 +6,10 @@ dotenv.config({ path: path.join(__dirname, '../../.env') }); // Load from projec
 
 import express from 'express';
 import http from 'http';
+import net from 'net';
 import cors from 'cors';
 import compression from 'compression';
+import cookieParser from 'cookie-parser';
 import Database from './database/database';
 import { AgentManager } from './services/AgentManager';
 import { AgentCommunication } from './services/AgentCommunication';
@@ -28,6 +30,8 @@ import fanConfigurationsRouter from './routes/fanConfigurations';
 import virtualSensorsRouter from './routes/virtualSensors';
 import deployRouter from './routes/deploy';
 import configRouter from './routes/config';
+import authRouter from './routes/auth';
+import { apiAuthGuard, initAuth } from './middleware/auth';
 import { licenseRouter, licenseManager } from './license';
 import { log, logger } from './utils/logger';
 import { createDemoLockResponse, isDemoMode } from './utils/mode';
@@ -38,6 +42,32 @@ const app = express();
 // 2. process.env.PANKHA_PORT (set by user in root .env for host access)
 // 3. 3143 (default fallback / brand port)
 const PORT = process.env.PORT || process.env.PANKHA_PORT || 3143;
+
+// Trusted reverse proxies, comma-separated IPs/CIDRs. Only forwarded-for
+// headers arriving FROM these addresses are believed, so the login limiter
+// sees the real client IP. Unset = no proxy trusted.
+const isIpOrCidr = (entry: string): boolean => {
+  const [ip, prefix, extra] = entry.split('/');
+  if (extra !== undefined) return false;
+  const family = net.isIP(ip);
+  if (family === 0) return false;
+  if (prefix === undefined) return true;
+  if (!/^\d+$/.test(prefix)) return false;
+  const bits = parseInt(prefix, 10);
+  return bits >= 0 && bits <= (family === 4 ? 32 : 128);
+};
+const TRUST_PROXY_RAW = (process.env.PANKHA_TRUST_PROXY ?? '').trim();
+if (TRUST_PROXY_RAW) {
+  const proxies = TRUST_PROXY_RAW.split(',').map((s) => s.trim()).filter(Boolean);
+  if (proxies.length > 0 && proxies.every(isIpOrCidr)) {
+    app.set('trust proxy', proxies);
+  } else {
+    log.warn(
+      `PANKHA_TRUST_PROXY ignored - expected comma-separated IPs/CIDRs (e.g. "192.168.1.5, 10.0.0.0/8"), got "${TRUST_PROXY_RAW}". No proxy is trusted.`,
+      'startup'
+    );
+  }
+}
 
 // Periodic heap-usage check. Warns only when heapUsed exceeds the threshold
 // (default 1024MB, tunable via MEMORY_WARN_THRESHOLD_MB) - high enough to stay
@@ -113,6 +143,9 @@ async function initializeServices() {
     // Initialize database
     const db = Database.getInstance();
     await db.initialize();
+
+    // Auth: session secret, PANKHA_AUTH_RESET handling, user cache
+    await initAuth();
 
     // Initialize core services
     const agentManager = AgentManager.getInstance();
@@ -195,8 +228,11 @@ async function initializeServices() {
 }
 
 // Middleware
-app.use(cors());
+// origin: true reflects the request origin so cookie-carrying requests work
+// from the Vite dev server (5173); same trust surface as the previous cors()
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+app.use(cookieParser());
 app.use(
   compression({
     threshold: COMPRESSION_THRESHOLD_BYTES,
@@ -232,7 +268,12 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Central auth guard: classifies every /api request (public, deploy-token,
+// agent-token, or session + minimum role) before any router runs
+app.use('/api', apiAuthGuard);
+
 // API routes
+app.use('/api/auth', authRouter);
 app.use('/api/systems', systemsRouter);
 app.use('/api/discovery', discoveryRouter);
 app.use('/api/fan-profiles', fanProfilesRouter);

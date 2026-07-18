@@ -9,6 +9,21 @@ pub struct AgentConfig {
     pub backend: BackendSettings,
     pub hardware: HardwareSettings,
     pub logging: LoggingSettings,
+    // Hub credentials. Declared last so it serializes as the final section
+    // of config.json. #[serde(default)] keeps pre-auth config files parsing.
+    #[serde(default)]
+    pub auth: AuthSettings,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AuthSettings {
+    // One-time bootstrap credential written by the install script; removed
+    // when the Hub issues the permanent auth_token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enrollment_token: Option<String>,
+    // Hub-minted permanent credential, presented on every registration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_token: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,6 +124,7 @@ impl Default for AgentConfig {
                 max_log_size_mb: 10,
                 log_retention_days: 7,
             },
+            auth: AuthSettings::default(),
         }
     }
 }

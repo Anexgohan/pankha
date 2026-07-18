@@ -9,6 +9,41 @@ Two kinds of identifiers appear in these routes:
 
 ---
 
+## Authentication
+
+All `/api` endpoints require a login session; requests without one get `401`. Logging in via `POST /api/auth/login` sets a session cookie (httpOnly, SameSite) that browsers and same-origin requests carry automatically; command-line clients pass it with curl's cookie flags (see Quick Examples). Sessions last 7 days by default, renewed by activity, and the duration is configurable with the `PANKHA_SESSION_DURATION` environment variable. Failed logins are rate limited. The WebSocket endpoint uses the same session cookie during connection.
+
+On a fresh install no accounts exist yet: the dashboard walks you through creating the first admin account, or call `POST /api/auth/setup` directly.
+
+### Roles
+
+| Role       | Can do                                                                                              |
+| ---------- | --------------------------------------------------------------------------------------------------- |
+| `viewer`   | Read everything: dashboard, systems, sensors, history. Cannot change anything.                       |
+| `operator` | Everything a viewer can, plus control: fan speeds, profiles, calibration, settings.                  |
+| `admin`    | Everything an operator can, plus user management, agent approval and deployment, fleet updates, and license changes. |
+
+Default rule: `GET` requests need viewer, all other methods need operator. Admin-only endpoints are marked in their tables. Agents are separate from user accounts - they authenticate their WebSocket connection with their own tokens, install scripts use short-lived deploy tokens, and agent binaries are public downloads.
+
+### Auth Endpoints
+
+| Method | Endpoint                 | Description                                                              |
+| ------ | ------------------------ | ------------------------------------------------------------------------ |
+| POST   | `/api/auth/setup`        | First-run only: create the initial admin account                         |
+| POST   | `/api/auth/login`        | Log in; sets the session cookie                                          |
+| POST   | `/api/auth/logout`       | Log out; clears the session cookie                                       |
+| GET    | `/api/auth/me`           | Current session: username, role, whether self-registration is enabled    |
+| PUT    | `/api/auth/password`     | Change your own password (any role)                                      |
+| GET    | `/api/auth/users`        | List users (admin)                                                       |
+| POST   | `/api/auth/users`        | Create a user with a role (admin)                                        |
+| PUT    | `/api/auth/users/:id`    | Update a user's role or reset their password (admin)                     |
+| DELETE | `/api/auth/users/:id`    | Delete a user; the last admin cannot be deleted (admin)                  |
+| GET    | `/api/auth/registration` | Read the self-registration setting (admin)                               |
+| PUT    | `/api/auth/registration` | Enable or disable self-registration and set its default role (admin)     |
+| POST   | `/api/auth/register`     | Create your own account, available when self-registration is enabled     |
+
+---
+
 ## Health & Status
 
 | Method | Endpoint              | Description                                  |
@@ -33,6 +68,15 @@ Two kinds of identifiers appear in these routes:
 | DELETE | `/api/systems/:id`             | Remove system                                    |
 | GET    | `/api/systems/:id/status`      | Real-time connection status                      |
 | GET    | `/api/systems/:id/diagnostics` | Get hardware diagnostics from agent              |
+
+### Pending Approval (admin)
+New agents wait for admin approval before they register as systems.
+
+| Method | Endpoint                                | Description                                   |
+| ------ | --------------------------------------- | --------------------------------------------- |
+| GET    | `/api/systems/pending`                  | List agents awaiting approval                 |
+| POST   | `/api/systems/pending/:agentId/approve` | Approve an agent; it registers and goes live  |
+| DELETE | `/api/systems/pending/:agentId`         | Dismiss a pending agent                       |
 
 ### Controller
 | Method | Endpoint                           | Description                    |
@@ -281,16 +325,24 @@ Vendor profiles that teach the [IPMI agent](Agents-IPMI) how to talk to a server
 
 ## Quick Examples
 
+### Log In (once per session)
+```bash
+# Saves the session cookie to cookies.txt; -b cookies.txt sends it on later calls
+curl -c cookies.txt -X POST http://localhost:3143/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username": "admin", "password": "your-password"}'
+```
+
 ### Set Fan Speed
 ```bash
-curl -X PUT http://localhost:3143/api/systems/1/fans/it8628_fan_1 \
+curl -b cookies.txt -X PUT http://localhost:3143/api/systems/1/fans/it8628_fan_1 \
   -H "Content-Type: application/json" \
   -d '{"speed": 75}'
 ```
 
 ### Create a Virtual Sensor
 ```bash
-curl -X POST http://localhost:3143/api/virtual-sensors \
+curl -b cookies.txt -X POST http://localhost:3143/api/virtual-sensors \
   -H "Content-Type: application/json" \
   -d '{
     "system_id": 1,
@@ -302,10 +354,10 @@ curl -X POST http://localhost:3143/api/virtual-sensors \
 
 ### Start a Manual Calibration
 ```bash
-curl -X POST http://localhost:3143/api/systems/1/fans/it8628_fan_1/calibrate
+curl -b cookies.txt -X POST http://localhost:3143/api/systems/1/fans/it8628_fan_1/calibrate
 ```
 
-### Check Health
+### Check Health (no login needed)
 ```bash
 curl http://localhost:3143/health
 ```
@@ -327,7 +379,8 @@ curl http://localhost:3143/health
 | 200  | Success                                                        |
 | 201  | Created                                                        |
 | 400  | Bad request                                                    |
-| 403  | Forbidden (license limit / read-only mode)                     |
+| 401  | Not logged in (missing or expired session - log in first)      |
+| 403  | Forbidden (role too low / license limit / read-only mode)      |
 | 404  | Not found                                                      |
 | 409  | Conflict (system offline, calibration lock, name collision)    |
 | 500  | Server error                                                   |

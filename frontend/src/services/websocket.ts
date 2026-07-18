@@ -39,7 +39,14 @@ export class WebSocketService {
 
         this.ws.onclose = (event) => {
           console.log('WebSocket disconnected:', event.code, event.reason);
-          
+
+          // 4401: hub requires a (fresh) session - reconnecting without one
+          // would loop forever. Surface to the auth layer instead.
+          if (event.code === 4401) {
+            this.handleMessage({ type: 'authRequired', data: { reason: event.reason } } as WebSocketMessage);
+            return;
+          }
+
           if (!this.isIntentionallyClosed && this.reconnectAttempts < this.maxReconnectAttempts) {
             this.scheduleReconnect();
           }
