@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import Database from '../database/database';
 import { log } from '../utils/logger';
+import { isDemoMode } from '../utils/mode';
 import {
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
@@ -193,6 +194,11 @@ export async function apiAuthGuard(
   if (access === 'public' || access === 'deploy-token' || access === 'agent-token') {
     // deploy-token and agent-token routes validate their own credentials
     return next();
+  }
+
+  // Demo instances (PANKHA_MODE=demo) render a read-only viewer view.
+  if (!req.session && isDemoMode()) {
+    req.session = { userId: -1, username: 'demo', role: 'viewer' };
   }
 
   if (!req.session) {

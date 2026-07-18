@@ -2,13 +2,16 @@ import crypto from 'crypto';
 import { SignJWT, jwtVerify } from 'jose';
 import Database from '../database/database';
 import { log } from '../utils/logger';
+import { parseDurationSeconds } from '../utils/duration';
 
 // Browser sessions: HS256 JWT in an httpOnly cookie. The token carries the
 // role NAME only - numeric levels exist solely in middleware/auth.ts.
 export const SESSION_COOKIE = 'pankha_session';
-export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days, sliding
-// Reissue the cookie once a session token is older than this (sliding expiry)
-export const SESSION_RENEW_AFTER_SECONDS = 24 * 60 * 60;
+// Session lifetime (sliding), e.g. "7 days", "12 hours". Via PANKHA_SESSION_DURATION; default 7 days.
+export const SESSION_TTL_SECONDS =
+  parseDurationSeconds(process.env.PANKHA_SESSION_DURATION) ?? 7 * 24 * 60 * 60;
+// Reissue the cookie once a session has used ~1/7 of its life (sliding expiry).
+export const SESSION_RENEW_AFTER_SECONDS = Math.floor(SESSION_TTL_SECONDS / 7);
 
 const SECRET_SETTING_KEY = 'session_secret';
 

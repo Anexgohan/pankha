@@ -3,6 +3,7 @@ import Database from '../database/database';
 import { log } from '../utils/logger';
 import { hashPassword, verifyPassword } from '../auth/passwords';
 import { signSession } from '../auth/session';
+import { isDemoMode } from '../utils/mode';
 import {
   VALID_ROLES,
   usersExist,
@@ -255,6 +256,15 @@ router.get('/me', async (req: Request, res: Response) => {
       authenticated: true,
       username: req.session.username,
       role: req.session.role,
+      auth_reset_active: isAuthResetActive(),
+    });
+  }
+  // Demo instances (PANKHA_MODE=demo) render a read-only viewer view.
+  if (isDemoMode()) {
+    return res.json({
+      authenticated: true,
+      username: 'demo',
+      role: 'viewer',
       auth_reset_active: isAuthResetActive(),
     });
   }

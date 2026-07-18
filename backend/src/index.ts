@@ -42,6 +42,12 @@ const app = express();
 // 3. 3143 (default fallback / brand port)
 const PORT = process.env.PORT || process.env.PANKHA_PORT || 3143;
 
+// Reverse-proxy hop count so the login limiter sees the real client IP, not the proxy. 0 (default) = off.
+const TRUST_PROXY_HOPS = parseInt(process.env.PANKHA_TRUST_PROXY ?? '', 10);
+if (Number.isInteger(TRUST_PROXY_HOPS) && TRUST_PROXY_HOPS > 0) {
+  app.set('trust proxy', TRUST_PROXY_HOPS);
+}
+
 // Periodic heap-usage check. Warns only when heapUsed exceeds the threshold
 // (default 1024MB, tunable via MEMORY_WARN_THRESHOLD_MB) - high enough to stay
 // silent in normal operation, so a warning signals an abnormal climb (leak).

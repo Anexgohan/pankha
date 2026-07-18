@@ -71,8 +71,7 @@ interface PendingAgent {
   requestedAt: string;
 }
 
-// Bound on concurrently held pending agents (memory + card-spam cap).
-// Raise it for a large first-time migration so the whole fleet pends at once.
+// Max agents held awaiting approval at once (memory + card-spam bound); raise for large migrations.
 const MAX_PENDING_AGENTS = (() => {
   const raw = parseInt(process.env.PANKHA_MAX_PENDING_AGENTS ?? '', 10);
   return Number.isInteger(raw) && raw > 0 ? raw : 20;
@@ -694,8 +693,7 @@ export class WebSocketHub extends EventEmitter {
   private async handleAgentRegistration(
     clientId: string,
     registrationData: any,
-    // true only from approvePendingAgent: an admin vouched for this agent, so
-    // the credential tree is skipped and a token is pushed via setAuthToken
+    // Set only by approvePendingAgent: admin vouched, so skip the credential tree and push a token.
     preApproved: boolean = false
   ): Promise<void> {
     try {
@@ -753,12 +751,7 @@ export class WebSocketHub extends EventEmitter {
             return;
           }
         } else {
-          // No stored token, known or unknown - the agent_id alone proves
-          // nothing. Valid enrollment token = automatic (script flow).
-          // Anything else is held as a pending-approval card (D13): fleet
-          // migration, --setup installs, stale (>24h) install scripts,
-          // deleted-but-still-running agents. A human admin decides; nothing
-          // flows until then.
+          // No stored token (known or unknown): a valid enrollment token auto-enrolls (script flow); anything else is held for admin approval (D13, single door).
           if (presentedEnrollment && (await isValidDeployToken(presentedEnrollment))) {
             mintedToken = mintAgentToken();
           } else {
@@ -967,11 +960,7 @@ export class WebSocketHub extends EventEmitter {
           ...(mintedToken ? { auth_token: mintedToken } : {}),
         });
 
-        // Approval path: push a permanent token to the agent an admin just
-        // approved. The hash is committed only on the agent's ack, so old
-        // binaries that ignore setAuthToken stay connectable (shown Unsecured
-        // in the UI) until fleet self-update delivers a binary that completes
-        // this.
+        // Approved agent: push its permanent token. Hash commits only on the agent's ack, so pre-auth binaries stay connectable (shown Unsecured) until self-update.
         if (preApproved) {
           const approvalToken = mintAgentToken();
           setTimeout(() => {
