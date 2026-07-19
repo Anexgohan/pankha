@@ -36,7 +36,11 @@ That's the whole install - two containers (app + PostgreSQL). See [Server Instal
 
 ## Step 2: Open the Dashboard
 
-Browse to `http://<server-ip>:3143` - port 3143 is the default; if you set `PANKHA_PORT` in `.env`, use that instead. Since no agents are connected yet, the dashboard greets you with a shortcut card pointing to the **Deployment Center** - that's your next stop.
+Browse to `http://<server-ip>:3143` - port 3143 is the default; if you set `PANKHA_PORT` in `.env`, use that instead.
+
+On first start, Pankha asks you to **create the admin account** - pick a username and password, then you're signed in. Every later visit starts at the login screen. (More accounts and roles can be added in **Settings → Accounts**.)
+
+Since no agents are connected yet, the dashboard greets you with a shortcut card pointing to the **Deployment Center** - that's your next stop.
 
 ## Step 3: Deploy Your First Agent
 

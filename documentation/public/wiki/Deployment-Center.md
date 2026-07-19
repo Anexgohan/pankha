@@ -130,9 +130,19 @@ For **Windows**, the summary provides the MSI download link instead - run the in
 
 ## Existing Fleet
 
-The fleet table below the deploy workspace lists every agent with its platform, type, version, and status (Online, Offline, Error, or Updating). Version badges flag agents that don't match your staged version - **NEW** for updates, **DOWNGRADE** if the staged version is older.
+The fleet table below the deploy workspace lists every agent with its platform, type, version, and status (Online, Offline, Error, Updating, or Pending Approval). Version badges flag agents that don't match your staged version - **NEW** for updates, **DOWNGRADE** if the staged version is older.
 
 ![Fleet maintenance table with version badges and update actions](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/deployment/fleet-maintenance.png)
+
+### Approving New Agents
+
+A machine that connects without credentials - a fresh manual install, or an agent from a version before v0.6.3 - doesn't join the fleet by itself. It waits as **Pending Approval**, with an approval card on the dashboard and an active button in its fleet row. You decide what joins:
+
+*   **Approve**: admits the agent and issues it a token. From then on it reconnects on its own.
+*   **Approve & Update** (shown for agents on older versions): admits the agent *and* updates it in the same click - it upgrades from your staged binaries, reconnects, and is secured automatically. Stage the latest release first, or the button will tell you to.
+*   Older **Windows** agents can't self-update yet: approve them, run the latest MSI on the machine, then approve once more.
+
+Agents installed through the deploy command above skip all of this - the install token enrolls them automatically.
 
 ### Updating Linux and IPMI Agents
 

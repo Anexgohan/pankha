@@ -27,6 +27,19 @@
 *   **Cause**: The systemd service was never installed - nothing starts the agent at boot.
 *   **Fix**: `sudo ./pankha-agent --install-service` (see [Linux Agent](Agents-Linux)). Deployment Center installs it automatically; the setup wizard asks - answer yes.
 
+## Accounts & Approval
+
+### Agent Stuck on "Pending Approval"
+*   **Info**: This is by design - machines without credentials wait for an admin. Click **Approve** on its card (see [Deployment Center](Deployment-Center)).
+*   If the button says to stage binaries first: the agent is on an old version and updates as part of the approval - download the latest release in **Deployment → Release & Hub cache**, then approve again.
+
+### Known System Reappeared Asking for Approval
+*   **Cause**: The agent lost its stored token - usually an OS reinstall, wiped config, or restored backup.
+*   **Fix**: Approve it. A fresh token is issued; the system keeps its history, names, and fan profiles.
+
+### Lost the Admin Password
+*   **Fix**: Set `PANKHA_AUTH_RESET=true` in `.env` and restart the server - all accounts are removed (your systems and data stay) and the first-run setup screen returns. **Remove the variable immediately after**, or every restart wipes accounts again. Only the exact value `true` triggers it.
+
 ## Server Issues
 
 ### Port Already in Use

@@ -23,13 +23,17 @@ If your license tier has a system limit, Total Systems shows it as `used/allowed
 
 ## System Cards
 
-Each agent is one card:
+Each agent is one card. A machine waiting to join the fleet shows an amber **Pending Approval** card instead - it lists the agent's ID, address, platform, and version so you can check it's really yours, with **Approve** (or **Approve & Update** for older versions) and **Dismiss** buttons. See [Deployment Center](Deployment-Center) for how approval works.
+
+![Pending approval card with agent details and the Approve and Dismiss buttons](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/dashboard/pending-approval-card.png)
+
+Approved agents get the full card:
 
 ![A system card showing the status badge, platform icon, name, meta row, summary stats, and configuration controls](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/dashboard/system-card.png)
 
 **Header row**
 
-*   **Status badge**: `online`, `offline`, or `error` - hovering an error badge shows the reason reported by the agent.
+*   **Status badge**: `online`, `offline`, `error`, or `updating` (mid self-update, reconnects on its own) - hovering an error badge shows the reason reported by the agent. An `unsecured` badge means the agent runs without an auth token - update it to secure it.
 *   **Platform icon**: Linux, Windows, or the server vendor's logo for IPMI agents, with an architecture tag.
 *   **Name**: click it to rename the system - the new name is saved centrally.
 *   **X button**: removes the system from the dashboard.
