@@ -1,17 +1,23 @@
 <!-- HOW THIS FILE WORKS:
      Edit sections below as you work toward a release. Delete the ones you don't need.
-     If this file is empty or contains only this template (comments + empty headings),
-     the release will use pure auto-generated categorised notes with no highlights block.
+     The ReleaseTag line declares which release(s) this prose belongs to - the
+     workflow uses these notes only when the tag being released matches it
+     (shell glob: "v0.6.3*" covers v0.6.3-alpha1 through stable v0.6.3).
+     Any other tag gets pure auto-generated categorised notes, so stale prose
+     can never leak into the wrong release. A missing ReleaseTag line skips
+     the prose with a warning in the workflow log.
+
+     Starting notes for the next release = overwrite the sections below and
+     point ReleaseTag at the new tag. Git history of this file preserves the
+     authored prose per release; the GitHub Release page is the archive.
 
      Images: drop files into .github/input/images/ and reference them here as
        ![Caption](./images/your-screenshot.png)
      The workflow uploads each image as a release asset and rewrites the URL to
-     the permanent releases/download/... URL automatically.
+     the permanent releases/download/... URL automatically. Images are not
+     cleaned up automatically - remove stale ones when retargeting. -->
 
-     After a release is published, this file resets to this template
-     automatically and .github/input/images/ is cleared. The full body is
-     preserved on the GitHub Release page; git log of this file preserves
-     the authored prose per release. -->
+ReleaseTag: v0.6.3*
 
 ## Highlights
 
@@ -27,7 +33,11 @@
 
 ## Screenshots
 
-<!-- ![Caption](./images/example.png) -->
+![Sign-in screen](./images/login-screen.png)
+
+![A new machine waiting for approval on the dashboard](./images/pending-approval-card.png)
+
+![Fleet Maintenance: approve and update older agents in one click](./images/fleet-maintenance-approve-update.png)
 
 ## Notes
 

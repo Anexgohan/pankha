@@ -744,7 +744,7 @@ export class WebSocketHub extends EventEmitter {
         return;
       }
 
-      // Credential decision tree (task_02 section 4.4, single door):
+      // Credential decision tree (single door):
       //   auth_token + stored hash        -> verify or close
       //   enrollment_token valid          -> exchange for a minted token
       //   anything else, known or unknown -> hold as pending-approval card

@@ -473,31 +473,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: gh release edit "${{ steps.version.outputs.version }}" --draft=false
 
-      # Reset .github/input/release-notes.md to its template and clear images/
-      # so the next release starts from a clean slate. Commit back to main.
-      # (The published GitHub Release page is the canonical archive; git log of
-      # release-notes.md preserves the authored prose per release.)
-      - name: Reset release notes input
-        if: success()
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-
-          # Switch to latest main for the cleanup commit
-          git fetch origin main
-          git checkout -B main origin/main
-
-          bash .github/scripts/reset-release-notes.sh
-          find .github/input/images -type f ! -name '.gitkeep' -delete 2>/dev/null || true
-
-          git config user.name "Anexgohan"
-          git config user.email "monish05m@gmail.com"
-          git add .github/input/release-notes.md .github/input/images
-          if git diff --cached --quiet; then
-            echo "No release-notes changes to commit"
-          else
-            git commit -m "chore: reset release-notes input after ${VERSION}"
-            git push origin main
-          fi
+      # No cleanup of release-notes.md: its ReleaseTag line scopes the prose
+      # to matching tags only, so stale notes can't leak into later releases.
+      # Retire images/ files when retargeting the prose.
 
       # Summary
       - name: Release Summary

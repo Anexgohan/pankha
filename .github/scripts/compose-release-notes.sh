@@ -39,15 +39,31 @@ PREV=$( { echo "$VERSION"; echo "$CANDIDATES"; } | sort -V -r | grep -A1 "^${VER
 echo "Diff base: $PREV..$VERSION ($RELEASE_TYPE)"
 
 # ---------------------------------------------------------------------------
-# 2. Highlights priority: file (non-empty after stripping) > tag annotation > none
+# 2. Highlights priority: file (ReleaseTag match + non-empty) > tag annotation > none
+#    The file's "ReleaseTag:" line declares which release(s) its prose belongs
+#    to (shell glob, e.g. "v0.6.3*"). No match or no line = prose skipped, so
+#    stale notes can never leak into the wrong release. No reset step needed.
 # ---------------------------------------------------------------------------
 HIGHLIGHTS=""
 if [ -f "$INPUT_NOTES" ]; then
-  RAW=$(cat "$INPUT_NOTES")
-  STRIPPED=$(echo "$RAW" \
-    | sed -E ':a;N;$!ba;s/<!--[^-]*(-[^-]+)*-->//g' \
-    | sed -E '/^[[:space:]]*$/d; /^#/d')
-  [ -n "$STRIPPED" ] && HIGHLIGHTS="$RAW"
+  TARGET=$(sed -nE 's/^[[:space:]]*ReleaseTag:[[:space:]]*//p' "$INPUT_NOTES" | head -1 | sed -E 's/[[:space:]]+$//')
+  if [ -z "$TARGET" ]; then
+    echo "::warning::${INPUT_NOTES} has no 'ReleaseTag:' line - authored notes skipped, using auto-generated notes only"
+  else
+    case "$VERSION" in
+      $TARGET)
+        echo "ReleaseTag '$TARGET' matches $VERSION - using authored notes"
+        RAW=$(grep -vE '^[[:space:]]*ReleaseTag:' "$INPUT_NOTES" || true)
+        STRIPPED=$(echo "$RAW" \
+          | sed -E ':a;N;$!ba;s/<!--[^-]*(-[^-]+)*-->//g' \
+          | sed -E '/^[[:space:]]*$/d; /^#/d')
+        [ -n "$STRIPPED" ] && HIGHLIGHTS="$RAW"
+        ;;
+      *)
+        echo "ReleaseTag '$TARGET' does not match $VERSION - authored notes skipped"
+        ;;
+    esac
+  fi
 fi
 if [ -z "$HIGHLIGHTS" ]; then
   # Only read tag contents for ANNOTATED tags. For lightweight tags

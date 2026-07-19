@@ -81,7 +81,7 @@ export class LicenseManager extends EventEmitter {
 
       if (result.rows.length > 0) {
         // Load install identity + seat state before validation so the
-        // seat-lost demotion applies from the first cacheResult (task_07)
+        // seat-lost demotion applies from the first cacheResult
         if (result.rows[0].instance_id) {
           this.instanceId = result.rows[0].instance_id;
         }
@@ -97,7 +97,7 @@ export class LicenseManager extends EventEmitter {
         await this.validateAndCache(result.rows[0].license_key);
         log.info(`Initialized with tier: ${this.cachedTier.name}`, 'LicenseManager');
 
-        // One-time seat bind (task_07): covers grandfathered installs and
+        // One-time seat bind: covers grandfathered installs and
         // lifetime licenses (which never sync). Best-effort - a network
         // failure leaves seatState NULL and we retry next boot.
         if (this.licenseId && this.seatState === null) {
@@ -122,7 +122,7 @@ export class LicenseManager extends EventEmitter {
   /**
    * Set a new license key and validate it.
    *
-   * task_07 additions:
+   * Additional behaviors:
    * - Recovery: a signature-valid but hard-expired token still proves
    *   ownership of the lid; the ledger may hold a fresher JWT this install
    *   never saw (renewals while offline, fresh install with an old key).
@@ -200,7 +200,7 @@ export class LicenseManager extends EventEmitter {
    */
   async removeLicense(): Promise<{ success: boolean; error?: string }> {
     try {
-      // Release the seat first (best-effort, task_07): lets the customer
+      // Release the seat first (best-effort): lets the customer
       // re-activate elsewhere without burning a force-move. Worker
       // unreachable is fine - the force-move path covers an orphaned binding.
       const storedToken = await this.getStoredLicenseKey();
@@ -421,7 +421,7 @@ export class LicenseManager extends EventEmitter {
 
       // Send token for ownership proof; licenseId kept for logging/correlation.
       // instanceId lets the worker return a seat verdict and claim the seat
-      // for grandfathered (unbound) rows - task_07.
+      // for grandfathered (unbound) rows.
       const storedToken = await this.getStoredLicenseKey();
       if (!storedToken) {
         return { success: true, changed: false };
@@ -466,7 +466,7 @@ export class LicenseManager extends EventEmitter {
         return { success: true, changed: false };
       }
 
-      // Seat verdict (task_07): soft demote when the seat is held elsewhere;
+      // Seat verdict: soft demote when the seat is held elsewhere;
       // restore when it comes back (e.g. released on the other system). The
       // worker also withholds replacementToken from non-seat callers, so a
       // shared copy hard-expires within one billing cycle.
@@ -671,7 +671,7 @@ export class LicenseManager extends EventEmitter {
   }
 
   /**
-   * Schedule cancellation via Worker /cancel (vendor-independent, task_07).
+   * Schedule cancellation via Worker /cancel (vendor-independent).
    * Cancel-at-period-end: the tier stays active until the paid-through date;
    * the provider webhook flips the ledger status at the effective date.
    */
@@ -736,7 +736,7 @@ export class LicenseManager extends EventEmitter {
   }
 
   /**
-   * Stable per-install identity for seat binding (task_07). Generated once,
+   * Stable per-install identity for seat binding. Generated once,
    * persisted in license_config so it survives container rebuilds. A DB wipe
    * produces a new identity - that is the force-move case, by design.
    */
@@ -766,7 +766,7 @@ export class LicenseManager extends EventEmitter {
     return id!;
   }
 
-  /** Persist seat state (task_07). Non-fatal on DB error, like persistLastSyncAt. */
+  /** Persist seat state. Non-fatal on DB error, like persistLastSyncAt. */
   private async setSeatState(state: 'bound' | 'lost' | null): Promise<void> {
     this.seatState = state;
     try {
@@ -781,7 +781,7 @@ export class LicenseManager extends EventEmitter {
   }
 
   /**
-   * One-time seat bind for a token already on file (task_07). Best-effort:
+   * One-time seat bind for a token already on file. Best-effort:
    * network failure leaves seatState NULL (retried next boot; subscriptions
    * also get claimed server-side on /status sync). A positive seat conflict
    * demotes softly.
@@ -802,7 +802,7 @@ export class LicenseManager extends EventEmitter {
   }
 
   /**
-   * Bind this install's seat via Worker /activate (task_07).
+   * Bind this install's seat via Worker /activate.
    * 404 not_found = token not in the ledger (CLI-minted) -> bind-exempt.
    */
   private async bindSeat(token: string, force: boolean): Promise<{
@@ -863,7 +863,7 @@ export class LicenseManager extends EventEmitter {
     }
   }
 
-  /** Release this install's seat via Worker /release (best-effort, task_07). */
+  /** Release this install's seat via Worker /release (best-effort). */
   private async releaseSeat(token: string): Promise<void> {
     try {
       const instanceId = await this.getInstanceId();
@@ -890,7 +890,7 @@ export class LicenseManager extends EventEmitter {
   }
 
   /**
-   * Recovery lookup (task_07): ask /status whether the chain behind a
+   * Recovery lookup: ask /status whether the chain behind a
    * signature-valid but expired token is alive and holds a fresher JWT.
    */
   private async fetchReplacementForToken(candidate: string): Promise<string | null> {
@@ -1079,7 +1079,7 @@ export class LicenseManager extends EventEmitter {
   private async cacheResult(key: string, result: ValidationResult): Promise<void> {
     const tier = result.valid ? result.tier : 'free';
     this.cachedTier = getTier(tier);
-    // Seat lost (task_07): license bound to another system - soft demote.
+    // Seat lost: license bound to another system - soft demote.
     // Token stays on file so a later re-bind or force-move can restore.
     if (this.seatState === 'lost') {
       this.cachedTier = TIERS.free;

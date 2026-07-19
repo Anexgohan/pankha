@@ -112,7 +112,7 @@ const PendingAgentCard: React.FC<PendingAgentCardProps> = ({ agent }) => {
 
       <div className="pending-actions">
         <button
-          className="control-button"
+          className="btn-primary-tactical deploy-copy-cta pending-approve"
           onClick={handleApprove}
           disabled={busy}
           title={willChainUpdate ? 'Approves this agent and updates it in one step' : undefined}

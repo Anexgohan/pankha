@@ -34,7 +34,7 @@ export const VALID_ROLES = Object.keys(ROLE_LEVEL);
 type Role = 'viewer' | 'operator' | 'admin';
 type AccessClass = 'public' | 'deploy-token' | 'agent-token' | Role;
 
-// REST surface classification (task_02 section 5.5). Matched against
+// REST surface classification. Matched against
 // "<METHOD> <path>" where path is relative to the /api mount. First match
 // wins; defaults below the table: GET -> viewer, everything else -> operator.
 const ACCESS_RULES: Array<{ pattern: RegExp; access: AccessClass }> = [

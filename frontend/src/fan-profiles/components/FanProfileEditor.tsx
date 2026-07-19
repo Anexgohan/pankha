@@ -408,7 +408,7 @@ const FanProfileEditor: React.FC<FanProfileEditorProps> = ({
               <button 
                 type="button"
                 onClick={handleAddPoint}
-                className="control-button add-point"
+                className="btn-prep-action add-point"
                 disabled={loading}
               >
                 <Plus size={14} /> Add Point

@@ -356,6 +356,12 @@
 }
 
 /* Curve Editor */
+/* Add Point rides btn-prep-action; keep the editor's sentence case */
+.add-point {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .curve-editor {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -554,12 +560,6 @@
   padding-top: var(--spacing-md);
   margin-top: var(--spacing-md);
   border-top: 1px solid var(--border-color);
-}
-
-.chart-controls .control-button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-xs);
 }
 
 .curve-info {

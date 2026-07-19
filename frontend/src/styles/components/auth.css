@@ -1,7 +1,6 @@
 /* ===================================
    Pankha Design System - Authentication Pages
    Login and first-run setup (App-level, outside any page directory).
-   Design per the approved hub-auth vertical slice (task_02 D16).
    Related styles live with their pages: pending card in
    systems/components/PendingAgentCard.css, Accounts tab in
    settings/styles/settings.css, unsecured badge in badges.css.
@@ -74,6 +73,13 @@
   margin-top: var(--spacing-sm);
   padding: var(--spacing-md) var(--spacing-lg);
   font-size: var(--font-size-base);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.auth-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .password-wrap {
