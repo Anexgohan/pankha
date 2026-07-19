@@ -414,15 +414,16 @@
   flex-shrink: 0;
 }
 
-/* Buttons */
+/* Buttons - local skins of the app button language (see frontend-explainer
+   Button Styles): primary = solid accent CTA, secondary = bordered neutral */
 .btn {
   padding: 10px 20px;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  transition: all 0.2s;
+  font-size: var(--font-size-sm2);
+  font-weight: var(--font-weight-semibold);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   min-width: 100px;
 }
 
@@ -436,21 +437,34 @@
 }
 
 .btn-secondary {
-  background-color: #757575;
-  color: white;
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-light);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background-color: #616161;
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+/* Copy All in the fan info panel is a benign action, not a cancel - hover
+   accent, not error */
+.fic-panel .btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-accent-dynamic);
+  color: var(--text-primary);
 }
 
 .btn-primary {
-  background-color: var(--color-info);
-  color: white;
+  background: var(--color-accent-dynamic);
+  color: var(--text-primary);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: var(--color-info-hover);
+  transform: translateY(-2px);
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--text-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-success), transparent 70%);
 }
 
 .btn-danger {

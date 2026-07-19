@@ -3486,7 +3486,7 @@
 }
 
 /* ===================================
-   Accounts tab (task_02 auth, design per approved hub-auth slice)
+   Accounts tab
    =================================== */
 
 .signed-in-row {
@@ -3625,8 +3625,9 @@
   border-color: var(--color-info);
 }
 
-.user-row-reset .control-button {
+.user-row-reset .user-row-save {
   padding: var(--spacing-xs) var(--spacing-lg);
+  min-height: 0;
 }
 
 .add-user-btn {
@@ -3676,7 +3677,7 @@
   margin-top: var(--spacing-md);
 }
 
-.add-user-actions .control-button {
+.add-user-actions .add-user-submit {
   padding: var(--spacing-xs) var(--spacing-lg);
 }
 
@@ -3688,6 +3689,11 @@
   padding: var(--spacing-xs) var(--spacing-lg);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-base);
+}
+
+.add-user-cancel:hover {
+  border-color: var(--color-error);
+  color: var(--color-error);
 }
 
 .role-hint {
@@ -3718,6 +3724,18 @@
   grid-column: 1 / -1;
 }
 
+.pw-save,
+.add-user-submit,
+.user-row-save {
+  text-transform: none;
+  letter-spacing: normal;
+}
+
 .pw-save {
   padding: var(--spacing-sm) var(--spacing-xl);
+}
+
+.pw-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

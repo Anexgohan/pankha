@@ -123,7 +123,7 @@ const LoginPage: React.FC = () => {
           </div>
         )}
 
-        <button type="submit" className="control-button auth-submit" disabled={busy}>
+        <button type="submit" className="btn-primary-tactical auth-submit" disabled={busy}>
           {mode === 'login' ? (busy ? 'Signing in...' : 'Sign in') : busy ? 'Creating...' : 'Create account'}
         </button>
 

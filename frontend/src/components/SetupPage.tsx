@@ -107,7 +107,7 @@ const SetupPage: React.FC = () => {
           />
         </div>
 
-        <button type="submit" className="control-button auth-submit" disabled={busy}>
+        <button type="submit" className="btn-primary-tactical auth-submit" disabled={busy}>
           {busy ? 'Creating...' : 'Create account'}
         </button>
       </form>

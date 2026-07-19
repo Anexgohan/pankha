@@ -6,7 +6,7 @@ import * as authApi from '../../services/authApi';
 import type { RegistrationSettings, Role, UserRow } from '../../services/authApi';
 import { toast } from '../../utils/toast';
 
-// Accounts tab (task_02 auth, design per approved hub-auth slice):
+// Accounts tab:
 // "Your account" for every rank; user management + self-registration
 // settings render for admins only.
 
@@ -187,7 +187,7 @@ const AccountsTab: React.FC = () => {
             />
           </div>
         </div>
-        <button type="submit" className="control-button pw-save" disabled={pwBusy}>
+        <button type="submit" className="btn-primary-tactical pw-save" disabled={pwBusy}>
           {pwBusy ? 'Updating...' : 'Update password'}
         </button>
       </form>
@@ -291,7 +291,7 @@ const AccountsTab: React.FC = () => {
                         autoFocus
                       />
                       <button
-                        className="control-button"
+                        className="btn-prep-action user-row-save"
                         onClick={() => handleResetPassword(user)}
                       >
                         Save
@@ -354,7 +354,7 @@ const AccountsTab: React.FC = () => {
                 </div>
               </div>
               <div className="add-user-actions">
-                <button type="submit" className="control-button">
+                <button type="submit" className="btn-primary-tactical add-user-submit">
                   Add user
                 </button>
                 <button

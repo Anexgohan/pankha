@@ -18,22 +18,6 @@ button:focus-visible {
   outline: 4px auto -webkit-focus-ring-color;
 }
 
-/* Primary Button */
-.refresh-button,
-.control-button {
-  background-color: var(--color-info);
-  color: white;
-  border: none;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border-radius: var(--radius-sm);
-  font-weight: var(--font-weight-medium);
-}
-
-.refresh-button:hover,
-.control-button:hover {
-  background-color: var(--color-info-hover);
-}
-
 /* Danger Button */
 .emergency-button,
 .delete-button {

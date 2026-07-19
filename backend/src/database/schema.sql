@@ -565,7 +565,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Migration: Add instance_id to license_config (task_07 seat binding - stable per-install identity).
+-- Migration: Add instance_id to license_config (seat binding - stable per-install identity).
 -- Generated once by LicenseManager on first use; survives container rebuilds (lives in the DB volume).
 DO $$ BEGIN
   IF NOT EXISTS (
@@ -577,7 +577,7 @@ DO $$ BEGIN
   END IF;
 END $$;
 
--- Migration: Add seat_state to license_config (task_07 seat binding).
+-- Migration: Add seat_state to license_config (seat binding).
 -- NULL = never bound (bind attempted on next activation/boot), 'bound' = seat held here,
 -- 'lost' = seat bound to another system (tier soft-demoted to Free until re-bound).
 DO $$ BEGIN
@@ -614,7 +614,7 @@ DO $$ BEGIN
 END $$;
 
 -- ============================================================================
--- Hub authentication (task_02): user accounts + per-agent token hash
+-- Hub authentication: user accounts + per-agent token hash
 -- ============================================================================
 
 -- Dashboard user accounts. Role names are validated in the backend; no CHECK

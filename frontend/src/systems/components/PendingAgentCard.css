@@ -1,4 +1,4 @@
-/* Pending-approval card (D13): defanged system card, amber identity.
+/* Pending-approval card: defanged system card, amber identity.
    Metadata only - no gauges or controls until the admin approves. */
 
 .pending-card {
@@ -58,12 +58,19 @@
   margin-top: var(--spacing-lg);
 }
 
-.pending-actions .control-button {
+/* Approve: the app's solid accent CTA (btn-primary-tactical deploy-copy-cta,
+   applied directly). Overrides below are card-context glue only. */
+.pending-actions .pending-approve {
   flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  margin-top: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
+}
+
+.pending-actions .pending-approve:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .pending-dismiss {
