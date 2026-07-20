@@ -2,6 +2,8 @@
 
 How to deploy Pankha Fan Control with Docker, and every environment variable the stack actually reads. Essentials first; advanced setups below.
 
+New here? [Server Installation](Server-Installation) walks through a first-time setup step by step - this page is the full reference to come back to.
+
 ---
 
 ## Quick Start
