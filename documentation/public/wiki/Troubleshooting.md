@@ -9,9 +9,9 @@
     2.  Check if the server firewall allows port `3143` (or your `PANKHA_PORT`).
     3.  Verify the `server_url` in `config.json` uses the correct IP (not `localhost` if on a different machine).
 
-### "WebSocket Handshake Failed"
-*   **Cause**: Protocol mismatch or proxy issue.
-*   **Fix**: Ensure your URL starts with `ws://`. If you are running behind a reverse proxy (like Nginx Proxy Manager), ensure that WebSocket support is enabled.
+### Connection Fails on a Secure (`wss://`) URL
+*   **Cause**: agents older than `v0.6.4` cannot complete a TLS handshake and exit immediately when the server URL uses `wss://`. Plain `ws://` is unaffected.
+*   **Fix**: upgrade the agent to `v0.6.4` or newer. From that version `wss://` through a reverse proxy (like Nginx Proxy Manager) works out of the box for public certificate authorities such as Let's Encrypt; for an internal or self-signed CA, add your CA to the host's system trust store. If you cannot upgrade yet, connect directly over `ws://` on a trusted network. Whichever you use, make sure the proxy has WebSocket support enabled.
 
 ### Agent Disconnects After Backend Restart
 *   **Info**: Agents have automatic reconnection with exponential backoff. They will retry indefinitely until the backend is available again. If you need to force a reconnect:
@@ -26,6 +26,15 @@
 ### Agent Stays Stopped After Every Reboot
 *   **Cause**: The systemd service was never installed - nothing starts the agent at boot.
 *   **Fix**: `sudo ./pankha-agent --install-service` (see [Linux Agent](Agents-Linux)). Deployment Center installs it automatically; the setup wizard asks - answer yes.
+
+### Agent Won't Start on SELinux Systems (Fedora, RHEL, Alma, Rocky)
+*   **Cause**: on installs from before `v0.6.4`, the install script placed the binary with a temporary-file security label (`user_tmp_t`) that SELinux blocks systemd from executing. The log shows an AVC `denied { execute }` for `pankha-agent`.
+*   **Fix**: restore the correct label, then restart:
+    ```bash
+    sudo restorecon -Rv /opt/pankha-agent
+    sudo systemctl restart pankha-agent
+    ```
+    Install scripts from `v0.6.4` onward set the label correctly, so a fresh reinstall also resolves it.
 
 ## Accounts & Approval
 
