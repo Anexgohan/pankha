@@ -88,7 +88,7 @@ const MAX_PENDING_AGENTS = (() => {
 // Oldest agent build that can store a pushed auth token. Approving an older
 // Linux/IPMI agent chains a self-update first; its token is pushed after it
 // reconnects on the new build.
-const MIN_TOKEN_CAPABLE_AGENT_VERSION = "v0.6.3-alpha1";
+const MIN_TOKEN_CAPABLE_AGENT_VERSION = "v0.6.3";
 
 // How long an updating agent has to reconnect before it must pend again.
 const UPDATE_RECONNECT_WINDOW_MS = 300_000;

@@ -108,4 +108,5 @@ Your `.env`, database, and staged binaries are untouched by updates.
 
 *   [Quick Start](Quick-Start): deploy your first agent and put a fan under control.
 *   [Server Configuration](Server-Configuration): environment variables and runtime settings in depth.
+*   [Docker & Env](Docker-and-Env): the complete reference - every variable with its accepted values, `docker run` without Compose, external PostgreSQL, and reverse-proxy setup.
 *   [Deployment Center](Deployment-Center): roll agents out to your machines.

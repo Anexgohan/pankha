@@ -19,6 +19,8 @@ The Pankha Fan Control server is configured through environment variables in you
 
 Some settings also have a **runtime home in the dashboard** - log level, data retention, and hardware pruning live in [Settings](Settings-Page) and take effect without a restart.
 
+> Looking for something not listed here - accepted values for each variable, the authentication settings, running without Compose, an external PostgreSQL, or a reverse proxy? [Docker & Env](Docker-and-Env) is the complete reference.
+
 ---
 
 ## Custom Port

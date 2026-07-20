@@ -18,6 +18,7 @@
   * [Fan Profiles](Fan-Profiles)
   * [Calibration & Health](Fan-Calibration)
 * [API Reference](API-Reference)
+* [Docker & Env](Docker-and-Env)
 * **Development**
   * [Building from Source](Development-Build)
   * [Backend](Development-Backend)
