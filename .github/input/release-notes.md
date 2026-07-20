@@ -27,7 +27,7 @@ ReleaseTag: v0.6.3*
 
 ## Breaking Changes
 
-- **The REST API now requires login.** Anything that calls the API directly (scripts, curl, integrations) must authenticate first and send the session cookie. Cookie-based examples are in the [API Reference](https://github.com/Anexgohan/pankha/wiki/API-Reference).
+- **The REST API now requires login.** Anything that calls the API directly (scripts, curl, integrations) must authenticate first and send the session cookie. Cookie-based examples are in the [API Reference](https://pankha.app/docs/wiki/api-reference).
 - **Existing agents need a one-time approval after this upgrade.** They will appear as pending approval cards. Stage this release's binaries in Fleet Maintenance first, then click Approve & Update on each Linux/IPMI agent - it updates and secures itself in one step. Windows agents: install the new MSI on the machine, then approve.
 - **Install scripts expire after 24 hours.** A script generated before this upgrade (or older than a day) will not enroll new agents - generate a fresh one from the Deployment page.
 
@@ -41,5 +41,5 @@ ReleaseTag: v0.6.3*
 
 ## Notes
 
-- New optional environment variables (reverse-proxy allowlist, session duration, admin reset) are documented on the [Docker and Env](https://github.com/Anexgohan/pankha/wiki/Docker-and-Env) wiki page. Note that `PANKHA_TRUST_PROXY` is now a comma-separated list of proxy IPs/CIDRs.
+- New optional environment variables (reverse-proxy allowlist, session duration, admin reset) are documented on the [Docker and Env](https://pankha.app/docs/wiki/docker-and-env) wiki page. Note that `PANKHA_TRUST_PROXY` is now a comma-separated list of proxy IPs/CIDRs.
 - Deleting a system on the dashboard no longer uninstalls anything on the machine; a still-running agent simply reappears as a pending card.

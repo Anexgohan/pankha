@@ -34,12 +34,12 @@ It's built to handle any scale - a single Windows or Linux PC, or fleets of serv
 
 - **Quieter PCs, cooler temps :**  smart fan curves with hysteresis and stepping eliminate the full-throttle noise and thermal spikes left behind by stock BIOS fan profiles
 - **Everything in one dashboard :**  one web UI for one system or a hundred - Windows, Linux, and IPMI/BMC-controlled servers, bare metal or VMs with passed-through hardware (GPU, HBA, PCIe), x64 or ARM - every fan and temperature managed from a single place
-- **Knows your fans personally :**  every fan's real usable range - where it starts, where it stalls, its true ceiling - is [measured automatically](https://github.com/Anexgohan/pankha/wiki/Fan-Calibration), and a fan that starts dying gets flagged before you can hear it
-- **Sensors you compose :**  combine any sensors into a [virtual sensor](https://github.com/Anexgohan/pankha/wiki/Dashboard) - let "the hottest of my NVMe drives" drive the drive-bay fan
-- **Visual profile editor :**  drag-and-drop curve editor with import / export so you can build, share, and reuse [fan profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles) across machines
+- **Knows your fans personally :**  every fan's real usable range - where it starts, where it stalls, its true ceiling - is [measured automatically](https://pankha.app/docs/wiki/fan-calibration), and a fan that starts dying gets flagged before you can hear it
+- **Sensors you compose :**  combine any sensors into a [virtual sensor](https://pankha.app/docs/wiki/dashboard) - let "the hottest of my NVMe drives" drive the drive-bay fan
+- **Visual profile editor :**  drag-and-drop curve editor with import / export so you can build, share, and reuse [fan profiles](https://pankha.app/docs/wiki/fan-profiles) across machines
 - **Real hardware control :**  direct PWM control with live RPM feedback, per-fan policies, and an always-on emergency-temperature override
 - **Real-time monitoring :**  temperature, RPM, and historical data for CPU, GPU, NVMe, motherboard, and chipset, streamed live over WebSocket
-- **Safe by design :**  if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override - and [agents never connect to anything but your server](https://github.com/Anexgohan/pankha/wiki/Agent-Philosophy)
+- **Safe by design :**  if the backend is unreachable, agents fall back to a configurable safe fan speed with a local emergency-temperature override - and [agents never connect to anything but your server](https://pankha.app/docs/wiki/agent-philosophy)
 - **Light and fast :**  the Linux agent is a single Rust binary using under 15MB RAM and under 1% CPU. The Windows agent runs as a .NET 8 service using under 25MB RAM and under 1% CPU with full LibreHardwareMonitor access. IPMI/BMC Agents use even less resources.
 - **Open source, self-hosted :**  AGPL-3.0, no cloud, no telemetry. PostgreSQL backend, single-container Docker deployment
 
@@ -106,7 +106,7 @@ docker compose pull && docker compose up -d
 
 Open the dashboard at `http://localhost:3143` (or your configured `PANKHA_PORT`).
 
-[![Wiki Server Setup](https://img.shields.io/badge/Wiki-Server_Setup-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Server-Installation)
+[![Wiki Server Setup](https://img.shields.io/badge/Wiki-Server_Setup-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://pankha.app/docs/wiki/server-installation)
 
 ---
 ### ![Linux](https://img.shields.io/badge/-Linux-FCC624?logo=linux&logoColor=black&style=flat-square) Linux Agent (Rust)
@@ -167,7 +167,7 @@ List all commands: `./pankha-agent --help`
 </details>
 
 ###
-[![Wiki Linux Agent](https://img.shields.io/badge/Wiki-Linux_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)
+[![Wiki Linux Agent](https://img.shields.io/badge/Wiki-Linux_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://pankha.app/docs/wiki/agents-linux)
 
 ---
 ### ![Windows](https://img.shields.io/badge/-Windows-0078D4?logo=windows&logoColor=white&style=flat-square) Windows Agent (.NET 8) :
@@ -175,14 +175,14 @@ List all commands: `./pankha-agent --help`
 Download **[pankha-agent-windows_x64.msi](https://github.com/Anexgohan/pankha/releases/latest/download/pankha-agent-windows_x64.msi)** from the latest release. The installer sets up the background service and the tray app. Right-click the tray icon &rarr; **Configure...** &rarr; set the backend URL. Done.
 Control your fans and monitor your temperatures from the dashboard!
 
-[![Wiki Windows Agent](https://img.shields.io/badge/Wiki-Windows_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)
+[![Wiki Windows Agent](https://img.shields.io/badge/Wiki-Windows_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://pankha.app/docs/wiki/agents-windows)
 
 ---
 ### ![IPMI](https://img.shields.io/badge/-IPMI%20%2F%20BMC-6C3483?logo=serverfault&logoColor=white&style=flat-square) IPMI Agent (enterprise servers) :
 
 For rack servers whose fans are owned by the BMC (Dell iDRAC, Supermicro, and more). In the dashboard's **Deployment** tab, pick the **IPMI** platform and your server's BMC profile, then run the generated command on the server - vendor commands come from swappable profiles, and unsupported hardware can be profiled with the built-in Profile Builder.
 
-[![Wiki IPMI Agent](https://img.shields.io/badge/Wiki-IPMI_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Agents-IPMI)
+[![Wiki IPMI Agent](https://img.shields.io/badge/Wiki-IPMI_Agent-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://pankha.app/docs/wiki/agents-ipmi)
 
 ---
 ## ![Architecture](https://img.shields.io/badge/-Architecture-333?logo=microsoftvisio&logoColor=white&style=flat-square) How Pankha Fan Control works
@@ -235,12 +235,12 @@ graph LR
     style Logic fill:#1565c0,stroke:#333,color:#fff
 ```
 
-[![Wiki Architecture](https://img.shields.io/badge/Wiki-How_the_Server_Works-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://github.com/Anexgohan/pankha/wiki/Server-Architecture)
+[![Wiki Architecture](https://img.shields.io/badge/Wiki-How_the_Server_Works-0db7ed?style=flat-square&logo=readthedocs&logoColor=white&labelColor=555555)](https://pankha.app/docs/wiki/server-architecture)
 
 
 ## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square) Documentation
 
-[![Wiki](https://img.shields.io/badge/Full_Documentation-GitHub_Wiki-0db7ed?style=for-the-badge&logo=github)](https://github.com/Anexgohan/pankha/wiki)
+[![Wiki](https://img.shields.io/badge/Full_Documentation-pankha.app-0db7ed?style=for-the-badge&logo=readthedocs&logoColor=white)](https://pankha.app/docs)
 
 <table>
 <tr>
@@ -250,9 +250,9 @@ graph LR
 
 <div align="left">
 
-- [Quick Start](https://github.com/Anexgohan/pankha/wiki/Quick-Start)
-- [Installation](https://github.com/Anexgohan/pankha/wiki/Server-Installation)
-- [Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
+- [Quick Start](https://pankha.app/docs/wiki/quick-start)
+- [Installation](https://pankha.app/docs/wiki/server-installation)
+- [Configuration](https://pankha.app/docs/wiki/server-configuration)
 
 </div>
 </td>
@@ -262,10 +262,10 @@ graph LR
 
 <div align="left">
 
-- [Linux](https://github.com/Anexgohan/pankha/wiki/Agents-Linux)
-- [Windows](https://github.com/Anexgohan/pankha/wiki/Agents-Windows)
-- [IPMI](https://github.com/Anexgohan/pankha/wiki/Agents-IPMI)
-- [Settings](https://github.com/Anexgohan/pankha/wiki/Agents-Advanced-Settings)
+- [Linux](https://pankha.app/docs/wiki/agents-linux)
+- [Windows](https://pankha.app/docs/wiki/agents-windows)
+- [IPMI](https://pankha.app/docs/wiki/agents-ipmi)
+- [Settings](https://pankha.app/docs/wiki/agents-advanced-settings)
 
 </div>
 </td>
@@ -275,8 +275,8 @@ graph LR
 
 <div align="left">
 
-- [API Reference](https://github.com/Anexgohan/pankha/wiki/API-Reference)
-- [Fan Profiles](https://github.com/Anexgohan/pankha/wiki/Fan-Profiles)
+- [API Reference](https://pankha.app/docs/wiki/api-reference)
+- [Fan Profiles](https://pankha.app/docs/wiki/fan-profiles)
 
 </div>
 </td>
@@ -286,8 +286,8 @@ graph LR
 
 <div align="left">
 
-- [Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)
-- [Build from Source](https://github.com/Anexgohan/pankha/wiki/Development-Build)
+- [Troubleshooting](https://pankha.app/docs/wiki/troubleshooting)
+- [Build from Source](https://pankha.app/docs/wiki/development-build)
 
 </div>
 </td>

@@ -68,8 +68,8 @@ sha256sum -c checksums.txt
 
 ## ![Docs](https://img.shields.io/badge/-Documentation-8CA1AF?logo=readthedocs&logoColor=white&style=flat-square)
 
-- [Installation Guide](https://github.com/Anexgohan/pankha/wiki/Server-Installation)
-- [Quick Start Guide](https://github.com/Anexgohan/pankha/wiki/Quick-Start)
-- [Configuration](https://github.com/Anexgohan/pankha/wiki/Server-Configuration)
-- [API Documentation](https://github.com/Anexgohan/pankha/wiki/API-Reference)
-- [Troubleshooting](https://github.com/Anexgohan/pankha/wiki/Troubleshooting)
+- [Installation Guide](https://pankha.app/docs/wiki/server-installation)
+- [Quick Start Guide](https://pankha.app/docs/wiki/quick-start)
+- [Configuration](https://pankha.app/docs/wiki/server-configuration)
+- [API Documentation](https://pankha.app/docs/wiki/api-reference)
+- [Troubleshooting](https://pankha.app/docs/wiki/troubleshooting)
