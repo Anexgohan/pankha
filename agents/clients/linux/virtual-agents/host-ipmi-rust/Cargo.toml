@@ -15,8 +15,12 @@ path = "src/main.rs"
 [dependencies]
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
-tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
+tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots", "rustls-tls-native-roots"] }
 futures-util = "0.3"
+
+# TLS crypto provider: pin ring so rustls resolves exactly one provider.
+# Without this, wss:// connections panic (no default CryptoProvider).
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

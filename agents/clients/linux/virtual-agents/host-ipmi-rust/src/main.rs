@@ -34,6 +34,10 @@ use daemon::LOG_DIR;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Install the ring crypto provider before any TLS use so wss:// connections
+    // don't panic on a missing default CryptoProvider. Idempotent; safe to ignore.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     // Parse arguments with custom error handling
     let args = match Args::try_parse() {
         Ok(args) => args,

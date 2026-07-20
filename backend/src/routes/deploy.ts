@@ -399,13 +399,14 @@ if [ "$HTTP_CODE" != "200" ]; then
     exit 1
 fi
 
+# install(1) creates a fresh destination file, so it inherits the target
+# directory's SELinux context instead of the temp dir's user_tmp_t label.
 if [ "$INSTALL_DIR" = "$(pwd)" ]; then
-    mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
-    chmod +x "$INSTALL_DIR/pankha-agent"
+    install -m 755 "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
 else
-    run_as_root mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
-    run_as_root chmod +x "$INSTALL_DIR/pankha-agent"
+    run_as_root install -m 755 "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
 fi
+rm -f "$DOWNLOAD_RESPONSE"
 
 echo "[4/6] Generating configuration..."
 
@@ -601,13 +602,14 @@ if [ "$HTTP_CODE" != "200" ]; then
     exit 1
 fi
 
+# install(1) creates a fresh destination file, so it inherits the target
+# directory's SELinux context instead of the temp dir's user_tmp_t label.
 if [ "$INSTALL_DIR" = "$(pwd)" ]; then
-    mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
-    chmod +x "$INSTALL_DIR/pankha-agent"
+    install -m 755 "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
 else
-    run_as_root mv "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
-    run_as_root chmod +x "$INSTALL_DIR/pankha-agent"
+    run_as_root install -m 755 "$DOWNLOAD_RESPONSE" "$INSTALL_DIR/pankha-agent"
 fi
+rm -f "$DOWNLOAD_RESPONSE"
 
 echo "[4/5] Generating configuration..."
 
