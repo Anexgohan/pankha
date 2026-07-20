@@ -1268,12 +1268,12 @@ const SystemCard: React.FC<SystemCardProps> = ({
 
     return (
       <div className="platform-icon-minimal" title={tooltip}>
-        <img src={getIconSrc()} alt={platformLabel} style={{ maxWidth: '48px', height: '26px', objectFit: 'contain' }} />
         {(agentTypeLabel || archLabel) && (
           <span className="arch-badge">
             {[agentTypeLabel, archLabel].filter(Boolean).join(' · ')}
           </span>
         )}
+        <img src={getIconSrc()} alt={platformLabel} style={{ maxWidth: '48px', height: '26px', objectFit: 'contain' }} />
       </div>
     );
   };
@@ -1299,7 +1299,6 @@ const SystemCard: React.FC<SystemCardProps> = ({
                 <span className="status-dot" />
                 {isUpdating ? 'updating' : isUnsecured ? 'unsecured' : isIpmiNoProfile ? 'read only' : system.status}
               </span>
-              {getPlatformIcon()}
             </div>
 
             <div className="header-actions">
@@ -1339,6 +1338,8 @@ const SystemCard: React.FC<SystemCardProps> = ({
               />
             </h3>
           </div>
+
+          {getPlatformIcon()}
         </div>
 
         <div className="system-meta">

@@ -227,6 +227,7 @@
   flex-shrink: 0;
   opacity: 0.75;
   transition: all 0.2s ease;
+  margin-top: calc(var(--spacing-lg) * -1);
 }
 
 .platform-icon-minimal:hover {
