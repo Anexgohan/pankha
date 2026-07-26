@@ -116,7 +116,7 @@ Setup complete!
 What each prompt decides:
 
 *   **Agent Name** - display name on the dashboard (defaults to the hostname).
-*   **Backend Server URL** - your Pankha server, in the form `ws://<server-ip>:3143/websocket`.
+*   **Backend Server URL** - your Pankha server, in the form `ws://<server-ip>:3143/websocket`. If your server sits behind a reverse proxy with an HTTPS certificate, use `wss://<your-domain>/websocket` instead. Certificates from a public authority such as Let's Encrypt work as-is; for an internal certificate authority, add it to the machine's system trust store first. Secure connections need agent `v0.6.4` or newer.
 *   **Update Interval** - how often the agent reports data (seconds).
 *   **Enable Fan Control** - allow this agent to control fans (yes for normal use).
 *   **Failsafe speed** - fan speed to hold if the server becomes unreachable.
