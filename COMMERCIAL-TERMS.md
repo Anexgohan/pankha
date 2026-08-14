@@ -18,7 +18,11 @@ Pankha offers Free, Pro, and Enterprise tiers. For current pricing and tier limi
 
 ## Changes to Terms and Pricing
 
-Pankha Fan Control may update these terms, tier definitions, and pricing from time to time. Updated terms and tier definitions take effect when published, at https://pankha.app/#pricing and in this document. Pricing changes never affect what you have already paid: a new price applies from your next purchase or renewal. We aim for changes that add value rather than remove it, and significant changes are announced on GitHub.
+Pankha Fan Control may update these terms and pricing, and may add, change, rename, combine, or discontinue tiers and what each tier includes, at any time. Updated terms and tier definitions are published at https://pankha.app/#pricing and in this document, and take effect on publication.
+
+Fees already paid are not affected: a change in price applies from your next purchase or renewal.
+
+We aim for changes that add value rather than remove it, and significant changes are announced on GitHub.
 
 ## Grant
 
@@ -28,7 +32,7 @@ Upon purchase, you receive a license token that, while active, unlocks the capac
 
 - **Monthly**: Valid while the subscription is active. On cancellation, remains valid until the end of the current billing period (plus Grace Period), then the deployment reverts to the Free tier.
 - **Yearly**: Valid for 1 year from purchase. Auto-renews unless cancelled; remains valid until the end of the current annual term on cancellation.
-- **Lifetime**: Perpetual, non-revocable. Includes all future updates. Not transferable to another legal entity.
+- **Lifetime**: Perpetual. Includes all future updates. Not transferable to another legal entity.
 
 Licenses are non-transferable between legal entities. For legitimate corporate restructuring (acquisition, subsidiary transfer, entity name change), contact support@pankha.app for re-issuance at no additional charge.
 
@@ -52,11 +56,11 @@ Paid-tier entitlements apply only while the license is active. Upon expiration, 
 2. Connected agents beyond the Free tier's limit are not disconnected or hidden: they remain visible with live monitoring in **read-only mode**, and only fan control for them is disabled. Expiry never removes your view of your fleet
 3. Your rights to use the software continue unchanged under the [LICENSE](LICENSE); nothing in this document affects them
 
-Pankha Fan Control may terminate a paid license for material breach of these terms, including circumvention of license validation. Termination for breach does not entitle the licensee to a refund.
+Pankha Fan Control may suspend or terminate a paid license, and may decline to issue, re-issue, replace, renew, or transfer tokens to you or to any system you operate, with immediate effect and without notice, for: material breach of these terms; circumvention of or interference with license validation; token sharing, resale, or distribution; fraudulent, unlawful, or abusive use of the software or of support channels; a chargeback, payment reversal, or failed payment; or any use that harms or attempts to harm the service, its infrastructure, or other users. On termination your right to use paid-tier capacity ends immediately, whether or not the software continues to operate. Suspension or termination under this section does not entitle you to a refund.
 
 ## Restrictions
 
-1. **Single Production Instance** - Each license covers one production deployment of the Pankha Fan Control server (the backend/hub instance used for real fan control by end users in one organization). Development, staging, and one disaster-recovery replica are included at no extra charge. Separate licenses are required for multiple independent production instances (e.g. two data centers, subsidiary companies, multi-tenant hosting).
+1. **Single Production Instance** - Each paid license covers one production deployment of the Pankha Fan Control server (the backend/hub instance used for real fan control by end users in one organization). Development, staging, and one disaster-recovery replica are included at no extra charge. Separate paid licenses are required to unlock paid-tier capacity on multiple independent production instances (e.g. two data centers, separately operated subsidiaries, multi-tenant hosting).
 
    Agents are not instances: you may install the Pankha agent on any number of machines. The number of agents concurrently connected to your server is governed by your tier's agent limit, not by this restriction.
 
@@ -79,6 +83,8 @@ Support is provided on a **best-effort basis** via GitHub Issues and email. No g
 
 For critical issues, open a GitHub Issue: https://github.com/Anexgohan/pankha/issues
 
+**Custom agreements**: A guaranteed response-time SLA, IP indemnification, security-vulnerability response commitments, purchase orders and invoicing, and vendor-onboarding paperwork are not included in the standard tiers, and can be arranged under a separate written agreement. Contact support@pankha.app.
+
 ## Purchase
 
 To purchase a paid tier, visit: https://pankha.app/#pricing
@@ -91,15 +97,35 @@ Refunds are available within 14 days of purchase if the software does not meet y
 
 ## Warranty Disclaimer
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND TITLE. LIABILITY IS ADDRESSED SOLELY IN THE LIMITATION OF LIABILITY SECTION BELOW.
 
 ## Limitation of Liability
 
 TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, PANKHA FAN CONTROL'S TOTAL AGGREGATE LIABILITY ARISING OUT OF OR RELATING TO THESE TERMS OR THE SOFTWARE SHALL NOT EXCEED THE GREATER OF (A) THE FEES PAID BY YOU TO PANKHA FAN CONTROL IN THE TWELVE (12) MONTHS PRECEDING THE EVENT GIVING RISE TO THE CLAIM, AND (B) FOR LIFETIME LICENSES, THE ONE-TIME FEE PAID. IN NO EVENT SHALL PANKHA FAN CONTROL BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION LOSS OF DATA, LOSS OF PROFITS, BUSINESS INTERRUPTION, OR DAMAGE TO HARDWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 
+## Assignment and Change of Control
+
+You may not assign or transfer these terms or your license token without prior written consent, except to a successor of all or substantially all of your business, on written notice to support@pankha.app.
+
+Pankha Fan Control may assign these terms to a successor in interest to the project, including on a sale, merger, or transfer of the project's assets.
+
 ## Governing Law and Disputes
 
-These terms are governed by and construed in accordance with the laws of the jurisdiction in which the author of Pankha Fan Control (the Licensor) maintains their principal place of business or residence, without regard to conflict-of-law principles. Any dispute, claim, or proceeding arising out of or relating to these terms or the software shall be brought exclusively in the courts of that jurisdiction, and you consent to their exclusive jurisdiction and venue.
+These terms are governed by and construed in accordance with the laws of India, without regard to conflict-of-law principles. The courts at Bengaluru, Karnataka, India have exclusive jurisdiction over any dispute, claim, or proceeding arising out of or relating to these terms or the software, and you consent to their exclusive jurisdiction and venue, except that Pankha Fan Control may bring proceedings against you in any court of competent jurisdiction.
+
+Nothing in this section limits any non-waivable right you have under the mandatory consumer-protection law of your country of residence.
+
+## General
+
+**Survival**: The Restrictions, Warranty Disclaimer, Limitation of Liability, Assignment and Change of Control, and Governing Law and Disputes sections survive the expiration or termination of your license.
+
+**Notices**: Notices to Pankha Fan Control go to support@pankha.app. Notices to you go to the email address associated with your purchase.
+
+**Entire agreement**: These terms, together with the [LICENSE](LICENSE), are the entire agreement between us concerning paid tiers, and supersede any prior discussion or representation. They are replaced only by a separate written agreement signed by both parties.
+
+**Severability**: If any provision of these terms is held unenforceable, that provision is limited to the minimum extent necessary and the remainder stays in full effect.
+
+**No waiver**: A failure to enforce any provision is not a waiver of the right to enforce it later.
 
 ---
 

@@ -68,7 +68,7 @@ stateDiagram-v2
 ## Connecting to Your Server
 
 1.  Right-click the **Pankha tray icon** and choose **Configure...**
-2.  In the **Backend Connection** section, enter your server's WebSocket URL, e.g. `ws://192.168.1.50:3143/websocket`.
+2.  In the **Backend Connection** section, enter your server's WebSocket URL, e.g. `ws://192.168.1.50:3143/websocket`. If your server sits behind a reverse proxy with an HTTPS certificate, type the full secure URL including the prefix: `wss://<your-domain>/websocket`. Entering just a name or address assumes the plain `ws://` form. Certificates from a public authority such as Let's Encrypt work as-is; for an internal certificate authority, install it into the Windows certificate store first.
 3.  Click **Save**. The service applies the change immediately - no restart needed - and the agent appears on your dashboard within seconds.
 
 ![Agent configuration window with the Backend Connection section](https://raw.githubusercontent.com/Anexgohan/pankha/main/documentation/public/images/agent-windows/pankha-tray_config-form.png)
