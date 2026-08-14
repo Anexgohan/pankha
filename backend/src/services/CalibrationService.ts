@@ -158,6 +158,9 @@ export class CalibrationService extends EventEmitter {
         // deferred agents quiet for a while (manual enqueueFans bypasses it).
         const until = this.snoozedUntil.get(event.agentId);
         if (until && Date.now() < until) return;
+        // Pre-flight: refuse a run phase 2 would abort anyway, before anything
+        // is locked or ramped. Not a failure, so the retry ladder is untouched.
+        if (this.tooHotToStart(event.agentId)) return;
         this.enqueue(event.agentId, [event.fanDbId]);
       }
     );
@@ -719,6 +722,31 @@ export class CalibrationService extends EventEmitter {
         );
       }
     }
+  }
+
+  /**
+   * True when the agent has no headroom for a run. Same sensors and margin as
+   * safetyCheck's phase-2 bar, so gate and in-run guard cannot disagree.
+   * Snoozes when it refuses; stale telemetry is runSystem's guard, not ours.
+   */
+  private tooHotToStart(agentId: string): boolean {
+    const data = this.dataAggregator.getSystemData(agentId);
+    if (!data) return false;
+    if (Date.now() - new Date(data.lastUpdate).getTime() > TELEMETRY_STALE_MS) {
+      return false;
+    }
+    const temps = (data.sensors ?? []).filter((s) => !s.isHidden).map((s) => s.temperature);
+    if (temps.length === 0) return false;
+
+    const emergencyTemp = this.agentManager.getAgentEmergencyTemp(agentId);
+    const maxTemp = Math.max(...temps);
+    if (maxTemp < emergencyTemp - STALL_SEARCH_MARGIN_C) return false;
+
+    this.snooze(
+      agentId,
+      `max temp ${maxTemp.toFixed(1)}C within ${STALL_SEARCH_MARGIN_C}C of emergency ${emergencyTemp}C`
+    );
+    return true;
   }
 
   // ---- command helpers ----

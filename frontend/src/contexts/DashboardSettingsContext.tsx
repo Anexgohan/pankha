@@ -257,7 +257,7 @@ interface DashboardSettingsContextType {
   // Hub log level
   hubLogLevel: string;
   updateHubLogLevel: (level: string) => Promise<void>;
-  // Fan recalibration interval (days, 0 = manual only)
+  // Fan recalibration interval (days, 0 = never)
   fanRecalDays: number;
   updateFanRecalDays: (days: number) => Promise<void>;
 }
@@ -326,7 +326,7 @@ export const DashboardSettingsProvider: React.FC<{ children: React.ReactNode }> 
   // Hub log level state
   const [hubLogLevel, setHubLogLevel] = useState<string>('info');
 
-  // Fan recalibration interval state (days, 0 = manual only)
+  // Fan recalibration interval state (days, 0 = never)
   const [fanRecalDays, setFanRecalDays] = useState<number>(7);
 
   const fetchSettings = useCallback(async () => {

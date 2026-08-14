@@ -999,10 +999,10 @@ const Settings: React.FC<SettingsProps> = ({ requestedTab = null }) => {
     { label: 'Never', value: 0, tooltip: 'Never auto-clean. Manage fan records manually' },
   ];
 
-  // Fan recalibration ladder (days; 0 = manual only).
+  // Fan recalibration ladder (days; 0 = never).
   // label = open-menu text; data = closed-trigger text ("Every ...").
   const recalIntervalOptions: SelectOption<number>[] = [
-    { value: 0, label: 'Manual only' },
+    { value: 0, label: 'Never' },
     { value: 1, label: '1 day', data: 'Every day' },
     { value: 3, label: '3 days', data: 'Every 3 days' },
     { value: 7, label: '7 days (default)', data: 'Every 7 days (default)' },
@@ -1719,7 +1719,9 @@ const Settings: React.FC<SettingsProps> = ({ requestedTab = null }) => {
                 <div className="setting-info-wrapper">
                   <span className="setting-label">Fan Recalibration</span>
                   <span className="setting-description">
-                    How often each fan is automatically re-measured to keep its speed curve accurate.
+                    How often each calibrated fan is automatically re-measured to keep its speed
+                    curve accurate. Fans that have never been calibrated are still measured once
+                    when you assign a profile, and a calibration that failed is retried on its own.
                   </span>
                 </div>
 

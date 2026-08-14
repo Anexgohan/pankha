@@ -57,7 +57,7 @@ const CAL_TITLES: Record<CalState, string> = {
   done: "", // built dynamically with the date
   stale:
     "Calibration is outdated - it will rerun automatically, or click to start now",
-  failed: "Calibration stopped early to keep temperatures safe - click to retry",
+  failed: "Calibration stopped early to keep temperatures safe - it will retry automatically, or click to start now",
   no_tach: "This fan does not report its speed, so it cannot be calibrated",
 };
 
