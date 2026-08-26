@@ -134,7 +134,7 @@ export class FanProfileController extends EventEmitter {
   // Managed by CalibrationService via setFanCalibrating().
   private calibratingFans: Set<string> = new Set();
 
-  // Days between automatic recalibrations (0 = manual only). Loaded from
+  // Days between automatic recalibrations (0 = never). Loaded from
   // backend_settings at start; updated live by the settings route.
   private recalibrationDays = 7;
 
@@ -937,7 +937,7 @@ export class FanProfileController extends EventEmitter {
   }
 
   /**
-   * Load recalibration interval (days, 0 = manual only) from database
+   * Load recalibration interval (days, 0 = never) from database
    */
   private async loadRecalibrationDays(): Promise<number> {
     try {
@@ -948,7 +948,7 @@ export class FanProfileController extends EventEmitter {
       if (setting && setting.setting_value !== undefined) {
         const days = parseInt(setting.setting_value, 10);
         if (Number.isFinite(days) && days >= 0) {
-          log.info(`Fan recalibration interval: ${days === 0 ? 'manual only' : `${days} day(s)`}`, 'FanProfileController');
+          log.info(`Fan recalibration interval: ${days === 0 ? 'never' : `${days} day(s)`}`, 'FanProfileController');
           return days;
         }
       }
@@ -964,7 +964,7 @@ export class FanProfileController extends EventEmitter {
   public setRecalibrationDays(days: number): void {
     if (!Number.isFinite(days) || days < 0) return;
     this.recalibrationDays = days;
-    log.info(`Fan recalibration interval set to ${days === 0 ? 'manual only' : `${days} day(s)`}`, 'FanProfileController');
+    log.info(`Fan recalibration interval set to ${days === 0 ? 'never' : `${days} day(s)`}`, 'FanProfileController');
   }
 
   /**
@@ -1195,7 +1195,7 @@ export class FanProfileController extends EventEmitter {
       when = `${this.recalibrationDays} day(s) (retry ladder exhausted)`;
     } else {
       nextAt = Number.POSITIVE_INFINITY;
-      when = 'next backend start (retry ladder exhausted, recalibration set to manual)';
+      when = 'next backend start (retry ladder exhausted, recalibration set to never)';
     }
     this.failedRetries.set(key, { count, nextAt });
     log.info(
