@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './api';
+import type { ActionResponse } from './api';
 
 // Auth REST client. Same-origin (Vite proxies /api in dev), so the session
 // cookie rides along automatically on every call.
@@ -9,6 +10,7 @@ export interface AuthMe {
   authenticated: boolean;
   username?: string;
   role?: Role;
+  demo_visitor?: boolean;
   setup_required?: boolean;
   registration_enabled?: boolean;
   auth_reset_active?: boolean;
@@ -109,11 +111,11 @@ export const updateRegistrationSettings = (changes: Partial<RegistrationSettings
 export const getPendingAgents = () => request<PendingAgent[]>('/api/systems/pending');
 
 export const approvePendingAgent = (agentId: string) =>
-  request<{ message: string }>(`/api/systems/pending/${encodeURIComponent(agentId)}/approve`, {
+  request<ActionResponse>(`/api/systems/pending/${encodeURIComponent(agentId)}/approve`, {
     method: 'POST',
   });
 
 export const dismissPendingAgent = (agentId: string) =>
-  request<{ message: string }>(`/api/systems/pending/${encodeURIComponent(agentId)}`, {
+  request<ActionResponse>(`/api/systems/pending/${encodeURIComponent(agentId)}`, {
     method: 'DELETE',
   });

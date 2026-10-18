@@ -23,8 +23,17 @@ const ENABLED_OPTIONS = [
 
 const MIN_PASSWORD_LENGTH = 8;
 
+const ACCOUNT_LOCK_MESSAGE = 'Account changes are locked in demo';
+
 const AccountsTab: React.FC = () => {
-  const { username, role, can } = useAuth();
+  const { username, role, can, isDemoVisitor } = useAuth();
+
+  // Demo visitors see everything; every change stops at the lock message
+  const demoLocked = () => {
+    if (isDemoVisitor) toast.warning(ACCOUNT_LOCK_MESSAGE);
+    return isDemoVisitor;
+  };
+  const lockTitle = isDemoVisitor ? ACCOUNT_LOCK_MESSAGE : undefined;
 
   // Your account - change password
   const [currentPassword, setCurrentPassword] = useState('');
@@ -64,6 +73,7 @@ const AccountsTab: React.FC = () => {
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (demoLocked()) return;
     if (newPassword !== confirmPassword) {
       toast.error('Passwords do not match');
       return;
@@ -84,6 +94,7 @@ const AccountsTab: React.FC = () => {
 
   const handleRoleChange = async (user: UserRow, nextRole: Role) => {
     if (nextRole === user.role) return;
+    if (demoLocked()) return;
     try {
       await authApi.updateUser(user.id, { role: nextRole });
       toast.success(`${user.username} is now ${nextRole}`);
@@ -94,6 +105,7 @@ const AccountsTab: React.FC = () => {
   };
 
   const handleResetPassword = async (user: UserRow) => {
+    if (demoLocked()) return;
     if (resetPassword.length < MIN_PASSWORD_LENGTH) {
       toast.error(`Password must be at least ${MIN_PASSWORD_LENGTH} characters`);
       return;
@@ -109,6 +121,7 @@ const AccountsTab: React.FC = () => {
   };
 
   const handleDeleteUser = async (user: UserRow) => {
+    if (demoLocked()) return;
     if (!window.confirm(`Delete user "${user.username}"? This cannot be undone.`)) return;
     try {
       await authApi.deleteUser(user.id);
@@ -121,6 +134,7 @@ const AccountsTab: React.FC = () => {
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (demoLocked()) return;
     try {
       await authApi.createUser(newUsername, newUserPassword, newUserRole);
       toast.success(`${newUsername} added as ${newUserRole}`);
@@ -135,6 +149,7 @@ const AccountsTab: React.FC = () => {
   };
 
   const handleRegistrationChange = async (changes: Partial<RegistrationSettings>) => {
+    if (demoLocked()) return;
     try {
       setRegistration(await authApi.updateRegistrationSettings(changes));
       toast.success('Registration settings saved');
@@ -187,7 +202,7 @@ const AccountsTab: React.FC = () => {
             />
           </div>
         </div>
-        <button type="submit" className="btn-primary-tactical pw-save" disabled={pwBusy}>
+        <button type="submit" className="btn-primary-tactical pw-save" disabled={pwBusy} title={lockTitle}>
           {pwBusy ? 'Updating...' : 'Update password'}
         </button>
       </form>
@@ -263,7 +278,7 @@ const AccountsTab: React.FC = () => {
                     <div className="row-actions">
                       <button
                         className="row-action"
-                        title="Reset password"
+                        title={lockTitle ?? 'Reset password'}
                         onClick={() => {
                           setResetPassword('');
                           setResetUserId(resetUserId === user.id ? null : user.id);
@@ -273,7 +288,7 @@ const AccountsTab: React.FC = () => {
                       </button>
                       <button
                         className="row-action danger"
-                        title={lastAdmin ? 'Cannot delete the last admin' : 'Delete user'}
+                        title={lastAdmin ? 'Cannot delete the last admin' : lockTitle ?? 'Delete user'}
                         disabled={lastAdmin}
                         onClick={() => handleDeleteUser(user)}
                       >
@@ -293,6 +308,7 @@ const AccountsTab: React.FC = () => {
                       <button
                         className="btn-prep-action user-row-save"
                         onClick={() => handleResetPassword(user)}
+                        title={lockTitle}
                       >
                         Save
                       </button>
@@ -354,7 +370,7 @@ const AccountsTab: React.FC = () => {
                 </div>
               </div>
               <div className="add-user-actions">
-                <button type="submit" className="btn-primary-tactical add-user-submit">
+                <button type="submit" className="btn-primary-tactical add-user-submit" title={lockTitle}>
                   Add user
                 </button>
                 <button

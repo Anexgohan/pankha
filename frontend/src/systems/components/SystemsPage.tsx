@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Command,
   LogOut,
+  LogIn,
   User,
   TriangleAlert
 } from 'lucide-react';
@@ -33,16 +34,23 @@ type TabType = 'systems' | 'profiles' | 'deployment' | 'settings';
 type SettingsTabName = 'general' | 'license' | 'accounts' | 'diagnostics' | 'about';
 
 // Header user menu: action list, not a value picker - value stays null
-type UserMenuAction = 'account' | 'settings' | 'logout';
+type UserMenuAction = 'account' | 'settings' | 'logout' | 'signin';
 const USER_MENU_OPTIONS: SelectOption<UserMenuAction>[] = [
   { value: 'account', label: 'Account' },
   { value: 'settings', label: 'Settings' },
   { value: 'logout', label: 'Log out' },
 ];
+// Demo mode visitors have no session to end, only one to start
+const DEMO_VISITOR_MENU_OPTIONS: SelectOption<UserMenuAction>[] = [
+  { value: 'account', label: 'Account' },
+  { value: 'settings', label: 'Settings' },
+  { value: 'signin', label: 'Sign in' },
+];
 const USER_MENU_ICONS: Record<UserMenuAction, React.ReactNode> = {
   account: <User size={15} />,
   settings: <Settings2 size={15} />,
   logout: <LogOut size={15} />,
+  signin: <LogIn size={15} />,
 };
 
 // Stable empty slices for agents with no calibration/stall events yet.
@@ -79,7 +87,7 @@ const SystemsPage: React.FC = () => {
     updatingAgentIds
   } = useWebSocketData();
   const { isDemoMode } = useDemoMode();
-  const { can, username, logout, authResetActive } = useAuth();
+  const { can, username, logout, authResetActive, isDemoVisitor, requestSignIn } = useAuth();
 
   // Fetch versions from GitHub API
   React.useEffect(() => {
@@ -273,10 +281,12 @@ const SystemsPage: React.FC = () => {
 
           <Select<UserMenuAction>
             value={null}
-            options={USER_MENU_OPTIONS}
+            options={isDemoVisitor ? DEMO_VISITOR_MENU_OPTIONS : USER_MENU_OPTIONS}
             onChange={(action) => {
               if (action === 'logout') {
                 logout();
+              } else if (action === 'signin') {
+                requestSignIn();
               } else {
                 // Non-admins have no General tab; Settings lands them on Accounts
                 setSettingsIntent({

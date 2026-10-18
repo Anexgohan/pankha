@@ -5,6 +5,8 @@ import { hashPassword, verifyPassword } from '../auth/passwords';
 import { signSession } from '../auth/session';
 import { isDemoMode } from '../utils/mode';
 import {
+  DEMO_SESSION,
+  isDemoVisitor,
   VALID_ROLES,
   usersExist,
   reloadUserCache,
@@ -259,12 +261,13 @@ router.get('/me', async (req: Request, res: Response) => {
       auth_reset_active: isAuthResetActive(),
     });
   }
-  // Demo instances (PANKHA_MODE=demo) render a read-only viewer view.
+  // Demo instances (PANKHA_MODE=demo): visitors get the full app, demo locks apply
   if (isDemoMode()) {
     return res.json({
       authenticated: true,
-      username: 'demo',
-      role: 'viewer',
+      username: DEMO_SESSION.username,
+      role: DEMO_SESSION.role,
+      demo_visitor: true,
       auth_reset_active: isAuthResetActive(),
     });
   }
@@ -320,7 +323,13 @@ router.put('/password', async (req: Request, res: Response) => {
 /**
  * GET /api/auth/users (admin)
  */
-router.get('/users', async (_req: Request, res: Response) => {
+router.get('/users', async (req: Request, res: Response) => {
+  // Demo visitors see only their own row, never the Hub's real accounts
+  if (isDemoVisitor(req.session)) {
+    return res.json([
+      { id: DEMO_SESSION.userId, username: DEMO_SESSION.username, role: DEMO_SESSION.role },
+    ]);
+  }
   try {
     const db = Database.getInstance();
     const users = await db.all(

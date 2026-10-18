@@ -5,10 +5,11 @@ import { useAuth } from '../contexts/AuthContext';
 
 /**
  * Sign-in screen, with an optional create-account mode when the admin has
- * enabled self-registration. Shown whenever no session exists.
+ * enabled self-registration. Shown whenever no session exists, or when a
+ * demo mode visitor picks Sign in.
  */
 const LoginPage: React.FC = () => {
-  const { login, registerAccount, registrationEnabled } = useAuth();
+  const { login, registerAccount, registrationEnabled, isDemoVisitor, cancelSignIn } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -135,6 +136,11 @@ const LoginPage: React.FC = () => {
         {mode === 'register' && (
           <div className="auth-alt">
             Already have an account? <a onClick={() => switchMode('login')}>Sign in</a>
+          </div>
+        )}
+        {isDemoVisitor && (
+          <div className="auth-alt">
+            <a onClick={cancelSignIn}>Back</a>
           </div>
         )}
       </form>

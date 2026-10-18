@@ -13,6 +13,7 @@ import { PoolClient } from "pg";
 import { reorderRows } from "../utils/reorder";
 import { log, logger } from "../utils/logger";
 import { createDemoLockResponse, isDemoMode } from "../utils/mode";
+import { isDemoVisitor } from "../middleware/auth";
 import {
   validFanSteps,
   validHysteresis,
@@ -410,7 +411,8 @@ router.get("/pending", (_req: Request, res: Response) => {
 // POST /api/systems/pending/:agentId/approve - Admit a pending agent
 router.post("/pending/:agentId/approve", async (req: Request, res: Response) => {
   try {
-    if (isDemoMode()) {
+    // Locked for demo visitors; a signed-in admin can still admit agents
+    if (isDemoVisitor(req.session)) {
       return res.json(createDemoLockResponse("Agent approval is locked in demo"));
     }
     const result = await WebSocketHub.getInstance().approvePendingAgent(
@@ -429,7 +431,7 @@ router.post("/pending/:agentId/approve", async (req: Request, res: Response) => 
 // DELETE /api/systems/pending/:agentId - Dismiss a pending agent (not a ban;
 // it reappears on its next reconnect unless uninstalled on the machine)
 router.delete("/pending/:agentId", (req: Request, res: Response) => {
-  if (isDemoMode()) {
+  if (isDemoVisitor(req.session)) {
     return res.json(createDemoLockResponse("Agent dismissal is locked in demo"));
   }
   const result = WebSocketHub.getInstance().dismissPendingAgent(
