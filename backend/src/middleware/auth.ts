@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import Database from '../database/database';
 import { log } from '../utils/logger';
-import { isDemoMode } from '../utils/mode';
+import { createDemoLockResponse, isDemoMode } from '../utils/mode';
 import {
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
@@ -73,15 +73,45 @@ const ACCESS_RULES: Array<{ pattern: RegExp; access: AccessClass }> = [
   { pattern: /^POST \/license\/(sync|renew|cancel|checkout)$/, access: 'admin' },
 ];
 
-function classify(method: string, path: string): AccessClass {
-  // Strip trailing slashes: Express routes "/foo/" to the "/foo" handler, so
-  // a rule must not be dodged by a slash that drops the path to the default.
+// Express routes "/foo/" and "/FOO" to the "/foo" handler, so trailing
+// slashes and case must not dodge a rule and drop the path to the default.
+function routeKey(method: string, path: string): string {
   const normalized = path.length > 1 ? path.replace(/\/+$/, '') : path;
-  const key = `${method} ${normalized}`;
+  return `${method} ${normalized.toLowerCase()}`;
+}
+
+function classify(method: string, path: string): AccessClass {
+  const key = routeKey(method, path);
   for (const rule of ACCESS_RULES) {
     if (rule.pattern.test(key)) return rule.access;
   }
   return method === 'GET' ? 'viewer' : 'operator';
+}
+
+// Demo visitors (PANKHA_MODE=demo, no session) get the full app; the demo
+// locks decide what they cannot change.
+const DEMO_USER_ID = -1;
+export const DEMO_SESSION: SessionUser = { userId: DEMO_USER_ID, username: 'demo', role: 'admin' };
+
+export function isDemoVisitor(session: SessionUser | undefined): boolean {
+  return session?.userId === DEMO_USER_ID;
+}
+
+// Sign in/out stays open; every other account or subscription change is locked.
+const DEMO_LOCK_RULES: Array<{ pattern: RegExp; message: string }> = [
+  {
+    pattern: /^(POST|PUT|PATCH|DELETE) \/auth\/(?!(login|logout)$)/,
+    message: 'Account changes are locked in demo',
+  },
+  {
+    pattern: /^(POST|PUT|PATCH|DELETE) \/license(\/|$)/,
+    message: 'Subscription changes are locked in demo',
+  },
+];
+
+function demoLockMessage(method: string, path: string): string | null {
+  const key = routeKey(method, path);
+  return DEMO_LOCK_RULES.find((rule) => rule.pattern.test(key))?.message ?? null;
 }
 
 // Live user cache: userId -> role. The session JWT carries the role name,
@@ -201,15 +231,23 @@ export async function apiAuthGuard(
     }
   }
 
+  // Checked before the public early-return: setup and register are public
+  const demoVisitor = !req.session && isDemoMode();
+  if (demoVisitor) {
+    const lockMessage = demoLockMessage(req.method, req.path);
+    if (lockMessage) {
+      return res.json(createDemoLockResponse(lockMessage));
+    }
+  }
+
   const access = classify(req.method, req.path);
   if (access === 'public' || access === 'deploy-token' || access === 'agent-token') {
     // deploy-token and agent-token routes validate their own credentials
     return next();
   }
 
-  // Demo instances (PANKHA_MODE=demo) render a read-only viewer view.
-  if (!req.session && isDemoMode()) {
-    req.session = { userId: -1, username: 'demo', role: 'viewer' };
+  if (demoVisitor) {
+    req.session = { ...DEMO_SESSION };
   }
 
   if (!req.session) {

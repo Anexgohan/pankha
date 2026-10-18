@@ -15,7 +15,11 @@ interface AuthContextValue {
   role: Role | null;
   registrationEnabled: boolean;
   authResetActive: boolean;
+  // Demo mode visitor without a session: full app, demo locks apply
+  isDemoVisitor: boolean;
   can: (minRole: Role) => boolean;
+  requestSignIn: () => void;
+  cancelSignIn: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   setupAdmin: (username: string, password: string) => Promise<void>;
@@ -31,16 +35,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<Role | null>(null);
   const [registrationEnabled, setRegistrationEnabled] = useState(false);
   const [authResetActive, setAuthResetActive] = useState(false);
+  const [isDemoVisitor, setIsDemoVisitor] = useState(false);
 
   const applyMe = useCallback((me: AuthMe) => {
     setAuthResetActive(me.auth_reset_active === true);
     if (me.authenticated && me.username && me.role) {
       setUsername(me.username);
       setRole(me.role);
+      setIsDemoVisitor(me.demo_visitor === true);
       setStatus('ready');
     } else {
       setUsername(null);
       setRole(null);
+      setIsDemoVisitor(false);
       setRegistrationEnabled(me.registration_enabled === true);
       setStatus(me.setup_required ? 'setup' : 'login');
     }
@@ -67,8 +74,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const result = await authApi.login(user, password);
     setUsername(result.username);
     setRole(result.role);
+    setIsDemoVisitor(false);
     setStatus('ready');
   }, []);
+
+  // Demo visitors reach the sign-in screen on request; cancel returns them
+  const requestSignIn = useCallback(() => setStatus('login'), []);
+  const cancelSignIn = refresh;
 
   const logout = useCallback(async () => {
     try {
@@ -105,7 +117,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role,
         registrationEnabled,
         authResetActive,
+        isDemoVisitor,
         can,
+        requestSignIn,
+        cancelSignIn,
         login,
         logout,
         setupAdmin,

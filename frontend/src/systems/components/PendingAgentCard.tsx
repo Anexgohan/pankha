@@ -33,7 +33,12 @@ const PendingAgentCard: React.FC<PendingAgentCardProps> = ({ agent }) => {
   const handleApprove = async () => {
     setBusy(true);
     try {
-      await approvePendingAgent(agent.agentId);
+      const result = await approvePendingAgent(agent.agentId);
+      if (result.locked) {
+        toast.warning(result.message || 'Agent approval is locked in demo');
+        setBusy(false);
+        return;
+      }
       toast.success(`${agent.name} approved`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Approval failed');
@@ -44,7 +49,12 @@ const PendingAgentCard: React.FC<PendingAgentCardProps> = ({ agent }) => {
   const handleDismiss = async () => {
     setBusy(true);
     try {
-      await dismissPendingAgent(agent.agentId);
+      const result = await dismissPendingAgent(agent.agentId);
+      if (result.locked) {
+        toast.warning(result.message || 'Agent dismissal is locked in demo');
+        setBusy(false);
+        return;
+      }
       toast.success(`${agent.name} dismissed - it may reappear when the agent reconnects`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Dismissal failed');

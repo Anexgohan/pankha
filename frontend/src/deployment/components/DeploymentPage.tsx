@@ -339,7 +339,11 @@ export const DeploymentPage: React.FC<DeploymentPageProps> = ({
   // for old builds the hub chains the update, so no second click needed
   const handleApprovePending = async (agentId: string) => {
     try {
-      await approvePendingAgent(agentId);
+      const result = await approvePendingAgent(agentId);
+      if (result.locked) {
+        toast.warning(result.message || 'Agent approval is locked in demo');
+        return;
+      }
       toast.success('Agent approved');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Approval failed');

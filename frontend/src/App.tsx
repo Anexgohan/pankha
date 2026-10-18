@@ -14,7 +14,7 @@ import { Loader2 } from 'lucide-react';
 // Session gate: setup screen on a fresh Hub, login without a session,
 // the dashboard once authenticated.
 function AuthGate() {
-  const { status } = useAuth();
+  const { status, username } = useAuth();
 
   if (status === 'loading') {
     return (
@@ -26,8 +26,10 @@ function AuthGate() {
   if (status === 'setup') return <SetupPage />;
   if (status === 'login') return <LoginPage />;
 
+  // Keyed by user: demo mode logout goes straight back to the dashboard,
+  // which must reconnect under the new identity
   return (
-    <LicenseProvider>
+    <LicenseProvider key={username ?? ''}>
       <DashboardSettingsProvider>
         <VisibilityProvider>
           <GraphPatternDefs />

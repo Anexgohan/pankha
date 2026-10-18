@@ -12,6 +12,7 @@ import Database from "../database/database";
 import type { AggregatedSystemData } from "../types/aggregatedData";
 import { licenseManager } from "../license";
 import { log } from "../utils/logger";
+import { isDemoMode } from "../utils/mode";
 import { SESSION_COOKIE, parseCookieHeader, verifySession } from "../auth/session";
 import { mintAgentToken, hashAgentToken, verifyAgentToken } from "../auth/tokens";
 import { isValidDeployToken } from "../auth/enrollment";
@@ -47,6 +48,9 @@ interface ClientConnection {
     // isFrontend is granted by a valid session cookie at upgrade, isAgent by
     // an authenticated register message. Neither = no data flows.
     isFrontend?: boolean;
+    // Demo mode: cookieless connections start as dashboard viewers and drop
+    // this on agent registration
+    demoViewer?: boolean;
     username?: string;
   };
 }
@@ -334,12 +338,14 @@ export class WebSocketHub extends EventEmitter {
     // Classification is credential-based: a valid session cookie on the
     // upgrade request marks a frontend connection; agents earn isAgent via an
     // authenticated register message. Unclassified connections receive
-    // nothing and may only register or ping.
+    // nothing and may only register or ping. Demo mode treats cookieless
+    // connections as dashboard viewers until they register.
     const cookies = parseCookieHeader(request.headers.cookie);
     const session = cookies[SESSION_COOKIE]
       ? await verifySession(cookies[SESSION_COOKIE])
       : null;
-    const isFrontend = !!session;
+    const demoViewer = !session && isDemoMode();
+    const isFrontend = !!session || demoViewer;
 
     // Get real IP address (handles nginx proxy and IPv6-mapped IPv4)
     const realIp = this.extractRealIp(request);
@@ -355,7 +361,8 @@ export class WebSocketHub extends EventEmitter {
         connectedAt: new Date(),
         isAgent: false,
         isFrontend,
-        username: session?.user.username,
+        demoViewer,
+        username: session ? session.user.username : demoViewer ? "demo" : undefined,
       },
     };
 
@@ -368,7 +375,7 @@ export class WebSocketHub extends EventEmitter {
       );
     } else {
       log.info(
-        ` New FRONTEND WebSocket connected: ${clientId} (${client.metadata.ip}, user: ${session!.user.username})`,
+        ` New FRONTEND WebSocket connected: ${clientId} (${client.metadata.ip}, user: ${client.metadata.username})`,
         "WebSocketHub"
       );
 
@@ -737,11 +744,16 @@ export class WebSocketHub extends EventEmitter {
       const agentId = registrationData.agentId;
       const client = this.clients.get(clientId);
 
-      if (client?.metadata.isFrontend) {
+      if (client?.metadata.isFrontend && !client.metadata.demoViewer) {
         this.sendToClient(clientId, "registrationError", {
           error: "Frontend connections cannot register as agents",
         });
         return;
+      }
+      if (client?.metadata.demoViewer) {
+        client.metadata.isFrontend = false;
+        client.metadata.demoViewer = false;
+        client.metadata.username = undefined;
       }
 
       // Credential decision tree (single door):
